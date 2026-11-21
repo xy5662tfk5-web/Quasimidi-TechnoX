@@ -193,3 +193,26 @@ The helpers reached from `0x4256` have now been classified at the level supporte
 - `0x695A` reads per-slot mode `XDATA[0x7C00 + 0x18*eventID + 0x19]` and chooses a translated value using table `0x72DA` and event/selector fields. This feeds the descriptor path.
 
 These helpers manipulate and translate structured per-slot state. The descriptor transaction `0x1494` remains the first confirmed boundary where a 13-byte record is consumed and a hardware-facing exchange sequence may begin. The exact physical target of the XDATA page `0x35` and the `0x7Cxx` windows remains unidentified without a board schematic or trace.
+
+## 18. 0x1494 -> 0x16C3: concrete four-register exchange sequence
+
+The descriptor path has a much more specific endpoint than a generic "DSP write". After the descriptor is decoded and its slot/page selected, `0x16C3` performs a byte-level exchange through the selected XDATA page using indirect offsets:
+
+| Offset | Operation in 0x16C3 | Confirmed meaning |
+|---|---|---|
+| `FB` | Read old status; write `0x80` or `0xC0` when flag E7 is set; otherwise write `0` | Status/command handshake byte |
+| `FC` | Write high nibble of `RAM[0x28]` | Mode/command field |
+| `FE` | Write low byte of pointer `RAM[0x3C]` | Descriptor/data pointer low |
+| `FF` | Write high byte of pointer `RAM[0x3D]` | Descriptor/data pointer high |
+
+Before the exchange, `RAM[0x36:0x37]` is incremented by two. The pointer is also written to selected-page offsets `0x61–0x62`, then `0x189D` is called to read a descriptor/record from page `0x28` and the selected XDATA pointer. After that, the routine samples status at `FD`, updates flags E0–E2 from the returned byte, clears E7/E6 and writes the final value back to `FD`.
+
+This establishes a mailbox-like register protocol with status, mode, and 16-bit pointer fields. It does **not** identify the physical chip or prove that these are audio sample/voice registers. The selected XDATA page is derived from `RAM[0x2D]`; the hardware address decode is still unknown.
+
+## 19. What 0x189D actually stages
+
+`0x189D` reads four fields from page `0x28` at offsets based on `0x2868 + RAM[0x28]*0x80`: offsets `0x00`, `0x10`, `0x20`, and `0x40` go to internal RAM `0x41`, `0x43`, `R3`, and `R4`. It then reads a variable record from the 16-bit pointer in `RAM[0x36:0x37]`, copying fields into `RAM[0x38–0x3B]` while updating internal flags B5/B4/B1. The routine therefore stages a structured record and its mode fields; it is not a PCM decoder.
+
+## 20. Critical consequence for the emulator
+
+The firmware evidence currently supports implementing the host-side transaction/mailbox protocol and descriptor staging, but not the audio chip's internal synthesis algorithm. Keep the existing oscillator backend explicitly marked as a test sound source. Do not label it as the original TechnoX/M.A.S.S. engine until the peripheral identity, command semantics, sample/voice memory map, and waveform decoding are established.
