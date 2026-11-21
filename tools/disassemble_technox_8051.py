@@ -197,13 +197,37 @@ def main() -> None:
     lines += [f"0x{x:04X}" for x in sorted(branches)]
     # Identify decoded MOVX sites and nearby statically visible DPTR immediates.
     lines += ["", "EXTERNAL DATA ACCESS INSTRUCTIONS (MOVX)"]
-    for pc in sorted(insns):
-        if code[pc] in (0xE0, 0xF0, 0xE2, 0xE3, 0xF2, 0xF3):
+    movx_ops = (0xE0, 0xF0, 0xE2, 0xE3, 0xF2, 0xF3)
+    ordered = sorted(insns)
+    dptr_constants = {}
+    for pc in ordered:
+        if code[pc] == 0x90:
+            value = (code[pc + 1] << 8) | code[pc + 2]
+            dptr_constants[value] = dptr_constants.get(value, 0) + 1
+        if code[pc] in movx_ops:
             lines.append(f"0x{pc:04X}: {insns[pc].text}")
+    lines += ["", "REACHABLE MOV DPTR,# CONSTANTS (static immediate operands)"]
+    for value, count in sorted(dptr_constants.items(), key=lambda item: (-item[1], item[0])):
+        lines.append(f"0x{value:04X}: {count} occurrence(s)")
+    # Lexical-neighborhood hints only: these are NOT proven register dataflow.
+    lines += ["", "MOVX NEARBY DPTR-IMMEDIATE HINTS (heuristic, not proof)"]
+    for index, pc in enumerate(ordered):
+        if code[pc] not in movx_ops:
+            continue
+        nearby = None
+        for prev in reversed(ordered[max(0, index - 8):index]):
+            if code[prev] == 0x90:
+                nearby = (code[prev + 1] << 8) | code[prev + 2]
+                break
+        if nearby is not None:
+            lines.append(f"0x{pc:04X}: {insns[pc].text}; nearest prior MOV DPTR,# 0x{nearby:04X}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Disassembly: {len(insns)} instructions; {len(calls)} direct calls; {len(branches)} branch targets")
-    print(f"MOVX sites: {sum(1 for pc in insns if code[pc] in (0xE0,0xF0,0xE2,0xE3,0xF2,0xF3))}")
+    movx_count = sum(1 for pc in insns if code[pc] in movx_ops)
+    print(f"MOVX sites: {movx_count}")
+    print("Reachable MOV DPTR,# constants: " + ", ".join(f"0x{x:04X}" for x in sorted(dptr_constants)))
+    print(f"Direct DPTR setup for ACIA 0xA000: {dptr_constants.get(0xA000, 0)}; LCD 0xB000: {dptr_constants.get(0xB000, 0)}")
     print(f"Listing written: {args.output}")
 
 
