@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "TechnoXPartModel.h"
 #include <algorithm>
 #include <atomic>
 #include <array>
@@ -20,6 +21,11 @@ struct Performance {
     OpaqueSysExBlock nameBlock;
     OpaqueSysExBlock commonBlock;
     std::array<OpaqueSysExBlock, 4> parts;
+
+    PartEditModel makePartEditModel(std::size_t partIndex) const {
+        if (partIndex >= parts.size()) return {};
+        return PartEditModel(parts[partIndex].completeMessage);
+    }
 };
 
 // Parses the embedded Standard MIDI File and retains complete original SysEx frames.
