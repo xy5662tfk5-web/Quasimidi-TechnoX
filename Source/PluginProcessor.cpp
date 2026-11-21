@@ -126,19 +126,30 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 {
     juce::ScopedNoDenormals noDenormals;
     const int performanceIndex = getCurrentProgram();
+    const bool omniPerformance = getMidiRoutingMode() == MidiRoutingMode::performanceOmni;
 
-    // MIDI controller decoding is bounded and allocation-free. The audio path
-    // only publishes parameter values atomically; the editor reads the same state.
     for (const auto metadata : midiMessages) {
         const auto& message = metadata.getMessage();
-        const int slot = partSlotForMidiChannel(message.getChannel());
-        if (slot < 0 || performanceIndex < 0 || performanceIndex >= 50)
-            continue;
+        std::array<int, 4> targetSlots{};
+        int targetCount = 0;
+        if (omniPerformance) {
+            for (int slot = 0; slot < 4; ++slot)
+                if (isPerformancePartActive(slot))
+                    targetSlots[static_cast<std::size_t>(targetCount++)] = slot;
+        } else {
+            const int slot = partSlotForMidiChannel(message.getChannel());
+            if (slot >= 0)
+                targetSlots[static_cast<std::size_t>(targetCount++)] = slot;
+        }
 
         if (message.isNoteOn()) {
-            massEngine.noteOn(static_cast<std::uint8_t>(12 + slot), static_cast<std::uint8_t>(message.getChannel()),
-                              static_cast<std::uint8_t>(message.getNoteNumber()),
-                              static_cast<std::uint8_t>(message.getVelocity()));
+            for (int i = 0; i < targetCount; ++i) {
+                const int slot = targetSlots[static_cast<std::size_t>(i)];
+                massEngine.noteOn(static_cast<std::uint8_t>(12 + slot),
+                                  static_cast<std::uint8_t>(message.getChannel()),
+                                  static_cast<std::uint8_t>(message.getNoteNumber()),
+                                  static_cast<std::uint8_t>(message.getVelocity()));
+            }
         } else if (message.isNoteOff()) {
             massEngine.noteOff(static_cast<std::uint8_t>(message.getChannel()),
                                static_cast<std::uint8_t>(message.getNoteNumber()));
@@ -147,40 +158,55 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isAllNotesOff()) {
             massEngine.allNotesOff(message.getChannel());
         } else if (message.isController()) {
-            const auto change = midiControlRouter.handleControlChange(
-                message.getChannel(), message.getControllerNumber(), message.getControllerValue());
-            if (message.getControllerNumber() == 6) {
-                const auto drum = midiControlRouter.decodeDrumNrpnDataEntry(
-                    message.getChannel(), message.getControllerValue());
-                if (drum.has_value())
-                    massEngine.setDrumParameter(12 + slot, drum->keyNumber,
-                                                drum->parameterIndex, drum->rawValue);
-                const auto rpn = midiControlRouter.decodeRpnDataEntry(
-                    message.getChannel(), message.getControllerValue());
-                if (rpn.has_value())
-                    massEngine.setRpn(12 + slot, rpn->parameterIndex, rpn->rawValue);
+            const int controller = message.getControllerNumber();
+            const int value = message.getControllerValue();
+
+            // Common Performance CCs are independent of the currently active layer count.
+            if (controller == 80)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx1Type, value);
+            else if (controller == 81)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx2Type, value);
+            else if (controller == 82)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpResolution, value);
+            else if (controller == 83)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpSpeed, value);
+
+            const auto partChange = midiControlRouter.handleControlChange(
+                message.getChannel(), controller, value);
+            const auto drumChange = controller == 6
+                ? midiControlRouter.decodeDrumNrpnDataEntry(message.getChannel(), value)
+                : std::optional<technox::MidiControlRouter::DrumParameterChange>{};
+            const auto rpnChange = controller == 6
+                ? midiControlRouter.decodeRpnDataEntry(message.getChannel(), value)
+                : std::optional<technox::MidiControlRouter::RpnParameterChange>{};
+
+            for (int i = 0; i < targetCount; ++i) {
+                const int slot = targetSlots[static_cast<std::size_t>(i)];
+                const int enginePart = 12 + slot;
+                if (partChange.has_value())
+                    setPartParameterRaw(performanceIndex, slot, partChange->parameter, partChange->rawValue);
+
+                if (controller == 1)
+                    massEngine.setModWheel(enginePart, value);
+                else if (controller == 65)
+                    massEngine.setPortamento(enginePart, value >= 64);
+                else if (controller == 67)
+                    massEngine.setSoftPedal(enginePart, value >= 64);
+                else if (controller == 121)
+                    massEngine.resetPartControllers(enginePart);
+
+                if (drumChange.has_value())
+                    massEngine.setDrumParameter(enginePart, drumChange->keyNumber,
+                                                drumChange->parameterIndex, drumChange->rawValue);
+                if (rpnChange.has_value())
+                    massEngine.setRpn(enginePart, rpnChange->parameterIndex, rpnChange->rawValue);
             }
-            if (message.getControllerNumber() == 80)
-                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx1Type, message.getControllerValue());
-            else if (message.getControllerNumber() == 81)
-                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx2Type, message.getControllerValue());
-            else if (message.getControllerNumber() == 82)
-                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpResolution, message.getControllerValue());
-            else if (message.getControllerNumber() == 83)
-                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpSpeed, message.getControllerValue());
-            else if (message.getControllerNumber() == 1)
-                massEngine.setModWheel(12 + slot, message.getControllerValue());
-            else if (message.getControllerNumber() == 65)
-                massEngine.setPortamento(12 + slot, message.getControllerValue() >= 64);
-            else if (message.getControllerNumber() == 67)
-                massEngine.setSoftPedal(12 + slot, message.getControllerValue() >= 64);
-            else if (message.getControllerNumber() == 121)
-                massEngine.resetPartControllers(12 + slot);
-            if (change.has_value())
-                setPartParameterRaw(performanceIndex, slot, change->parameter, change->rawValue);
-        } else if (message.isProgramChange()) {
-            setPartParameterRaw(performanceIndex, slot, technox::PartParameter::soundNumber,
-                                message.getProgramChangeNumber());
+        } else if (message.isProgramChange() && !omniPerformance) {
+            for (int i = 0; i < targetCount; ++i) {
+                const int slot = targetSlots[static_cast<std::size_t>(i)];
+                setPartParameterRaw(performanceIndex, slot, technox::PartParameter::soundNumber,
+                                    message.getProgramChangeNumber());
+            }
         }
     }
 
