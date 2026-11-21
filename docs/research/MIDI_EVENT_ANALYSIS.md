@@ -241,3 +241,15 @@ The transaction is invoked from multiple subsystems (`0x02C0`, `0x0A4F`, `0x0B53
 - Not confirmed: the semantics of the four command bytes. The call sites use different values, so the next step is to classify call-site tuples and correlate them with the selected slot, descriptor pointer, and status returned by register 2.
 
 This fixed `0x8000–0x8003` window is distinct from the variable page-`0x7Cxx` parameter records and from the page-selected `FB/FC/FE/FF` mailbox sequence at `0x16C3`. Treating all three as one DSP register map would be incorrect.
+
+## 22. 0x8000 command call-site classification
+
+Call-site inspection separates the fixed-window writes into three families:
+
+1. **Slot/page-derived commands** (`0x0A4F`, `0x0B53`, `0x0D07`): callers compute a 24-bit-ish value from a per-slot record, split it into `R2:R3:R4`, use `RAM[0x2B]` as `R5`, and write the four-byte tuple. The low three bits of the final byte are retained; flag E7 may be set to signal a state transition.
+2. **Queue/descriptor scan commands** (`0x1045`, `0x110A`): callers scan a page/slot list and issue tuples with `R3=1`, `R2=0x80` or a computed mask, and a selector in `R5`. These appear to update or acknowledge entries, but the target's semantic role remains unconfirmed.
+3. **Bulk initialization/script commands** (`0x26C9`, `0x26DE`, `0x2767`, `0x277E`): callers fetch successive 3-byte records using `MOVC`, transform the bytes, and issue repeated four-byte writes. The routine at `0x26A2` temporarily writes `0x00` to SFR `0xA8`, selects P2=`0x80`, and starts reading code memory from DPTR=`0x0000`. Because the static disassembly does not resolve the apparent bank/overlay behavior at this point, these bytes must not yet be interpreted as ordinary command-table values. This is a high-priority banked-ROM/boot-script investigation.
+
+### Strong conclusion
+
+The fixed `0x8000–0x8003` block is a shared command/data port used by initialization, slot/descriptor processing, and state synchronization. It is not merely the MIDI note trigger. The values sent are structured tuples, while register 3 carries the E7 handshake state. The physical peripheral and command meanings are still unknown.
