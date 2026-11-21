@@ -897,3 +897,24 @@ At 0x26A2 the routine:
 - restores the saved interrupt-enable SFR with POP 0xA8 and returns.
 
 This context strongly classifies the 256 x 6-byte operation as a boot/system-initialization hardware test, rather than a normal per-note or per-voice update. It validates an external indexed memory/register interface before the rest of initialization proceeds. The exact physical device remains unidentified.
+
+
+## 26. A second 0x8000 transaction path performs indexed read/modify/write
+
+The path at 0x0B3F–0x0BCD branches on bit 2 of the current record-control byte XDATA[RAM[0x2E]]:
+
+- If bit 2 is clear, it emits a normal four-byte packet through 0x0DB7 with R5=RAM[0x2B] and the caller-prepared R2/R3/R4 values.
+- If bit 2 is set, it enters 0x0B5C and performs a direct read/modify/write transaction against the 0x8000 window.
+
+The 0x0B5C path is:
+
+1. Select A0=0x80.
+2. Compare internal bit 0x0D (requested phase) with bit 0x0C (remembered phase). If they differ, update bit 0x0C and write 0x40 or 0xC0 to XDATA offset 3. It then reads offset 4; the returned value is not retained by this routine.
+3. Write RAM[0x2B]-1 to XDATA offset 0, then read offsets 2 and 3.
+4. Form the two's-complement of the existing offset-2 / low-three-bits-of-offset-3 value, add the caller's R3/R4 value, and constrain the result. This is an arithmetic read/modify step, not a blind packet copy.
+5. Write RAM[0x2B] to offset 0, then write a newly encoded value to offset 1, transformed R3 to offset 2, and transformed R4 to offset 3. R4.7 is conditionally set from internal bit 0x0D; ACC.6 is cleared before the final write.
+6. Restore A0=RAM[0x2D].
+
+This establishes a second, stateful transaction style on the same external window: the firmware can select one index, read existing data, compute a delta, and write a transformed value under the next index. The use of RAM[0x2B]-1 for the read phase and RAM[0x2B] for the write phase is explicit in the instruction stream.
+
+The relationship between this indexed delta update and the 256 x 6-byte boot diagnostic is now a key target. Both use the same XDATA offsets 0–4 and phase-control bits, but the semantic meaning of the indexed values (voice, Part, parameter, or another hardware resource) remains unassigned until this path is connected to its callers and the 0x7Cxx record fields.
