@@ -11,6 +11,10 @@ int main() {
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
     assert(!engine.setModWheel(16, 127));
+    assert(engine.setPortamento(12, true) && engine.portamento(12));
+    assert(engine.setSoftPedal(12, true) && engine.softPedal(12));
+    engine.resetPartControllers(12);
+    assert(!engine.portamento(12) && !engine.softPedal(12) && engine.getModWheel(12) == 0);
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
     engine.noteOff(1, 48);
@@ -20,6 +24,8 @@ int main() {
     assert(releasing);
     const int stolen = engine.voiceManager().noteOn(1, 2, 72, 110);
     assert(stolen >= 0 && engine.voiceManager().activeVoiceCount() == 21);
+    engine.allSoundsOff(1);
+    assert(engine.voiceManager().activeVoiceCount() == 1);
     auto& matrix = engine.modulationMatrix();
     assert(!matrix.setRoute(16, ModSource::modWheel, ModDestination::cutoff, 0.5f));
     assert(matrix.setRoute(0, ModSource::modWheel, ModDestination::cutoff, 0.5f));
