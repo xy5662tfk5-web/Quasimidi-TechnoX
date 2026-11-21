@@ -15,8 +15,7 @@ namespace technox::firmware {
 struct MailboxWrite {
     static constexpr std::uint16_t kBaseAddress = 0x8000;
     std::array<std::uint8_t, 4> bytes{};
-    // Firmware clears internal bit 0x0C, then sets it iff outgoing byte 3
-    // (R4 after ACC.6 is cleared) has bit 7 set.
+    // Firmware clears internal bit 0x0C, then sets it iff the separate E7 flag is set.
     bool setInternalFlag0C = false;
 };
 
@@ -84,9 +83,8 @@ inline MailboxScanResult scanMailboxEntries(const XDataMemory& memory,
 
         result.visitedOffsets[result.visitedCount++] = static_cast<std::uint8_t>(offset);
         if ((value & kMailboxEntryMarkerMask) == kMailboxEntryMarker) {
-            const auto r4 = static_cast<std::uint8_t>(flag0D ? 0x80 : 0x00);
             result.writes[result.writeCount++] = makeMailboxWrite(
-                result.nextSequence, 0x80, 0x01, r4, flag0D);
+                result.nextSequence, 0x80, 0x01, 0x00, flag0D);
         }
         result.nextSequence = static_cast<std::uint8_t>(result.nextSequence + 1);
     }
