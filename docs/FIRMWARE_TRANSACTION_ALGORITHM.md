@@ -835,3 +835,48 @@ The companion sequence therefore uses the fourth packet byte's bit 7 as a phase/
 This is substantially stronger evidence for a stateful external protocol than a bare four-byte memory write. It suggests a toggle/phase-controlled interface with a control strobe at offset 3 and a status read at offset 4. It still does not prove whether the receiving device is a sound generator, a register bridge, or another controller; nor does it establish that the offset-4 read is an acknowledgement without board/bus evidence.
 
 The direct reachable call sites to 0x0DCE are 0x0E08, 0x10F0, 0x26FD, 0x271C, 0x279D, and 0x27BF. The exact complete caller set should be regenerated after the next CFG pass; this list is not treated as exhaustive.
+
+
+## 24. The 0x26AA–0x27xx path is a 256-index, six-byte-per-index write/readback test
+
+The code around 0x26AA provides the clearest explanation yet for the 0x8000 protocol. It selects A0=0x80, calls 0x0E21 to establish the control state, sets DPTR=0 (code-memory source), and initializes R5=0 as the external index.
+
+### 24.1 Normal-pattern write pass
+
+For each R5 value, the routine reads six consecutive bytes from code memory with MOVC and emits two packets through 0x0DB7:
+
+- phase 0 packet: [R5, code[DPTR+0], code[DPTR+1], code[DPTR+2] & 0x07]
+- phase 1 packet: [R5, code[DPTR+3], code[DPTR+4], 0x80 | (code[DPTR+5] & 0x07)]
+
+DPTR advances by six bytes per R5 index. R5 is decremented after each pair, starting at 0x00 and wrapping through 0xFF, 0xFE, ... 0x01. DJNZ therefore visits all 256 possible index values exactly once. The source span is 256 * 6 = 1536 bytes (code addresses 0x0000–0x05FF).
+
+### 24.2 Normal-pattern readback verification
+
+The next pass resets DPTR=0 and reads the same two phases through 0x0DCE for each R5 index. Returned R2/R3/R4 values are compared against the corresponding three code-memory bytes; the third byte is compared only in its low three bits because the high bit is used as the phase selector.
+
+Each mismatch branches to a JNZ instruction that jumps to itself, permanently trapping the firmware at that check. The routine therefore treats a readback mismatch as a fatal test failure, not as a retry/poll loop.
+
+### 24.3 Complement-pattern write and readback
+
+The following pass repeats the same 256-index / six-byte pattern with every source byte complemented before transmission. It then performs the matching readback comparison against the complemented code-memory bytes.
+
+For the first six source bytes, the normal pattern is:
+[02, EB, 32, FF, FF, FF]
+
+The complement pattern is:
+[FD, 14, CD, 00, 00, 00]
+
+The low three bits of each third byte are the data portion; bit 7 distinguishes the two phases. The routine's repeated structure applies this to the full 1536-byte span, not just the first six bytes.
+
+### 24.4 What this establishes
+
+The firmware implements an indexed external data path with:
+
+- 256 distinct index values in R5;
+- six data bytes per index, transferred as two three-byte phases;
+- phase selection carried in bit 7 of the third byte;
+- a control/strobe interaction at XDATA offset 3 using 0x40/0xC0;
+- readback of offsets 0–4 through 0x0DCE;
+- full write/readback tests using both normal and complemented patterns.
+
+This is strong evidence for a 256 x 6-byte external storage/register space or a hardware interface that emulates one. It is not yet proof that the space is audio-parameter RAM: the code is executing a diagnostic pattern test, and the actual receiver IC and its role still require board-level evidence.
