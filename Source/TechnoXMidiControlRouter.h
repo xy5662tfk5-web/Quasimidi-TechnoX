@@ -72,6 +72,31 @@ public:
         return RpnParameterChange{rpnLsb_[ch], static_cast<std::uint8_t>(value)};
     }
 
+    struct DrumParameterChange {
+        std::uint8_t parameterIndex; // 0 pitch, 1 level, 2 pan, 3 FX1 send, 4 FX2 send
+        std::uint8_t keyNumber;
+        std::uint8_t rawValue;
+    };
+
+    std::optional<DrumParameterChange> decodeDrumNrpnDataEntry(int channel, int value) const noexcept {
+        if (!validChannel(channel) || value < 0 || value > 127)
+            return std::nullopt;
+        const auto ch = static_cast<std::size_t>(channel - 1);
+        std::uint8_t parameter = 0xff;
+        switch (nrpnMsb_[ch]) {
+            case 0x18: parameter = 0; break;
+            case 0x1a: parameter = 1; break;
+            case 0x1c: parameter = 2; break;
+            case 0x1d: parameter = 3; break;
+            case 0x1e: parameter = 4; break;
+            default: return std::nullopt;
+        }
+        constexpr int maxima[5] = {48, 127, 19, 63, 63};
+        if (value > maxima[parameter])
+            return std::nullopt;
+        return DrumParameterChange{parameter, nrpnLsb_[ch], static_cast<std::uint8_t>(value)};
+    }
+
     static std::optional<PartParameterChange> decodePartNrpn(int msb, int lsb, int value) noexcept {
         if (value < 0 || value > 127 || msb < 0 || msb > 127 || lsb < 0 || lsb > 127 || msb != 0x01)
             return std::nullopt;
