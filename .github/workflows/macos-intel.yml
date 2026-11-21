@@ -2,14 +2,15 @@ name: macOS Intel build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/part-editor-midi-mass-foundation ]
   pull_request:
-    branches: [ main, feature/performance-manager ]
+    branches: [ main, feature/performance-manager, research/part-parameter-model-final ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-13
+    timeout-minutes: 60
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Test lossless MIDI/SysEx parser
