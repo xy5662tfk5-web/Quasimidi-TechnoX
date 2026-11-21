@@ -92,4 +92,4 @@ Hardware captures are still useful to validate how the front-panel editor emits 
 - RPN: MSB 0x00 and LSB 0x00/0x01/0x02 for pitch-bend range/fine tune/coarse tune.
 - CC120 is treated as All Sounds Off; CC123 as All Notes Off.
 
-CC124/125 Omni mode are global MIDI-receive modes and are not yet mapped to the Part editor. The DSP backend remains silent; these routes update bounded control state only.
+CC124 (Omni Off) and CC125 (Omni On) switch the plugin between Part Channels and Performance Omni routing. CC126/127 select Mono/Poly Track Mode. The DSP backend remains silent; these routes update bounded control state only.
