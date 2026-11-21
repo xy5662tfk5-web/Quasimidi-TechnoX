@@ -14,7 +14,7 @@ RPN/NRPN selectors (98–101) and Data Entry (6) are represented as MIDI control
 
 ## Part SysEx observations
 
-The supplied bank dump contains 200 Part frames: four 32-byte frames for each of 50 Performances. The empirical frame envelope is:
+The supplied bank dump contains 200 Part frames: four 32-byte frames for each of 50 Performances. The manual-confirmed frame envelope is:
 
 - bytes 0–4: \`F0 3F 00 22 44\`
 - byte 5: Performance address high byte (0x05..0x36, Performance 1–50)
@@ -22,7 +22,7 @@ The supplied bank dump contains 200 Part frames: four 32-byte frames for each of
 - bytes 7–30: 24 Part parameter bytes (offsets 0x00–0x17)
 - byte 31: \`F7\`
 
-The manual supplies the official 24-byte Part parameter map. The four Performance dump blocks are Parts 13–16. The parser retains every complete frame unchanged.
+The manual supplies the official 24-byte Part parameter map. The four Performance dump blocks are Parts 13–16. The parser retains every complete frame unchanged. Source: [Quasimidi TechnoX Owner’s Manual](https://www.deepsonic.ch/deep/docs_manuals/quasimidi_technox_manual.pdf), printed pages 32–38.
 
 
 ## Official Part parameter map (manual, printed page 37)
