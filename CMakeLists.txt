@@ -4,7 +4,7 @@ project(QuasimidiTechnoX VERSION 0.1.0)
 # Configure with -DCMAKE_OSX_ARCHITECTURES=x86_64 for Intel Macs.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS version")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version" FORCE)
 
 include(FetchContent)
 FetchContent_Declare(
