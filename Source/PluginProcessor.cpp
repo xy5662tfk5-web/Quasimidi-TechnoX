@@ -99,6 +99,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isController()) {
             const auto change = midiControlRouter.handleControlChange(
                 message.getChannel(), message.getControllerNumber(), message.getControllerValue());
+            if (message.getControllerNumber() == 1)
+                massEngine.setModWheel(12 + slot, message.getControllerValue());
             if (change.has_value())
                 setPartParameterRaw(performanceIndex, slot, change->parameter, change->rawValue);
         } else if (message.isProgramChange()) {
