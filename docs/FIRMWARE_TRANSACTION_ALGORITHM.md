@@ -1361,3 +1361,25 @@ The routine also calls 0xAC00 with the Part index and note, connecting Note On t
 The 0x7C15 + 24*P table is not merely an arbitrary 16-entry structure: its offsets line up with the manual's documented Part parameters, and the Note On routine reads several of those exact offsets for transpose, velocity-curve mapping, and track-mode selection. The manual and firmware now corroborate one another on this runtime Part-state structure.
 
 The next pass should follow the three descriptor-page variants (P, P+0xC0, P+0xE0) through 0x1494 and the downstream record/transport paths, then correlate the resulting descriptor bytes with the 0x8000–0x8003 transport and the separate 0x7Cxx peripheral state. The receiving hardware and final sample/voice-generation algorithm remain unidentified.
+
+
+## 40. 0x02D1 converts descriptor inputs into a per-Part 16-bit XDATA value
+
+The 0x02D1 routine, called during 16-Part initialization from 0x3ECE, performs a second descriptor-derived calculation:
+
+1. It reads XDATA 0x2054 + RAM[0x28] (one byte per Part).
+2. If that byte is zero, it writes zero to the Part's two-byte output.
+3. Otherwise it takes the source byte's low nibble, shifts it into the high nibble (SWAP A / AND 0xF0), and uses that as a scale factor.
+4. It combines RAM[0x29] and RAM[0x2A] through rotate/subtract and MUL AB operations.
+5. Internal bit 0x03 selects one of two four-byte constant records in IC4 code:
+   - bit 0x03 clear: 0x00C8–0x00CB = 00 00 07 9C
+   - bit 0x03 set: 0x0098–0x009B = 00 00 0E 5E
+6. It performs the fixed-point multiply/add and writes the resulting 16-bit value to XDATA 0x2000 + 3*RAM[0x28], offsets +0 and +1. Offset +2 is not written by this routine.
+
+During 0x3ECE initialization, RAM[0x28] is the Part index, RAM[0x29] comes from event-record offset +2, and RAM[0x2A] is initialized to 0x40 before the call. Thus the per-Part descriptor selector and a fixed 0x40 input feed this conversion.
+
+This establishes a second descriptor-to-Part-state path alongside the 0x0D80 slot update:
+- 0x0D80 derives slot offset +1 and reaches 0x0A57 / 0x0DB7.
+- 0x02D1 derives a 16-bit word at 0x2000 + 3*PartIndex.
+
+The meaning of the 0x2054 scale byte, the two constant records, and the 0x2000 word is still unknown. Treat it as a per-Part fixed-point parameter output, not yet as a named pitch, frequency, envelope, or volume register.
