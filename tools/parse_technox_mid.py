@@ -8,7 +8,7 @@ from typing import List
 
 HEADER = bytes((0xF0, 0x3F, 0x00, 0x22, 0x44))
 EXPECTED_BLOCK_SELECTORS = (0x05, 0x00, 0x01, 0x02, 0x03, 0x04)
-EXPECTED_SIZES = {0x05: 16, 0x00: 73, 0x01: 32, 0x02: 32, 0x03: 32, 0x04: 32}
+EXPECTED_SIZES = {0x05: 17, 0x00: 74, 0x01: 33, 0x02: 33, 0x03: 33, 0x04: 33}
 
 class MidiFormatError(ValueError): pass
 
@@ -114,7 +114,7 @@ def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
             if strict and len(f.raw) != EXPECTED_SIZES[f.block_type]:
                 raise MidiFormatError(f"unexpected size {len(f.raw)} for block {f.block_type:#04x}")
             if any(x > 0x7F for x in f.raw[1:-1]): raise MidiFormatError("non-7-bit data byte in SysEx payload")
-        name = group[0].raw[7:-1].decode("ascii", errors="replace").rstrip(" \x00")
+        name = group[0].raw[8:16].decode("ascii", errors="replace").rstrip(" \x00")
         result.append(Performance(indexes[0], name, group[0].raw, group[1].raw,
                                   [f.raw for f in group[2:6]]))
     if strict:
