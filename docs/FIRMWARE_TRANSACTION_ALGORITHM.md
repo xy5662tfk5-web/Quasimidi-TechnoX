@@ -1752,3 +1752,35 @@ The 0x30 stride is directly visible; the table's semantic record type is not yet
 This helper inspects the current record's first byte at RAM[0x2E] and masks it with 0x41. If neither bit is present, it returns without changing R2. When both bits are set, it initializes a scale accumulator and may map RAM[0x41] and RAM[0x43] through code tables at 0x11E0 and 0x11E8, multiplying the resulting factors into R2. When the record's masked value is not 0x41, internal bit 0x06 selects whether the helper calls 0x1890 using RAM[0x41] or RAM[0x43], returning the mapped value in R2.
 
 The routine therefore applies an optional record-dependent scale/mapping factor to R2. The source fields and lookup tables are confirmed; their user-facing parameter names are not. In the 0x1EDD path it is called after intermediate arithmetic and before the result is committed to the output record.
+
+
+## 54. Consolidated eight-byte endpoint-slot map and proven data provenance
+
+This section consolidates the slot-array evidence from the scanner (0x0849–0x0899), interpolation helper (0x0C59), descriptor resolver (0x0D0E), endpoint updater (0x0D80), and packet service routine (0x0A57). Let S be the base address of one slot; in the 0x0D0E endpoint scan, S = 0x80 + 8*slot_index on the selected XDATA page.
+
+| Offset | Current evidence | Proven producer / consumer | Confidence boundary |
+|---:|---|---|---|
+| +0 | Status/class byte; scanner checks `(S[0] & 0x38) != 0x38`, `(S[0] & 0x38) == 0x10`, and `(S[0] & 0x7A) == 0x12` | 0x0D0E scans and qualifies candidate slots; 0x0A57 reads current slot fields | Status role confirmed; semantic label unknown |
+| +1 | First byte of the three-byte value used by the packet service | 0x0D80 writes it from the mapped descriptor pair and S[+5]; 0x0C59 may update it during interpolation; 0x0A57 consumes it | Dataflow confirmed; unit/parameter name unknown |
+| +2 | Second byte of the three-byte value | 0x0C59 reads/updates it; 0x0A57 consumes it | Value role confirmed; semantic label unknown |
+| +3 | Third byte; only low three bits are treated as value bits in the packet path, with upper bits participating in flags/phase handling | 0x0C59 reads/updates it; 0x0A57 consumes it; 0x0DB7 clears ACC.6 on its final packet byte | Packed-data role confirmed; bit meanings not fully assigned |
+| +4 | Control byte; bit 7 gates the 0x0C59 interpolation/update path | Scanner tests it; 0x0A57 reads it; 0x0C59 may clear bit 7 using the next slot's +13 flag | Control role confirmed; semantic label unknown |
+| +5 | Input to the 0x0D80 multiply/scale calculation that produces S[+1] | 0x0D80 reads it; mapped event-record +2/+10 values are the other calculation inputs | Arithmetic role confirmed; producer and unit not yet identified |
+| +6 | No stable semantic use established in the traced paths | Not assigned | Unknown |
+| +7 | Compared against XDATA page 0x20 at offset `0x40 + RAM[0x30]` by 0x0A57; mismatch invokes 0x1848 and sets internal bit 0x09 | 0x0A57 consumer | Comparison/cache role confirmed; meaning unknown |
+
+### 54.1 Cross-slot interpolation fields (do not confuse with fields in the same slot)
+
+The 0x0C59 helper starts from the current slot's +4 control byte. It reads the current value triple at S[+1..+3] and the next slot's corresponding triple at S[+9..+11] (because the slot stride is eight). It reads the next slot's +12 as the interpolation scale/control input and next slot's +13 as a condition used when clearing bit 7 in the current S[+4]. Therefore +9..+13 are not extra fields of the current eight-byte slot: they are offsets +1..+5 of the next slot, followed by the next slot's +5/+6? More precisely, with T=S+8, T[+1..+3]=S[+9..+11], T[+4]=S[+12], and T[+5]=S[+13]. The firmware's interpolation helper thus uses the next slot's +4 and +5 as scale/flag inputs.
+
+### 54.2 Descriptor-to-slot producer chain
+
+The established chain is:
+
+1. Per-Part 12-byte event descriptor at `0x2900 + 12*PartIndex` supplies bytes +2 and +10.
+2. 0x1494 extracts/maps those two bytes through ROM table 0x1208.
+3. 0x0D0E resolves the mapped pair against endpoint candidates on the selected page and chooses a slot at `0x80 + 8*slot_index`.
+4. 0x0D80 reads that slot's +5 and combines it with the two mapped descriptor values using MUL AB; the result is written to slot +1.
+5. 0x0A57 services the slot and transforms its +1/+2/+3 fields into external-port traffic through 0x0DB7 or the alternate direct page-0x80 transaction.
+
+This chain is sufficient to say that the eight-byte slot array is an endpoint/runtime value structure and that its +1 field is descriptor-derived. It is not sufficient to name +1/+2/+3 as pitch, sample address, envelope, or another synthesis parameter. The next highest-value target is to trace writers of slot +5 and +2/+3, then resolve the XDATA 0x20 comparison used by +7.
