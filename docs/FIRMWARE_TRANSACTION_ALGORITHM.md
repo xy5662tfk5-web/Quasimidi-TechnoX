@@ -1811,3 +1811,27 @@ The 12-byte record at XDATA `0x2900 + 12*PartIndex` is distinct from both the 24
 ### 55.2 Immediate next trace
 
 The highest-value unresolved path is now the producer/consumer chain for descriptor offsets +5…+9 and +11, followed by the exact 0x1208 mapping and endpoint-match predicates in 0x0D0E. In parallel, the endpoint slot's +5 producer must be traced independently; it is a different structure and must not be conflated with descriptor offset +5.
+
+
+## 56. ROM selector conversion table at 0x1208 recovered
+
+The 128-byte table at code address `0x1208–0x1287` has now been read directly from the descrambled IC4 ROM. It is a monotonic 7-bit input conversion table with endpoints `0x00 → 0x00` and `0x7F → 0x7F`. It is not a simple identity map: low values are quantized and the upper range progressively expands.
+
+Representative entries:
+
+| Input | Output | Input | Output |
+|---:|---:|---:|---:|
+| 0x00 | 0x00 | 0x20 | 0x18 |
+| 0x01 | 0x01 | 0x30 | 0x0E |
+| 0x04 | 0x01 | 0x40 | 0x18 |
+| 0x08 | 0x02 | 0x60 | 0x40 |
+| 0x10 | 0x03 | 0x70 | 0x59 |
+| 0x20 | 0x07 | 0x7F | 0x7F |
+
+Correction to the shorthand description in section 48: this table is a **7-bit nonlinear value conversion**, not proof by itself that +2/+10 are a named parameter family or physical register selector. The firmware applies the same conversion to both fields before endpoint matching, but their semantic names remain unresolved.
+
+The complete 128-entry mapping is stored in the ROM-derived analysis; table boundaries and endpoint values were verified against the 131072-byte ROM image after the documented address/data descramble. No physical sound-chip identity is inferred from this table.
+
+### 56.1 Next trace
+
+Trace the values entering RAM[0x29] and RAM[0x2A] at every call site of 0x0D0E, then compare their converted values against the endpoint candidate bytes inspected by the scan loop. This will establish whether the pair represents a selector tuple, a range, or a parameter address. Do not infer that from the curve shape alone.
