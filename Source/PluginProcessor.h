@@ -6,6 +6,7 @@
 #include "MASSAudioEngine.h"
 #include <array>
 #include <atomic>
+#include <vector>
 
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
@@ -38,6 +39,7 @@ public:
     juce::String getCurrentPartSoundName(int partIndex) const;
     int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
     bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    bool getEditedPartSysEx(int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const;
     int getPartMidiChannel(int partIndex) const noexcept;
     bool setPartMidiChannel(int partIndex, int midiChannel) noexcept;
     const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
