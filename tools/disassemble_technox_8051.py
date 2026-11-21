@@ -281,6 +281,23 @@ def main() -> None:
             idx = ordered.index(site)
             for nearby_pc in ordered[max(0, idx - 4):idx + 9]:
                 lines.append(f"    {nearby_pc:04X}  {insns[nearby_pc].raw:<11} {insns[nearby_pc].text}")
+    lines += ["", "ALL REACHABLE DPTR CONSTANTS IN MAME EXTERNAL I/O / NO-OP WINDOWS"]
+    def mapped_window(value: int) -> str | None:
+        if 0x3900 <= value <= 0x3903: return "0x3900-0x3903 no-op read"
+        if value == 0x390B: return "0x390B no-op read"
+        if 0x7C00 <= value <= 0x7FFF: return "0x7C00-0x7FFF no-op read/write"
+        if 0x8000 <= value <= 0x8003: return "0x8000-0x8003 no-op read/write"
+        if 0xA000 <= value <= 0xA003: return "ACIA window"
+        if 0xB000 <= value <= 0xB003: return "LCD window"
+        if 0xC000 <= value <= 0xC0FF: return "0xC000-0xC0FF no-op write"
+        if value == 0xFF10: return "0xFF10 no-op read/write"
+        return None
+    for value in sorted(dptr_constants):
+        window = mapped_window(value)
+        if window is None:
+            continue
+        sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == value]
+        lines.append(f"{window}: DPTR 0x{value:04X} at " + ", ".join(f"0x{x:04X}" for x in sites))
     lines += ["", "ACIA INITIALIZATION CALLEES (first-level static cross-references)"]
     for focus in (0xA7C6, 0xA819):
         callers = [pc for pc in ordered if insns[pc].text.endswith(f"0x{focus:04X}")]
@@ -308,19 +325,12 @@ def main() -> None:
     print(f"MOVX sites: {movx_count}")
     print("Reachable MOV DPTR,# constants: " + ", ".join(f"0x{x:04X}" for x in sorted(dptr_constants)))
     print("MAME-mapped external I/O/no-op address contexts:")
-    for target, label in ((0x3900,"no-op 0x3900"),(0x390B,"no-op 0x390B"),
-                          (0x7C00,"no-op 0x7C00"),(0x8000,"no-op 0x8000"),
-                          (0x8001,"no-op 0x8001"),(0x8002,"no-op 0x8002"),
-                          (0x8003,"no-op 0x8003"),(0xA000,"ACIA write"),
-                          (0xA001,"ACIA write"),(0xA002,"ACIA read"),
-                          (0xA003,"ACIA read"),(0xB000,"LCD write"),
-                          (0xB001,"LCD write"),(0xB002,"LCD read"),
-                          (0xB003,"LCD read"),(0xC000,"no-op 0xC000"),
-                          (0xFF10,"no-op 0xFF10")):
+    targets = sorted(v for v in dptr_constants if mapped_window(v) is not None)
+    for target in targets:
         sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
         for site in sites:
             idx = ordered.index(site)
-            print(f"  {label} DPTR 0x{target:04X} at code 0x{site:04X}:")
+            print(f"  {mapped_window(target)} DPTR 0x{target:04X} at code 0x{site:04X}:")
             for nearby_pc in ordered[max(0, idx - 3):idx + 7]:
                 print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
     for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
