@@ -30,6 +30,36 @@ Each Part message contains 25 data bytes. Across 200 Part messages:
 - the latter two values are consistent with selecting one of four single-sound banks (A-D) and a 0–127 program number from `Technox.ins`;
 - remaining bytes stay opaque until their meanings are corroborated.
 
+Across 200 Part messages, the 25 data-byte offsets have these observed ranges and distinct-value counts:
+
+| Part data offset (zero-based) | Min–max | Distinct values |
+|---:|---:|---:|
+| 0 | 0–0 | 1 |
+| 1 | 0–3 | 4 |
+| 2 | 0–127 | 64 |
+| 3 | 1–3 | 3 |
+| 4 | 44–127 | 39 |
+| 5 | 0–18 | 13 |
+| 6 | 0–63 | 10 |
+| 7 | 0–63 | 6 |
+| 8 | 0–36 | 4 |
+| 9 | 34–91 | 18 |
+| 10 | 52–124 | 3 |
+| 11 | 6–64 | 2 |
+| 12 | 0–127 | 14 |
+| 13 | 0–127 | 13 |
+| 14 | 0–79 | 15 |
+| 15 | 64–88 | 2 |
+| 16 | 64–64 | 1 |
+| 17 | 64–64 | 1 |
+| 18 | 0–7 | 5 |
+| 19 | 0–1 | 2 |
+| 20 | 0–76 | 2 |
+| 21 | 24–26 | 2 |
+| 22 | 64–127 | 2 |
+| 23 | 0–127 | 8 |
+| 24 | 0–50 | 5 |
+
 The bank/program interpretation is a strong structural hypothesis, not a verified hardware protocol mapping. No checksum or write command is inferred.
 
 ## MIDI controller labels
