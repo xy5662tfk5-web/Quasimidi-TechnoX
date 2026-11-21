@@ -44,6 +44,27 @@ private:
     std::array<std::array<std::atomic<int>, kParameterCount>, kPartCount> values_{};
 };
 
+class MASSModulationSourceStore {
+public:
+    static constexpr std::size_t kPartCount = 16;
+    MASSModulationSourceStore() {
+        for (auto& value : modWheel_)
+            value.store(0, std::memory_order_relaxed);
+    }
+    bool setModWheel(int partIndex, int value) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) || value < 0 || value > 127)
+            return false;
+        modWheel_[static_cast<std::size_t>(partIndex)].store(value, std::memory_order_release);
+        return true;
+    }
+    int modWheel(int partIndex) const noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return 0;
+        return modWheel_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire);
+    }
+private:
+    std::array<std::atomic<int>, kPartCount> modWheel_{};
+};
+
 // Backend contract only. A real implementation must be based on verified
 // TechnoX sample/algorithm evidence; the included null backend is intentionally silent.
 class IMASSVoiceBackend {
@@ -53,7 +74,8 @@ public:
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void render(float* const* channels, int channelCount, int sampleCount,
-                        const VoiceManager& voices, const MASSPartParameterStore& parts) noexcept = 0;
+                        const VoiceManager& voices, const MASSPartParameterStore& parts,
+                        const MASSModulationSourceStore& sources) noexcept = 0;
 };
 
 class NullMASSVoiceBackend final : public IMASSVoiceBackend {
@@ -62,7 +84,8 @@ public:
     void noteOn(int, const VoiceSlot&) noexcept override {}
     void noteOff(int, const VoiceSlot&) noexcept override {}
     void render(float* const* channels, int channelCount, int sampleCount,
-                const VoiceManager&, const MASSPartParameterStore&) noexcept override {
+                const VoiceManager&, const MASSPartParameterStore&,
+                const MASSModulationSourceStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
                 channels[channel][sample] = 0.0f;
@@ -109,7 +132,7 @@ public:
     }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_, partParameters_);
+        backend_->render(channels, channelCount, sampleCount, voices_, partParameters_, modulationSources_);
     }
 
     VoiceManager& voiceManager() noexcept { return voices_; }
@@ -123,7 +146,7 @@ private:
     IMASSVoiceBackend* backend_;
     VoiceManager voices_;
     ModulationMatrix modulation_;
-    MASSPartParameterStore partParameters_;
+    MASSPartParameterStore partParameters_;\n    MASSModulationSourceStore modulationSources_;
 };
 
 } // namespace technox
