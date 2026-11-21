@@ -1084,3 +1084,17 @@ The safe conclusion is:
 - This mapped byte then participates in the 0x1494 descriptor processing that ultimately feeds the external packet path.
 
 Do not yet label the field as velocity curve, key curve, or sample-zone curve in the emulator API. The table shapes make a response-curve interpretation plausible, but caller-side value ranges and the exact lookup index semantics must be confirmed first.
+
+
+## 34. The Part-record lookup selector at offset +0x11 defaults to zero
+
+The initializer at 0xB665 computes each 24-byte Part record base as 0x7C15 + 0x18*PartIndex. Near the end of its initialization sequence it explicitly writes zero to base + 0x11 (instruction sequence at 0xB73D–0xB747).
+
+For the same record, 0x4256 reads base + 0x11 (address 0x7C26 + 0x18*PartIndex) into R5 before calling 0xABBF. Since the default selector is zero, the helper's initial R7=0xEF survives its zero-input early return, and 0x4256 writes 0xEF to event-record byte +1.
+
+This confirms the default behavior of the lookup field:
+- Part-record offset +0x11 = 0 by default.
+- 0xABBF maps selector zero to the sentinel/default value 0xEF.
+- Nonzero selector values take the ROM-table mapping path or special-case branches.
+
+The six monotonic 128-byte ROM blocks at 0xA8BF–0xABBE are therefore optional mappings selected by a Part-record field, while zero selects the default 0xEF value. The user-facing name of this setting remains unconfirmed.
