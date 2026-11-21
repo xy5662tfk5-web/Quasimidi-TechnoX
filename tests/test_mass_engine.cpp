@@ -1,4 +1,5 @@
 #include "../Source/MASSAudioEngine.h"
+#include "../Source/BasicMASSVoiceBackend.h"
 #include <cassert>
 #include <cmath>
 using namespace technox;
@@ -51,8 +52,27 @@ int main() {
     assert(std::abs(matrix.contribution(ModDestination::cutoff, 0.8f, 0, 0, 0)-0.4f) < 0.0001f);
     matrix.clearRoute(0);
     assert(matrix.contribution(ModDestination::cutoff, 1, 0, 0, 0) == 0.0f);
-    float left[8], right[8]; for (auto& v:left) v=1; for (auto& v:right) v=1;
-    float* outputs[]={left,right}; engine.render(outputs,2,8);
-    for(int i=0;i<8;++i) assert(left[i]==0 && right[i]==0);
+    // The production processor uses the audible prototype backend; the engine's
+    // default null backend remains available for isolated routing/state tests.
+    BasicMASSVoiceBackend synth;
+    MASSAudioEngine audible(&synth);
+    audible.prepare(44100.0, 512);
+    audible.setPartParameter(12, PartParameter::level, 127);
+    audible.setPartParameter(12, PartParameter::cutoffFrequency, 127);
+    audible.setPartParameter(12, PartParameter::egAttack, 0);
+    audible.setPartParameter(12, PartParameter::egDecay, 0);
+    audible.setPartParameter(12, PartParameter::egRelease, 0);
+    audible.noteOn(12, 1, 69, 127);
+    float left[512]{}, right[512]{};
+    float* outputs[]={left,right};
+    audible.render(outputs,2,512);
+    bool audibleSignal = false;
+    for (int i=0;i<512;++i) audibleSignal = audibleSignal || std::abs(left[i]) > 0.00001f;
+    assert(audibleSignal);
+    audible.noteOff(1,69);
+    float releaseLeft[4096]{}, releaseRight[4096]{};
+    float* releaseOutputs[]={releaseLeft,releaseRight};
+    audible.render(releaseOutputs,2,4096);
+    assert(audible.voiceManager().activeVoiceCount() == 0);
     return 0;
 }
