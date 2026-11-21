@@ -98,16 +98,16 @@ def extract_sysex(data: bytes) -> List[Frame]:
                 if status == 0xF0:
                     if pending is not None:
                         raise MidiFormatError("new F0 before previous SysEx completed")
-                    pending = bytearray(b"\\xF0" + payload); pending_offset = p - n
+                    pending = bytearray(b"\xF0" + payload); pending_offset = p - n
                 else:
                     if pending is None:
-                        if payload.startswith(b"\\xF0"):
+                        if payload.startswith(b"\xF0"):
                             pending = bytearray(payload)
                         else:
                             continue
                     else:
                         pending.extend(payload)
-                if pending is not None and pending.endswith(b"\\xF7"):
+                if pending is not None and pending.endswith(b"\xF7"):
                     frames.append(Frame(bytes(pending), ti, pending_offset)); pending = None
                 running = None
             elif 0x80 <= status <= 0xEF:
@@ -131,7 +131,7 @@ def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
     result = []
     for base in range(0, len(frames), 6):
         group = frames[base:base+6]
-        if any(not f.raw.startswith(HEADER) or not f.raw.endswith(b"\\xF7") for f in group):
+        if any(not f.raw.startswith(HEADER) or not f.raw.endswith(b"\xF7") for f in group):
             raise MidiFormatError(f"invalid TechnoX SysEx envelope at group {base//6}")
         types = tuple(f.block_type for f in group)
         if types != EXPECTED_TYPES:
