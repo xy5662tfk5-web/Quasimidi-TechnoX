@@ -71,6 +71,40 @@ private:
     std::array<std::atomic<int>, kControlCount> values_{};
 };
 
+class MASSDrumParameterStore {
+public:
+    static constexpr std::size_t kPartCount = 16;
+    static constexpr std::size_t kKeyCount = 128;
+    static constexpr std::size_t kParameterCount = 5;
+    MASSDrumParameterStore() {
+        for (auto& part : values_)
+            for (auto& key : part)
+                for (auto& value : key)
+                    value.store(-1, std::memory_order_relaxed);
+    }
+    bool set(int partIndex, int keyNumber, int parameterIndex, int value) noexcept {
+        constexpr int maxima[kParameterCount] = {48, 127, 19, 63, 63};
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            keyNumber < 0 || keyNumber >= static_cast<int>(kKeyCount) ||
+            parameterIndex < 0 || parameterIndex >= static_cast<int>(kParameterCount) ||
+            value < 0 || value > maxima[parameterIndex])
+            return false;
+        values_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(keyNumber)]
+               [static_cast<std::size_t>(parameterIndex)].store(value, std::memory_order_release);
+        return true;
+    }
+    int get(int partIndex, int keyNumber, int parameterIndex) const noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            keyNumber < 0 || keyNumber >= static_cast<int>(kKeyCount) ||
+            parameterIndex < 0 || parameterIndex >= static_cast<int>(kParameterCount))
+            return -1;
+        return values_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(keyNumber)]
+                      [static_cast<std::size_t>(parameterIndex)].load(std::memory_order_acquire);
+    }
+private:
+    std::array<std::array<std::array<std::atomic<int>, kParameterCount>, kKeyCount>, kPartCount> values_{};
+};
+
 class MASSModulationSourceStore {
 public:
     static constexpr std::size_t kPartCount = 16;
@@ -158,7 +192,8 @@ public:
                         const MASSPartParameterStore& parts,
                         const MASSModulationSourceStore& sources,
                         const MASSPartRuntimeControlStore& runtimeControls,
-                        const MASSCommonControlStore& common) noexcept = 0;
+                        const MASSCommonControlStore& common,
+                        const MASSDrumParameterStore& drums) noexcept = 0;
 };
 
 class NullMASSVoiceBackend final : public IMASSVoiceBackend {
@@ -170,7 +205,7 @@ public:
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
                 const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&,
-                const MASSCommonControlStore&) noexcept override {
+                const MASSCommonControlStore&, const MASSDrumParameterStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
                 channels[channel][sample] = 0.0f;
@@ -224,6 +259,9 @@ public:
         }
     }
 
+    bool setDrumParameter(int partIndex, int keyNumber, int parameterIndex, int value) noexcept { return drumParameters_.set(partIndex, keyNumber, parameterIndex, value); }
+    int getDrumParameter(int partIndex, int keyNumber, int parameterIndex) const noexcept { return drumParameters_.get(partIndex, keyNumber, parameterIndex); }
+
     bool setCommonControl(MASSCommonControl control, int value) noexcept { return commonControls_.set(control, value); }
     int getCommonControl(MASSCommonControl control) const noexcept { return commonControls_.get(control); }
     void clearCommonControl(MASSCommonControl control) noexcept { commonControls_.clear(control); }
@@ -245,7 +283,7 @@ public:
     void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); setModWheel(partIndex, 0); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_, commonControls_);
+        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_, commonControls_, drumParameters_);
     }
 
     void finishVoiceRelease(std::size_t voiceIndex) noexcept { voices_.finishRelease(voiceIndex); }
@@ -264,6 +302,7 @@ private:
     MASSModulationSourceStore modulationSources_;
     MASSPartRuntimeControlStore runtimeControls_;
     MASSCommonControlStore commonControls_;
+    MASSDrumParameterStore drumParameters_;
 };
 
 } // namespace technox
