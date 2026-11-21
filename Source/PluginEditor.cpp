@@ -34,6 +34,18 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
     setResizable(false, false);
     performanceLabel.setBounds(510, 12, 110, 20);
     performanceSelector.setBounds(620, 10, 300, 26);
+    startTimerHz(15);
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
+{
+    // Hosts may change the program without interacting with this editor.
+    // Poll the processor's thread-safe selection and mirror it without
+    // triggering the ComboBox's onChange callback.
+    const int selectedId = audioProcessor.getCurrentProgram() + 1;
+    if (performanceSelector.getSelectedId() != selectedId)
+        performanceSelector.setSelectedId(selectedId, juce::dontSendNotification);
+    repaint();
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
@@ -74,7 +86,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& eve
             audioProcessor.setCurrentProgram(next);
             performanceSelector.setSelectedId(next + 1, juce::sendNotification);
         }
-        else
+        else if (p.y >= 57)
             partNumber = juce::jlimit(1, 16, partNumber + (p.x < 428 ? -1 : 1));
     }
     else if (p.x >= 218 && p.x <= 260 && p.y >= 35 && p.y <= 78)
