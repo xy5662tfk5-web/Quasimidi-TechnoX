@@ -25,7 +25,7 @@ The supplied bank dump contains 200 Part frames: four 33-byte complete frames fo
 - bytes 8–31: 24 Part parameter bytes (offsets 0x00–0x17)
 - byte 32: \`F7\`
 
-The manual supplies the official 24-byte Part parameter map. The four Performance dump blocks are Parts 13–16. In Sequencer Multi mode the manual maps Part N to MIDI channel N, so the editor defaults these four stored Performance parts to channels 13–16; the mapping remains user-configurable. The parser retains every complete frame unchanged. Source: [Quasimidi TechnoX Owner’s Manual](https://www.deepsonic.ch/deep/docs_manuals/quasimidi_technox_manual.pdf), printed pages 32–38.
+The manual supplies the official 24-byte Part parameter map. The four Performance dump blocks are Parts 13–16. In Performance mode the manual specifies MIDI Omni: the same incoming note information is received on all 16 channels. The editor therefore defaults to Performance Omni and triggers the active layers selected by the Performance Common mode. An optional Part Channels mode follows the Sequencer Multi mapping (Part N ↔ MIDI channel N), defaulting the four stored blocks to channels 13–16. The parser retains every complete frame unchanged. Source: [Quasimidi TechnoX Owner’s Manual](https://www.deepsonic.ch/deep/docs_manuals/quasimidi_technox_manual.pdf), printed pages 32–38.
 
 
 ## Official Part parameter map (manual, printed page 37)
