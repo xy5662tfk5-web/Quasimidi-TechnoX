@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "TechnoXPerformanceLayers.h"
 #include "BinaryData.h"
 
 namespace {
@@ -325,7 +326,7 @@ bool QuasimidiTechnoXAudioProcessor::isPerformancePartActive(int partIndex) cons
     if (mode < 0 || mode > 3 || partIndex > mode)
         return false;
     const int trackMode = getPartParameterRaw(performanceIndex, partIndex, technox::PartParameter::trackMode);
-    return trackMode > 0;
+    return technox::isPerformanceLayerActive(mode, partIndex, trackMode);
 }
 
 int QuasimidiTechnoXAudioProcessor::partSlotForMidiChannel(int channel) const noexcept
