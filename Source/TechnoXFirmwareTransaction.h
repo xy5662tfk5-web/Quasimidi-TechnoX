@@ -129,6 +129,92 @@ inline DecodeResult decodeDescriptor(const XDataMemory& memory,
     return result;
 }
 
+enum class LoaderAction : std::uint8_t {
+    readModeControlByte,
+    jumpToZeroByteHandler,
+    clearSlotBusyBit,
+    scanSlotStatus,
+    loadReplacementFirstByte,
+    continueAt1599,
+    callResourceManager17D4,
+    setSlotBusyBit,
+    writeSecondByte,
+    retryAt1544
+};
+
+struct LoaderRuntimeFlags {
+    bool bit06 = false;
+    bool bit04 = false;
+    bool bitE7 = false;
+    bool ram52IsZero = false;
+};
+
+struct LoaderBranchPlan {
+    std::array<LoaderAction, 6> actions{};
+    std::size_t actionCount = 0;
+    std::uint16_t slotBase = 0;
+    std::uint16_t slotDataAddress = 0;
+    std::uint16_t modeControlAddress = 0;
+    bool valid = false;
+
+    void append(LoaderAction action) noexcept {
+        if (actionCount < actions.size()) actions[actionCount++] = action;
+    }
+};
+
+inline LoaderBranchPlan planLoaderBranch(const LoaderDecision& decision,
+                                         LoaderRuntimeFlags flags) noexcept {
+    LoaderBranchPlan plan{};
+    if (!decision.valid) return plan;
+
+    plan.valid = true;
+    // The firmware computes DPTR = 0x2068 + (mode * 0x80).
+    plan.slotBase = static_cast<std::uint16_t>(
+        0x2068u + static_cast<unsigned>(decision.input.mode & 0x0f) * 0x80u);
+    plan.slotDataAddress = static_cast<std::uint16_t>(
+        plan.slotBase + (flags.bit06 ? decision.descriptor.first() : 0u));
+    plan.modeControlAddress = static_cast<std::uint16_t>(
+        0x28d8u + (decision.input.mode & 0x0f));
+
+    if (decision.path == LoaderPath::zeroSecondByte) {
+        if (!flags.bit06) {
+            // 0x1525 reads 0x28D8 + mode, then jumps to 0x0E8E.
+            plan.append(LoaderAction::readModeControlByte);
+            plan.append(LoaderAction::jumpToZeroByteHandler);
+            return plan;
+        }
+
+        // 0x1534..0x156E clear the busy bit, scan status, and either
+        // retry the zero-byte path or load replacement descriptor bytes.
+        plan.append(LoaderAction::clearSlotBusyBit);
+        plan.append(LoaderAction::scanSlotStatus);
+        if (flags.bitE7) {
+            plan.append(LoaderAction::loadReplacementFirstByte);
+            plan.append(LoaderAction::continueAt1599);
+        } else {
+            plan.append(LoaderAction::retryAt1544);
+        }
+        return plan;
+    }
+
+    if (flags.ram52IsZero)
+        plan.append(LoaderAction::callResourceManager17D4);
+
+    if (!flags.bit06) {
+        plan.append(LoaderAction::continueAt1599);
+        return plan;
+    }
+
+    // 0x157C..0x1595 set bit 7 in the selected slot byte and store byte +1.
+    plan.append(LoaderAction::setSlotBusyBit);
+    plan.append(LoaderAction::writeSecondByte);
+    if (flags.bit04)
+        plan.append(LoaderAction::retryAt1544);
+    else
+        plan.append(LoaderAction::continueAt1599);
+    return plan;
+}
+
 struct LoaderInputs {
     std::uint8_t page = 0;
     std::uint8_t offset = 0;
