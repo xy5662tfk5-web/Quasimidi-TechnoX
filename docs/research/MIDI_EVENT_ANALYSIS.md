@@ -350,3 +350,18 @@ Follow-up control-flow inspection narrows the interpretation of section 28:
 **What is now proven:** the firmware computes a 6-bit phase/index, obtains a signed sine value from the 64-byte table, and writes that value to external XDATA via an indirect pointer. A second computed-dispatch handler also reads the same sine table.
 
 **What is not proven:** the target XDATA page/device, whether the generated values are audio-rate samples, and whether this code belongs to the main M.A.S.S. oscillator rather than modulation, envelope/LFO, or peripheral setup. Keep the wavetable finding as evidence of firmware-side waveform/math generation, not as proof that the complete sound engine has been recovered.
+## 30. Sine generator is gated by XDATA[0x2050]
+
+Tracing the `0x0C1A–0x0C58` path reveals an important guard:
+
+- `0x0C1A` sets P2=`0x20`, R1=`0x50`, then reads `XDATA[0x2050]` using `MOVX A,@R1`.
+- If the byte is nonzero (`JNZ` at `0x0C20`), the routine returns immediately.
+- Only when `XDATA[0x2050] == 0` does it continue through the phase/shape calculation, read `CODE[0x001E + (A & 0x3F)]`, increment R1, and write the sine value to XDATA through `MOVX @R1,A`.
+- Startup routine around `0x0130` explicitly initializes `XDATA[0x2050]` to `0x3C` (`MOV DPTR,#0x2050; MOV A,#0x3C; MOVX @DPTR,A`).
+- Static scan found no other direct `MOV DPTR,#0x2050` or direct immediate reference to `0x2051`; the generator uses the indirect P2/R1 addressing path.
+
+This means the sine-writing path is disabled by its initial state and requires some later state transition to zero the gate byte. That is evidence against casually identifying it as the continuously running main audio oscillator. The routine may be an explicitly enabled modulation/diagnostic/peripheral initialization path; its caller/state transition still needs to be identified.
+
+### Revised conclusion
+
+Confirmed: IC4 contains a 64-entry signed sine lookup, and executable firmware can write indexed sine values into external XDATA. Not confirmed: that this path runs during normal note playback, its exact destination beyond the indirect XDATA pointer, or its role in M.A.S.S. Continue by finding all writes to page `0x20`, offset `0x50`, including indirect page/R1 accesses, and by mapping the dispatch entry that reaches `0x0C1A`.
