@@ -292,12 +292,23 @@ def main() -> None:
         if 0xC000 <= value <= 0xC0FF: return "0xC000-0xC0FF no-op write"
         if value == 0xFF10: return "0xFF10 no-op read/write"
         return None
+    def has_local_movx(site: int) -> bool:
+        idx = ordered.index(site)
+        for next_pc in ordered[idx + 1:idx + 9]:
+            op = code[next_pc]
+            if op in movx_ops:
+                return True
+            if op == 0x90 or op in (0x02, 0x12, 0x22, 0x32, 0x73, 0x80):
+                return False
+        return False
     for value in sorted(dptr_constants):
         window = mapped_window(value)
         if window is None:
             continue
-        sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == value]
-        lines.append(f"{window}: DPTR 0x{value:04X} at " + ", ".join(f"0x{x:04X}" for x in sites))
+        sites = [pc for pc in ordered if code[pc] == 0x90 and
+                 ((code[pc+1] << 8) | code[pc+2]) == value and has_local_movx(pc)]
+        if sites:
+            lines.append(f"{window}: DPTR 0x{value:04X} with nearby MOVX at " + ", ".join(f"0x{x:04X}" for x in sites))
     lines += ["", "ACIA INITIALIZATION CALLEES (first-level static cross-references)"]
     for focus in (0xA7C6, 0xA819):
         callers = [pc for pc in ordered if insns[pc].text.endswith(f"0x{focus:04X}")]
@@ -327,7 +338,8 @@ def main() -> None:
     print("MAME-mapped external I/O/no-op address contexts:")
     targets = sorted(v for v in dptr_constants if mapped_window(v) is not None)
     for target in targets:
-        sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
+        sites = [pc for pc in ordered if code[pc] == 0x90 and
+                 ((code[pc+1] << 8) | code[pc+2]) == target and has_local_movx(pc)]
         for site in sites:
             idx = ordered.index(site)
             print(f"  {mapped_window(target)} DPTR 0x{target:04X} at code 0x{site:04X}:")
@@ -336,6 +348,14 @@ def main() -> None:
     for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
         sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
         print(f"{label} DPTR 0x{target:04X} setup sites: " + (", ".join(f"0x{x:04X}" for x in sites) or "none"))
+    print("ACIA initialization helper contexts:")
+    for focus in (0xA7C6, 0xA819, 0xA86C):
+        callers = [pc for pc in ordered if insns[pc].text.endswith(f"0x{focus:04X}")]
+        print(f"  target 0x{focus:04X}; callers: " + (", ".join(f"0x{x:04X}" for x in callers) or "none"))
+        if focus in insns:
+            idx = ordered.index(focus)
+            for nearby_pc in ordered[max(0, idx - 2):idx + 14]:
+                print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
     print(f"Listing written: {args.output}")
 
 
