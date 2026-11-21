@@ -38,6 +38,39 @@ The byte-pattern scan is deliberately labelled as candidate data, not disassembl
 
 CI writes a text listing artifact named `technox-ic4-mcs51-disassembly`. The next analysis pass must annotate direct/indirect DPTR setup reaching each MOVX site, inspect ACIA access paths around `0xA000`, and correlate call graphs with MIDI status handling. The sound-chip address map remains unknown until code evidence or hardware documentation establishes it.
 
+### MIDI receive interrupt and software byte queues
+
+Instruction-level tracing identifies `0x3DF0–0x3E76` as an interrupt handler: it saves CPU state, calls the ACIA receive-byte routine at `0xA7C0`, restores state, and exits with `RETI`. This makes `0x3DFE` the only direct call site currently found for the ACIA RX byte reader.
+
+The handler stores the received byte in internal RAM `0x5C` and classifies it:
+
+- Bytes `0xF8–0xFF` enter a MIDI System Real-Time path. The branch arithmetic specifically identifies `0xF8` (Timing Clock), `0xFA` (Start), and `0xFC` (Stop). The F8 path increments XDATA counter `0x2B8D` when state flag `0x30E5` is enabled; FA clears `0x30EF` under the same condition; FC calls `0x9B69` when enabled.
+- For non-real-time bytes, status `0x99` sets internal bit `0x1C`; other status bytes at or above `0x80` clear it. This is consistent with a special parser path for MIDI channel 10 Note On, but does not prove that other channel messages are unsupported.
+- When bit `0x1C` is set, the handler checks external address `0x7D95`. If zero, it sends the byte to `0xA831`; otherwise, or when the special flag is clear, it sends it to `0xA7DE`. Both are byte-queue producer routines. The handler then calls `0xB3AF` and returns from the interrupt.
+
+The three buffer families initialized by `0xA7A0` are software circular queues in external RAM:
+
+| Queue | XDATA page | Count | Producer index | Consumer index |
+|---|---|---|---|---|
+| 1 | `0x3200–0x32FF` | internal `0x53` | `0x54` | `0x55` |
+| 2 | `0x3300–0x33FF` | internal `0x56` | `0x57` | `0x58` |
+| 3 | `0x3400–0x34FF` | internal `0x59` | `0x5A` | `0x5B` |
+
+Each queue has a producer and consumer routine, count tracking, index wrap handling, and an overflow flag. The receive ISR routes ordinary MIDI bytes into queue 1 and the gated `0x99` path into queue 2. Queue 3 is initialized alongside them; its exact producer/consumer role still needs call-site tracing.
+
+These pages are CPU external-RAM buffers, not sound-chip sample memory. The ACIA interrupt decouples serial byte reception from later MIDI/event processing.
+
+### Peripheral initialization sequence at `0xB61B`
+
+The routine beginning at `0xB61B` performs structured initialization of the undocumented `0x7Cxx` window:
+
+1. Clears six sequential external locations `0x7BFF–0x7C04`.
+2. Writes `0x01` to `0x7C05` and `0x00` to `0x7C06`.
+3. Clears `0x7C07–0x7C0F`.
+4. Writes `02 47 40 06 00` to `0x7C10–0x7C14`.
+
+The routine has no direct LCALL/ACALL callers in the current static cross-reference, so its entry mechanism may involve a computed jump or another indirect dispatch. It is not yet safe to label this a voice allocator or a specific sound chip. The repeated `0x7D95` status read and this initialization block remain the highest-priority unknown hardware interface to resolve.
+
 ### Confirmed MIDI and LCD access paths
 
 The reachable code now gives instruction-level confirmation of the MAME device map:
