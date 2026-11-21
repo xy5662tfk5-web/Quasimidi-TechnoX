@@ -573,3 +573,71 @@ The handler family now contains three visibly different operation classes:
 3. Page-0x80 endpoint/control operations through A0=0x80 and helper 0x0DB7 in the 0x224C and 0x2301 paths.
 
 The next required step is to trace the caller-provided values of RAM[0x2E], RAM[0x2B], RAM[0x2C], RAM[0x36:0x37], and internal bits 0x08/0x0A/0x0D across real entry paths. Then compare these writes against the board-level bus wiring or captured hardware traffic. Until that is done, 0x8000–0x8003 is an identified external XDATA write window, not a named sound-chip register bank.
+
+
+## 18. Shared four-byte external write helper and eight-byte record iteration
+
+### 18.1 0x0DB7 writes the same 0x8000–0x8003 window
+
+The helper at 0x0DB7 is short and instruction-aligned:
+
+```asm
+0DB7  MOV R0,#0x00
+0DB9  MOV A,R5
+0DBA  MOVX @R0,A
+0DBB  MOV A,R2
+0DBC  INC R0
+0DBD  MOVX @R0,A
+0DBE  MOV A,R3
+0DBF  INC R0
+0DC0  MOVX @R0,A
+0DC1  MOV A,R4
+0DC2  CLR 0xE6
+0DC4  INC R0
+0DC5  MOVX @R0,A
+0DC6  CLR 0x0C
+0DC8  JNB 0xE7,0x0DCD
+0DCB  SETB 0x0C
+0DCD  RET
+```
+
+Callers select A0=0x80 before entering this helper. Since R0 starts at zero, the four MOVX writes target XDATA 0x8000, 0x8001, 0x8002, and 0x8003 in order. The packet is:
+
+- 0x8000 = R5
+- 0x8001 = R2
+- 0x8002 = R3
+- 0x8003 = R4 with ACC.6 cleared immediately before the write
+
+After the write, internal bit address 0x0C is cleared and then set only if ACC.7 of the modified R4 value is set. This is a concrete completion/control side effect; the physical meaning of bit 0x0C is not yet known.
+
+This independently confirms that the 0x8000–0x8003 range used directly by 0x1EDD is also the four-byte write window used by the page-0x80 helper. The repeated four-byte width is strong evidence of a shared external protocol, but not enough to name the receiving IC or decode the packet fields.
+
+### 18.2 0x1BEF and 0x1BE2 — two distinct special branches
+
+The bit-0x0A alternate edge from 0x1C2B reaches 0x1BEF. That routine reads four bytes through the descriptor pointer, advances and saves the pointer, then writes a four-byte record through R1=RAM[0x2E]:
+
+`[0x38, R2, R3, R4]`
+
+It then jumps to 0x19C2. This is a fixed-type record construction branch, distinct from the ordinary 0x1C2B test of descriptor byte +3 bit 3.
+
+The bit-0x08 edge from 0x224C reaches 0x1BE2. That path advances RAM[0x36:0x37] by four and jumps to 0x19C2; it skips the four-byte descriptor item rather than dispatching it through the ordinary endpoint path.
+
+### 18.3 0x19C2 is the common eight-byte record-stride loop
+
+The common continuation at 0x19C2 performs:
+
+1. RAM[0x2E] += 8;
+2. RAM[0x2B] += 1;
+3. DJNZ RAM[0x2C], 0x1986;
+4. RET when the loop counter reaches zero.
+
+This establishes an eight-byte stride in the indirect record/buffer area and a parallel incrementing index in RAM[0x2B]. The descriptor pointer RAM[0x36:0x37] is advanced separately by each handler (for example +1, +3, or +4); it is not automatically advanced by 0x19C2.
+
+### 18.4 Updated hardware-interface boundary
+
+Two code paths now independently emit four-byte writes to the same external XDATA window:
+
+- 0x1EDD uses direct DPTR writes to 0x8000–0x8003, emitting two ordinary blocks and one conditional block.
+- 0x0DB7 uses A0=0x80 plus R0=0..3 to write [R5, R2, R3, R4 & 0xBF].
+
+The 0x224C and 0x2301 handlers prepare arguments and call 0x0DB7. This unifies the previously separate observations into one external four-byte transport window. The device identity, command/address interpretation, timing, and acknowledgement semantics remain open.
