@@ -24,6 +24,7 @@ class PartAnalysisTests(unittest.TestCase):
         test_module = importlib.util.module_from_spec(spec3); sys.modules[spec3.name] = test_module; spec3.loader.exec_module(test_module)
         result = module.analyze(test_module.smf(frames))
         self.assertEqual(result["part_frames"],200)
+        self.assertEqual([p["part_number"] for p in result["parts"]],[13,14,15,16])
         self.assertEqual(result["parts"][0]["byte_statistics"][0]["constant_value"],1)
         self.assertEqual(result["parts"][3]["byte_statistics"][23]["constant_value"],4)
 
