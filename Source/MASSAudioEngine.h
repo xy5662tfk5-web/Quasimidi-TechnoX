@@ -50,7 +50,7 @@ class MASSCommonControlStore {
 public:
     static constexpr std::size_t kControlCount = 4;
     MASSCommonControlStore() {
-        for (auto& value : values_) value.store(0, std::memory_order_relaxed);
+        for (auto& value : values_) value.store(-1, std::memory_order_relaxed);
     }
     bool set(MASSCommonControl control, int value) noexcept {
         const auto index = static_cast<std::size_t>(control);
@@ -62,6 +62,10 @@ public:
     int get(MASSCommonControl control) const noexcept {
         const auto index = static_cast<std::size_t>(control);
         return index < kControlCount ? values_[index].load(std::memory_order_acquire) : -1;
+    }
+    void clear(MASSCommonControl control) noexcept {
+        const auto index = static_cast<std::size_t>(control);
+        if (index < kControlCount) values_[index].store(-1, std::memory_order_release);
     }
 private:
     std::array<std::atomic<int>, kControlCount> values_{};
@@ -206,6 +210,7 @@ public:
 
     bool setCommonControl(MASSCommonControl control, int value) noexcept { return commonControls_.set(control, value); }
     int getCommonControl(MASSCommonControl control) const noexcept { return commonControls_.get(control); }
+    void clearCommonControl(MASSCommonControl control) noexcept { commonControls_.clear(control); }
 
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         return partParameters_.set(partIndex, parameter, rawValue);
