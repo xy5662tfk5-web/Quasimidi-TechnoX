@@ -79,3 +79,33 @@ This is the broader channel Note On/Off path, separate from the dedicated channe
 1. Trace `0x5671 -> 0x4256/0x51B6/0x3ECE` to map MIDI note data to per-Part staging.
 2. Trace the `0x0200` source table and `0xB437` copy destinations; determine whether the source is a voice/part descriptor table.
 3. Follow the `0x7BD4`, `0x7Dxx`, and `0x62xx` blocks to their readers and writes into the `0x7Cxx` peripheral window.
+
+## 8. Corrected interpretation of 0x5671 and the four internal event slots
+
+The caller at `0x597E–0x59B7` does not pass a raw MIDI status as `R7`. It synthesizes event IDs `0x0C, 0x0D, 0x0E, 0x0F` in `R7`, passes the decoded MIDI message class from `RAM[0x60]` in `R5`, the first data byte from `RAM[0x61]` in `R3`, and saves the second data byte in `RAM[0x67]`.
+
+Inside `0x5671`:
+- `R5=0x09` selects the Note On branch (velocity zero is redirected to the release/decrement logic).
+- `R5=0x08` selects the Note Off branch.
+- Other message classes have distinct branches (including control/other message handling); therefore this routine is an event dispatcher, not itself a raw MIDI parser.
+- Event ID `R7` selects per-event state slots. It is used in address arithmetic for per-slot XDATA at `0x2FC7 + eventID` and `0x7C15 + 0x18*eventID`.
+- The routine writes two values to per-slot XDATA offsets `+0x15` and `+0x16`, calls `0x418E`, then calls `0x3ECE`. `0x3ECE` clears fields at `0x2040+eventID`, `0x2020+eventID`, `0x2FF9+eventID`, and `0x303B+eventID`.
+
+This is strong evidence for four event/part-like slots, but the numeric IDs `0x0C–0x0F` alone do not prove that they correspond one-to-one with the four user-visible Parts. That mapping still needs confirmation against parameter setup and Performance/Part selection code.
+
+## 9. What 0x418E does for Note On
+
+When `0x418E` receives `R7=0x09` (message class Note On), it:
+- checks and clamps `R3` to at most `0x1F`;
+- calls `0xBC3F` with the clamped value;
+- writes `0x06` to XDATA `0x2975`;
+- reads XDATA `0x3719`, transforms it, and calls `0xB3BC`;
+- writes the returned pair into `0x2971–0x2972`.
+
+This is a parameter translation/staging step associated with Note On, not proof of direct sample playback. The companion non-Note-On branch clamps a different input and updates a per-event XDATA field.
+
+## 10. Revised next targets
+
+1. Decode `0xBC3F`, `0xB3BC`, and their table inputs to identify what Note On values are transformed into.
+2. Trace readers of `0x2971–0x2975` and writes to the `0x7C15 + 0x18*eventID` blocks.
+3. Compare event IDs `0x0C–0x0F` with the firmware's Part-selection and Performance parameter mapping before claiming a four-Part correspondence.
