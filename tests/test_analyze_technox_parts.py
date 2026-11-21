@@ -10,7 +10,7 @@ spec2 = importlib.util.spec_from_file_location("analyze_technox_parts", ANALYZER
 module = importlib.util.module_from_spec(spec2); sys.modules[spec2.name] = module; spec2.loader.exec_module(module)
 
 class PartAnalysisTests(unittest.TestCase):
-    def test_byte_statistics_keep_manual_offsets(self):
+    def test_byte_statistics_use_manual_parameter_offsets(self):
         frames = []
         for performance in range(5, 55):
             frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,5]) + b"\x00Test    " + b"\xF7")
@@ -24,8 +24,10 @@ class PartAnalysisTests(unittest.TestCase):
         result = module.analyze(test_module.smf(frames))
         self.assertEqual(result["part_frames"], 200)
         self.assertEqual([p["part_number"] for p in result["parts"]], [13,14,15,16])
-        self.assertEqual(result["parts"][0]["byte_statistics"][0]["constant_value"], 1)
-        self.assertEqual(result["parts"][3]["byte_statistics"][23]["constant_value"], 4)
+        self.assertEqual(result["parts"][0]["parameter_statistics"][0]["constant_value"], 1)
+        self.assertEqual(result["parts"][3]["parameter_statistics"][23]["constant_value"], 4)
+        self.assertEqual(result["frame_layout"]["complete_frame_bytes"], 33)
+        self.assertEqual(result["frame_layout"]["part_parameter_data_start_offset"], 8)
 
 if __name__ == "__main__":
     unittest.main()
