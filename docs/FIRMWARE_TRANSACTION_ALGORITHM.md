@@ -1159,3 +1159,60 @@ Simulating the instruction sequence at 0xABBF with the Part-record selector in R
 Important boundary observation: selectors 6 and 14 read from 0xAC2E and 0xABD0, respectively, which lie beyond the six 0x80-byte blocks 0xA8BF–0xABBE and inside the surrounding code-address region. MOVC is allowed to read those bytes, so the returned values are literal ROM results; whether those two values are intentional table entries or code/data overlap remains to be checked against all call contexts.
 
 The map is now exact at the byte level for this helper, but it is not yet a complete model of the user-visible Velocity Curve behavior. In particular, the event descriptor byte +1 is only one stage in the downstream descriptor transformation.
+
+
+## 19. 0x0DB7 is a shared transport primitive, not a voice-specific routine
+
+A cross-reference pass over the reachable code finds 16 direct LCALL sites to 0x0DB7. They do not all belong to the 0x1BC3 descriptor family. This changes the interpretation boundary: 0x0DB7 is a reusable four-byte external-port writer used by several firmware subsystems.
+
+### 19.1 Call-site groups
+
+**Computed descriptor / page-0x80 family:**
+
+- 0x1E8A — reached from the 0x1EDD descriptor handler after record-field calculations.
+- 0x211F — alternate 0x1EDD branch; explicitly sets R2=0 and R5=RAM[0x2B], masks R4 to its low three bits, then calls the helper.
+- 0x22F8 — endpoint/descriptor branch associated with 0x224C.
+- 0x236B — endpoint/descriptor branch associated with 0x2301.
+
+These four call sites are directly connected to the computed descriptor dispatch examined in sections 17–18.
+
+**Other firmware paths using the same primitive:**
+
+- 0x02C0 — looped startup/configuration sequence; R2 and R3 are zeroed, R4 is selected as 0x00 or 0x80, R5 is derived from the high nibble of A, and R6 controls a 15-iteration loop.
+- 0x0B53, 0x0D07, 0x0A4F, 0x1045, 0x110A — additional page-0x80 operations in other routines.
+- 0x0E1A and 0x0E67 — two calls in a related helper sequence; one prepares R3 with bit 6 set and may add 0x80 to R4, while the later call sends a cleared/zeroed set of fields.
+- 0x26C9 and 0x26DE — paired table-driven four-byte writes from code-space data, with R1/R5 loop controls.
+- 0x2767 and 0x277E — another paired table-driven sequence; its table bytes are complemented before the helper call.
+
+The static cross-reference establishes reuse of the same port writer. It does not yet establish whether all call-site groups address the same physical device function or whether the receiving logic interprets packet types differently.
+
+### 19.2 Correct packet-level model
+
+The helper's observable operation is:
+
+1. Caller sets P2 (SFR 0xA0) to 0x80.
+2. Helper sets R0=0.
+3. Writes R5, R2, R3, then R4 with ACC.6 cleared to XDATA 0x8000, 0x8001, 0x8002, and 0x8003.
+4. Clears internal bit 0x0C, then sets it iff the post-mask ACC.7 value is one.
+5. Returns; most callers restore P2 from RAM[0x2D].
+
+This is a four-byte port transaction with a side-band internal state update. Bit 0x0C is a firmware-visible state bit associated with the final transmitted byte; its physical meaning (acknowledgement, pending state, or another protocol condition) remains unverified.
+
+### 19.3 ROM lookup evidence used by the descriptor path
+
+The 0x1EDD path uses two confirmed code-space lookup tables:
+
+- 0x1288: a 128-byte monotonic, nonlinear lookup table, beginning 00 08 08 ... and ending ... F3 F7 FB FF. The handler indexes it after deriving an index from a descriptor field and current record state.
+- 0x1308: a 128-byte stepped lookup table beginning 00 08 18 30 38 40 ... and increasing in plateaus through D8. The handler uses it in the conditional field transformation around 0x1F81–0x1F86.
+
+These are numeric mapping tables, not strings or obvious command identifiers. Their precise musical meaning is not established.
+
+### 19.4 Shared arithmetic / memory helpers
+
+- 0x2381 computes a code/data-record address using a 0x30-byte stride and the base pointer in RAM[0x39:0x38], adds an offset derived from RAM[0x2F], then reads one byte with MOVX A,@DPTR. It is an indexed record lookup helper.
+- 0x1848 performs a multi-step arithmetic transform using MUL AB, rotate, complement/two's-complement corrections, and RAM[0xF0]/R2. It is used to transform values in the descriptor path; its exact fixed-point scale and signedness should be validated with controlled input/output vectors before assigning a semantic name.
+- 0x23C7 is called near the end of the 0x1EDD processing path. It reads the record byte at RAM[0x2E], tests bits 0 and 6, and may use the lookup tables at 0x11E0 and 0x11E8 to scale R2 using values from RAM[0x41] and RAM[0x43]. This is another record-dependent scaling helper, not an external-port writer.
+
+### 19.5 Consequence for sound-engine reconstruction
+
+Do not equate every call to 0x0DB7 with Note On, voice allocation, or a sound-chip register write. The helper is a transport primitive. The next task is to classify each caller by its higher-level purpose and correlate the four transmitted bytes with the separate 0x7Cxx indexed-record subsystem, MIDI event handlers, and hardware evidence. The undocumented 0x7C00–0x7FFF window remains a stronger candidate for the runtime voice/peripheral state than the 0x8000–0x8003 port alone, but its physical device and register semantics are still not proven.
