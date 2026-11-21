@@ -880,3 +880,20 @@ The firmware implements an indexed external data path with:
 - full write/readback tests using both normal and complemented patterns.
 
 This is strong evidence for a 256 x 6-byte external storage/register space or a hardware interface that emulates one. It is not yet proof that the space is audio-parameter RAM: the code is executing a diagnostic pattern test, and the actual receiver IC and its role still require board-level evidence.
+
+
+## 25. The 256 x 6-byte test is called during system initialization
+
+The direct call-site scan found one reachable call to the test routine at 0x26A2: address 0x374E executes LCALL 0x26A2.
+
+The caller at 0x3700 is part of the system initialization sequence: it initializes MIDI/serial-related state, performs setup calls, conditionally updates interrupt-control state, calls 0x26A2, then continues with initialization routines at 0x00F8, 0xB56C, 0x5EF9, 0xB5A9, and 0x6433.
+
+At 0x26A2 the routine:
+- pushes the current interrupt-enable SFR (0xA8);
+- writes zero to SFR 0xA8, disabling interrupts during the test;
+- calls 0x0E3A to prepare the external interface;
+- selects A0=0x80 and performs the normal-pattern write/readback pass;
+- performs the complemented-pattern write/readback pass;
+- restores the saved interrupt-enable SFR with POP 0xA8 and returns.
+
+This context strongly classifies the 256 x 6-byte operation as a boot/system-initialization hardware test, rather than a normal per-note or per-voice update. It validates an external indexed memory/register interface before the rest of initialization proceeds. The exact physical device remains unidentified.
