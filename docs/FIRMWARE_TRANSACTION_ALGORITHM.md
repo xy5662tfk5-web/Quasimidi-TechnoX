@@ -43,7 +43,7 @@ Therefore the source is a 12-byte block in XDATA page `RAM[0x29]`, starting at o
 | +6 | `RAM[0x36] = byte` | 14E1–14E3 |
 | +7 | skipped | 14E5–14E6 |
 | +8 | skipped | 14E6–14E7 |
-| +9 | bits 0–2 copied to flags E0–E2 | 14E8–14F3 |
+| +9 | bits 0–2 copied into internal bit addresses 0x00–0x02 | 14E8–14F3 |
 | +10 | `RAM[0x32] = ROM[0x1208 + byte]` | 14F5–14F8 |
 | +11 | `RAM[0x35] = byte` | 14FA–14FC |
 
@@ -240,7 +240,7 @@ Observed behavior:
 2. Cache the current map/status byte in RAM[0x3E]. If bit 0x20 is set, skip the initial free-slot test and enter the status-handshake path at 0x0EE6.
 3. Otherwise increment the slot candidate counter RAM[0x31]. Candidate zero is checked against the bit mask RAM[0x2F] through indexed helper 0x1408. If the masked bit is clear, return.
 4. Candidates are scanned up to 0x1F; each candidate selects a pair of bytes in XDATA page 0x2B, starting at offset 2 * candidate. The pair is compared against RAM[0x2F] and RAM[0x28]. A match identifies the candidate and loads its associated status byte at offset 0x41 + candidate.
-5. The selected status byte is masked with 0x1F and used as the dynamic XDATA page (RAM[0x2D] and A0). The firmware then polls offset 0xFB and checks flags E3, E5, E6, E7, and E4. These checks control retries, writes to offset 0xFD, and progression into the lower-level slot descriptor processing beginning at 0x0F33.
+5. The selected status byte is masked with 0x1F and used as the dynamic XDATA page (RAM[0x2D] and A0). The firmware then polls offset 0xFB and tests selected bits of the just-read accumulator value (ACC.3 through ACC.7, depending on the branch). These are accumulator-bit tests, not independent persistent flags. The tests control retries, writes to offset 0xFD, and progression into the lower-level slot descriptor processing beginning at 0x0F33.
 
 The scan is bounded by 32 candidates. The code establishes a slot-selection/status protocol, but does not identify the selected slot as a musical voice number without further evidence.
 
@@ -266,9 +266,9 @@ The queue links are stored in internal RAM at 0x7E + page_id. The routine mainta
 
 These routines select a candidate page from RAM[0x50], load its page into RAM[0x2D]/A0, and inspect status offset 0xFB.
 
-- 0x1780 accepts the current candidate only when E3 is set and neither E5 nor E6 is set. It then calls 0x1009, delays, calls 0x018D, and returns zero. If the candidate is not ready, it follows the page link at 0x7E + page_id and retries; if it reaches RAM[0x51], it transitions to the alternate candidate path at 0x17AC.
-- 0x17AC performs a related check without the E3 requirement: it requires E5 and E6 both clear before calling 0x1009, delaying, calling 0x018D, and returning zero. Otherwise it follows the linked page list; reaching RAM[0x51] returns without acquiring a page.
-- 0x17D4 is a third retry path. It selects the same candidate chain and checks E3/E5/E6. If E3 is clear, or E5/E6 are both clear, it calls 0x1009 and returns zero. Otherwise it follows the page links and retries. This routine is invoked by the nonzero descriptor path when RAM[0x52] == 0.
+- 0x1780 reads offset 0xFB into A and accepts the current candidate only when ACC.3 is set and ACC.5 and ACC.6 are clear. It then calls 0x1009, delays, calls 0x018D, and returns zero. If the candidate is not ready, it follows the page link at 0x7E + page_id and retries; if it reaches RAM[0x51], it transitions to the alternate candidate path at 0x17AC.
+- 0x17AC performs a related check without the ACC.3 requirement: it requires ACC.5 and ACC.6 both clear before calling 0x1009, delaying, calling 0x018D, and returning zero. Otherwise it follows the linked page list; reaching RAM[0x51] returns without acquiring a page.
+- 0x17D4 is a third retry path. It selects the same candidate chain and tests bits of the status byte in A. Its exact branch predicate must be read from the individual instruction path; do not treat E3/E5/E6 as persistent global flags or infer the condition from their names. This routine is invoked by the nonzero descriptor path when RAM[0x52] == 0.
 
 The delay is a short software loop (R0=0, NOP, DJNZ); no time unit is inferred.
 
@@ -284,7 +284,7 @@ This is endpoint discovery/initialization on a selected page. The signature is o
 
 0x018D rejects any selected page with upper three bits set (page & 0xE0 != 0) by jumping to address zero. For a valid page it selects that XDATA page and calls 0x0211, then updates the linked page queue and increments RAM[0x52].
 
-0x0211 reads status offset 0xFB; if E5 is set it raises internal flag bit 0x0A. It calls 0x0DF7 with the selected page, clears offset 0xFB, writes 0x40 to offset 0xFA, then scans endpoint bytes beginning at offset 0x30. It initializes endpoint fields and checks associated flags. This is page/endpoint initialization, not proof of a synth voice register protocol.
+0x0211 reads status offset 0xFB; if bit 5 of the returned byte (ACC.5) is set it raises internal bit address 0x0A. It calls 0x0DF7 with the selected page, clears offset 0xFB, writes 0x40 to offset 0xFA, then scans endpoint bytes beginning at offset 0x30. It initializes endpoint fields and checks associated flags. This is page/endpoint initialization, not proof of a synth voice register protocol.
 
 ### Updated interpretation and limits
 
@@ -395,3 +395,85 @@ The evidence supports this conservative sequence:
 8. Separate conditional readback path: under the 0x15BF guards, read F8 and 60 only when FB.3 is clear.
 
 The sequence is firmware-confirmed at the instruction level. The semantic interpretation of the external controller's bits and whether the final FD write is the command-acceptance acknowledgement or a general status reset are still hypotheses. No claim is made that this is specifically a synth voice-start command.
+
+
+## 15. Corrected accumulator-bit interpretation and deeper trace of 0x189D / 0x104F
+
+### 15.1 Critical MCS-51 addressing correction
+
+In the 8051 architecture, direct bit addresses 0xE0–0xE7 are the eight bit-addressable bits of the accumulator SFR A (direct address 0xE0). Therefore:
+
+- JB 0xE5 means test ACC.5 of the current A value.
+- JNB 0xE7 means test ACC.7 of the current A value.
+- CLR 0xE7 clears ACC.7 in the current accumulator.
+- MOV C,0xE5 copies ACC.5 into carry.
+- MOV 0xE1,C writes carry into bit-address 0xE1, which is an accumulator bit, not a general RAM flag.
+
+These conditions are data-dependent. They do not denote persistent firmware flags by themselves. Any interpretation of E3–E7 must identify the immediately preceding load/operation that established A.
+
+By contrast, bit addresses 0x00–0x7F map to the bit-addressable internal RAM area 0x20–0x2F. The instructions at 0x14E8–0x14F3 transfer descriptor byte +9 bits 0–2 into internal bit addresses 0x00, 0x01, and 0x02. The later checks JNB 0x00, JNB 0x01, JNB 0x02 in 0x189D therefore refer to persistent internal bit flags.
+
+### 15.2 Confirmed writers of RAM[0x3E] and RAM[0x3F]
+
+The reachable-code cross-reference pass finds these direct writes:
+
+| Address | Destination | Operation |
+|---|---|---|
+| 0x0E98 | RAM[0x3E] | MOV RAM[3E],A |
+| 0x0EE1 | RAM[0x3E] | MOV RAM[3E],A |
+| 0x148E | RAM[0x3E] | MOV RAM[3E],A |
+| 0x15AC | RAM[0x3E] | MOV RAM[3E],A |
+| 0x1699 | RAM[0x3E] | MOV RAM[3E],A |
+| 0x16C1 | RAM[0x3E] | MOV RAM[3E],A |
+| 0x1498 | RAM[0x3F] | MOV RAM[3F],#0x00 |
+| 0x14BD | RAM[0x3F] | MOV RAM[3F],A |
+| 0x16DF | RAM[0x3F] | MOV RAM[3F],#0x80 |
+
+This list is from reachable, instruction-aligned code in the current 64 KiB descrambled map. It is a direct-write inventory, not a semantic classification of every value.
+
+RAM[0x3F] is initialized to zero at 0x1498. The conditional path at 0x14B3–0x14BD can set it from a mode-indexed byte at XDATA page 0x20, ORed with 0x80. The interface routine at 0x16C8 tests bit 7 of this value; when the old FB byte has bit 3 set, the code writes 0x80 back into RAM[0x3F] at 0x16DF. Thus RAM[0x3F] is a transaction-control byte whose high bit directly gates the FB control-write branch. Its full semantic name remains unknown.
+
+RAM[0x3E] is a state byte written by the slot/resource paths and the loader. The code at 0x1694–0x1699 clears bit 5 in the value loaded from RAM[0x3E], then stores it back. Later branches test bits of this byte after loading it into A. It is therefore unsafe to describe E5 as a standalone global flag: in these locations it is simply bit 5 of RAM[0x3E]'s current value.
+
+### 15.3 What 0x104F actually does
+
+The reachable instructions show that 0x104F is not the voice-command writer. It is part of page/endpoint discovery and initialization:
+
+1. Load selected page RAM[0x2D] into A0.
+2. Derive a page-group value from the high nibble and store it in RAM[0x2B]; internal bit address 0x0D records one mode condition.
+3. Read status offset 0xFB.
+4. If ACC.5 is clear, read pointer bytes at offsets 0xFE and 0xFF, load DPTR, read/modify/write the pointed byte with mask 0xDF.
+5. Scan the page's low-offset control area and clear/initialize entries. The loop is bounded by the firmware's 0x30 guard.
+6. Scan endpoint descriptors at offsets 0x80, 0x88, ... 0xF8. A byte is a candidate when (value & 0x7E) == 0x16.
+7. On a candidate, switch A0 to page 0x80, prepare group/endpoint arguments, and call 0x0DCE and 0x0DB7; restore the original selected page and continue the scan.
+8. At completion, set bits 3 and 4 in status offset 0xFB, write 0xFF to offset 0x70, and return.
+
+The endpoint signature and the page-0x80 helper calls are direct observations. The endpoint's physical identity is still unknown. This routine should be modelled as discovery/initialization, not as proof of a sound-generation command.
+
+### 15.4 Deeper trace of 0x189D
+
+0x189D is called from 0x171D in the interface transaction. Its initial operations build a mode-indexed DPTR in XDATA page 0x28:
+
+- First read: offset 0x68 + RAM[0x28] → RAM[0x41].
+- Second read: offset 0x78 + RAM[0x28] → RAM[0x43].
+- Third read: offset 0x88 + RAM[0x28] → R3.
+- Fourth read: offset 0xA8 + RAM[0x28] → R4.
+
+It then replaces DPTR with the pointer in RAM[0x36:0x37]. Internal bit addresses 0x00–0x02 control three bit-addressable SFR bits:
+
+- if internal bit 0 is set, clear bit address 0xB5;
+- if internal bit 1 is set, clear bit address 0xB4;
+- if internal bit 2 is set, clear bit address 0xB1.
+
+The routine reads descriptor bytes through the pointer into RAM[0x38], RAM[0x39], RAM[0x3A], and RAM[0x3B], with additional branches that advance the pointer and alter RAM[0x2E]. It also sets the same SFR bits 0xB4, 0xB5, and 0xB1 again at several later points. These are direct writes to bit-addressable SFR space; whether the corresponding P3 pins are being used as GPIO control lines or alternate-function signals requires board-level corroboration.
+
+At 0x19BD, the routine loads DPTR with 0x1BC3 and executes JMP @A+DPTR. This is computed control flow. The current reachability disassembler intentionally stops at indirect jumps, so it cannot yet enumerate the complete mode-dispatch targets or claim that every branch of 0x189D has been decoded. This is now the next focused target: recover the table at 0x1BC3, determine its entry widths and target addresses, then decode each target independently.
+
+### 15.5 Consequences for the emulator
+
+- Represent ACC bits E0–E7 as aliases of the current accumulator, never as persistent global flags.
+- Represent bit addresses 0x00–0x02 as persistent internal RAM bits.
+- Represent bit addresses 0xB1, 0xB4, and 0xB5 as bit-addressable SFR bits, not ordinary RAM flags.
+- Model RAM[0x3E] and RAM[0x3F] as separate state bytes with the writers listed above.
+- Keep 0x104F in the page/endpoint initialization subsystem.
+- Do not complete the 0x189D model until the computed jump table at 0x1BC3 and its targets are decoded.
