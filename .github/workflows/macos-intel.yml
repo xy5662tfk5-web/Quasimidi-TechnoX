@@ -1,4 +1,5 @@
 name: macOS Intel build
+# Research branch also verifies the raw ROM SHA-1 values before further analysis.
 
 on:
   push:
