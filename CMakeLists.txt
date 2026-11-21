@@ -42,6 +42,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/PluginEditor.cpp
     Source/TechnoXPartModel.h
     Source/TechnoXSoundCatalog.h
+    Source/TechnoXPerformanceLayers.h
     Source/TechnoXMidiControlRouter.h
     Source/MASSVoiceManager.h
     Source/MASSModulationMatrix.h
