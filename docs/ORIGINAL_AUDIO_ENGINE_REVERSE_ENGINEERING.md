@@ -37,6 +37,10 @@ The byte-pattern scan is deliberately labelled as candidate data, not disassembl
 
 CI writes a text listing artifact named `technox-ic4-mcs51-disassembly`. The next analysis pass must annotate direct/indirect DPTR setup reaching each MOVX site, inspect ACIA access paths around `0xA000`, and correlate call graphs with MIDI status handling. The sound-chip address map remains unknown until code evidence or hardware documentation establishes it.
 
+### First external-memory / I/O cross-reference
+
+The first reachable-code pass finds an immediate DPTR setup to `0xA000` at code address `0xA7A0`, and three setups to `0xB000` at `0xA601`, `0xA654`, and `0xA669`. These addresses match the MAME driver's ACIA and LCD mappings respectively. This is strong evidence that reachable firmware code references both mapped devices. It does **not yet** prove which MOVX instructions use those values: the next pass prints the local instruction context and must follow DPTR through each basic block and any calls before assigning reads/writes to the ACIA. The sound-generation interface is still unidentified.
+
 ## Work sequence toward an authentic engine
 
 ### A. Identify the sound hardware
