@@ -3,6 +3,7 @@
 #include "TechnoXPerformanceBank.h"
 #include "TechnoXSoundCatalog.h"
 #include "TechnoXMidiControlRouter.h"
+#include "MASSAudioEngine.h"
 #include <array>
 #include <atomic>
 
@@ -48,6 +49,7 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MidiControlRouter midiControlRouter;
+    technox::MASSAudioEngine massEngine;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
