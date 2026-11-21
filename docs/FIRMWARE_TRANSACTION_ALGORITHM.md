@@ -834,4 +834,4 @@ The companion sequence therefore uses the fourth packet byte's bit 7 as a phase/
 
 This is substantially stronger evidence for a stateful external protocol than a bare four-byte memory write. It suggests a toggle/phase-controlled interface with a control strobe at offset 3 and a status read at offset 4. It still does not prove whether the receiving device is a sound generator, a register bridge, or another controller; nor does it establish that the offset-4 read is an acknowledgement without board/bus evidence.
 
-The direct reachable call sites to 0x0DCE are 0x0E08, 0x0F? [not yet fully cross-checked], 0x10F0, 0x26FD, 0x271C, 0x279D, and 0x27BF. The exact complete caller set should be regenerated after the next CFG pass; this list is not treated as exhaustive.
+The direct reachable call sites to 0x0DCE are 0x0E08, 0x10F0, 0x26FD, 0x271C, 0x279D, and 0x27BF. The exact complete caller set should be regenerated after the next CFG pass; this list is not treated as exhaustive.
