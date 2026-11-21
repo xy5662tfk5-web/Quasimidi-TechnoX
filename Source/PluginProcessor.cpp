@@ -143,6 +143,12 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isController()) {
             const auto change = midiControlRouter.handleControlChange(
                 message.getChannel(), message.getControllerNumber(), message.getControllerValue());
+            if (message.getControllerNumber() == 6) {
+                const auto rpn = midiControlRouter.decodeRpnDataEntry(
+                    message.getChannel(), message.getControllerValue());
+                if (rpn.has_value())
+                    massEngine.setRpn(12 + slot, rpn->parameterIndex, rpn->rawValue);
+            }
             if (message.getControllerNumber() == 80)
                 setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx1Type, message.getControllerValue());
             else if (message.getControllerNumber() == 81)
