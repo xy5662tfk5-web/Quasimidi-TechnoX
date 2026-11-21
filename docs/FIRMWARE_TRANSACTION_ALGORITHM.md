@@ -1383,3 +1383,69 @@ This establishes a second descriptor-to-Part-state path alongside the 0x0D80 slo
 - 0x02D1 derives a 16-bit word at 0x2000 + 3*PartIndex.
 
 The meaning of the 0x2054 scale byte, the two constant records, and the 0x2000 word is still unknown. Treat it as a per-Part fixed-point parameter output, not yet as a named pitch, frequency, envelope, or volume register.
+
+
+## 39. 0x1494 descriptor selector flags and per-Part slot page
+
+### 39.1 RAM[0x28] is a packed Part selector, not a plain bank number
+
+At 0x1494 the firmware first copies bits from RAM[0x28] into internal state:
+
+| Input bit in RAM[0x28] | Destination |
+|---|---|
+| bit 4 | internal bit 0x0E |
+| bit 5 | internal bit 0x04 |
+| bit 6 | internal bit 0x05 |
+| bit 7 | internal bit 0x06 |
+
+It then masks RAM[0x28] with 0x0F, leaving the zero-based Part index. Therefore the values prepared by the Note On routine have this exact flag interpretation:
+
+- P: Part P, no high selector flags.
+- P+0x10: Part P with internal bit 0x0E set.
+- P+0xC0: Part P with internal bits 0x05 and 0x06 set.
+- P+0xE0: Part P with internal bits 0x04, 0x05, and 0x06 set.
+
+This confirms that the +0xC0 and +0xE0 values in the Note On routine are packed mode/operation flags layered onto the Part index, not separate physical banks.
+
+### 39.2 Descriptor layout loaded by 0x1494
+
+The descriptor pointer is supplied in RAM[0x29:0x2A]. The loader reads its 12-byte record and extracts:
+
+| Descriptor byte | Result |
+|---:|---|
+| +0 | RAM[0x2F] = byte & 0x7F |
+| +1 | RAM[0x30] |
+| +2 | mapped through ROM table 0x1208 → RAM[0x31] |
+| +3 | RAM[0x33] |
+| +4 | RAM[0x34] |
+| +5 | RAM[0x37] |
+| +6 | RAM[0x36] |
+| +7 | skipped by this extraction pass |
+| +8 | skipped by this extraction pass |
+| +9 | low three bits copied to internal bit addresses 0x00–0x02 |
+| +10 | mapped through ROM table 0x1208 → RAM[0x32] |
+| +11 | RAM[0x35] |
+
+The loader also derives the Part index from RAM[0x28] and computes a per-Part external slot-page base:
+
+`0x2068 + 0x80 * PartIndex`
+
+If internal bit 0x06 is clear, RAM[0x2F] is added to this base to select an entry within the page. If bit 0x06 is set, the base is used without that offset at this stage. The loader then follows different slot/entry paths depending on RAM[0x30] (descriptor byte +1) and the selector flags.
+
+### 39.3 Zero and nonzero descriptor-byte-1 paths
+
+- If RAM[0x30] is zero and internal bit 0x06 is clear, the code reads a value from 0x28D8+PartIndex into RAM[0x45] and jumps to 0x0E8E.
+- If RAM[0x30] is zero and bit 0x06 is set, it clears bit 7 in the selected slot byte and scans the per-Part slot page for an entry whose status bit permits reuse. The scan updates RAM[0x2F] and the selected slot pointer.
+- If RAM[0x30] is nonzero, the loader may call 0x17D4 when RAM[0x52] is zero. Under bit 0x06 it sets bit 7 in the selected slot byte, writes RAM[0x30] to the following byte, and may repeat the update when internal bit 0x04 is set. Otherwise it continues through 0x1599.
+
+These paths establish a per-Part 0x80-byte slot/entry page and a busy/valid high-bit convention in its entries. They do not yet identify the downstream hardware or prove that each slot is one physical audio voice.
+
+### 39.4 0x1408 selects a byte lane and bit mask in the 0x2Axx area
+
+The helper at 0x1408 computes a small dispatch index from R5 and R6, then uses a code-space jump table at 0x1416 to return one of eight bit masks (01, 02, 04, 08, 10, 20, 40, 80) in R5 and a DPTR low address derived from R5. The resulting pointer is in the 0x2Axx external-RAM page. The caller at 0x0E8E uses this helper while inspecting or updating the slot/entry map.
+
+This is another indication that the descriptor loader maintains structured bit/slot state in external RAM, rather than writing a simple linear set of sound-chip registers.
+
+### 39.5 Next data-flow question
+
+The Note On routine sets RAM[0x29:0x2A] from the pointer stored at 0x2B98/0x2B99. That pointer is calculated as 0x2900 + 12*PartIndex. The Note On routine visibly writes the first two bytes of this 12-byte intermediate record, while 0x1494 consumes all 12 bytes. The next pass must inventory every writer to 0x2900 + 12*PartIndex and reconstruct the remaining ten bytes, including whether they come from sound definitions, preloaded Part state, or another descriptor table. This is the immediate bridge between the MIDI Note On path and the descriptor-driven slot allocator.
