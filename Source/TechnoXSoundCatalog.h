@@ -4,6 +4,7 @@
 #include "TechnoXPartModel.h"
 #include <array>
 #include <cstddef>
+#include <utility>
 
 namespace technox {
 
@@ -27,7 +28,7 @@ public:
         if (rootObject == nullptr)
             return false;
 
-        const auto banksValue = rootObject->getProperty("program_banks");
+        const auto banksValue = rootObject->getProperty(juce::Identifier("program_banks"));
         const auto* banksObject = banksValue.getDynamicObject();
         if (banksObject == nullptr)
             return false;
@@ -46,8 +47,8 @@ public:
                 if (entryObject == nullptr)
                     return false;
 
-                const int program = entryObject->getProperty("program").toString().getIntValue();
-                const auto name = entryObject->getProperty("name").toString();
+                const int program = entryObject->getProperty(juce::Identifier("program")).toString().getIntValue();
+                const auto name = entryObject->getProperty(juce::Identifier("name")).toString();
                 if (program < 0 || program >= static_cast<int>(kProgramsPerBank) || name.isEmpty())
                     return false;
 
