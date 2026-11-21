@@ -936,3 +936,26 @@ At entry to 0x0C59, R1 still points to slot offset +4. The routine then:
 This is consistent with a fixed-point interpolation/slew operation between adjacent eight-byte records, but the exact semantic label of the scale byte and the record pair is not yet proven. The key confirmed relationship is that the packet emitted to the external interface is derived from the current slot's three-byte state, the next slot's three-byte state, and a scale/control byte at +12.
 
 This gives a concrete path from the 16-slot record buffer to the external 0x8000 packet writer. The next step is to trace who populates slot offsets +1..+4 and +9..+13, then compare those writes with the 24-byte records at 0x7C15 + 0x18*index and with MIDI note/controller events.
+
+
+## 28. Current neutral field map for the eight-byte slot array
+
+The currently observed accesses support this provisional layout for each slot at base S = RAM[0x2E] + 8*n. These are access roles, not semantic parameter names:
+
+| Offset | Confirmed use |
+|---|---|
+| +0 | Status/class byte; scanner tests masks 0x38 and 0x10 |
+| +1 | First byte of the three-byte value sent to the external packet interface |
+| +2 | Second byte of that value |
+| +3 | Third byte; low three bits are data, while high bits participate in flags/phase handling |
+| +4 | Control/flag byte; bit 7 gates the 0x0C59 update path |
+| +5, +6 | Not yet assigned from the current trace |
+| +7 | Compared with a value read from page 0x20 and passed through helper 0x1848 |
+| +8 | Next slot base (because the stride is eight bytes) |
+| +9..+11 | Next slot's +1..+3 triple, used as the second endpoint of the delta calculation |
+| +12 | Scale/control byte used by the MUL AB path |
+| +13 | Additional flag/compare byte used when deciding whether to clear bit 7 at current slot +4 |
+
+The +9..+13 references are cross-slot reads: they belong to the next eight-byte slot, not to extra fields inside the current slot. This is why the 0x0C59 routine can compute a transition between adjacent slots.
+
+The slot array is therefore a separate structure from the 24-byte records at 0x7C15 + 0x18*index. Their relationship is still unproven; do not merge these two layouts in the emulator data model yet.
