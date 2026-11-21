@@ -182,3 +182,14 @@ The most promising chain to follow now is:
 `0x5671 (Note On) -> 0x4256 -> per-slot XDATA 0x7Cxx -> 0xABBF / 0xAC00 / 0xAC88 -> descriptor 0x1494 -> 0x16C3 / 0x189D`.
 
 The key unresolved question is what the per-slot `0x7Cxx` fields and the resulting 13-byte descriptor mean at the hardware boundary.
+
+## 17. Downstream helpers used by the Note On descriptor path
+
+The helpers reached from `0x4256` have now been classified at the level supported by the disassembly:
+
+- `0xABBF` is a value remapper. It handles zero specially; maps selector `R5=7` to constant `0x55`; for values above 7 it reflects the input around `0x80` and clears selected internal flags; otherwise it indexes a code-memory lookup table beginning at `0xA8BF`, with 128-byte selector pages. It is a translation function, not a hardware write.
+- `0xAC00` computes a per-event byte index as `16*eventID + floor(selector/8)`, selects XDATA page `0x35`, then dispatches through a 14-way computed jump table. It is a bit/field update helper for an event-slot data structure.
+- `0xAC88` uses the same per-event indexing and XDATA page `0x35`, but its computed jump table has 17 cases and it also receives an extra mask/value in `R3`. It is a companion field/bit update helper.
+- `0x695A` reads per-slot mode `XDATA[0x7C00 + 0x18*eventID + 0x19]` and chooses a translated value using table `0x72DA` and event/selector fields. This feeds the descriptor path.
+
+These helpers manipulate and translate structured per-slot state. The descriptor transaction `0x1494` remains the first confirmed boundary where a 13-byte record is consumed and a hardware-facing exchange sequence may begin. The exact physical target of the XDATA page `0x35` and the `0x7Cxx` windows remains unidentified without a board schematic or trace.
