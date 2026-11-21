@@ -1926,3 +1926,33 @@ The current pass establishes the existence and ordering of those signature gates
 ### 59.4 Revised priority
 
 The 0x2000 result array is not yet a proven audio-parameter store. The higher-value immediate target is now the endpoint record lifecycle: find who creates/initializes the eight-byte records, map every field write against the three 0x0D0E tests, then connect the accepted record to the 0x0A57 / 0x0DB7 output path.
+
+
+## 60. Endpoint-record lifecycle: second pass
+
+### 60.1 Confirmed readers and record stride
+
+The 0x0D0E matcher uses RAM[0x2E] as the current record pointer and reads record bytes through the XDATA-indirect `MOVX A,@R1` path. The scan advances the candidate pointer in eight-byte steps. It applies masked tests to record bytes at offsets +0, +1, and +2 before calling 0x0D80. The match is therefore a structured record lookup, not a linear search over arbitrary parameter bytes.
+
+The downstream routine 0x0A57 independently reads the same record through offsets +1, +2, +3, +4, and +7. In particular:
+- +1 is tested for zero and retained as a working value.
+- +4 is tested for zero and can supply a value combined with XDATA 0x2040+RAM[0x30].
+- +7 is compared against R3 before the record is accepted for the ordinary path.
+- +2 and +3 participate in the branch/control and arithmetic preparation.
+This is direct evidence that the eight-byte record carries multiple typed fields consumed by the output preparation path. Their semantic names are still unknown.
+
+### 60.2 0x0D80 updates the matched record
+
+After a candidate passes the three signature predicates, 0x0D80 derives a value from RAM[0x29]/RAM[0x2A] and the matched record pointer. It writes the resulting byte to record offset +1, sets internal bit 0x09, calls 0x0A57, clears bit 0x09, and returns. This confirms offset +1 is a mutable field in the matched endpoint record, not just a static signature byte.
+
+### 60.3 Two related scan/output paths
+
+The code contains a second scan path beginning around 0x0F52. It also walks the page-0x80 record region with an eight-byte stride, filters candidates using masked signature values, and can call 0x0DB7 to emit a four-byte output packet. The discovery helper at 0x1009 scans the same page in eight-byte steps and recognizes records with the signature predicate `(value & 0x7E) == 0x16`, then submits the selected channel through 0x0DB7.
+
+The same eight-byte record geometry is therefore used by both endpoint matching and endpoint discovery/output. The precise relationship between the 0x0D0E selector match and the 0x1009 signature-discovery path remains to be proven.
+
+### 60.4 Current confidence boundary
+
+Confirmed: eight-byte XDATA records; scan in the page-0x80 region; signature filtering; record offsets +1/+2/+3/+4/+7 read by 0x0A57; +1 rewritten by 0x0D80; accepted records feed the 0x0A57 -> 0x0DB7 preparation/output chain.
+
+Not yet confirmed: the real hardware register meanings of the eight fields, whether the record is a hardware voice/channel descriptor or a transport/endpoint descriptor, and whether the 0x8000 packet directly controls the sound generator.
