@@ -251,6 +251,7 @@ public:
 
     void prepare(double sampleRate, int maximumBlockSize) {
         backend_->prepare(sampleRate, maximumBlockSize);
+        voices_.reset();
     }
 
     void noteOn(std::uint8_t part, std::uint8_t channel,
