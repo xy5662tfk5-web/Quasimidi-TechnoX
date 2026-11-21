@@ -259,6 +259,16 @@ def main() -> None:
     lines += ["", "REACHABLE MOV DPTR,# CONSTANTS (static immediate operands)"]
     for value, count in sorted(dptr_constants.items(), key=lambda item: (-item[1], item[0])):
         lines.append(f"0x{value:04X}: {count} occurrence(s)")
+    lines += ["", "MAME-MAPPED I/O ADDRESS SETUPS AND LOCAL CONTEXT"]
+    for target in (0xA000, 0xB000):
+        matches = [pc for pc in ordered if code[pc] == 0x90 and
+                   ((code[pc + 1] << 8) | code[pc + 2]) == target]
+        lines.append(f"DPTR <- 0x{target:04X}: " + (", ".join(f"0x{x:04X}" for x in matches) or "no reachable immediate setup"))
+        for site in matches:
+            lines.append(f"  context around 0x{site:04X}:")
+            idx = ordered.index(site)
+            for nearby_pc in ordered[max(0, idx - 4):idx + 9]:
+                lines.append(f"    {nearby_pc:04X}  {insns[nearby_pc].raw:<11} {insns[nearby_pc].text}")
     # Lexical-neighborhood hints only: these are NOT proven register dataflow.
     lines += ["", "MOVX NEARBY DPTR-IMMEDIATE HINTS (heuristic, not proof)"]
     for index, pc in enumerate(ordered):
@@ -277,7 +287,9 @@ def main() -> None:
     movx_count = sum(1 for pc in insns if code[pc] in movx_ops)
     print(f"MOVX sites: {movx_count}")
     print("Reachable MOV DPTR,# constants: " + ", ".join(f"0x{x:04X}" for x in sorted(dptr_constants)))
-    print(f"Direct DPTR setup for ACIA 0xA000: {dptr_constants.get(0xA000, 0)}; LCD 0xB000: {dptr_constants.get(0xB000, 0)}")
+    for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
+        sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
+        print(f"{label} DPTR 0x{target:04X} setup sites: " + (", ".join(f"0x{x:04X}" for x in sites) or "none"))
     print(f"Listing written: {args.output}")
 
 
