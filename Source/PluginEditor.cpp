@@ -56,6 +56,23 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
     };
     addAndMakeVisible(midiChannelSelector);
 
+    routingModeLabel.setText("MIDI ROUTING", juce::dontSendNotification);
+    routingModeLabel.setColour(juce::Label::textColourId, juce::Colour(0xffd8dde3));
+    addAndMakeVisible(routingModeLabel);
+    routingModeSelector.addItem("Performance Omni", 1);
+    routingModeSelector.addItem("Part Channels", 2);
+    routingModeSelector.setSelectedId(
+        audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni ? 1 : 2,
+        juce::dontSendNotification);
+    routingModeSelector.onChange = [this] {
+        audioProcessor.setMidiRoutingMode(
+            routingModeSelector.getSelectedId() == 2
+                ? MidiRoutingMode::partChannels : MidiRoutingMode::performanceOmni);
+        refreshPartControls();
+        repaint();
+    };
+    addAndMakeVisible(routingModeSelector);
+
     for (std::size_t i = 0; i < parameterSliders.size(); ++i) {
         const auto* descriptor = technox::PartEditModel::descriptor(i);
         parameterLabels[i].setText(descriptor != nullptr ? descriptor->name : "Parameter",
@@ -94,6 +111,8 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
     partSelector.setBounds(112, 122, 120, 26);
     midiChannelLabel.setBounds(260, 124, 112, 22);
     midiChannelSelector.setBounds(374, 122, 64, 26);
+    routingModeLabel.setBounds(470, 124, 104, 22);
+    routingModeSelector.setBounds(576, 122, 164, 26);
 
     for (std::size_t i = 0; i < parameterSliders.size(); ++i) {
         const int column = static_cast<int>(i / 6);
@@ -115,6 +134,10 @@ void QuasimidiTechnoXAudioProcessorEditor::refreshPartControls()
     refreshingControls = true;
     midiChannelSelector.setSelectedId(audioProcessor.getPartMidiChannel(selectedPartSlot),
                                       juce::dontSendNotification);
+    midiChannelSelector.setEnabled(audioProcessor.getMidiRoutingMode() == MidiRoutingMode::partChannels);
+    routingModeSelector.setSelectedId(
+        audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni ? 1 : 2,
+        juce::dontSendNotification);
     for (std::size_t i = 0; i < parameterSliders.size(); ++i) {
         const auto* descriptor = technox::PartEditModel::descriptor(i);
         const int raw = audioProcessor.getPartParameterRaw(
@@ -152,8 +175,9 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     const auto name = audioProcessor.getCurrentPerformanceName();
     g.drawText(juce::String(audioProcessor.getCurrentProgram() + 1).paddedLeft('0', 2)
                    + " " + name, 237, 43, 145, 14, juce::Justification::left, false);
-    g.drawText("Part:" + juce::String(13 + selectedPartSlot)
-                   + "  Ch:" + juce::String(audioProcessor.getPartMidiChannel(selectedPartSlot)),
+    const auto midiLabel = audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+        ? juce::String("OMNI") : juce::String("Ch:") + juce::String(audioProcessor.getPartMidiChannel(selectedPartSlot));
+    g.drawText("Part:" + juce::String(13 + selectedPartSlot) + "  " + midiLabel,
                237, 56, 145, 15, juce::Justification::left, false);
     g.setFont(juce::Font("Courier New", 8.5f, juce::Font::bold));
     const auto soundName = audioProcessor.getCurrentPartSoundName(selectedPartSlot);
@@ -164,8 +188,10 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(14.0f, juce::Font::bold));
     g.drawText("PART PARAMETER EDITOR", 20, 153, 320, 20, juce::Justification::left, false);
     g.setFont(juce::Font(10.0f));
-    g.drawText("MIDI CC / NRPN input follows the assigned MIDI channel.",
-               350, 153, 820, 20, juce::Justification::right, false);
+    const auto routingHint = audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+        ? juce::String("All incoming channels trigger the active Performance layers.")
+        : juce::String("MIDI channels are assigned individually to Parts 13–16.");
+    g.drawText(routingHint, 350, 153, 820, 20, juce::Justification::right, false);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
