@@ -171,6 +171,9 @@ public:
     void reset(int partIndex) noexcept {
         setPortamento(partIndex, false);
         setSoftPedal(partIndex, false);
+        if (partIndex >= 0 && partIndex < static_cast<int>(kPartCount))
+            for (auto& rpn : rpnValues_[static_cast<std::size_t>(partIndex)])
+                rpn.store(-1, std::memory_order_release);
     }
 private:
     std::array<std::atomic<int>, kPartCount> portamento_{};
