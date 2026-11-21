@@ -978,3 +978,51 @@ The routine then examines slot +3 and +2, branches on their flag bits, and eithe
 The 0x0B3F path can emit a packet through 0x0DB7 or take the direct read/modify/write path at 0x0B5C. Thus 0x0A57 is a confirmed service/transform stage for the eight-byte slot array, and the slot scanner reaches the external packet interface through it.
 
 The exact meaning of the XDATA 0x20:0x40+RAM[0x30] comparison and the slot flags remains open. It is not yet safe to call these fields pitch, envelope, note, or voice status.
+
+
+## 30. MIDI Note On reaches the four Performance Parts and the external packet path
+
+The instruction path from the MIDI channel-voice parser is now connected to the descriptor/packet machinery.
+
+### 30.1 Parsed MIDI event fields
+
+At 0x57A8 the parser saves:
+- original status byte from R7 into RAM[0x60];
+- note number from R5 into RAM[0x61];
+- velocity from R3 into RAM[0x62];
+- channel nibble into RAM[0x63].
+
+It then normalizes RAM[0x60] to the status high nibble (0x09 for Note On, 0x08 for Note Off).
+
+For Note On with nonzero velocity, the path at 0x57EA increments the active-note counter at XDATA 0x3039 and jumps to the event-dispatch routine at 0x593D. Note On with zero velocity follows the release/Note-Off handling path.
+
+### 30.2 Four Performance-Part dispatch flags
+
+At 0x593D the firmware reads XDATA 0x7BD5 and sets a mask across internal bits 0x2F–0x32. The exact mapping observed in the branch tree is:
+
+- 0x7BD5 = 1: set bits 0x2F and 0x30.
+- 0x7BD5 = 2: set bits 0x2F, 0x30, and 0x31.
+- 0x7BD5 = 3: set bits 0x2F, 0x30, 0x31, and 0x32.
+- Other values in the tested branch path: set only bit 0x2F.
+
+For each set bit, 0x593D calls 0x5671 with R7 set to 0x0C, 0x0D, 0x0E, or 0x0F respectively; R5 receives the normalized status nibble, R3 receives the note number, and RAM[0x67] receives velocity. These are zero-based Part indices 12–15, corresponding to Parts 13–16 in one-based manual terminology.
+
+This is a direct code-level link between the four Performance Part blocks and the event dispatcher. The value at 0x7BD5 controls a cumulative enable mask, but its user-facing parameter name is not assigned here.
+
+### 30.3 Note On dispatch to 0x4256
+
+Within 0x5671, the Note On status path (R5=0x09) preserves the Part index, note, and velocity. Under the routine's state gates, it calls 0x4256 with:
+
+- R7 = Part index (0x0C–0x0F)
+- R5 = note number
+- R3 = velocity
+
+This is the input contract of 0x4256 confirmed from both its caller and its own register saves at entry.
+
+### 30.4 0x4256 to descriptor loader to external device
+
+The 0x4256 routine calculates the per-Part 24-byte record address using 0x7C15 + 0x18 * PartIndex, updates associated working records, and prepares descriptor pointers in RAM[0x29:0x2A] from XDATA 0x2B98. It then calls 0x1494 at multiple points (including 0x4403, 0x442C, 0x4455, 0x4467, and 0x44A6).
+
+The 0x1494 loader consumes those descriptor pointers and reaches the 0x189D / 0x1BC3 dispatch machinery. The decoded handlers construct the external four-byte transactions described in sections 17–24, including the writes through 0x0DB7 and the direct 0x8000–0x8003 path.
+
+This establishes a concrete software route from MIDI Note On to the external hardware interface through the Part record and descriptor system. It does not yet establish the receiving IC's identity or prove which packet fields correspond to pitch, sample address, envelope, or other synthesis parameters.
