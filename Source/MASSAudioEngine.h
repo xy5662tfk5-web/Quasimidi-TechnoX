@@ -249,7 +249,27 @@ public:
     explicit MASSAudioEngine(IMASSVoiceBackend* backend = nullptr) noexcept
         : backend_(backend != nullptr ? backend : &nullBackend_) {}
 
+    // Install a different DSP implementation while the host is stopped.
+    // The engine owns neither backend; the supplied object must outlive it.
+    // This is the hand-off point for the recovered original TechnoX M.A.S.S.
+    // backend. Existing voices are discarded so no state leaks between DSPs.
+    void setBackend(IMASSVoiceBackend* backend) noexcept {
+        for (std::size_t i = 0; i < voices_.voices().size(); ++i)
+            if (voices_.voices()[i].active)
+                backend_->resetVoice(static_cast<int>(i), voices_.voices()[i]);
+        voices_.reset();
+        backend_ = backend != nullptr ? backend : &nullBackend_;
+        if (prepared_)
+            backend_->prepare(preparedSampleRate_, preparedMaximumBlockSize_);
+    }
+
+    IMASSVoiceBackend* backend() noexcept { return backend_; }
+    const IMASSVoiceBackend* backend() const noexcept { return backend_; }
+
     void prepare(double sampleRate, int maximumBlockSize) {
+        preparedSampleRate_ = sampleRate;
+        preparedMaximumBlockSize_ = maximumBlockSize;
+        prepared_ = true;
         backend_->prepare(sampleRate, maximumBlockSize);
         voices_.reset();
     }
@@ -347,6 +367,9 @@ public:
 private:
     NullMASSVoiceBackend nullBackend_;
     IMASSVoiceBackend* backend_;
+    double preparedSampleRate_ = 44100.0;
+    int preparedMaximumBlockSize_ = 0;
+    bool prepared_ = false;
     VoiceManager voices_;
     ModulationMatrix modulation_;
     MASSPartParameterStore partParameters_;
