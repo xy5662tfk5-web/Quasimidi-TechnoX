@@ -15,18 +15,16 @@ namespace technox::firmware {
 struct MailboxWrite {
     static constexpr std::uint16_t kBaseAddress = 0x8000;
     std::array<std::uint8_t, 4> bytes{};
-    // Firmware clears internal bit 0x0C, then sets it iff the separate E7 flag is set.
+    // 0x0DB7 loads R4 into ACC, clears ACC.6, writes it, then mirrors ACC.7
+    // into internal bit 0x0C. Therefore this flag follows the original R4 bit 7.
     bool setInternalFlag0C = false;
 };
 
 inline MailboxWrite makeMailboxWrite(std::uint8_t r5, std::uint8_t r2,
-                                     std::uint8_t r3, std::uint8_t r4,
-                                     bool setFlag0C) noexcept {
+                                     std::uint8_t r3, std::uint8_t r4) noexcept {
     MailboxWrite result{};
     result.bytes = {r5, r2, r3, static_cast<std::uint8_t>(r4 & 0xBF)};
-    // Firmware clears bit 0x0C and sets it only when the separate E7 flag is set.
-    // E7 is not derived from bit 7 of the fourth mailbox byte.
-    result.setInternalFlag0C = setFlag0C;
+    result.setInternalFlag0C = (r4 & 0x80) != 0;
     return result;
 }
 
@@ -83,8 +81,11 @@ inline MailboxScanResult scanMailboxEntries(const XDataMemory& memory,
 
         result.visitedOffsets[result.visitedCount++] = static_cast<std::uint8_t>(offset);
         if ((value & kMailboxEntryMarkerMask) == kMailboxEntryMarker) {
+            // At the 0x1045 call site, ACC is zeroed and ACC.7 is set iff
+            // firmware flag 0x0D is set; MOV R4,A passes that value to 0x0DB7.
+            const auto r4 = static_cast<std::uint8_t>(flag0D ? 0x80 : 0x00);
             result.writes[result.writeCount++] = makeMailboxWrite(
-                result.nextSequence, 0x80, 0x01, 0x00, flag0D);
+                result.nextSequence, 0x80, 0x01, r4);
         }
         result.nextSequence = static_cast<std::uint8_t>(result.nextSequence + 1);
     }
