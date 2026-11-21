@@ -87,7 +87,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& eve
             performanceSelector.setSelectedId(next + 1, juce::sendNotification);
         }
         else if (p.y >= 57)
-            partNumber = juce::jlimit(1, 16, partNumber + (p.x < 428 ? -1 : 1));
+            partNumber = juce::jlimit(13, 16, partNumber + (p.x < 428 ? -1 : 1));
     }
     else if (p.x >= 218 && p.x <= 260 && p.y >= 35 && p.y <= 78)
         parameterNumber = (parameterNumber % 128) + 1;
