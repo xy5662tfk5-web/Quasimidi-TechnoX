@@ -34,6 +34,15 @@ jobs:
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_performance_layers.cpp -o /tmp/test_performance_layers && /tmp/test_performance_layers
       - name: Analyze TechnoX v1.05 ROM images
         run: python3 tools/analyze_technox_rom.py --write-descrambled-ic4 build/technox_ic4_descrambled.bin
+      - name: Disassemble reachable TechnoX MCS-51 firmware
+        run: python3 tools/disassemble_technox_8051.py --output build/technox_ic4_disassembly.txt
+      - name: Upload TechnoX firmware disassembly
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-ic4-mcs51-disassembly
+          path: build/technox_ic4_disassembly.txt
+          if-no-files-found: error
+          compression-level: 6
       - name: Upload descrambled IC4 research image
         uses: actions/upload-artifact@v4
         with:
