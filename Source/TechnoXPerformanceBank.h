@@ -65,7 +65,7 @@ public:
         std::vector<Performance> parsed;
         parsed.reserve(kExpectedPerformances);
         constexpr std::array<std::uint8_t, 5> header{{0xF0, 0x3F, 0x00, 0x22, 0x44}};
-        constexpr std::array<std::uint8_t, 6> types{{0x05, 0x00, 0x01, 0x02, 0x03, 0x04}};
+        constexpr std::array<std::uint8_t, 6> blockSelectors{{0x05, 0x00, 0x01, 0x02, 0x03, 0x04}};
         constexpr std::array<std::size_t, 6> sizes{{16, 73, 32, 32, 32, 32}};
 
         for (std::size_t record = 0; record < kExpectedPerformances; ++record) {
@@ -77,7 +77,7 @@ public:
                 const auto& frame = frames[base + block];
                 if (frame.size() != sizes[block] || frame.back() != 0xF7) return false;
                 if (!std::equal(header.begin(), header.end(), frame.begin())) return false;
-                if (frame[5] != sourceIndex || frame[6] != types[block]) return false;
+                if (frame[5] != sourceIndex || frame[6] != blockSelectors[block]) return false;
                 for (std::size_t i = 1; i + 1 < frame.size(); ++i)
                     if (frame[i] > 0x7F) return false;
             }
@@ -88,10 +88,10 @@ public:
             p.name.assign(nameFrame.begin() + 7, nameFrame.end() - 1);
             while (!p.name.empty() && (p.name.back() == ' ' || p.name.back() == '\0'))
                 p.name.pop_back();
-            p.nameBlock = {types[0], nameFrame};
-            p.commonBlock = {types[1], frames[base + 1]};
+            p.nameBlock = {blockSelectors[0], nameFrame};
+            p.commonBlock = {blockSelectors[1], frames[base + 1]};
             for (std::size_t part = 0; part < 4; ++part)
-                p.parts[part] = {types[part + 2], frames[base + part + 2]};
+                p.parts[part] = {blockSelectors[part + 2], frames[base + part + 2]};
             parsed.push_back(std::move(p));
         }
         records_ = std::move(parsed);
