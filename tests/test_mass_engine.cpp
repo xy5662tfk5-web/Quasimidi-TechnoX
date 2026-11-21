@@ -8,6 +8,9 @@ int main() {
     assert(engine.setPartParameter(12, PartParameter::cutoffFrequency, 91));
     assert(engine.getPartParameter(12, PartParameter::cutoffFrequency) == 91);
     assert(!engine.setPartParameter(16, PartParameter::cutoffFrequency, 91));
+    assert(engine.setModWheel(15, 127));
+    assert(engine.getModWheel(15) == 127);
+    assert(!engine.setModWheel(16, 127));
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
     engine.noteOff(1, 48);
