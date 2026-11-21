@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -88,21 +89,22 @@ public:
             parsed.push_back(std::move(p));
         }
         records_ = std::move(parsed);
-        selected_ = 0;
+        selected_.store(0, std::memory_order_release);
         return true;
     }
 
     std::size_t count() const noexcept { return records_.size(); }
-    std::size_t selectedIndex() const noexcept { return selected_; }
+    std::size_t selectedIndex() const noexcept { return selected_.load(std::memory_order_acquire); }
     const Performance* current() const noexcept {
-        return records_.empty() ? nullptr : &records_[selected_];
+        const auto index = selectedIndex();
+        return index < records_.size() ? &records_[index] : nullptr;
     }
     const Performance* at(std::size_t i) const noexcept {
         return i < records_.size() ? &records_[i] : nullptr;
     }
     bool select(std::size_t i) noexcept {
         if (i >= records_.size()) return false;
-        selected_ = i;
+        selected_.store(i, std::memory_order_release);
         return true;
     }
     bool selectSourceIndex(std::uint8_t id) noexcept {
@@ -113,6 +115,6 @@ public:
 
 private:
     std::vector<Performance> records_;
-    std::size_t selected_ = 0;
+    std::atomic<std::size_t> selected_{0};
 };
 } // namespace technox
