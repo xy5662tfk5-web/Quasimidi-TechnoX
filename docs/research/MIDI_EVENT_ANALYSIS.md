@@ -109,3 +109,16 @@ This is a parameter translation/staging step associated with Note On, not proof 
 1. Decode `0xBC3F`, `0xB3BC`, and their table inputs to identify what Note On values are transformed into.
 2. Trace readers of `0x2971–0x2975` and writes to the `0x7C15 + 0x18*eventID` blocks.
 3. Compare event IDs `0x0C–0x0F` with the firmware's Part-selection and Performance parameter mapping before claiming a four-Part correspondence.
+
+## 11. Note On staging is a parameter conversion, not a sample trigger
+
+Further inspection of `0x418E`, `0xBC3F`, and `0xB3BC` narrows the interpretation:
+
+- `0x418E` receives the event-slot ID in `R7`, MIDI message class in `R5`, and the first data byte in `R3`. On Note On (`R7` at entry is the message class value `0x09`), it clamps `R3` to `0x1F`, calls `0xBC3F`, and then writes derived values to `0x2971–0x2972` plus a selector `0x06` to `0x2975`.
+- `0xBC3F` is a bulk table-copy routine. It selects ROM table data using the argument, copies a block into XDATA beginning at `0x3710`, and for indices at/above `0x18` uses a second table region beginning around code address `0x3CAB`. It is not itself a voice allocator.
+- `0xB3BC` reads a two-byte value from a table via `0xB385` and `0xB395`; `0x418E` uses it to derive the pair at `0x2971–0x2972`.
+- The only reachable readers of `0x2971` in this disassembly are in `0x446B` (which reads `0x2971–0x2972` and `0x2975`, transforms them, and submits descriptor `09 29 6C` to `0x1494`) and adjacent parameter-update code. This is a descriptor/parameter transaction chain, not proof of audio waveform access.
+
+Consequently, the best-established current chain is:
+`MIDI Note On/Off -> 0x57A8 -> 0x593D -> event slots 0x0C..0x0F -> 0x5671 -> 0x418E -> lookup/table conversion -> 0x446B -> 0x1494`.
+The final hardware voice trigger and sample/DSP interface remain unresolved. This is now the next reverse-engineering boundary.
