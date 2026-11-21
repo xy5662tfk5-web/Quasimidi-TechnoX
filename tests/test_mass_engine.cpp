@@ -29,6 +29,7 @@ int main() {
     assert(engine.setSoftPedal(12, true) && engine.softPedal(12));
     engine.resetPartControllers(12);
     assert(!engine.portamento(12) && !engine.softPedal(12) && engine.getModWheel(12) == 0);
+    assert(engine.getRpn(12, 0) == -1 && engine.getRpn(12, 1) == -1);
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
     engine.noteOff(1, 48);
