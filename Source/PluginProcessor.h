@@ -39,6 +39,8 @@ public:
     juce::String getCurrentPartSoundName(int partIndex) const;
     int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
     bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    int getCommonControlRaw(int performanceIndex, technox::MASSCommonControl control) const noexcept;
+    bool setCommonControlRaw(int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept;
     bool getEditedPartSysEx(int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const;
     int getPartMidiChannel(int partIndex) const noexcept;
     bool setPartMidiChannel(int partIndex, int midiChannel) noexcept;
@@ -53,6 +55,7 @@ private:
     technox::MidiControlRouter midiControlRouter;
     technox::MASSAudioEngine massEngine;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
+    std::array<std::array<std::atomic<int>, 4>, 50> commonValues{};
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
     void initialisePartStates();
