@@ -7,6 +7,8 @@ Status: research branch opened; no claim of original DSP emulation yet.
 - Verified v1.05 IC4 program image: 128 KiB, CRC32 `4d393cd9`, SHA-1 `9ee853f1e2f88fbfc86589c4d0f91003d0ff146f`.
 - Verified v1.05 IC51 image: 128 KiB, CRC32 `d669570e`, SHA-1 `0645a1b022ed25a836152933e6df32da4448f49a`.
 - MAME configures an I8032/MCS-51-family CPU and applies a 256-byte-block address descrambler to the **program** region only.
+- The current MAME driver maps CPU program addresses `0x0000–0xFFFF` to the **first 64 KiB** of the 128 KiB IC4 region and explicitly leaves banking as `TODO`. It maps external data memory separately: RAM at `0x0000–0x38FF`, ACIA at `0xA000`, and LCD at `0xB000`. These are emulator mappings, not proof that the physical board has no additional bank logic.
+- The TechnoX IC4 dump is identified by MAME as version `1.05b`; IC51 is a 128 KiB `nm27c010_v105` sample-region dump. The driver applies the same program-ROM descrambler to TechnoX and Quasar, but does not transform IC51.
 - MAME marks TechnoX `NO_SOUND | NOT_WORKING`; it does not document or emulate the sound device, sample codec, or playback path.
 - IC51 is declared as a samples region, but its 128 KiB dump does not reconcile with period descriptions of a much larger sample memory. It is not safe to treat it as the complete waveform library.
 - The project already has the 50 factory Performance records, four Part blocks per Performance, 512 program names, the documented 24 Part parameters, and a working MIDI/audio prototype. Those control-layer assets do not identify the synthesis algorithms.
@@ -22,7 +24,7 @@ python3 tools/analyze_technox_rom.py
 The utility:
 1. Verifies the raw IC4/IC51 identities against known hashes.
 2. Reproduces MAME's IC4 descrambling on a separate in-memory working image.
-3. Prints the 8051 interrupt-vector bytes and candidate call/jump/DPTR references.
+3. Prints the 8051 interrupt-vector bytes and candidate call/jump/DPTR references. These byte scans are only reconnaissance; the next task is instruction-boundary-aware control-flow disassembly from reset and interrupt vectors, with explicit treatment of the unresolved upper 64 KiB/banking question.
 4. Reports IC51 raw non-0xFF spans without assigning them sample boundaries.
 5. Can optionally write a descrambled IC4 working copy with `--write-descrambled-ic4 PATH`.
 
