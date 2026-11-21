@@ -1083,7 +1083,7 @@ The safe conclusion is:
 - The mapped result becomes byte +1 of the per-Part 12-byte event descriptor.
 - This mapped byte then participates in the 0x1494 descriptor processing that ultimately feeds the external packet path.
 
-Do not yet label the field as velocity curve, key curve, or sample-zone curve in the emulator API. The table shapes make a response-curve interpretation plausible, but caller-side value ranges and the exact lookup index semantics must be confirmed first.
+The official Owner's Manual identifies Part offset 0x11 as Velocity Curve, range 0–14. The firmware evidence now independently confirms that this byte is passed through the ROM response-table mapper. The exact internal mapping from all 15 documented curve values to the six observed ROM blocks and the helper's fixed indices remains to be resolved.
 
 
 ## 34. The Part-record lookup selector at offset +0x11 defaults to zero
@@ -1097,4 +1097,4 @@ This confirms the default behavior of the lookup field:
 - 0xABBF maps selector zero to the sentinel/default value 0xEF.
 - Nonzero selector values take the ROM-table mapping path or special-case branches.
 
-The six monotonic 128-byte ROM blocks at 0xA8BF–0xABBE are therefore optional mappings selected by a Part-record field, while zero selects the default 0xEF value. The user-facing name of this setting remains unconfirmed.
+The six monotonic 128-byte ROM blocks at 0xA8BF–0xABBE are therefore optional mappings selected by a Part-record field, while zero selects the default 0xEF value. The user-facing name is manual-confirmed as Velocity Curve (Part parameter offset 0x11, range 0–14). The helper's exact internal mapping for all 15 values remains open.
