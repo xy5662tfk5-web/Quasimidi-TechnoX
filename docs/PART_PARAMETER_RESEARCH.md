@@ -16,9 +16,12 @@ RPN/NRPN selectors (98–101) and Data Entry (6) are represented as MIDI control
 
 The supplied bank dump contains 200 Part frames: four 33-byte complete frames for each of 50 Performances. The empirical frame envelope is:
 
-- bytes 0–6: \`F0 3F 00 22 44 <type 01..04> <performance index>\`
-- bytes 7–30: 24 opaque 7-bit data bytes
-- byte 31: \`F7\`
+- bytes 0–4: \`F0 3F 00 22 44\`
+- byte 5: Performance source index (0x05–0x36)
+- byte 6: block selector (0x01–0x04 for Part blocks)
+- byte 7: reserved zero byte in this factory dump
+- bytes 8–31: 24 Part parameter bytes (manual offsets 0x00–0x17)
+- byte 32: \`F7\`
 
 The manual now supplies the official 24-byte Part parameter map. The manual parameter data begins at complete-message byte 8; the parser retains every complete frame unchanged.
 
