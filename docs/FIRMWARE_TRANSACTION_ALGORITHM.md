@@ -2191,3 +2191,18 @@ At 0xAC00, after the shared address calculation, the firmware loads A with 0x0E,
 ### 70.4 Caller constraints and current conclusion
 
 The only direct call to 0xAC00 found in the descrambled ROM is at 0x433D; the only direct call to 0xAC88 is at 0x43E8. Both are within 0x4256, which supplies R7/R5/R3 from its Part/event-processing context. The bank values 0x35 and 0x36, the computed byte offset, and the bit-lane dispatch are confirmed from instruction semantics. The physical device identity and the meaning of the two banks are not established by this code alone.
+
+
+## 71. Part-field translation helper 0x695A and its separation from bus writes
+
+### 71.1 0x695A is a Part-field mapper, not a hardware transaction
+
+The routine at 0x695A reads the Part record byte at offset +0x19 from `0x7C00 + 24*R7`. It classifies the value into several ranges, consults lookup table 0x72DA (and, in a secondary path, 0x72EA), and writes the mapped result into the Part descriptor at `0x2900 + 12*R7`, offset +3. The helper therefore translates a stored Part-record field into a compact descriptor field; it does not perform MOVX bus access or call the 0x0DB7 mailbox writer.
+
+### 71.2 Use inside 0x4256
+
+0x4256 calls 0x695A at 0x43D0 after loading the current Part index and event/Part context into registers. This call is adjacent to the later 0xAC88 external-bus operation, but the two operations are distinct: 0x695A updates the in-memory descriptor using a ROM lookup, whereas 0xAC88 performs the banked P2/MOVX bit update. The caller's ordering shows descriptor/Part preparation around the bus operation, not that the lookup result itself is a bus payload.
+
+### 71.3 Independent callers corroborate helper role
+
+Other direct callers include 0x5345 and 0x6BE1. The 0x5345 path also supplies a Part index and zeroed auxiliary registers before calling 0x695A. This supports interpreting 0x695A as a reusable Part-field translation helper, rather than a special-case MIDI or endpoint routine. The exact user-facing parameter represented by record offset +0x19 remains unidentified.
