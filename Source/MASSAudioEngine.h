@@ -44,6 +44,29 @@ private:
     std::array<std::array<std::atomic<int>, kParameterCount>, kPartCount> values_{};
 };
 
+enum class MASSCommonControl : std::size_t { fx1Type = 0, fx2Type, arpResolution, arpSpeed };
+
+class MASSCommonControlStore {
+public:
+    static constexpr std::size_t kControlCount = 4;
+    MASSCommonControlStore() {
+        for (auto& value : values_) value.store(0, std::memory_order_relaxed);
+    }
+    bool set(MASSCommonControl control, int value) noexcept {
+        const auto index = static_cast<std::size_t>(control);
+        constexpr int maxima[kControlCount] = {21, 21, 3, 127};
+        if (index >= kControlCount || value < 0 || value > maxima[index]) return false;
+        values_[index].store(value, std::memory_order_release);
+        return true;
+    }
+    int get(MASSCommonControl control) const noexcept {
+        const auto index = static_cast<std::size_t>(control);
+        return index < kControlCount ? values_[index].load(std::memory_order_acquire) : -1;
+    }
+private:
+    std::array<std::atomic<int>, kControlCount> values_{};
+};
+
 class MASSModulationSourceStore {
 public:
     static constexpr std::size_t kPartCount = 16;
@@ -114,7 +137,8 @@ public:
                         const VoiceManager& voices, const ModulationMatrix& matrix,
                         const MASSPartParameterStore& parts,
                         const MASSModulationSourceStore& sources,
-                        const MASSPartRuntimeControlStore& runtimeControls) noexcept = 0;
+                        const MASSPartRuntimeControlStore& runtimeControls,
+                        const MASSCommonControlStore& common) noexcept = 0;
 };
 
 class NullMASSVoiceBackend final : public IMASSVoiceBackend {
@@ -125,7 +149,8 @@ public:
     void resetVoice(int, const VoiceSlot&) noexcept override {}
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
-                const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&) noexcept override {
+                const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&,
+                const MASSCommonControlStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
                 channels[channel][sample] = 0.0f;
@@ -179,6 +204,9 @@ public:
         }
     }
 
+    bool setCommonControl(MASSCommonControl control, int value) noexcept { return commonControls_.set(control, value); }
+    int getCommonControl(MASSCommonControl control) const noexcept { return commonControls_.get(control); }
+
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         return partParameters_.set(partIndex, parameter, rawValue);
     }
@@ -194,7 +222,7 @@ public:
     void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); setModWheel(partIndex, 0); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_);
+        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_, commonControls_);
     }
 
     void finishVoiceRelease(std::size_t voiceIndex) noexcept { voices_.finishRelease(voiceIndex); }
@@ -212,6 +240,7 @@ private:
     MASSPartParameterStore partParameters_;
     MASSModulationSourceStore modulationSources_;
     MASSPartRuntimeControlStore runtimeControls_;
+    MASSCommonControlStore commonControls_;
 };
 
 } // namespace technox
