@@ -918,3 +918,21 @@ The 0x0B5C path is:
 This establishes a second, stateful transaction style on the same external window: the firmware can select one index, read existing data, compute a delta, and write a transformed value under the next index. The use of RAM[0x2B]-1 for the read phase and RAM[0x2B] for the write phase is explicit in the instruction stream.
 
 The relationship between this indexed delta update and the 256 x 6-byte boot diagnostic is now a key target. Both use the same XDATA offsets 0–4 and phase-control bits, but the semantic meaning of the indexed values (voice, Part, parameter, or another hardware resource) remains unassigned until this path is connected to its callers and the 0x7Cxx record fields.
+
+
+## 27. The eight-byte slot records feed a three-byte update/interpolation path
+
+The scanner path around 0x0849–0x0899 derives an eight-byte slot base in RAM[0x2E] from an index in RAM[0x2B]. It checks slot status fields and dispatches work according to flags in the record. One confirmed branch at 0x08A9 reads slot offset +4; if ACC.7 is set, it calls 0x0C59.
+
+At entry to 0x0C59, R1 still points to slot offset +4. The routine then:
+
+1. Reads the current slot's three-byte value from offsets +1, +2, and +3 into R5, R6, and R7 (R7 is masked to three bits).
+2. Reads a second three-byte value from offsets +9, +10, and +11 into RAM[0x3A], RAM[0x3B], and RAM[0x3C]. These are the corresponding +1..+3 fields of the next eight-byte slot.
+3. Subtracts the current triple from the next triple with borrow propagation, producing a three-byte delta.
+4. Reads a scale/control byte at slot offset +12 and uses MUL AB operations to scale the delta. Internal bit 0x03 selects a sign/negation path.
+5. Adds the scaled delta to the current triple, updates the slot's +1..+3 fields, and conditionally clears bit 7 of slot offset +4 based on a flag at offset +13.
+6. Selects A0=0x80, sets R5=RAM[0x2B], prepares R2/R3/R4 from the updated triple (with the low three bits of R4 kept separate from the other flags), and calls 0x0DB7 to emit the indexed packet. It then restores A0=RAM[0x2D].
+
+This is consistent with a fixed-point interpolation/slew operation between adjacent eight-byte records, but the exact semantic label of the scale byte and the record pair is not yet proven. The key confirmed relationship is that the packet emitted to the external interface is derived from the current slot's three-byte state, the next slot's three-byte state, and a scale/control byte at +12.
+
+This gives a concrete path from the 16-slot record buffer to the external 0x8000 packet writer. The next step is to trace who populates slot offsets +1..+4 and +9..+13, then compare those writes with the 24-byte records at 0x7C15 + 0x18*index and with MIDI note/controller events.
