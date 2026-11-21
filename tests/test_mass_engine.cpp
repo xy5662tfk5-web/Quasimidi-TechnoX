@@ -18,6 +18,9 @@ int main() {
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
     assert(!engine.setModWheel(16, 127));
+    assert(engine.setRpn(12, 0, 12) && engine.getRpn(12, 0) == 12);
+    assert(engine.setRpn(12, 1, 64) && engine.getRpn(12, 1) == 64);
+    assert(!engine.setRpn(12, 3, 1));
     assert(engine.setPortamento(12, true) && engine.portamento(12));
     assert(engine.setSoftPedal(12, true) && engine.softPedal(12));
     engine.resetPartControllers(12);
