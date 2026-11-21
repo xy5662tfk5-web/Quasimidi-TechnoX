@@ -2000,3 +2000,32 @@ The table-driven sequence at 0x26A0 must not be used as evidence for sound-engin
 ### 62.4 Next high-value target
 
 Prioritize the non-diagnostic producers around 0x1E8A, 0x211F, 0x22F8, 0x236B, 0x26C9/0x26DE, and the note/event path around 0x4256. Correlate their packet bytes with the 8-byte endpoint record fields and the status/pointer registers on page 0x80. This avoids spending time interpreting a self-test as the synthesizer protocol.
+
+
+## 63. Non-diagnostic packet producers: first comparative pass
+
+### 63.1 Scope and method
+
+The ROM was re-read from the checked-in IC4 image after applying the documented address/data descramble. This pass compares the non-diagnostic packet call sites at 0x1E8A, 0x211F, 0x22F8, and 0x236B by inspecting their immediate setup and continuation, rather than assigning command meanings from the call address alone.
+
+### 63.2 0x1E8A: record-walk output branch
+
+The code immediately before 0x1E8A manipulates the current record pointer RAM[0x2E], performs XDATA-indirect reads/writes, and consults record data and flags. At 0x1E8A it calls 0x0DB7, restores/selects the page from RAM[0x2D], then continues the record walk at 0x19C2. The call is therefore embedded in a record-processing loop, not in the 0x26A0 diagnostic. The exact four packet bytes still require tracing the live register values at the call boundary.
+
+### 63.3 0x211F: descriptor/selector processing branch
+
+The preceding block at 0x20E8–0x211E writes a four-byte sequence to XDATA 0x8000–0x8003 using RAM[0x2B] and registers R5/R6/R7, then performs another packet submission at 0x211F after testing a selector derived from the current record and XDATA 0x2066. Following the call, the routine normalizes a low-three-bit selector and uses descriptor state including RAM[0x33]. This ties the packet to descriptor/record processing, but does not yet prove that the packet is a note-on or oscillator command.
+
+### 63.4 0x22F8: conditional state-transition packet
+
+The code leading to 0x22F8 tests RAM[0x2B] low-nibble values, internal state bits 0x00/0x01/0x02/0x0C, and a selector in RAM[0x40]. Only selected branches reach the 0x0DB7 call. The routine then checks internal bit 0x0A and compares record data while advancing through an eight-byte record structure. This is a conditional state/record transition packet, not a generic unconditional voice update.
+
+### 63.5 0x236B: page-0x80 record scan/output
+
+Immediately before 0x236B, the code prepares a value from RAM[0x2B] with its low nibble forced to 0x0F, selects page 0x80, and calls 0x0DB7. It then switches back to the page selected by RAM[0x2D] and continues the record walk. This call is directly associated with the endpoint-record scan/output mechanism.
+
+### 63.6 Result and next decisive test
+
+These four callers are not one uniform packet family: 0x1E8A and 0x236B are in record-walk paths; 0x211F is coupled to descriptor-selector normalization; 0x22F8 is gated by multiple internal state predicates. The shared 0x0DB7 mailbox therefore carries context-dependent operations. No packet has yet been assigned a sound-chip register meaning.
+
+Next, recover the exact live R5/R2/R3/R4 values at each call boundary and compare them with the corresponding page-0x80 record bytes and the post-call status transitions. In parallel, trace 0x4256 from its entry through its Part-record lookup to identify which packet-producing branch is reached for an actual MIDI Note On.
