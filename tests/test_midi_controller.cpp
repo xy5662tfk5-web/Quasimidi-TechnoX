@@ -20,6 +20,10 @@ int main() {
     cc = router.handleControlChange(1, 6, 96);
     assert(cc && cc->parameter == PartParameter::cutoffFrequency && cc->rawValue == 96);
     assert(!router.handleControlChange(1, 99, 1));
+    assert(!router.handleControlChange(1, 98, 0x10));
+    cc = router.handleControlChange(1, 6, 32);
+    assert(cc && cc->parameter == PartParameter::vibratoDelay && cc->rawValue == 32);
+    assert(!router.handleControlChange(1, 99, 1));
     assert(!router.handleControlChange(1, 98, 0x63));
     cc = router.handleControlChange(1, 6, 48);
     assert(cc && cc->parameter == PartParameter::egAttack && cc->rawValue == 48);
