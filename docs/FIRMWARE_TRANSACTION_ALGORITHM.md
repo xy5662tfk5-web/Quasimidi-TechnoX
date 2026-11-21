@@ -1552,3 +1552,49 @@ This closes one parameter loop end-to-end:
 - The remapped value is written into the Part's intermediate descriptor/runtime record before 0x1494 continues.
 
 The manual documents Velocity Curve values 0–14, so these six contiguous arrays account only for selectors 1–6. The computed address for selectors 7–14 advances into the code region beginning at 0xABBF; the firmware still performs MOVC there, but those bytes are not six additional clean monotonic tables. Section 36 records the raw selector/output behavior observed in a separate simulation; it must be validated with the exact R1/R7 state at every caller before assigning labels to selectors 7–14. Do not describe the six arrays as the complete manual range. The six tables' musical labels (for example, soft, hard, fixed, or linear) are not assigned yet.
+
+
+## 42. The 24-entry Part-parameter dispatcher maps directly to the manual's 24 fields
+
+The dispatcher at 0x6B2D receives the Part index in R7 and the parameter offset/index in R5. It rejects indices >= 0x18, computes A = 3*R5, sets DPTR=0x6B3F, and executes JMP @A+DPTR. The table contains 24 three-byte LJMP entries, one for each byte offset in the 24-byte Part record.
+
+| Part offset/index | Manual parameter | Handler |
+|---:|---|---:|
+| 0 | Bank number | 0x6B87 |
+| 1 | Sound number | 0x6BA6 |
+| 2 | Track Mode | 0x6BD0 |
+| 3 | Level | 0x6BD6 |
+| 4 | Panorama | 0x6BDC |
+| 5 | FX1 Send | 0x6BE5 |
+| 6 | FX2 Send | 0x6BE5 |
+| 7 | Transpose | 0x6BEB |
+| 8 | Fine Tune | 0x6BF1 |
+| 9 | Cutoff | 0x6BF7 |
+| 10 | Resonance | 0x6C1B |
+| 11 | EG Attack | 0x6C44 |
+| 12 | EG Decay | 0x6C68 |
+| 13 | EG Release | 0x6C8C |
+| 14 | Vibrato Rate | 0x6CB0 |
+| 15 | Vibrato Depth | 0x6CD4 |
+| 16 | Vibrato Delay | 0x6CF8 |
+| 17 | Velocity Curve | 0x6E49 |
+| 18 | Hold Pedal | 0x6D1C |
+| 19 | Modulation Depth | 0x6D49 |
+| 20 | Pitch Sensitivity | 0x6D81 |
+| 21 | Volume Modulation Sensitivity | 0x6DDB |
+| 22 | Tone Modulation Sensitivity | 0x6DFF |
+| 23 | Portamento Time | 0x6E23 |
+
+This is a direct structural match between the 24-byte Part record and the firmware's parameter-update dispatch. FX1 and FX2 Send share the same handler at 0x6BE5; the handler distinguishes the two by the parameter index.
+
+### 42.1 Pitch Sensitivity handler 0x6D81 writes the scale byte read by 0x02D1
+
+Handler 0x6D81 reads Part offset +20 from 0x7C15 + 0x18*PartIndex + 0x14 and stores the raw value at XDATA 0x3062. It then converts the manual's centered range around 0x18 (24):
+
+- If value >= 0x18, it writes value - 0x18 to XDATA 0x2054 + PartIndex.
+- If value < 0x18, it writes 0x18 - value to XDATA 0x2054 + PartIndex.
+- At the neutral value 0x18, the resulting scale byte is zero.
+
+This closes the previously open writer path for 0x2054 + PartIndex. The 0x02D1 routine reads this derived magnitude and uses its low nibble as a fixed-point scale factor. Therefore 0x2054 is a per-Part Pitch Sensitivity magnitude, not an unexplained external value.
+
+The 0x02D1 routine then applies that sensitivity to a signed/bipolar input and writes a 16-bit result at 0x2000 + 3*PartIndex. The evidence now strongly identifies this as the firmware's per-Part pitch-control scaling path. The exact external consumer and the meaning of the third byte at +2 remain to be traced.
