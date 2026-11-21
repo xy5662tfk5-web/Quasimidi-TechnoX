@@ -1696,3 +1696,36 @@ The special 0x38 computed-dispatch case enters 0x19A7 with A=0x38. It writes tha
 ### 51.8 Current interpretation
 
 The computed-dispatch family is not a single uniform "voice start" routine. It contains at least: a descriptor probe (0x1C2B), a larger numeric/record transformation (0x1C61), an extended descriptor calculation (0x1EDD), an endpoint packet preparation path (0x224C), a record normalization/output path (0x2301), and a one-byte pointer advance (0x2374). Several paths converge on 0x0DB7, whose four-byte page-0x80 output behavior is already documented in Section 50. The physical receiver and exact packet-field meanings remain unconfirmed.
+
+
+## 52. Common record walker, sentinel handling, and selector normalization
+
+### 52.1 0x1986–0x19C2 is the descriptor-record walker
+
+The walker uses DPTR as the current descriptor cursor, RAM[0x2E] as the current destination-record offset, RAM[0x2B] as a group/record counter, and RAM[0x2C] as the remaining-iteration count.
+
+At 0x1986 it conditionally clears P3 bits 0xB5/0xB4/0xB1 according to internal flags 0x00–0x02, reads one XDATA byte, and restores those P3 bits. The byte is classified as follows:
+
+- 0xFF: branch to 0x19E1, which waits while internal bit 0x0A remains set, writes the 0xFF marker at the current destination offset, then continues at 0x19CD.
+- Any other value: mask with 0x38. If the result is 0x38, enter 0x19A7.
+- Otherwise rotate right once, load DPTR=0x1BC3, and execute the computed jump through the seven-entry dispatch table.
+
+The 0x19A7 branch writes the 0x38 marker and advances the source cursor and destination record by their observed strides. The ordinary continuation at 0x19C2 advances RAM[0x2E] by eight, increments RAM[0x2B], and decrements RAM[0x2C]; if more records remain it loops to 0x1980. At loop completion, unless internal bit 0x06 or 0x0A suppresses it, the code writes 0xFF to the destination offset held in RAM[0x44]. It then checks the offset against 0x80; an offset at or above 0x80 reaches the reset-vector jump at 0x19DD, while a lower offset returns. The value 0xFF is therefore a record terminator/marker in this path, not a MIDI velocity or voice command.
+
+### 52.2 0x1BE2 and 0x1BEF are additional record variants
+
+0x1BE2 advances the 16-bit descriptor cursor RAM[0x36:0x37] by four bytes and returns through 0x19C2. 0x1BEF instead copies the current cursor into DPTR, advances once, performs the same P3 control-line envelope, reads three bytes into R2–R4, saves the advanced cursor, and writes a four-byte destination record at RAM[0x2E]: marker 0x38 followed by those three values. It then returns to the common 0x19C2 record-loop continuation. This is a compact record-copy/marker variant.
+
+### 52.3 0x2128 normalizes a record selector using XDATA 0x2066 and RAM[0x33]
+
+The helper reads the current record's byte at RAM[0x2E]+1, saves its low three bits, and reads XDATA 0x2066. It derives a bounded low-three-bit adjustment from the value in RAM[0x33] and the selector's current value, with separate paths depending on internal bit 0xE3 (ACC.3 of the currently tested value) and whether RAM[0x33]'s high nibble equals 0x80. It masks the low selector bits in internal byte RAM[0x02] and writes the adjusted selector back to record offset +1. The helper does not change the upper five bits of that record byte.
+
+### 52.4 0x21B7 is the corresponding normalizer using RAM[0x35]
+
+This helper uses the same record byte +1 and XDATA 0x2066, but derives its range adjustment from RAM[0x35] rather than RAM[0x33]. It splits RAM[0x35] into low- and high-nibble contributions, clamps each difference against the value at 0x2066, and then applies the same low-three-bit bounded adjustment. If the high nibble is 0x80, the original selector byte is retained; otherwise the adjusted low selector bits are written back to record offset +1.
+
+The shared structure of 0x2128 and 0x21B7 supports describing them as selector/range normalization helpers. The exact external meaning of the selector and of XDATA 0x2066 remains unassigned.
+
+### 52.5 Consequence for the dispatch-family model
+
+The computed handlers operate inside a loop that builds a sequence of eight-byte destination records and terminates it with 0xFF or a 0x38 marker, depending on the source descriptor byte. This is a stronger description than treating each handler as an independent hardware command. The 0x0DB7 calls observed in selected handlers are downstream output steps from records prepared by this walker; the record markers and loop counters themselves are not evidence of note-on/off semantics.
