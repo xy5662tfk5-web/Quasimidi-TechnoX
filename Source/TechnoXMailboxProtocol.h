@@ -7,6 +7,7 @@
 #include "TechnoXFirmwareTransaction.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace technox::firmware {
