@@ -7,47 +7,46 @@
 using namespace technox::firmware;
 
 int main() {
-    // 0x0DB7 writes R5, R2, R3, then R4 with ACC.6 cleared.
-    // Internal flag 0x0C mirrors the original R4/ACC.7 bit.
-    const auto mailboxLow = makeMailboxWrite(0x12, 0x34, 0x56, 0x7F);
+    // 0x0DB7 clears bit 6 of R4 before writing it, while E7 independently
+    // controls internal flag 0x0C.
+    const auto mailboxLow = makeMailboxWrite(0x12, 0x34, 0x56, 0x7F, false);
     assert(mailboxLow.kBaseAddress == 0x8000);
     assert((mailboxLow.bytes == std::array<std::uint8_t, 4>{0x12, 0x34, 0x56, 0x3F}));
     assert(!mailboxLow.setInternalFlag0C);
-    const auto mailboxHigh = makeMailboxWrite(0xA1, 0xB2, 0xC3, 0xFF);
+    const auto mailboxHigh = makeMailboxWrite(0xA1, 0xB2, 0xC3, 0xFF, true);
     assert((mailboxHigh.bytes == std::array<std::uint8_t, 4>{0xA1, 0xB2, 0xC3, 0xBF}));
     assert(mailboxHigh.setInternalFlag0C);
-    const auto mailboxFlagOnly = makeMailboxWrite(0, 0, 0, 0x80);
-    assert(mailboxFlagOnly.bytes[3] == 0x80);
-    assert(mailboxFlagOnly.setInternalFlag0C);
-    const auto mailboxBit6Only = makeMailboxWrite(0, 0, 0, 0x40);
-    assert(mailboxBit6Only.bytes[3] == 0x00);
-    assert(!mailboxBit6Only.setInternalFlag0C);
+    const auto independentFlag = makeMailboxWrite(0, 0, 0, 0x00, true);
+    assert(independentFlag.bytes[3] == 0x00);
+    assert(independentFlag.setInternalFlag0C);
+    const auto highR4WithoutFlag = makeMailboxWrite(0, 0, 0, 0x80, false);
+    assert(highR4WithoutFlag.bytes[3] == 0x80);
+    assert(!highR4WithoutFlag.setInternalFlag0C);
 
-    // 0x0DCE toggles the handshake only when ACC.7 (R4 bit 7) differs
-    // from internal bit 0x0C, writing 0xC0 on set and 0x40 on clear.
-    const auto handshakeIdleLow = transitionMailboxHandshake(false, 0x00);
+    // 0x0DCE synchronizes internal bit 0x0C with E7, not with R4.
+    const auto handshakeIdleLow = transitionMailboxHandshake(false, false);
     assert(!handshakeIdleLow.nextFlag0C && !handshakeIdleLow.writesFourthByte);
-    const auto handshakeSet = transitionMailboxHandshake(false, 0x80);
+    const auto handshakeSet = transitionMailboxHandshake(false, true);
     assert(handshakeSet.nextFlag0C && handshakeSet.writesFourthByte);
     assert(handshakeSet.fourthByte == 0xC0);
-    const auto handshakeIdleHigh = transitionMailboxHandshake(true, 0x80);
+    const auto handshakeIdleHigh = transitionMailboxHandshake(true, true);
     assert(handshakeIdleHigh.nextFlag0C && !handshakeIdleHigh.writesFourthByte);
-    const auto handshakeClear = transitionMailboxHandshake(true, 0x00);
+    const auto handshakeClear = transitionMailboxHandshake(true, false);
     assert(!handshakeClear.nextFlag0C && handshakeClear.writesFourthByte);
     assert(handshakeClear.fourthByte == 0x40);
 
     XDataMemory memory;
     XDataMemory::Page page{};
-    page[0x20] = 0xE5; // first byte: high bit must be masked by the loader
-    page[0x21] = 0x64; // nonzero second byte selects the nonzero path
+    page[0x20] = 0xE5;
+    page[0x21] = 0x64;
     page[0x22] = 0x03;
     page[0x23] = 0x11;
     page[0x24] = 0x22;
     page[0x25] = 0x33;
     page[0x26] = 0x44;
-    page[0x27] = 0xA5; // skipped
-    page[0x28] = 0x5A; // skipped
-    page[0x29] = 0x07; // only low three bits become flags
+    page[0x27] = 0xA5;
+    page[0x28] = 0x5A;
+    page[0x29] = 0x07;
     page[0x2A] = 0x09;
     page[0x2B] = 0x55;
     memory.loadPage(0x29, page);
@@ -120,20 +119,18 @@ int main() {
     assert(zeroControlPlan.actions[0] == LoaderAction::readModeControlByte);
     assert(zeroControlPlan.actions[1] == LoaderAction::jumpToZeroByteHandler);
 
-
-    // Firmware 0x1009 scans a packed list at P2=0x80, R0=0x80..0xF0,
-    // in steps of eight. The first 0xFF terminates the list. At the 0x1045
-    // call site R4 is 0x80 iff flag 0x0D is set (ACC.7 is copied into R4).
+    // 0x1009 uses the XDATA page selected by RAM[0x2D]. At call site 0x1045,
+    // R4 is zero and E7 is set iff internal flag 0x0D is set.
     XDataMemory mailboxMemory;
     XDataMemory::Page mailboxPage{};
-    mailboxPage[0x80] = 0x16; // marker: (value & 0x7E) == 0x16
-    mailboxPage[0x88] = 0x02; // occupied entry, but not a mailbox marker
-    mailboxPage[0x90] = 0x97; // marker with high bit and low bit set
-    mailboxPage[0x98] = 0xFF; // terminator; later entries must be ignored
+    mailboxPage[0x80] = 0x16;
+    mailboxPage[0x88] = 0x02;
+    mailboxPage[0x90] = 0x97;
+    mailboxPage[0x98] = 0xFF;
     mailboxPage[0xA0] = 0x16;
-    mailboxMemory.loadPage(kMailboxScanPage, mailboxPage);
+    mailboxMemory.loadPage(0x29, mailboxPage);
 
-    const auto mailboxScan = scanMailboxEntries(mailboxMemory, 7, true);
+    const auto mailboxScan = scanMailboxEntries(mailboxMemory, 0x29, 7, true);
     assert(mailboxScan);
     assert(mailboxScan.visitedCount == 3);
     assert(mailboxScan.writeCount == 2);
@@ -142,17 +139,17 @@ int main() {
     assert(mailboxScan.visitedOffsets[0] == 0x80);
     assert(mailboxScan.visitedOffsets[1] == 0x88);
     assert(mailboxScan.visitedOffsets[2] == 0x90);
-    assert((mailboxScan.writes[0].bytes == std::array<std::uint8_t, 4>{7, 0x80, 0x01, 0x80}));
-    assert((mailboxScan.writes[1].bytes == std::array<std::uint8_t, 4>{9, 0x80, 0x01, 0x80}));
+    assert((mailboxScan.writes[0].bytes == std::array<std::uint8_t, 4>{7, 0x80, 0x01, 0x00}));
+    assert((mailboxScan.writes[1].bytes == std::array<std::uint8_t, 4>{9, 0x80, 0x01, 0x00}));
     assert(mailboxScan.writes[0].setInternalFlag0C);
     assert(mailboxScan.writes[1].setInternalFlag0C);
 
-    const auto mailboxScanFlagClear = scanMailboxEntries(mailboxMemory, 7, false);
+    const auto mailboxScanFlagClear = scanMailboxEntries(mailboxMemory, 0x29, 7, false);
     assert(mailboxScanFlagClear.writeCount == 2);
     assert(mailboxScanFlagClear.writes[0].bytes[3] == 0x00);
     assert(!mailboxScanFlagClear.writes[0].setInternalFlag0C);
 
-    const auto missingMailboxPage = scanMailboxEntries(XDataMemory{}, 0, false);
+    const auto missingMailboxPage = scanMailboxEntries(XDataMemory{}, 0x29, 0, false);
     assert(!missingMailboxPage);
     assert(missingMailboxPage.error == MailboxScanError::sourcePageMissing);
 
