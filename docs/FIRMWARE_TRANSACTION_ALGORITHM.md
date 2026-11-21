@@ -2513,3 +2513,29 @@ Caller 0x56BB/0x56C5 загружает R7 из RAM[0x64], caller 0x43D0 исп�
 XDATA[0x2FA2+R7] -> RAM[0x71] -> R3 -> 0xAC88 -> изменение битов на внешних страницах 0x35/0x36.
 
 Это делает диапазон 0x2FA2–0x2FB1 частью индексируемой конфигурации внешнего page-map пути, но не доказывает, что все 16 байтов диапазона используются или что R7 всегда равен номеру одной из четырёх Part.
+
+## 84. Part-index mapping in the incoming MIDI dispatcher
+
+### 84.1 Four explicit R7 values
+
+At 0x5980–0x59B0 the dispatcher contains four explicit setup paths:
+- R7=0x0C;
+- R7=0x0D;
+- R7=0x0E;
+- R7=0x0F.
+
+Each path loads the current event fields into R5/R3 and calls 0x5671. In 0x5671, R7 is saved to RAM[0x64]. The Note On/Off handling path later reloads R7 from RAM[0x64] and calls 0x4256 at 0x56BB/0x56C5.
+
+### 84.2 Exact indexed addresses on this MIDI path
+
+For these four dispatcher paths, 0x4256 reads:
+- index 0x0C -> XDATA[0x2FAE];
+- index 0x0D -> XDATA[0x2FAF];
+- index 0x0E -> XDATA[0x2FB0];
+- index 0x0F -> XDATA[0x2FB1].
+
+This is strong evidence that the final four bytes of the previously unknown range 0x2FA2–0x2FB1 are consulted by the four explicit MIDI Part dispatch paths. Their values are then passed to 0xAC88 to select/update the external page-map branch.
+
+### 84.3 Scope limitation
+
+This mapping is established for the four explicit 0x5980–0x59B0 incoming MIDI paths only. It does not prove that every 0x4256 caller uses R7 as a Part number: the output-queue caller at 0x5AC0 obtains R7 from XDATA[0x30E6], while periodic ADxx callers inherit their own outer context. Therefore the 0x2FA2 table is indexed by the 0x4256 argument, whose semantic domain depends on caller.
