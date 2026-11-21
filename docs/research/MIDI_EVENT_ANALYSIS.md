@@ -54,3 +54,28 @@ This identifies a distinct general Note On/Note Off state-management path. The r
 1. Trace `0x4100 -> 0xB9C2 -> 0xB437` and identify what structured data is copied and where it is consumed.
 2. Trace `0x5671` and its callees (`0x4256`, `0x51B6`, `0x3ECE`, `0x9968`) to determine whether note events become per-part voice commands.
 3. Cross-reference all writes and reads around XDATA `0x7C00–0x7CFF` and establish the actual hardware boundary.
+
+## 6. General Note On/Off dispatch: 0x57A8 -> 0x5671
+
+The queue-1 parser in `0x5B92` assembles status plus two data bytes and calls `0x57A8` with `R7=status`, `R5=data1`, `R3=data2`.
+
+- `0x57A8` splits the status byte: low nibble (MIDI channel) is saved at direct RAM `0x63`; high nibble (message class) at `0x60`.
+- Message class `0x09` is Note On. Nonzero data2 increments XDATA `0x3039`; zero velocity follows the release/decrement branch.
+- Message class `0x08` is Note Off and follows the decrement/release branch.
+- After state handling, `0x57A8` reaches `0x593D`, which interprets XDATA `0x7BD5` and conditionally dispatches event IDs `0x0C–0x0F` to `0x5671`.
+- `0x5671` receives the original status/data values, branches on data1 values, and in several paths calls `0x4256`, `0x51B6`, `0x3ECE`, or `0x9968`.
+
+This is the broader channel Note On/Off path, separate from the dedicated channel-10 byte-pair handling above. It is the strongest current route to follow for the synth Parts.
+
+## 7. Part/parameter staging and data-copy helpers
+
+- `0x4256` stores a two-byte selector/address derived from its first argument into XDATA `0x2B98–0x2B99`; it also reads channel-indexed values from the `0x7Cxx` external window, uses `0x3700`, and performs range/offset arithmetic. It is a staging/translation routine, not proven audio output.
+- `0x4100` maintains XDATA state `0x3039`, `0x304B`, `0x303A`, and `0x3050`; its active branch calls `0xB9C2`.
+- `0xB9C2` iterates over indexed blocks and calls `0xB437`.
+- `0xB437` uses a base at XDATA `0x0200`, computes an indexed source pointer, then copies structured blocks into XDATA windows beginning around `0x62CD`, `0x7BD4`, and `0x7D35`. This looks like indexed parameter/resource staging, but the copied block formats and consumer remain to be identified.
+
+## Updated next targets
+
+1. Trace `0x5671 -> 0x4256/0x51B6/0x3ECE` to map MIDI note data to per-Part staging.
+2. Trace the `0x0200` source table and `0xB437` copy destinations; determine whether the source is a voice/part descriptor table.
+3. Follow the `0x7BD4`, `0x7Dxx`, and `0x62xx` blocks to their readers and writes into the `0x7Cxx` peripheral window.
