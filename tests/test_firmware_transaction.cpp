@@ -44,11 +44,12 @@ int main() {
     page[0x24] = 0x22;
     page[0x25] = 0x33;
     page[0x26] = 0x44;
-    page[0x27] = 0xA5;
-    page[0x28] = 0x5A;
-    page[0x29] = 0x07;
-    page[0x2A] = 0x09;
-    page[0x2B] = 0x55;
+    page[0x27] = 0xA5; // skipped descriptor byte 7
+    page[0x28] = 0x5A; // skipped descriptor byte 8
+    page[0x29] = 0x33; // skipped descriptor byte 9
+    page[0x2A] = 0x07; // byte 10: low three bits become flags
+    page[0x2B] = 0x09; // byte 11: translated through ROM table 0x1208
+    page[0x2C] = 0x55; // byte 12: copied directly
     memory.loadPage(0x29, page);
 
     LookupTable lookup{};
