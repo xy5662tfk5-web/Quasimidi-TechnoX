@@ -133,3 +133,16 @@ There are two reachable direct call sites for `0x418E`:
 Therefore, the previous section's description of the `0x418E` `R7==0x09` branch as a direct Note On staging path was too strong. It is a separate setup/event-type branch. The general MIDI route is still confirmed through `0x57A8 -> 0x593D -> 0x5671`, but the exact function of its `0x572F -> 0x418E` staging call must be described from its non-`0x09` branch and downstream consumers.
 
 The safe current conclusion: four event-slot IDs are dispatched and written into per-slot structures; their exact mapping to four Parts and the final hardware voice command are not yet proven.
+
+## 13. Exact non-0x09 branch of 0x418E used by MIDI event slots
+
+The `0x572F` caller enters `0x418E` with event ID `0x0C–0x0F`, so the relevant branch is `0x41D6–0x4255`, not the `R7==0x09` branch.
+
+That branch:
+- clamps its second argument (`R5`) to `0x03`;
+- calls `0x6AA6` with event ID, clamped selector, and third argument;
+- uses ROM table at `0x5C3D` to obtain a mapped value;
+- writes that mapped value to XDATA address `0x2909 + 0x0C*eventID`;
+- uses the mapped value and a flag bit from the selector to form an index/value pair, calls `0xB3BC`, and writes the resulting pair to `0x2905 + 0x0C*eventID`.
+
+This is a concrete per-event-slot parameter mapping operation. It does not yet show a hardware voice trigger; next trace is `0x6AA6`, table `0x5C3D`, and readers of the `0x2905/0x2909` per-slot records.
