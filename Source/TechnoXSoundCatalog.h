@@ -37,7 +37,7 @@ public:
         std::array<std::array<juce::String, kProgramsPerBank>, kBankCount> parsedNames{};
 
         for (std::size_t bank = 0; bank < kBankCount; ++bank) {
-            const auto bankValue = banksObject->getProperty(bankKeys[bank]);
+            const auto bankValue = banksObject->getProperty(juce::Identifier(bankKeys[bank]));
             const auto* entries = bankValue.getArray();
             if (entries == nullptr || entries->size() != static_cast<int>(kProgramsPerBank))
                 return false;
