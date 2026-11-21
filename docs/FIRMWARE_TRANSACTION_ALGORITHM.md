@@ -2102,3 +2102,26 @@ No direct control-flow proof currently connects the R5=0x09 dispatcher branch at
 ### 66.4 Next trace target
 
 Resolve the caller of the 0x5670 dispatcher and the producer of its R5/R7/R3 arguments; trace the staging bytes at XDATA 0x30E4–0x30E8; then follow the 0x4256 branch through 0x1494 and determine whether its state changes reach the endpoint scan/0x0DB7 output path. This is the shortest route to a defensible Note On-to-hardware-command chain.
+
+
+## 67. XDATA 0x30E4–0x30E8 are mirrored Part-state fields, not raw MIDI bytes
+
+### 67.1 Record-to-staging transfer at 0x9333–0x9400
+
+The routine entered through the dispatch at 0x9333 selects a field from the 24-byte Part record at XDATA 0x7C10–0x7C14 and mirrors it into the 0x30E0–0x30E8 staging area. The field at 0x7C10 is shifted right by two and masked to six bits, then stored in 0x30E4; its low two bits are separately stored in 0x30E1. The 0x7C11 and 0x7C12 bytes are copied to 0x30E0 and 0x30DF. The 0x7C13 byte is split into compact fields stored at 0x30E5, 0x30E2, 0x30EA, 0x30EB, and 0x30EC. The 0x7C14 byte is similarly split into 0x30E6, 0x30E7, and 0x30E8, with a loop over 0x0C Part/index values invoking 0x4029.
+
+### 67.2 Reverse transfer at 0x9409–0x9477
+
+A complementary routine reads 0x30E4 and the adjacent staging fields, recombines the packed bit fields, and writes the reconstructed bytes back to 0x7C10–0x7C14. In particular, it rebuilds 0x7C13 from 0x30E5/0x30E2/0x30EA/0x30EB/0x30EC and rebuilds 0x7C14 from 0x30E7/0x30E6/0x30E8/0x30E9. This establishes the 0x30E* block as a packed mirror/edit staging representation of Part-record fields, not a simple raw MIDI event buffer.
+
+### 67.3 Consequence for the 0x5670 dispatcher
+
+The checks of 0x30E4, 0x30E6, and 0x30E7 inside the 0x5670 dispatcher therefore operate on this mirrored Part-state representation. In the R5=0x09 branch, the dispatcher compares 0x30E6 with saved R7 and tests 0x30E7 after calling 0x9968; these are state/selector guards, not sufficient evidence of MIDI Note On/Off. The earlier interpretation that 0x30E4–0x30E8 might be a generic event staging packet is superseded by the record-mirroring evidence.
+
+### 67.4 IRQ context
+
+The interrupt handler at 0x3DF0 also reads 0x30E5 and 0x30E4 while processing a separate interrupt-side state path. It checks 0x30E5 against 1 and can update XDATA 0x2B8D; the surrounding interrupt dispatch also routes received serial bytes into queue producers 0xA831/0xA7DE. This reinforces that the 0x30E* fields participate in shared firmware state, but does not by itself prove they contain MIDI data.
+
+### 67.5 Revised conclusion
+
+The 0x5670 dispatcher must be interpreted as a Part-state/event dispatcher whose guards consult the packed mirror of record 0x7C10–0x7C14. It is not yet proven to be called directly from the MIDI Note On/Off parser. The MIDI channel-voice parser at 0x57A8 remains the separately established Note On/Off path. The next trace should identify the dispatch mechanism/caller for 0x5670 and follow the Part-record changes into 0x4256/0x1494 and the downstream endpoint transaction machinery.
