@@ -95,6 +95,18 @@ The first reachable-code pass finds an immediate DPTR setup to `0xA000` at code 
 ### E. Validate against hardware
 For each reference capture, preserve the exact MIDI sequence, velocity, CC/NRPN/RPN, Performance, sample rate and dry/wet state. Compare pitch, waveform, envelope, loop, filter response, modulation, stereo position, FX and voice stealing.
 
+## LCD character ROM evidence
+
+The repository default branch now contains `hd44780_a00.bin` (4,096 bytes; Git blob SHA `751ca4a7f85521545061cf298db59ad9a464bda3`). Its layout is consistent with an HD44780 A00 character-generator ROM rather than a framebuffer, LCD controller firmware, or audio data:
+
+- 256 character-code slots, each 16 bytes (`0x10)-byte stride).
+- 189 slots contain non-zero glyph data.
+- Glyph row bytes use only the lower five bits, consistent with a 5-dot-wide LCD character cell.
+- The first populated slot is `0x21` and decodes as the familiar ASCII exclamation mark; the final slot `0xFF` is a solid block.
+- A small number of extended-character slots also contain non-zero bytes in the second half of their 16-byte records, so preserve all 16 bytes per slot rather than truncating the file to eight rows.
+
+This is useful for reproducing the TechnoX LCD's character shapes and validating the display UI. It does **not** reveal the LCD's live DDRAM contents, cursor state, CGRAM custom characters, or the audio engine. The file currently lives on `main`; the research branch records the finding but does not yet contain a byte-for-byte copy of the ROM.
+
 ## Immediate blockers / evidence needed
 
 The most valuable missing evidence is a complete, sharp photo set of the TechnoX main PCB (front and back, full board plus close-ups of every IC marking) and any additional sample ROM dumps not represented by IC4/IC51. If the user has no physical unit, continue with IC4 firmware analysis and treat the IC51 decode as unresolved.
