@@ -161,7 +161,7 @@ enum class LoaderAction : std::uint8_t {
     callResourceManager17D4,
     setSlotBusyBit,
     writeSecondByte,
-    retryAt1544
+    returnToModeControl
 };
 
 struct LoaderRuntimeFlags {
@@ -194,8 +194,8 @@ struct LoaderDecision {
     LoaderInputs input{};
     Descriptor descriptor{};
     LoaderPath path = LoaderPath::zeroSecondByte;
-    // 0x1494's first branch is classified exactly. Subsequent slot arbitration
-    // and external-interface writes are intentionally not guessed here.
+    // 0x1494's descriptor decode and first slot-arbitration branch are modeled;
+    // indirect hardware state and external-interface writes remain explicit inputs.
     bool valid = false;
 };
 
@@ -209,7 +209,7 @@ inline LoaderBranchPlan planLoaderBranch(const LoaderDecision& decision,
     plan.slotBase = static_cast<std::uint16_t>(
         0x2068u + static_cast<unsigned>(decision.input.mode & 0x0f) * 0x80u);
     plan.slotDataAddress = static_cast<std::uint16_t>(
-        plan.slotBase + (flags.bit06 ? decision.descriptor.first() : 0u));
+        plan.slotBase + (flags.bit06 ? 0u : decision.descriptor.first()));
     plan.modeControlAddress = static_cast<std::uint16_t>(
         0x28d8u + (decision.input.mode & 0x0f));
 
@@ -229,7 +229,7 @@ inline LoaderBranchPlan planLoaderBranch(const LoaderDecision& decision,
             plan.append(LoaderAction::loadReplacementFirstByte);
             plan.append(LoaderAction::continueAt1599);
         } else {
-            plan.append(LoaderAction::retryAt1544);
+            plan.append(LoaderAction::returnToModeControl);
         }
         return plan;
     }
