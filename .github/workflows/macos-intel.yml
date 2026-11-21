@@ -51,3 +51,14 @@ jobs:
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
         run: cmake --build build --config Release --parallel 2
+      - name: Package Intel plugin formats
+        run: |
+          cd build/QuasimidiTechnoX_artefacts/Release
+          tar -czf "$GITHUB_WORKSPACE/technox-intel-plugins.tar.gz" AU VST3 Standalone
+      - name: Upload Intel plugin formats
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-intel-plugins
+          path: technox-intel-plugins.tar.gz
+          if-no-files-found: error
+          compression-level: 0
