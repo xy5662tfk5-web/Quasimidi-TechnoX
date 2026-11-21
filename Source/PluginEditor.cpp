@@ -67,7 +67,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& eve
     const auto p = event.getPosition();
     if (p.x >= 400 && p.x <= 455 && p.y >= 43 && p.y <= 74)
     {
-        if (p.y < 57)
+        if (p.y < 57 && audioProcessor.getNumPrograms() > 0)
         {
             const auto next = juce::jlimit(0, audioProcessor.getNumPrograms() - 1,
                                            audioProcessor.getCurrentProgram() + (p.x < 428 ? -1 : 1));
