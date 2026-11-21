@@ -25,6 +25,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     if (const auto* catalogData = BinaryData::getNamedResource("technox_ins_json", catalogSize))
         soundCatalog.loadFromJson(catalogData, catalogSize);
     initialisePartStates();
+    syncCurrentPerformanceToEngine();
 }
 
 void QuasimidiTechnoXAudioProcessor::initialisePartStates()
@@ -40,6 +41,22 @@ void QuasimidiTechnoXAudioProcessor::initialisePartStates()
                 if (value >= 0)
                     partValues[performanceIndex][partIndex][parameter].store(value, std::memory_order_relaxed);
             }
+        }
+    }
+}
+
+void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
+{
+    const int performanceIndex = getCurrentProgram();
+    if (performanceIndex < 0 || performanceIndex >= 50)
+        return;
+    for (int slot = 0; slot < 4; ++slot) {
+        for (std::size_t parameter = 0; parameter < 24; ++parameter) {
+            const int value = getPartParameterRaw(performanceIndex, slot,
+                static_cast<technox::PartParameter>(parameter));
+            if (value >= 0)
+                massEngine.setPartParameter(12 + slot,
+                    static_cast<technox::PartParameter>(parameter), value);
         }
     }
 }
@@ -71,7 +88,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             continue;
 
         if (message.isNoteOn()) {
-            massEngine.noteOn(static_cast<std::uint8_t>(slot), static_cast<std::uint8_t>(message.getChannel()),
+            massEngine.noteOn(static_cast<std::uint8_t>(12 + slot), static_cast<std::uint8_t>(message.getChannel()),
                               static_cast<std::uint8_t>(message.getNoteNumber()),
                               static_cast<std::uint8_t>(message.getVelocity()));
         } else if (message.isNoteOff()) {
@@ -97,8 +114,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 
 void QuasimidiTechnoXAudioProcessor::setCurrentProgram(int index)
 {
-    if (index >= 0)
-        performanceBank.select(static_cast<std::size_t>(index));
+    if (index >= 0 && performanceBank.select(static_cast<std::size_t>(index)))
+        syncCurrentPerformanceToEngine();
 }
 
 const juce::String QuasimidiTechnoXAudioProcessor::getProgramName(int index)
@@ -139,6 +156,8 @@ bool QuasimidiTechnoXAudioProcessor::setPartParameterRaw(
     partValues[static_cast<std::size_t>(performanceIndex)]
               [static_cast<std::size_t>(partIndex)][parameterIndex]
                   .store(rawValue, std::memory_order_release);
+    if (performanceIndex == getCurrentProgram())
+        massEngine.setPartParameter(12 + partIndex, parameter, rawValue);
     return true;
 }
 
