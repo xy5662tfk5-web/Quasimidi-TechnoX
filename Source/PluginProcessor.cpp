@@ -30,6 +30,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     if (const auto* catalogData = BinaryData::getNamedResource("technox_ins_json", catalogSize))
         soundCatalog.loadFromJson(catalogData, catalogSize);
     initialisePartStates();
+    initialiseCommonControlsFromBank();
     syncCurrentPerformanceToEngine();
 }
 
@@ -47,6 +48,30 @@ void QuasimidiTechnoXAudioProcessor::initialisePartStates()
                     partValues[performanceIndex][partIndex][parameter].store(value, std::memory_order_relaxed);
             }
         }
+    }
+}
+
+void QuasimidiTechnoXAudioProcessor::initialiseCommonControlsFromBank() noexcept
+{
+    for (std::size_t performanceIndex = 0; performanceIndex < 50; ++performanceIndex) {
+        const auto* performance = performanceBank.at(performanceIndex);
+        if (performance == nullptr)
+            continue;
+        const auto& frame = performance->commonBlock.completeMessage;
+        if (frame.size() != 74 || frame[0] != 0xF0 || frame[73] != 0xF7)
+            continue;
+        // Manual Common parameter map: FX1 type 0x2A, FX2 type 0x32,
+        // Arpeggiator packed flags/resolution 0x3C, speed 0x3D.
+        const int fx1Type = frame[8 + 0x2A];
+        const int fx2Type = frame[8 + 0x32];
+        const int arpPacked = frame[8 + 0x3C];
+        const int arpSpeed = frame[8 + 0x3D];
+        if (fx1Type <= 21)
+            commonValues[performanceIndex][0].store(fx1Type, std::memory_order_relaxed);
+        if (fx2Type <= 21)
+            commonValues[performanceIndex][1].store(fx2Type, std::memory_order_relaxed);
+        commonValues[performanceIndex][2].store(arpPacked & 0x03, std::memory_order_relaxed);
+        commonValues[performanceIndex][3].store(arpSpeed, std::memory_order_relaxed);
     }
 }
 
@@ -331,9 +356,7 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
                     std::memory_order_release);
             }
     } else {
-        for (auto& performance : commonValues)
-            for (auto& value : performance)
-                value.store(-1, std::memory_order_release);
+        initialiseCommonControlsFromBank();
     }
 
     for (auto& channel : partMidiChannels) {
