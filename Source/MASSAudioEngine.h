@@ -130,6 +130,8 @@ public:
     int getPartParameter(int partIndex, PartParameter parameter) const noexcept {
         return partParameters_.get(partIndex, parameter);
     }
+    bool setModWheel(int partIndex, int value) noexcept { return modulationSources_.setModWheel(partIndex, value); }
+    int getModWheel(int partIndex) const noexcept { return modulationSources_.modWheel(partIndex); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
         backend_->render(channels, channelCount, sampleCount, voices_, partParameters_, modulationSources_);
@@ -146,7 +148,8 @@ private:
     IMASSVoiceBackend* backend_;
     VoiceManager voices_;
     ModulationMatrix modulation_;
-    MASSPartParameterStore partParameters_;\n    MASSModulationSourceStore modulationSources_;
+    MASSPartParameterStore partParameters_;
+    MASSModulationSourceStore modulationSources_;
 };
 
 } // namespace technox
