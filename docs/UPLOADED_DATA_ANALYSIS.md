@@ -11,10 +11,10 @@ This is a Standard MIDI File, format 0, one track, 384 ticks per quarter note, 1
 Parsed contents:
 - 300 complete SysEx frames.
 - Exactly 50 performance records, indexed by the first record byte from 0x05 through 0x36 (decimal 5–54).
-- Every record has six frames, with subrecord types in this order: 0x05 (8-character performance name), 0x00 (73-byte global/performance block), 0x01, 0x02, 0x03, 0x04 (four 32-byte part blocks).
+- Every record has six frames, with address-middle values in this order: 0x05 (8-character performance name), 0x00 (73-byte global/performance block), 0x01, 0x02, 0x03, 0x04 (four 32-byte part blocks). The first address byte identifies the Performance (0x05..0x36); the second address byte selects the block.
 - Frame lengths including the final F7 byte: 16 bytes × 50, 73 bytes × 50, 32 bytes × 200.
 - All SysEx payload bytes are 7-bit values; each frame ends with F7.
-- The common SysEx prefix is `F0 3F 00 22 44` (the SMF stores the event payload without the leading F0).
+- The common SysEx prefix is `F0 3F 00 22 44`. The next two bytes are the Performance address (0x05..0x36) and block selector (0x00..0x05); the low address offset is implicitly zero in these bulk-dump frames, so the 24-byte Part payload begins at byte 7.
 
 Performance names, records 5–54:
 ArpPad, Fantasy, FatTekno, Obi_Pad, Passport, Killer, Saege, Spectize, Snowbird, Crunch, Taurin, RedBull, Natural, Koffein, SyntVoic, AnaStrng, OverPads, Padding, Piano!, HardCore, Strictly, FatSolo, Computer, ArpOdyx, Arounder, D_Mode, Blubber, BodyMoog, Sequenz, Syncers, Beltram, DeepSea, Aliens, Dionysos, DarkSide, Sweepoid, Foggy, OverDriv, Texture, Frusty, Arktis, Sirena, VeryDeep, ResoArp, Floating, ChillOut, Bonita, BanaBrss, Happy, Friday13.
