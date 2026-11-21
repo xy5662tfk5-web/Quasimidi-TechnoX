@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "TechnoXPerformanceBank.h"
+#include "TechnoXSoundCatalog.h"
 
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
@@ -30,12 +31,15 @@ public:
 
     const technox::PerformanceBank& getPerformanceBank() const noexcept { return performanceBank; }
     juce::String getCurrentPerformanceName() const;
+    juce::String getCurrentPartSoundName(int partIndex) const;
+    const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
 private:
     technox::PerformanceBank performanceBank;
+    technox::SoundCatalog soundCatalog;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
 };
