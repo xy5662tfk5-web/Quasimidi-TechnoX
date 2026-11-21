@@ -14,7 +14,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test lossless MIDI/SysEx parser
         run: python3 -m unittest discover -s tests -v
+      - name: Analyze opaque Part SysEx bytes
+        run: python3 tools/analyze_technox_parts.py TECHNOX.MID --output technox_part_byte_report.json
       - name: Configure (x86_64)
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
         run: cmake --build build --config Release --parallel 2
+      - name: Upload Part byte report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-part-byte-report
+          path: technox_part_byte_report.json
+          if-no-files-found: ignore
