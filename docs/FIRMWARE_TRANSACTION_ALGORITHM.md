@@ -226,3 +226,85 @@ The planner models these observed actions:
 The planner reports intended actions and addresses; it does not perform the firmware's asynchronous resource wait, emulate the external controller, or claim a Note On semantic.
 
 Unit tests are in `tests/test_firmware_transaction.cpp`. They cover descriptor decoding, byte masking, lookup mapping, page/range errors, zero/nonzero branching, slot address calculation, and selected action sequences. A standalone GitHub Actions workflow compiles the test with C++17 and warnings-as-errors.
+
+
+## 13. Slot scan and resource arbitration — newly traced
+
+### 0x0E8E: select an available slot in the selected mode
+
+Entry is reached from the zero-second-byte path of 0x1494 after reading the mode-control byte at XDATA 0x28D8 + mode.
+
+Observed behavior:
+
+1. Initialize RAM[0x31] = 0xFF, then read the two-byte slot-map pointer previously stored in RAM[0x3C:0x3D].
+2. Cache the current map/status byte in RAM[0x3E]. If bit 0x20 is set, skip the initial free-slot test and enter the status-handshake path at 0x0EE6.
+3. Otherwise increment the slot candidate counter RAM[0x31]. Candidate zero is checked against the bit mask RAM[0x2F] through indexed helper 0x1408. If the masked bit is clear, return.
+4. Candidates are scanned up to 0x1F; each candidate selects a pair of bytes in XDATA page 0x2B, starting at offset 2 * candidate. The pair is compared against RAM[0x2F] and RAM[0x28]. A match identifies the candidate and loads its associated status byte at offset 0x41 + candidate.
+5. The selected status byte is masked with 0x1F and used as the dynamic XDATA page (RAM[0x2D] and A0). The firmware then polls offset 0xFB and checks flags E3, E5, E6, E7, and E4. These checks control retries, writes to offset 0xFD, and progression into the lower-level slot descriptor processing beginning at 0x0F33.
+
+The scan is bounded by 32 candidates. The code establishes a slot-selection/status protocol, but does not identify the selected slot as a musical voice number without further evidence.
+
+### 0x1456: reserve/prepare selected slot, then dispatch
+
+The routine begins with LCALL 0x1742. If the returned accumulator is 0xFF, it returns immediately. Otherwise the returned value is copied to RAM[0x2D] and used as the selected XDATA page.
+
+It then writes RAM[0x2F] and RAM[0x28] to offsets 0x00 and 0x01 of XDATA page 0x2B; calls 0x1408 with the descriptor mask and selected page to compute a bitmap address; ORs the computed mask into that bitmap byte; increments XDATA counter 0x2B40; stores a per-page pointer derived from page + 0x41 in RAM[0x3C:0x3D]; writes page | 0x60 to the selected page's offset 0x41; and tail-jumps to 0x16C3.
+
+This is evidence for a reservation/allocation step rather than direct voice start: the routine reserves a bitmap bit, updates a counter and page metadata, and only then enters the external-interface transaction.
+
+### 0x1742: resource token / page queue manager
+
+0x1742 reads RAM[0x52] and subtracts one.
+
+- If the result underflows (original value was zero), it calls 0x1780.
+- If 0x1780 returns zero, it retries the 0x1742 loop.
+- If the result is nonzero, it decrements RAM[0x52], updates the linked page queue using RAM[0x50], RAM[0x51], RAM[0x4E], and RAM[0x4F], then returns the previous queue head in A.
+
+The queue links are stored in internal RAM at 0x7E + page_id. The routine maintains a head/tail-like pair and increments/decrements RAM[0x52]; this is consistent with a page/resource availability queue. The exact semantic label of the resource remains unproven.
+
+### 0x1780, 0x17AC, 0x17D4: page arbitration and retry
+
+These routines select a candidate page from RAM[0x50], load its page into RAM[0x2D]/A0, and inspect status offset 0xFB.
+
+- 0x1780 accepts the current candidate only when E3 is set and neither E5 nor E6 is set. It then calls 0x1009, delays, calls 0x018D, and returns zero. If the candidate is not ready, it follows the page link at 0x7E + page_id and retries; if it reaches RAM[0x51], it transitions to the alternate candidate path at 0x17AC.
+- 0x17AC performs a related check without the E3 requirement: it requires E5 and E6 both clear before calling 0x1009, delaying, calling 0x018D, and returning zero. Otherwise it follows the linked page list; reaching RAM[0x51] returns without acquiring a page.
+- 0x17D4 is a third retry path. It selects the same candidate chain and checks E3/E5/E6. If E3 is clear, or E5/E6 are both clear, it calls 0x1009 and returns zero. Otherwise it follows the page links and retries. This routine is invoked by the nonzero descriptor path when RAM[0x52] == 0.
+
+The delay is a short software loop (R0=0, NOP, DJNZ); no time unit is inferred.
+
+### 0x1009: discover a usable endpoint on a page
+
+0x1009 selects page RAM[0x2D], derives a high-nibble group from the page ID, and scans offsets 0x80, 0x88, ... 0xF8.
+
+A candidate byte is accepted when (value & 0x7E) == 0x16. The routine then switches to XDATA page 0x80, prepares arguments (R5 = group, R4 = 0, R3 = 1, R2 = 0x80), calls 0x0DB7, restores the original page, and continues scanning.
+
+This is endpoint discovery/initialization on a selected page. The signature is observed in firmware; the endpoint's hardware identity is not established.
+
+### 0x018D and 0x0211: validate and initialize selected page
+
+0x018D rejects any selected page with upper three bits set (page & 0xE0 != 0) by jumping to address zero. For a valid page it selects that XDATA page and calls 0x0211, then updates the linked page queue and increments RAM[0x52].
+
+0x0211 reads status offset 0xFB; if E5 is set it raises internal flag bit 0x0A. It calls 0x0DF7 with the selected page, clears offset 0xFB, writes 0x40 to offset 0xFA, then scans endpoint bytes beginning at offset 0x30. It initializes endpoint fields and checks associated flags. This is page/endpoint initialization, not proof of a synth voice register protocol.
+
+### Updated interpretation and limits
+
+The combined path is now clearer:
+
+0x1494 → 0x0E8E → slot scan/status → 0x1456 → 0x1742 → page arbitration → 0x1009/0x018D → 0x16C3
+
+The exact ordering varies by branch: 0x1456 calls 0x1742 before writing reservation metadata and jumping to 0x16C3; 0x0E8E can also return early or enter the status path without reaching 0x1456.
+
+Confirmed:
+- candidate slots are scanned and tested using bitmap masks;
+- page IDs and linked lists are maintained;
+- a selected page's bitmap, counter, metadata, and endpoint table are updated;
+- status bits gate retry/acquisition;
+- 0x1456 enters the external-interface transaction only after the reservation work.
+
+Not yet confirmed:
+- the external controller's chip identity;
+- whether a page corresponds to a physical voice, channel, DSP, or transport endpoint;
+- which final status transition constitutes successful synthesis-command completion;
+- whether the 0x2B page records represent voices, commands, or another resource abstraction.
+
+No function in this chain is labelled Note On or voice-start at this stage.
