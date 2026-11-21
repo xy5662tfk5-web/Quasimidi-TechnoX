@@ -333,6 +333,7 @@ void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& dest
             stream.writeByte(static_cast<char>(value.load(std::memory_order_acquire)));
     for (const auto& channel : partMidiChannels)
         stream.writeByte(static_cast<char>(channel.load(std::memory_order_acquire)));
+    stream.writeByte(static_cast<char>(static_cast<int>(getMidiRoutingMode())));
 }
 
 void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -346,30 +347,39 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         setCurrentProgram(program);
         return;
     }
-    if (magic != kStateMagicV2 && magic != kStateMagicV3)
+    if (magic != kStateMagicV2 && magic != kStateMagicV3 && magic != kStateMagicV4)
         return;
-    const int requiredBytes = magic == kStateMagicV2 ? kPartStateBytesV2 : kPartStateBytesV3;
+    const int requiredBytes = magic == kStateMagicV2 ? kPartStateBytesV2
+        : (magic == kStateMagicV3 ? kPartStateBytesV3 : kPartStateBytesV4);
     if (sizeInBytes < 8 + requiredBytes)
         return;
 
-    for (std::size_t performance = 0; performance < partValues.size(); ++performance) {
-        for (std::size_t part = 0; part < partValues[performance].size(); ++part) {
+    for (std::size_t performance = 0; performance < partValues.size(); ++performance)
+        for (std::size_t part = 0; part < partValues[performance].size(); ++part)
             for (std::size_t parameter = 0; parameter < partValues[performance][part].size(); ++parameter) {
                 const int value = static_cast<unsigned char>(stream.readByte());
                 const auto maximum = technox::kPartParameterDescriptors[parameter].maximum;
                 partValues[performance][part][parameter].store(
                     juce::jlimit(0, static_cast<int>(maximum), value), std::memory_order_release);
             }
-        }
-    }
 
-    if (magic == kStateMagicV3) {
-        constexpr int commonMaxima[4] = {21, 21, 3, 127};
+    if (magic == kStateMagicV4) {
+        constexpr int maxima[5] = {3, 21, 21, 3, 127};
+        for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
+            for (std::size_t control = 0; control < 5; ++control) {
+                const int value = static_cast<unsigned char>(stream.readByte());
+                commonValues[performance][control].store(
+                    value == 0xff ? -1 : juce::jlimit(0, maxima[control], value),
+                    std::memory_order_release);
+            }
+    } else if (magic == kStateMagicV3) {
+        initialiseCommonControlsFromBank();
+        constexpr int oldMaxima[4] = {21, 21, 3, 127};
         for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
             for (std::size_t control = 0; control < 4; ++control) {
                 const int value = static_cast<unsigned char>(stream.readByte());
-                commonValues[performance][control].store(
-                    value == 0xff ? -1 : juce::jlimit(0, commonMaxima[control], value),
+                commonValues[performance][control + 1].store(
+                    value == 0xff ? -1 : juce::jlimit(0, oldMaxima[control], value),
                     std::memory_order_release);
             }
     } else {
@@ -380,6 +390,12 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         const int restoredChannel = static_cast<unsigned char>(stream.readByte());
         if (restoredChannel >= 1 && restoredChannel <= 16)
             channel.store(restoredChannel, std::memory_order_release);
+    }
+    if (magic == kStateMagicV4) {
+        const int mode = static_cast<unsigned char>(stream.readByte());
+        midiRoutingMode.store(mode == 1 ? 1 : 0, std::memory_order_release);
+    } else {
+        midiRoutingMode.store(static_cast<int>(MidiRoutingMode::performanceOmni), std::memory_order_release);
     }
     setCurrentProgram(program);
 }
