@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "TechnoXMidi.h"
 
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
@@ -31,5 +32,6 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
 private:
+    technox::MidiState midiState;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
 };
