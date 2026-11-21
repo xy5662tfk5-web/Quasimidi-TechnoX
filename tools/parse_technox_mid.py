@@ -18,9 +18,9 @@ class Frame:
     track: int
     event_offset: int
     @property
-    def record_index(self): return self.raw[5] if len(self.raw) > 5 else None
+    def performance_address(self): return self.raw[5] if len(self.raw) > 5 else None
     @property
-    def block_type(self): return self.raw[6] if len(self.raw) > 6 else None
+    def block_selector(self): return self.raw[6] if len(self.raw) > 6 else None
 
 @dataclass
 class Performance:
@@ -106,13 +106,13 @@ def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
         group = frames[base:base+6]
         if any(not f.raw.startswith(HEADER) or not f.raw.endswith(b"\xF7") for f in group):
             raise MidiFormatError(f"invalid TechnoX SysEx envelope at group {base//6}")
-        selectors = tuple(f.block_type for f in group)
+        selectors = tuple(f.block_selector for f in group)
         if selectors != EXPECTED_BLOCK_SELECTORS: raise MidiFormatError(f"unexpected block selector sequence {selectors} at group {base//6}")
-        indexes = [f.record_index for f in group]
+        indexes = [f.performance_address for f in group]
         if len(set(indexes)) != 1: raise MidiFormatError(f"record index mismatch at group {base//6}")
         for f in group:
-            if strict and len(f.raw) != EXPECTED_SIZES[f.block_type]:
-                raise MidiFormatError(f"unexpected size {len(f.raw)} for block {f.block_type:#04x}")
+            if strict and len(f.raw) != EXPECTED_SIZES[f.block_selector]:
+                raise MidiFormatError(f"unexpected size {len(f.raw)} for block {f.block_selector:#04x}")
             if any(x > 0x7F for x in f.raw[1:-1]): raise MidiFormatError("non-7-bit data byte in SysEx payload")
         name = group[0].raw[7:-1].decode("ascii", errors="replace").rstrip(" \x00")
         result.append(Performance(indexes[0], name, group[0].raw, group[1].raw,
