@@ -72,12 +72,12 @@ public:
             const auto base = record * 6;
             const auto& nameFrame = frames[base];
             if (nameFrame.size() != sizes[0]) return false;
-            const auto sourceIndex = nameFrame[6];
+            const auto sourceIndex = nameFrame[5];
             for (std::size_t block = 0; block < 6; ++block) {
                 const auto& frame = frames[base + block];
                 if (frame.size() != sizes[block] || frame.back() != 0xF7) return false;
                 if (!std::equal(header.begin(), header.end(), frame.begin())) return false;
-                if (frame[5] != types[block] || frame[6] != sourceIndex) return false;
+                if (frame[5] != sourceIndex || frame[6] != types[block]) return false;
                 for (std::size_t i = 1; i + 1 < frame.size(); ++i)
                     if (frame[i] > 0x7F) return false;
             }
