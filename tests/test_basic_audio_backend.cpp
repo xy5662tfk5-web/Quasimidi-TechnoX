@@ -7,10 +7,11 @@
 class CountingBackend final : public technox::IMASSVoiceBackend {
 public:
     int noteOffCalls = 0;
+    int resetVoiceCalls = 0;
     void prepare(double, int) override {}
     void noteOn(int, const technox::VoiceSlot&) noexcept override {}
     void noteOff(int, const technox::VoiceSlot&) noexcept override { ++noteOffCalls; }
-    void resetVoice(int, const technox::VoiceSlot&) noexcept override {}
+    void resetVoice(int, const technox::VoiceSlot&) noexcept override { ++resetVoiceCalls; }
     bool isVoiceFinished(int) const noexcept override { return false; }
     void render(float* const*, int, int, const technox::VoiceManager&,
                 const technox::ModulationMatrix&, const technox::MASSPartParameterStore&,
@@ -39,6 +40,61 @@ int main() {
         }
     assert(releasingParts == 1);
     assert(fourPartEngine.voiceManager().activeVoiceCount() == 4);
+
+    // Identical pitches on different Part channels must remain independent.
+    fourPartEngine.noteOn(13, 14, 60, 100);
+    fourPartEngine.noteOff(13, 60);
+    int samePitchReleasing = 0;
+    int samePitchHeld = 0;
+    for (const auto& voice : fourPartEngine.voiceManager().voices()) {
+        if (!voice.active || voice.note != 60) continue;
+        if (voice.channel == 13 && voice.part == 12 && voice.releasing) ++samePitchReleasing;
+        if (voice.channel == 14 && voice.part == 13 && !voice.releasing) ++samePitchHeld;
+    }
+    assert(samePitchReleasing == 1);
+    assert(samePitchHeld == 1);
+
+    // Channel-scoped All Notes Off and All Sounds Off must not touch another Part.
+    fourPartEngine.allNotesOff(14);
+    int channel13Releasing = 0;
+    int channel14Releasing = 0;
+    for (const auto& voice : fourPartEngine.voiceManager().voices()) {
+        if (!voice.active) continue;
+        if (voice.channel == 13 && voice.releasing) ++channel13Releasing;
+        if (voice.channel == 14 && voice.releasing) ++channel14Releasing;
+    }
+    assert(channel13Releasing == 1);
+    assert(channel14Releasing == 1);
+    fourPartEngine.allSoundsOff(14);
+    assert(fourPartEngine.voiceManager().activeVoiceCount() == 3);
+    assert(fourPartBackend.resetVoiceCalls == 1);
+    for (const auto& voice : fourPartEngine.voiceManager().voices())
+        if (voice.active) assert(voice.channel != 14);
+
+    // Modulation, RPN and switch controllers are stored independently per Part.
+    assert(fourPartEngine.setModWheel(12, 90));
+    assert(fourPartEngine.setModWheel(13, 12));
+    assert(fourPartEngine.setExpression(12, 80));
+    assert(fourPartEngine.setExpression(13, 30));
+    assert(fourPartEngine.setPitchBend(12, 4096));
+    assert(fourPartEngine.setPitchBend(13, -2048));
+    assert(fourPartEngine.setRpn(12, 0, 12));
+    assert(fourPartEngine.setRpn(13, 0, 2));
+    assert(fourPartEngine.setPortamento(12, true));
+    assert(fourPartEngine.setSoftPedal(13, true));
+    assert(fourPartEngine.getModWheel(12) == 90 && fourPartEngine.getModWheel(13) == 12);
+    assert(fourPartEngine.getExpression(12) == 80 && fourPartEngine.getExpression(13) == 30);
+    assert(fourPartEngine.getPitchBend(12) == 4096 && fourPartEngine.getPitchBend(13) == -2048);
+    assert(fourPartEngine.getRpn(12, 0) == 12 && fourPartEngine.getRpn(13, 0) == 2);
+    assert(fourPartEngine.portamento(12) && !fourPartEngine.portamento(13));
+    assert(!fourPartEngine.softPedal(12) && fourPartEngine.softPedal(13));
+    fourPartEngine.resetPartControllers(12);
+    assert(fourPartEngine.getModWheel(12) == 0 && fourPartEngine.getExpression(12) == 127);
+    assert(fourPartEngine.getPitchBend(12) == 0 && fourPartEngine.getRpn(12, 0) == -1);
+    assert(!fourPartEngine.portamento(12));
+    assert(fourPartEngine.getModWheel(13) == 12 && fourPartEngine.getExpression(13) == 30);
+    assert(fourPartEngine.getPitchBend(13) == -2048 && fourPartEngine.getRpn(13, 0) == 2);
+    assert(fourPartEngine.softPedal(13));
 
     // With all 21 slots occupied, a releasing voice is stolen before a held
     // voice; the new note must occupy the released slot.
