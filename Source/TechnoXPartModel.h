@@ -68,6 +68,9 @@ public:
         return static_cast<int>(edited_[kDataOffset + index]);
     }
 
+    int bankNumber() const noexcept { return rawValue(static_cast<std::size_t>(PartParameter::bankNumber)); }
+    int soundNumber() const noexcept { return rawValue(static_cast<std::size_t>(PartParameter::soundNumber)); }
+
     int parameterValue(PartParameter parameter) const noexcept {
         const auto index = static_cast<std::size_t>(parameter);
         const int raw = rawValue(index);
