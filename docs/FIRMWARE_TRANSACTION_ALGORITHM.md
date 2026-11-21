@@ -1835,3 +1835,20 @@ The complete 128-entry mapping is stored in the ROM-derived analysis; table boun
 ### 56.1 Next trace
 
 Trace the values entering RAM[0x29] and RAM[0x2A] at every call site of 0x0D0E, then compare their converted values against the endpoint candidate bytes inspected by the scan loop. This will establish whether the pair represents a selector tuple, a range, or a parameter address. Do not infer that from the curve shape alone.
+
+
+## 57. Call-site evidence: the 0x7F endpoint bound is deliberately initialized
+
+The call-site inspection confirms that the two inputs consumed by 0x0D0E are prepared differently depending on the operation:
+
+- In the Part initialization path at 0x3ECE, the firmware loads the Part's descriptor byte from `XDATA[0x2902 + 12*PartIndex]`, initializes the paired byte at `XDATA[0x290A + 12*PartIndex]` to `0x7F`, mirrors that value into RAM[0x2A], and calls 0x0D0E.
+- In the update path around 0x3F10, the routine prepares RAM[0x29] and RAM[0x2A], invokes 0x02D1 as an intermediate selector calculation, then sets the paired descriptor field at `XDATA[0x290A + 12*PartIndex]` and RAM[0x2A] to `0x7F` before calling 0x0D0E.
+- Other update paths at 0x4B0A and 0x6A79 write the Part descriptor's +2/+10 pair and call 0x0D0E. The call at 0x4880 services the already-prepared pair.
+
+Because the ROM table maps `0x7F → 0x7F`, this initialization value survives conversion unchanged. That is consistent with a maximum/boundary value used during slot resolution, but the code does not yet prove whether it means "all values", "upper endpoint", "unrestricted", or a literal selector.
+
+The strongest grounded interpretation is therefore: descriptor +2 supplies a Part-specific mapped selector, while +10 is initialized to the top of the 7-bit conversion range and can later be updated by runtime routines. This is more precise than calling both bytes generic parameter IDs, but their final semantic labels remain open.
+
+### 57.1 Next high-value target
+
+Decode 0x02D1 and compare its output with the values written by 0x3F10/0x4B0A/0x6A79. Then follow the 0x0D0E scan's exact comparison operands against candidate slot metadata. This is the shortest route to a defensible selector/slot matching rule.
