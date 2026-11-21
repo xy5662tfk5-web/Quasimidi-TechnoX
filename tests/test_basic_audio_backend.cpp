@@ -21,6 +21,44 @@ public:
 int main() {
     using namespace technox;
 
+    // Four Parts on distinct MIDI channels retain independent note lifecycles.
+    CountingBackend fourPartBackend;
+    MASSAudioEngine fourPartEngine(&fourPartBackend);
+    fourPartEngine.prepare(48000.0, 128);
+    for (int part = 0; part < 4; ++part)
+        fourPartEngine.noteOn(static_cast<std::uint8_t>(12 + part),
+                              static_cast<std::uint8_t>(13 + part),
+                              static_cast<std::uint8_t>(60 + part), 100);
+    assert(fourPartEngine.voiceManager().activeVoiceCount() == 4);
+    fourPartEngine.noteOff(13, 60);
+    int releasingParts = 0;
+    for (const auto& voice : fourPartEngine.voiceManager().voices())
+        if (voice.active && voice.releasing) {
+            ++releasingParts;
+            assert(voice.part == 12);
+        }
+    assert(releasingParts == 1);
+    assert(fourPartEngine.voiceManager().activeVoiceCount() == 4);
+
+    // With all 21 slots occupied, a releasing voice is stolen before a held
+    // voice; the new note must occupy the released slot.
+    CountingBackend stealingBackend;
+    MASSAudioEngine stealingEngine(&stealingBackend);
+    stealingEngine.prepare(48000.0, 128);
+    for (int note = 0; note < 21; ++note)
+        stealingEngine.noteOn(static_cast<std::uint8_t>(12 + (note % 4)),
+                              static_cast<std::uint8_t>(1 + (note % 4)),
+                              static_cast<std::uint8_t>(40 + note), 100);
+    assert(stealingEngine.voiceManager().activeVoiceCount() == 21);
+    stealingEngine.noteOff(1, 40);
+    assert(stealingEngine.voiceManager().voices()[0].releasing);
+    stealingEngine.noteOn(15, 4, 100, 110);
+    assert(stealingEngine.voiceManager().activeVoiceCount() == 21);
+    assert(stealingEngine.voiceManager().voices()[0].active);
+    assert(!stealingEngine.voiceManager().voices()[0].releasing);
+    assert(stealingEngine.voiceManager().voices()[0].note == 100);
+    assert(stealingEngine.voiceManager().voices()[1].note == 41);
+
     // Duplicate Note Off messages must not restart the backend release.
     CountingBackend countingBackend;
     MASSAudioEngine countingEngine(&countingBackend);
