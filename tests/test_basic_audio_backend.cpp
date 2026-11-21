@@ -70,6 +70,13 @@ int main() {
     assert(preEventEnergy == 0.0);
     assert(postEventEnergy > 0.01);
 
+    // Reinitializing the audio device must not leave stale active voice slots.
+    assert(offsetEngine.voiceManager().activeVoiceCount() == 1);
+    offsetEngine.prepare(44100.0, 256);
+    assert(offsetEngine.voiceManager().activeVoiceCount() == 0);
+    offsetEngine.noteOn(12, 1, 69, 110);
+    assert(offsetEngine.voiceManager().activeVoiceCount() == 1);
+
     engine.noteOff(1, 69);
     assert(engine.voiceManager().voices()[0].releasing);
 
