@@ -8,20 +8,20 @@ using namespace technox::firmware;
 
 int main() {
     // 0x0DB7 writes R5, R2, R3, then R4 with ACC.6 cleared.
-    // Internal flag 0x0C mirrors bit 7 of the modified fourth byte.
-    const auto mailboxLow = makeMailboxWrite(0x12, 0x34, 0x56, 0x7F, false);
+    // Internal flag 0x0C mirrors the original R4/ACC.7 bit.
+    const auto mailboxLow = makeMailboxWrite(0x12, 0x34, 0x56, 0x7F);
     assert(mailboxLow.kBaseAddress == 0x8000);
     assert((mailboxLow.bytes == std::array<std::uint8_t, 4>{0x12, 0x34, 0x56, 0x3F}));
     assert(!mailboxLow.setInternalFlag0C);
-    const auto mailboxHigh = makeMailboxWrite(0xA1, 0xB2, 0xC3, 0xFF, true);
+    const auto mailboxHigh = makeMailboxWrite(0xA1, 0xB2, 0xC3, 0xFF);
     assert((mailboxHigh.bytes == std::array<std::uint8_t, 4>{0xA1, 0xB2, 0xC3, 0xBF}));
     assert(mailboxHigh.setInternalFlag0C);
-    const auto mailboxFlagOnly = makeMailboxWrite(0, 0, 0, 0x80, true);
+    const auto mailboxFlagOnly = makeMailboxWrite(0, 0, 0, 0x80);
     assert(mailboxFlagOnly.bytes[3] == 0x80);
     assert(mailboxFlagOnly.setInternalFlag0C);
-    const auto mailboxByteBitWithoutFlag = makeMailboxWrite(0, 0, 0, 0x80, false);
-    assert(mailboxByteBitWithoutFlag.bytes[3] == 0x80);
-    assert(!mailboxByteBitWithoutFlag.setInternalFlag0C);
+    const auto mailboxBit6Only = makeMailboxWrite(0, 0, 0, 0x40);
+    assert(mailboxBit6Only.bytes[3] == 0x00);
+    assert(!mailboxBit6Only.setInternalFlag0C);
 
     XDataMemory memory;
     XDataMemory::Page page{};
@@ -109,8 +109,8 @@ int main() {
 
 
     // Firmware 0x1009 scans a packed list at P2=0x80, R0=0x80..0xF0,
-    // in steps of eight. The first 0xFF terminates the list. E7 is copied
-    // from the separate 0x0D flag; R4 is zero for this call site.
+    // in steps of eight. The first 0xFF terminates the list. At the 0x1045
+    // call site R4 is 0x80 iff flag 0x0D is set (ACC.7 is copied into R4).
     XDataMemory mailboxMemory;
     XDataMemory::Page mailboxPage{};
     mailboxPage[0x80] = 0x16; // marker: (value & 0x7E) == 0x16
@@ -129,8 +129,8 @@ int main() {
     assert(mailboxScan.visitedOffsets[0] == 0x80);
     assert(mailboxScan.visitedOffsets[1] == 0x88);
     assert(mailboxScan.visitedOffsets[2] == 0x90);
-    assert((mailboxScan.writes[0].bytes == std::array<std::uint8_t, 4>{7, 0x80, 0x01, 0x00}));
-    assert((mailboxScan.writes[1].bytes == std::array<std::uint8_t, 4>{9, 0x80, 0x01, 0x00}));
+    assert((mailboxScan.writes[0].bytes == std::array<std::uint8_t, 4>{7, 0x80, 0x01, 0x80}));
+    assert((mailboxScan.writes[1].bytes == std::array<std::uint8_t, 4>{9, 0x80, 0x01, 0x80}));
     assert(mailboxScan.writes[0].setInternalFlag0C);
     assert(mailboxScan.writes[1].setInternalFlag0C);
 
