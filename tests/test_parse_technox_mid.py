@@ -1,8 +1,8 @@
-import importlib.util, struct, unittest
+import importlib.util, struct, unittest, sys
 from pathlib import Path
 MODULE = Path(__file__).with_name("parse_technox_mid.py")
 spec = importlib.util.spec_from_file_location("parse_technox_mid", MODULE)
-parser = importlib.util.module_from_spec(spec); spec.loader.exec_module(parser)
+parser = importlib.util.module_from_spec(spec); sys.modules[spec.name] = parser; spec.loader.exec_module(parser)
 def vlq(n):
     out=[n & 127]; n >>= 7
     while n: out.insert(0,(n & 127)|128); n >>= 7
