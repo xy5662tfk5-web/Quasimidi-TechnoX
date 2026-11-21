@@ -30,7 +30,7 @@ public:
         }
         if (selected < 0) {
             // Prefer stealing the oldest releasing voice, otherwise the oldest voice.
-            std::uint64_t oldest = UINT64_MAX;
+            std::uint64_t oldest = ~std::uint64_t{0};
             for (std::size_t i = 0; i < voices_.size(); ++i) {
                 if (voices_[i].releasing && voices_[i].age < oldest) {
                     oldest = voices_[i].age;
