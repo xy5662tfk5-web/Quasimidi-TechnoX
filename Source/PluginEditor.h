@@ -30,11 +30,6 @@ private:
     int selectedPartSlot = 0;
     int lastDisplayedPerformance = -1;
     bool refreshingControls = false;
-    int partNumber = 13;
-    int midiChannel = 1;
-    int parameterNumber = 1;
-    int valueNumber = 64;
-    int volumeNumber = 100;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessorEditor)
 };
