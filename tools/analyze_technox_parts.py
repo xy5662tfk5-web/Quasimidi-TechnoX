@@ -18,7 +18,8 @@ def analyze(midi_bytes: bytes):
             "type_byte_offset": 6,
             "performance_index_offset": 5,
             "opaque_data_start_offset": 8,
-            "reserved_byte_offset": 7,\n            "opaque_data_bytes": 24,
+            "reserved_byte_offset": 7,
+            "opaque_data_bytes": 24,
             "terminator_offset": 32
         },
         "parts": []
