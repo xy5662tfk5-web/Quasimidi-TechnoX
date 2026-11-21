@@ -82,3 +82,14 @@ if (BUILD_TESTING)
         COMMAND technox_firmware_transaction_tests
     )
 endif()
+
+# Dependency-free smoke test for the first audible generic voice backend.
+if (BUILD_TESTING)
+    add_executable(technox_basic_audio_backend_tests
+        tests/test_basic_audio_backend.cpp
+    )
+    target_compile_features(technox_basic_audio_backend_tests PRIVATE cxx_std_17)
+    add_test(NAME technox_basic_audio_backend_tests
+        COMMAND technox_basic_audio_backend_tests
+    )
+endif()
