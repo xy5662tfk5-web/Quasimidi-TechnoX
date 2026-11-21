@@ -18,7 +18,7 @@ class ParserTests(unittest.TestCase):
         f=b"\xf0\x3f\x00\x22\x44\x05\x05"+b"Test    "+b"\xf7"
         self.assertEqual(parser.extract_sysex(smf([f]))[0].raw,f)
     def test_address_high_and_block_selector_order(self):
-        frame = parser.Frame(b"\\xf0\\x3f\\x00\\x22\\x44\\x06\\x01" + bytes(24) + b"\\xf7", 0, 0)
+        frame = parser.Frame(b"\xf0\x3f\x00\x22\x44\x06\x01" + bytes(24) + b"\xf7", 0, 0)
         self.assertEqual(frame.record_index, 6)
         self.assertEqual(frame.block_type, 1)
     def test_incomplete_sysex_rejected(self):
