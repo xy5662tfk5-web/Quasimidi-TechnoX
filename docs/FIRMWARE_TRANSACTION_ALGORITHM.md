@@ -505,3 +505,71 @@ Recovered table:
 Each entry begins with an 8051 LJMP (opcode 0x02) followed by a 16-bit destination and a trailing zero byte. The computed jump therefore lands on the LJMP instruction, which transfers control to the corresponding handler. Inputs whose masked value is 0x38 do not use this table; they take the separate 0x19A7 path.
 
 This resolves the dispatch destinations but not the full semantics of each handler. The next reverse-engineering pass must disassemble each target with instruction-aligned control flow, trace its pointer accesses and P3-bit writes, and compare the common data-path operations. The target list is now grounded in the actual ROM bytes rather than inferred from nearby code.
+
+
+## 17. First instruction-aligned decode of the 0x1BC3 handlers
+
+The seven table destinations were decoded independently from the descrambled IC4 bytes. This section records control/data-flow facts only; handler names are descriptive working labels, not claimed hardware semantics.
+
+### 17.1 0x1C2B — descriptor gate and dispatch
+
+At entry, bit address 0x0A selects an alternate path. On the ordinary path, the routine derives DPTR = RAM[0x36:0x37] + 3, applies the descriptor bit flags 0x00–0x02 to SFR bits 0xB5/0xB4/0xB1, reads one XDATA byte, restores those SFR bits, and tests bit 3 of the byte.
+
+- If bit 3 is clear, it advances the pointer, saves it to RAM[0x36:0x37], and jumps to 0x19C2.
+- If bit 3 is set, it jumps to 0x224C.
+
+The branch is therefore based on a byte read through the descriptor pointer; it is not a persistent global status flag.
+
+### 17.2 0x1C61 — descriptor-field transfer and table-driven transformation
+
+The handler saves RAM[0x36:0x37] as DPTR, applies the three descriptor-controlled SFR strobes, then reads a run of bytes through MOVX A,@DPTR into A/R2/R3/R4/R7/R6/R5. It saves the advanced pointer back to RAM[0x36:0x37].
+
+It then uses R1 = RAM[0x2E] as an indirect XDATA destination and writes the fields into a record/buffer. The record layout is not a simple byte-for-byte copy: the fourth field is conditionally merged with existing low three bits, one field is masked with 0x7F, and later fields are copied separately. The path consults XDATA 0x2067 and ROM tables beginning at 0x11F0, 0x1288, and 0x1308, then reaches a shared continuation at 0x1EDD through the branch at 0x1E37.
+
+The table-derived values and the complete loop/exit conditions remain to be modelled. In particular, do not infer musical parameter names from the table indices.
+
+### 17.3 0x1EDD — record construction and external-window output
+
+This handler begins by clearing RAM[0x3E], copies the descriptor pointer into DPTR, applies the three descriptor-controlled SFR strobes, and reads a sequence of descriptor bytes into R2/R3/R5/R6/F0/R4/R7. It writes a record through MOVX @R1,A, with R1 initially loaded from RAM[0x2E]. Several fields are transformed using current state (including RAM[0x30], RAM[0x3F], RAM[0x40], RAM[0x41], RAM[0x43], and RAM[0x3E]) and ROM lookup tables at 0x1288 and 0x1308. The code also calls helpers 0x2381 and 0x1848.
+
+A confirmed external write sequence occurs at 0x20CC–0x210B. It uses MOV DPTR,#0x8000 and MOVX writes to four consecutive XDATA addresses, 0x8000–0x8003:
+
+- Optional block, emitted only when internal bit address 0x0A is set: byte 0 = RAM[0x2B] - 2; bytes 1–3 are read from the record area relative to RAM[0x2E] (the third is masked to three bits, with a conditional ACC.7 adjustment).
+- Second block: [RAM[0x2B], R5, R6, R7].
+- Third block: [RAM[0x2B] - 1, R2, R3, R4].
+
+The second and third blocks are emitted on the ordinary path regardless of the optional-block condition. The code then jumps to 0x19C2. If the alternate branch at 0x2092 is taken, it instead prepares R2=0 and calls 0x0DB7 with A0=0x80 before restoring A0 from RAM[0x2D].
+
+This is the strongest current evidence that the table-dispatched descriptor machinery feeds a separate external XDATA device/window. The firmware proves writes to 0x8000–0x8003; it does not identify the receiving IC or the semantic meaning of the four bytes. Existing MAME no-op mappings for this range are emulator mapping evidence, not proof that the physical hardware ignores the writes.
+
+### 17.4 0x224C — page-0x80 endpoint operation
+
+This handler can divert immediately to 0x1BE2 when internal bit address 0x08 is set. Otherwise it reads three bytes from the descriptor pointer, stores one field in the record area at RAM[0x2E], applies the descriptor SFR strobes, and prepares the page-0x80 endpoint operation.
+
+It selects A0=0x80, derives a group value from RAM[0x2B], and under the relevant mode conditions writes a short control/argument block through MOVX @R0. It then calls 0x0DB7, restores A0 from RAM[0x2D], and jumps to 0x19C2. The call and page selection establish an endpoint operation, but do not establish the endpoint's physical identity.
+
+### 17.5 0x2301 — record initialization plus endpoint dispatch
+
+When internal bit address 0x0A is clear, the handler walks the record area in eight-byte steps and fills selected entries with 0x38; otherwise it sets RAM[0x2E] to 0xF8. It then reads descriptor bytes through RAM[0x36:0x37], stores fields beginning at offset 0xF9 of the indirect XDATA area, and merges the low three bits of an existing field with the descriptor's low three bits.
+
+The routine calls 0x2128 and 0x21B7, conditionally sets ACC.7 based on internal bit 0x0D, derives an endpoint/group argument from RAM[0x2B], selects A0=0x80, calls 0x0DB7, restores A0 from RAM[0x2D], and jumps to 0x19CD. This is a second distinct page-0x80 endpoint path; the exact payload semantics are not yet known.
+
+### 17.6 0x2374 — pointer advance
+
+This short handler increments the 16-bit pointer in RAM[0x36:0x37] by one, including carry into the high byte, then jumps to 0x19C2. It is a descriptor-iteration helper, not an independent peripheral-write sequence.
+
+### 17.7 0x19A7 — special descriptor-record path
+
+The special branch for masked mode value 0x38 writes the current accumulator byte to XDATA through R1 = RAM[0x2E], increments DPTR, saves DPTR back to RAM[0x36:0x37], advances RAM[0x2E] by eight, increments RAM[0x2B], and decrements RAM[0x2C]. If the loop counter remains nonzero it jumps back to 0x1986; otherwise it returns.
+
+This path advances a repeated eight-byte record/descriptor sequence. It is not one of the seven four-byte LJMP table entries.
+
+### 17.8 Current interpretation boundary
+
+The handler family now contains three visibly different operation classes:
+
+1. Descriptor reads and transformed record construction in the indirect XDATA area addressed from RAM[0x2E].
+2. Explicit external-window writes to XDATA 0x8000–0x8003 in the 0x1EDD path.
+3. Page-0x80 endpoint/control operations through A0=0x80 and helper 0x0DB7 in the 0x224C and 0x2301 paths.
+
+The next required step is to trace the caller-provided values of RAM[0x2E], RAM[0x2B], RAM[0x2C], RAM[0x36:0x37], and internal bits 0x08/0x0A/0x0D across real entry paths. Then compare these writes against the board-level bus wiring or captured hardware traffic. Until that is done, 0x8000–0x8003 is an identified external XDATA write window, not a named sound-chip register bank.
