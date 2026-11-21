@@ -14,7 +14,9 @@ constexpr int kPartStateBytesV4 = 50 * 4 * 24 + 50 * 5 + 4 + 1;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
-    : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true))
+    : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      voiceBackend(std::make_unique<technox::BasicMASSVoiceBackend>()),
+      massEngine(voiceBackend.get())
 {
     for (auto& performance : partValues)
         for (auto& part : performance)
@@ -35,6 +37,19 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     initialisePartStates();
     initialiseCommonControlsFromBank();
     syncCurrentPerformanceToEngine();
+}
+
+bool QuasimidiTechnoXAudioProcessor::installVoiceBackend(
+    std::unique_ptr<technox::IMASSVoiceBackend> backend) noexcept
+{
+    if (backend == nullptr)
+        return false;
+
+    // MASSAudioEngine clears the old backend and prepares the replacement
+    // using the current host sample rate/block size before ownership changes.
+    massEngine.setBackend(backend.get());
+    voiceBackend = std::move(backend);
+    return true;
 }
 
 void QuasimidiTechnoXAudioProcessor::initialisePartStates()
