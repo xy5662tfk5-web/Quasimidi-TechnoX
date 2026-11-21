@@ -36,6 +36,40 @@ int main() {
     }
     assert(energy > 0.01);
 
+    // A MIDI event placed inside a host block must only affect the samples
+    // after its event offset. This mirrors the processor's segmented rendering.
+    BasicMASSVoiceBackend offsetBackend;
+    MASSAudioEngine offsetEngine(&offsetBackend);
+    offsetEngine.prepare(48000.0, 512);
+    assert(offsetEngine.setPartParameter(12, PartParameter::level, 127));
+    assert(offsetEngine.setPartParameter(12, PartParameter::cutoffFrequency, 127));
+    assert(offsetEngine.setPartParameter(12, PartParameter::resonance, 0));
+    assert(offsetEngine.setPartParameter(12, PartParameter::egAttack, 0));
+    assert(offsetEngine.setPartParameter(12, PartParameter::egDecay, 0));
+    assert(offsetEngine.setPartParameter(12, PartParameter::egRelease, 0));
+
+    std::array<float, 512> offsetLeft{};
+    std::array<float, 512> offsetRight{};
+    float* offsetChannels[] = {offsetLeft.data(), offsetRight.data()};
+    constexpr int noteOnOffset = 96;
+    offsetEngine.render(offsetChannels, 2, noteOnOffset);
+    offsetEngine.noteOn(12, 1, 69, 110);
+    float* afterNoteOn[] = {offsetLeft.data() + noteOnOffset, offsetRight.data() + noteOnOffset};
+    offsetEngine.render(afterNoteOn, 2, 512 - noteOnOffset);
+
+    double preEventEnergy = 0.0;
+    double postEventEnergy = 0.0;
+    for (int i = 0; i < 512; ++i) {
+        const double sampleEnergy = std::abs(offsetLeft[static_cast<std::size_t>(i)]) +
+                                    std::abs(offsetRight[static_cast<std::size_t>(i)]);
+        if (i < noteOnOffset)
+            preEventEnergy += sampleEnergy;
+        else
+            postEventEnergy += sampleEnergy;
+    }
+    assert(preEventEnergy == 0.0);
+    assert(postEventEnergy > 0.01);
+
     engine.noteOff(1, 69);
     assert(engine.voiceManager().voices()[0].releasing);
 
