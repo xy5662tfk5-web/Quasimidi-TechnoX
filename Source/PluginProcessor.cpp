@@ -19,7 +19,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
                 parameter.store(0, std::memory_order_relaxed);
     for (auto& performance : commonValues)
         for (auto& value : performance)
-            value.store(0, std::memory_order_relaxed);
+            value.store(-1, std::memory_order_relaxed);
     for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
         partMidiChannels[part].store(static_cast<int>(part + 13), std::memory_order_relaxed);
 
@@ -71,7 +71,10 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
     for (std::size_t i = 0; i < 4; ++i) {
         const int value = commonValues[static_cast<std::size_t>(performanceIndex)][i]
             .load(std::memory_order_acquire);
-        massEngine.setCommonControl(controls[i], value);
+        if (value >= 0)
+            massEngine.setCommonControl(controls[i], value);
+        else
+            massEngine.clearCommonControl(controls[i]);
     }
 }
 
@@ -324,12 +327,13 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
             for (std::size_t control = 0; control < 4; ++control) {
                 const int value = static_cast<unsigned char>(stream.readByte());
                 commonValues[performance][control].store(
-                    juce::jlimit(0, commonMaxima[control], value), std::memory_order_release);
+                    value == 0xff ? -1 : juce::jlimit(0, commonMaxima[control], value),
+                    std::memory_order_release);
             }
     } else {
         for (auto& performance : commonValues)
             for (auto& value : performance)
-                value.store(0, std::memory_order_release);
+                value.store(-1, std::memory_order_release);
     }
 
     for (auto& channel : partMidiChannels) {
