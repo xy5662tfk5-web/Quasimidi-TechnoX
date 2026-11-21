@@ -44,17 +44,17 @@ private:
     std::array<std::array<std::atomic<int>, kParameterCount>, kPartCount> values_{};
 };
 
-enum class MASSCommonControl : std::size_t { fx1Type = 0, fx2Type, arpResolution, arpSpeed };
+enum class MASSCommonControl : std::size_t { performanceMode = 0, fx1Type, fx2Type, arpResolution, arpSpeed };
 
 class MASSCommonControlStore {
 public:
-    static constexpr std::size_t kControlCount = 4;
+    static constexpr std::size_t kControlCount = 5;
     MASSCommonControlStore() {
         for (auto& value : values_) value.store(-1, std::memory_order_relaxed);
     }
     bool set(MASSCommonControl control, int value) noexcept {
         const auto index = static_cast<std::size_t>(control);
-        constexpr int maxima[kControlCount] = {21, 21, 3, 127};
+        constexpr int maxima[kControlCount] = {3, 21, 21, 3, 127};
         if (index >= kControlCount || value < 0 || value > maxima[index]) return false;
         values_[index].store(value, std::memory_order_release);
         return true;
