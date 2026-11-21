@@ -118,7 +118,17 @@ int main() {
         LoaderRuntimeFlags{true, false, false, true});
     assert(nonzeroPlan.valid);
     assert(nonzeroPlan.slotBase == 0x21E8);
-    assert(nonzeroPlan.slotDataAddress == 0x224D);
+    assert(nonzeroPlan.slotDataAddress == 0x21E8); // bit 0x06 skips the descriptor offset
+
+    const auto nonzeroPlanWithoutBit06 = planLoaderBranch(nonzeroDecision,
+        LoaderRuntimeFlags{false, false, false, true});
+    assert(nonzeroPlanWithoutBit06.valid);
+    assert(nonzeroPlanWithoutBit06.slotDataAddress == 0x224D); // bit 0x06 clear adds byte 0
+
+    const auto zeroScanPlan = planLoaderBranch(zeroDecision,
+        LoaderRuntimeFlags{true, false, false, false});
+    assert(zeroScanPlan.actionCount == 3);
+    assert(zeroScanPlan.actions[2] == LoaderAction::returnToModeControl);
     assert(nonzeroPlan.actionCount == 4);
     assert(nonzeroPlan.actions[0] == LoaderAction::callResourceManager17D4);
     assert(nonzeroPlan.actions[1] == LoaderAction::setSlotBusyBit);
