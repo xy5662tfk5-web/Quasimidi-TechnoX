@@ -2172,3 +2172,22 @@ Two hardware-facing paths are now evidenced separately:
 - Mailbox transaction: callers prepare R5/R2/R3/R4 and call 0x0DB7, which writes XDATA 0x8000–0x8003 and updates internal handshake bits.
 
 The exact external device identity and semantic meaning of the P2 pages remain unconfirmed. Likewise, a complete causal route from a MIDI Note On/Off event through Part processing to a particular 0x0DB7 caller remains to be reconstructed; do not assume the two paths are equivalent.
+
+
+## 70. External-bus address arithmetic and bit-lane selection
+
+### 70.1 Shared external address calculation
+
+Both 0xAC00 and 0xAC88 begin by calculating an 8-bit external offset from R7 and R5. The instruction sequence multiplies R7 by 0x10 and saves the low result in R0, then divides R5 by 8 (`MOV B,#8; DIV AB`), adds the quotient to R0, and retains the remainder in B. The resulting offset is therefore `R0 = (16*R7 + floor(R5/8)) mod 256`, while `B = R5 mod 8`. The selected external page is then P2=0x35 or P2=0x36. This is a banked external-memory access pattern, not an access to XDATA 0x8000.
+
+### 70.2 0xAC00: explicit 8-way bit-position dispatch
+
+At 0xAC00, after the shared address calculation, the firmware loads A with 0x0E, multiplies by the retained remainder in B, loads DPTR=0xAC17, and executes `JMP @A+DPTR`. The 14-byte-stride dispatch selects one of eight short code sequences. Each sequence reads the byte at the computed R0 offset with P2=0x35, sets the corresponding accumulator bit, and writes it back; it then selects P2=0x36, reads the corresponding byte, clears that bit, and writes it back. The repeated code explicitly uses ACC bit 0 through bit 7. Thus the remainder `R5 mod 8` selects the bit lane, while the quotient contributes to the byte offset.
+
+### 70.3 0xAC88: related but not identical update operation
+
+0xAC88 repeats the same R7*16 plus R5/8 address calculation and selects P2=0x35. It then computes a 17-byte-stride dispatch from R3 (`A=0x11; MUL AB`) into the code table beginning at 0xACA1. The selected block updates the corresponding ACC bit at the P2=0x35 location and conditionally updates the P2=0x36 location using a bit test against B. The code blocks are structurally distinct from the 14-byte table in 0xAC00; do not describe 0xAC88 as a simple duplicate or assume its R3 argument has the same meaning as R5's remainder. The exact semantic interpretation of R3 and the external device's register map remain open.
+
+### 70.4 Caller constraints and current conclusion
+
+The only direct call to 0xAC00 found in the descrambled ROM is at 0x433D; the only direct call to 0xAC88 is at 0x43E8. Both are within 0x4256, which supplies R7/R5/R3 from its Part/event-processing context. The bank values 0x35 and 0x36, the computed byte offset, and the bit-lane dispatch are confirmed from instruction semantics. The physical device identity and the meaning of the two banks are not established by this code alone.
