@@ -75,7 +75,7 @@ These controller messages are control paths, not a promise that each CC is a dir
 
 ## Editing model
 
-\`Source/TechnoXPartModel.h\` introduces a conservative editable Part model. It validates the observed 33-byte envelope, skips the reserved byte at offset 7, exposes 24 named parameters with documented ranges and signed display offsets, permits bounded edits, preserves the original complete SysEx frame, and supports revert. Raw-byte access remains available so original bytes can be preserved and any future unknown extensions can be round-tripped.
+\`Source/TechnoXPartModel.h\` introduces a conservative editable Part model. It validates the observed 33-byte envelope, skips the reserved byte at offset 7, exposes 24 named parameters with documented ranges and signed display offsets, permits bounded edits, preserves the original complete SysEx frame, and supports revert. Raw-byte access remains available so original bytes can be preserved and any future unknown extensions can be round-tripped. The plugin now embeds the generated four-bank catalog, resolves each Part's Bank Number and Sound Number, and displays the current Part's resolved single-sound name in the LCD area.
 
 ## Required next capture set
 
