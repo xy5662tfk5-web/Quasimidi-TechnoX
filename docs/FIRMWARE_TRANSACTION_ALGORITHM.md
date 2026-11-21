@@ -308,3 +308,90 @@ Not yet confirmed:
 - whether the 0x2B page records represent voices, commands, or another resource abstraction.
 
 No function in this chain is labelled Note On or voice-start at this stage.
+
+## 14. External-interface transaction: write sequence and status return (0x15D1, 0x16C3, 0x172F, 0x1740)
+
+This section records the instruction-level evidence recovered by re-downloading the IC4 v1.05 ROM from the research branch, applying the repository's IC4 address descrambler, and regenerating the reachable MCS-51 listing (16,349 decoded instructions). The addresses below are instruction addresses in the descrambled 64 KiB code image.
+
+### 14.1 Entry context and branch into the interface path
+
+The code at 0x16C3 is not an independent subroutine entry. It is reached from the common 0x1494 loader:
+
+- At 0x169E the firmware reads RAM[0x3E] and transfers bit E5 into internal bit flag 0x08.
+- At 0x16A4, if E5 is set, execution branches to 0x16C3.
+- If E5 is clear, execution calls 0x1742 to acquire a page/resource, clears bit 0x06, and proceeds through the page-selection and transaction setup path.
+- The allocator routine 0x1456 also tail-jumps to 0x16C3 after reserving a bitmap bit and updating page metadata.
+
+Thus, the same external-interface setup is reached from more than one loader/resource state. Do not infer a musical event type from the entry alone.
+
+### 14.2 Exact setup and write ordering at 0x16C3–0x172C
+
+The selected page is dynamic: A0 = RAM[0x2D]. All following MOVX @R0,A accesses use this selected page and the low-byte offset in R0.
+
+| PC | Instruction / operation | Effect |
+|---|---|---|
+| 16C3 | MOV A0, RAM[2D] | Select external XDATA page |
+| 16C6–16C8 | R0=FB; A=RAM[3F] | Load control value; ACC.7 is tested |
+| 16CA | JNB ACC.7, 16E4 | If bit 7 is clear, skip the read/active-control write |
+| 16CD–16CE | Read FB; save old byte in R6 | Preserve previous status/control byte |
+| 16CF–16D7 | Build 0x80, optionally OR 0x40 when internal bit-address flag 0x05 is set; write to FB | Active control write is 0x80 or 0xC0 |
+| 16D8–16DB | Test bit 3 of the previously read FB | Tests old status, not the just-written value |
+| 16DD–16DF | If old FB.3 is set: clear internal bit flag 0x06; set RAM[0x3F]=0x80 | Updates loader state for subsequent branch |
+| 16E4–16E5 | Alternative: write 0x00 to FB | Used when the initial ACC.7 test fails |
+| 16E6–16EC | Increment R0 to FC; write (RAM[0x28] << 4) & 0xF0 | Mode selector in upper nibble |
+| 16ED–16F5 | Add 2 to RAM[0x36:0x37] | Advances the second pointer by two bytes |
+| 16F7–16FF | Write RAM[0x3C] and RAM[0x3D] to FE and FF | First pointer/address pair |
+| 1700–170C | Derive upper page group from RAM[0x2D]; update internal flag 0x0D; save group in RAM[0x2B] | Page/group metadata |
+| 170E–1712 | Set RAM[0x44]=0x70; clear RAM[0x2E] | Prepare helper state |
+| 1714–171C | Write RAM[0x36] and RAM[0x37] to offsets 61 and 62 | Second pointer/address pair |
+| 171D | Call 0x189D | Builds/loads further transaction data |
+| 1720–172C | If internal bit 0x06 is clear, write RAM[0x2F] to F8 and RAM[0x30] to 60 | Two payload bytes are written after helper 0x189D; when bit 0x06 is set these two writes are skipped |
+
+The write order is therefore not simply “payload then trigger”: the firmware first selects the page and writes control/mode and pointer fields, invokes helper 0x189D, and only then conditionally writes the two payload bytes.
+
+0x189D reads mode-indexed configuration bytes beginning at XDATA page 0x28, offset 0x68 + RAM[0x28] (and subsequent offsets), then reads descriptor bytes through the pointer in RAM[0x36:0x37]. It updates internal state and descriptor flags. Its role is a data-preparation helper; the available evidence does not identify a physical sound-chip register map.
+
+### 14.3 Status read/modify/write at 0x172F–0x1741
+
+After the optional payload writes, execution always reaches:
+
+| PC | Instruction | Meaning |
+|---|---|---|
+| 172D | R0=FD | Select status/handshake offset |
+| 172F | MOVX A,@R0 | Read current FD byte |
+| 1730–173A | Copy internal bit flags 0x00, 0x01, 0x02 into ACC.0, ACC.1, ACC.2 | Replaces the low three bits with descriptor-derived flags saved earlier by 0x14E8–0x14F3 |
+| 173C | CLR ACC.7 | Clear bit 7 in the value to be written back |
+| 173E | CLR ACC.6 | Clear bit 6 in the value to be written back |
+| 1740 | MOVX @R0,A | Write modified byte back to FD |
+| 1741 | RET | Return to caller |
+
+Important 8051 addressing detail: bit addresses 0xE0–0xE7 are bits 0–7 of the accumulator. The operations at 0x1730–0x173E modify the accumulator value read from FD; they are not writes to XDATA addresses 0xE0–0xE7.
+
+This is a read/modify/write acknowledgement or state-normalization step: it preserves FD bits 3–5, replaces bits 0–2 from the descriptor flags, and clears bits 6–7 before writing back. The firmware clearly clears those two high bits in the returned control/status byte. Their hardware names and exact meaning (busy, request, acknowledgement, interrupt, etc.) remain unassigned until corroborated by controller documentation or captured bus traces.
+
+### 14.4 Conditional readback at 0x15D1–0x15D8
+
+This is an earlier branch in the same loader flow, not the continuation immediately after 0x1740:
+
+1. The branch requires internal flag 0x06 to be set.
+2. It requires bit E5 of RAM[0x3E] to be set.
+3. It selects page RAM[0x3E] & 0x1F.
+4. It reads FB; if ACC.3 is set, it skips the readback.
+5. Otherwise it reads F8 into R5 and 60 into R6.
+
+This establishes a conditional two-byte readback from the external page. No comparison against expected values occurs at 0x15D1–0x15D8, so this is evidence of data retrieval, not by itself proof of successful command completion.
+
+### 14.5 Reconstructed transaction phases
+
+The evidence supports this conservative sequence:
+
+1. Page selection: A0 <- RAM[2D].
+2. Control/status sampling: read FB; branch on its previous bit 3 and internal loader state.
+3. Control write: write 0x80 or 0xC0 to FB, or write 0x00 on the alternate branch.
+4. Mode and pointer setup: write FC, FE–FF, and 61–62.
+5. Data preparation: call 0x189D.
+6. Conditional payload transfer: if bit 0x06 is clear, write descriptor bytes to F8 and 60.
+7. Status normalization/acknowledgement: read FD, replace low three bits with descriptor flags, clear bits 6 and 7, and write it back.
+8. Separate conditional readback path: under the 0x15BF guards, read F8 and 60 only when FB.3 is clear.
+
+The sequence is firmware-confirmed at the instruction level. The semantic interpretation of the external controller's bits and whether the final FD write is the command-acceptance acknowledgement or a general status reset are still hypotheses. No claim is made that this is specifically a synth voice-start command.
