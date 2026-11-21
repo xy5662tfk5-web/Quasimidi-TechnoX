@@ -44,6 +44,9 @@ public:
     bool getEditedPartSysEx(int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const;
     int getPartMidiChannel(int partIndex) const noexcept;
     bool setPartMidiChannel(int partIndex, int midiChannel) noexcept;
+    MidiRoutingMode getMidiRoutingMode() const noexcept;
+    void setMidiRoutingMode(MidiRoutingMode mode) noexcept;
+    bool isPerformancePartActive(int partIndex) const noexcept;
     const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
 
     void getStateInformation(juce::MemoryBlock& destData) override;
@@ -55,7 +58,8 @@ private:
     technox::MidiControlRouter midiControlRouter;
     technox::MASSAudioEngine massEngine;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
-    std::array<std::array<std::atomic<int>, 4>, 50> commonValues{};
+    std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
+    std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
     void initialisePartStates();
