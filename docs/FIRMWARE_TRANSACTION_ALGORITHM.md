@@ -2206,3 +2206,22 @@ The routine at 0x695A reads the Part record byte at offset +0x19 from `0x7C00 + 
 ### 71.3 Independent callers corroborate helper role
 
 Other direct callers include 0x5345 and 0x6BE1. The 0x5345 path also supplies a Part index and zeroed auxiliary registers before calling 0x695A. This supports interpreting 0x695A as a reusable Part-field translation helper, rather than a special-case MIDI or endpoint routine. The exact user-facing parameter represented by record offset +0x19 remains unidentified.
+
+
+## 72. Clarifying the Part lookup tables and correcting helper boundaries
+
+### 72.1 0x72DA and 0x72EA belong to adjacent routines, not one helper
+
+A byte-accurate boundary check shows 0x695A ends with RET at 0x69DA. The next routine begins at 0x69DB and contains the accesses to table 0x72EA. Therefore 0x695A uses lookup table 0x72DA; the separate helper at 0x69DB uses 0x72EA. The earlier Section 71 wording that grouped both tables under 0x695A is corrected here.
+
+### 72.2 0x72DA is a nonlinear translation table
+
+The table beginning at 0x72DA contains a compact sequence of mapped values, including a descending set near its beginning and a later range of small control values followed by a rising value range. The 0x695A routine selects table entries after classifying the Part record's byte at offset +0x19. The output is stored at descriptor offset +3. This confirms a nonlinear parameter conversion, but the exact front-panel parameter name is not identified from firmware bytes alone.
+
+### 72.3 Part initialization establishes a baseline, not a sound-chip register map
+
+The initializer around 0xB650 writes defaults into the 24-byte Part records at 0x7C00 + 24*index. The visible initialization includes fixed values in offsets +0x04 through +0x17, with conditional initialization of +0x06, while the later runtime mapper reads +0x19 (a byte beyond the 24-byte record's nominal +0x17 extent). This is a warning that the record stride/overlap and the exact record base must be followed carefully: do not label +0x19 as a field of the same 24-byte record without resolving whether the runtime pointer uses a different base or extended record layout.
+
+### 72.4 Hardware-bank interpretation remains bounded
+
+P2=0x35 and P2=0x36 are confirmed external address-page selections used by MOVX @R0 operations. The code demonstrates bit-set/bit-clear behavior selected by computed code branches. It does not reveal the physical chip identity or a named register map. The safe emulator model at this stage is an abstract pair of 256-byte banked bit-addressable spaces with exact access ordering preserved, pending board-level mapping evidence.
