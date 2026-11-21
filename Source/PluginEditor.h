@@ -2,7 +2,8 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
-class QuasimidiTechnoXAudioProcessorEditor final : public juce::AudioProcessorEditor
+class QuasimidiTechnoXAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                                   private juce::Timer
 {
 public:
     explicit QuasimidiTechnoXAudioProcessorEditor(QuasimidiTechnoXAudioProcessor&);
@@ -12,6 +13,8 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
 
 private:
+    void timerCallback() override;
+
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
     juce::ComboBox performanceSelector;
