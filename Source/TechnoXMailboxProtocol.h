@@ -21,10 +21,13 @@ struct MailboxWrite {
 };
 
 inline MailboxWrite makeMailboxWrite(std::uint8_t r5, std::uint8_t r2,
-                                     std::uint8_t r3, std::uint8_t r4) noexcept {
+                                     std::uint8_t r3, std::uint8_t r4,
+                                     bool setFlag0C) noexcept {
     MailboxWrite result{};
     result.bytes = {r5, r2, r3, static_cast<std::uint8_t>(r4 & 0xBF)};
-    result.setInternalFlag0C = (result.bytes[3] & 0x80) != 0;
+    // Firmware clears bit 0x0C and sets it only when the separate E7 flag is set.
+    // E7 is not derived from bit 7 of the fourth mailbox byte.
+    result.setInternalFlag0C = setFlag0C;
     return result;
 }
 
@@ -83,7 +86,7 @@ inline MailboxScanResult scanMailboxEntries(const XDataMemory& memory,
         if ((value & kMailboxEntryMarkerMask) == kMailboxEntryMarker) {
             const auto r4 = static_cast<std::uint8_t>(flag0D ? 0x80 : 0x00);
             result.writes[result.writeCount++] = makeMailboxWrite(
-                result.nextSequence, 0x80, 0x01, r4);
+                result.nextSequence, 0x80, 0x01, r4, flag0D);
         }
         result.nextSequence = static_cast<std::uint8_t>(result.nextSequence + 1);
     }
