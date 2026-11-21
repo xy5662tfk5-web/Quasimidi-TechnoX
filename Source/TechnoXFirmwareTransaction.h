@@ -12,7 +12,7 @@ namespace technox::firmware {
 
 constexpr std::size_t kPageCount = 256;
 constexpr std::size_t kPageSize = 256;
-constexpr std::size_t kDescriptorSize = 12;
+constexpr std::size_t kDescriptorSize = 13;
 
 class XDataMemory {
 public:
@@ -120,10 +120,11 @@ inline DecodeResult decodeDescriptor(const XDataMemory& memory,
     result.descriptor.fifth = bytes[4];
     result.descriptor.sixth = bytes[5];
     result.descriptor.seventh = bytes[6];
-    // bytes[7] and bytes[8] are not copied into the loader's byte variables.
-    result.descriptor.controlFlags = static_cast<std::uint8_t>(bytes[9] & 0x07);
-    result.descriptor.mappedEleventh = lookup.values[bytes[10]];
-    result.descriptor.twelfth = bytes[11];
+    // Bytes 7..9 are skipped. Byte 10 supplies internal flags E0..E2;
+    // byte 11 is translated through ROM table 0x1208, and byte 12 is copied.
+    result.descriptor.controlFlags = static_cast<std::uint8_t>(bytes[10] & 0x07);
+    result.descriptor.mappedEleventh = lookup.values[bytes[11]];
+    result.descriptor.twelfth = bytes[12];
     result.path = bytes[1] == 0 ? LoaderPath::zeroSecondByte
                                 : LoaderPath::nonzeroSecondByte;
     return result;
