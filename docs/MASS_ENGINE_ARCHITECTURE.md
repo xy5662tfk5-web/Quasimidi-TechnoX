@@ -127,4 +127,4 @@ The Standalone, AU and VST3 wrappers should share the same engine and state mode
 
 ## 9. Immediate next engineering task
 
-The next concrete task is **Catalog integration**: use the 24-byte Part parameter model's Bank Number and Sound Number fields to resolve a single-sound name from data/technox_ins.json, then expose that resolved name for each of the four factory Performance Part blocks. This is achievable without pretending that the synthesis engine already exists.
+The first Catalog integration is now in place: the plugin embeds data/technox_ins.json, resolves the Bank Number and Sound Number fields through SoundCatalog, and displays the selected Part's single-sound name on the LCD. The next task is to expose all four Part states in the editor and connect parameter edits to the documented CC/RPN/NRPN paths. This remains control-layer work; the audio engine is still not implemented.
