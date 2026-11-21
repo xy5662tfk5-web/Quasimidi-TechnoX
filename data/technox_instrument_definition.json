@@ -3018,5 +3018,287 @@
       "5": "Performance name"
     },
     "note": "The supplied bulk dump omits an explicit low address-offset byte; data begins at byte 7, matching the 24 Part parameter bytes and 65-byte common block described in the manual."
+  },
+  "common_parameter_map": [
+    {
+      "offset": 0,
+      "hexOffset": "00",
+      "id": "performanceLevel",
+      "name": "Performance level",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 1,
+      "hexOffset": "01",
+      "id": "performanceMode",
+      "name": "Performance mode",
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "offset": 2,
+      "hexOffset": "02",
+      "id": "reserved02",
+      "name": "Reserved"
+    },
+    {
+      "offset": 3,
+      "hexOffset": "03",
+      "id": "reserved03",
+      "name": "Reserved"
+    },
+    {
+      "offset": 4,
+      "hexOffset": "04",
+      "id": "freeControllerNumber",
+      "name": "Free controller number",
+      "minimum": 0,
+      "maximum": 97
+    },
+    {
+      "offset": 5,
+      "hexOffset": "05",
+      "id": "footControllerNumber",
+      "name": "Foot controller number",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 6,
+      "hexOffset": "06",
+      "id": "footControlOnValue",
+      "name": "Foot control on value",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 7,
+      "hexOffset": "07",
+      "id": "footControlOffValue",
+      "name": "Foot control off value",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 8,
+      "hexOffset": "08",
+      "id": "footControlToggleMode",
+      "name": "Foot control toggle mode",
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "offset": 9,
+      "hexOffset": "09",
+      "id": "modulationMatrix",
+      "name": "Modulation matrix depths",
+      "count": 32,
+      "maximum": 127,
+      "notes": "Offsets 0x09–0x28; 4 sources × 8 destinations; raw 0..127 represents -64..+63"
+    },
+    {
+      "offset": 41,
+      "hexOffset": "29",
+      "id": "fx1Activity",
+      "name": "FX1 activity",
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "offset": 42,
+      "hexOffset": "2A",
+      "id": "fx1Type",
+      "name": "FX1 type",
+      "minimum": 0,
+      "maximum": 21
+    },
+    {
+      "offset": 43,
+      "hexOffset": "2B",
+      "id": "fx1Page1",
+      "name": "FX1 parameter page 1",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 44,
+      "hexOffset": "2C",
+      "id": "fx1Page2",
+      "name": "FX1 parameter page 2",
+      "minimum": 0,
+      "maximum": 63
+    },
+    {
+      "offset": 45,
+      "hexOffset": "2D",
+      "id": "fx1Page3",
+      "name": "FX1 parameter page 3",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 46,
+      "hexOffset": "2E",
+      "id": "fx1Page4",
+      "name": "FX1 parameter page 4",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 47,
+      "hexOffset": "2F",
+      "id": "fx1Page5",
+      "name": "FX1 parameter page 5",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 48,
+      "hexOffset": "30",
+      "id": "fx1Page6",
+      "name": "FX1 parameter page 6",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 49,
+      "hexOffset": "31",
+      "id": "fx2Activity",
+      "name": "FX2 activity",
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "offset": 50,
+      "hexOffset": "32",
+      "id": "fx2Type",
+      "name": "FX2 type",
+      "minimum": 0,
+      "maximum": 21
+    },
+    {
+      "offset": 51,
+      "hexOffset": "33",
+      "id": "fx2Page1",
+      "name": "FX2 parameter page 1",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 52,
+      "hexOffset": "34",
+      "id": "fx2Page2",
+      "name": "FX2 parameter page 2",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 53,
+      "hexOffset": "35",
+      "id": "fx2Page3",
+      "name": "FX2 parameter page 3",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 54,
+      "hexOffset": "36",
+      "id": "fx2Page4",
+      "name": "FX2 parameter page 4",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 55,
+      "hexOffset": "37",
+      "id": "fx2Page5",
+      "name": "FX2 parameter page 5",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 56,
+      "hexOffset": "38",
+      "id": "fx2Page6",
+      "name": "FX2 parameter page 6",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 57,
+      "hexOffset": "39",
+      "id": "fx2Page7",
+      "name": "FX2 parameter page 7",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 58,
+      "hexOffset": "3A",
+      "id": "fx2Page8",
+      "name": "FX2 parameter page 8",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 59,
+      "hexOffset": "3B",
+      "id": "fx2Page9",
+      "name": "FX2 parameter page 9",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 60,
+      "hexOffset": "3C",
+      "id": "arpeggiatorPack1",
+      "name": "Arpeggiator pack 1",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Bit fields: bit 2 arp on/off; bits 0–1 resolution 4/8/16/32"
+    },
+    {
+      "offset": 61,
+      "hexOffset": "3D",
+      "id": "arpeggiatorSpeed",
+      "name": "Arpeggiator speed",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 62,
+      "hexOffset": "3E",
+      "id": "arpeggiatorGate",
+      "name": "Arpeggiator gate",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 63,
+      "hexOffset": "3F",
+      "id": "arpeggiatorPack2",
+      "name": "Arpeggiator pack 2",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Bit fields: bits 5 sync; bits 3–4 direction; bit 1 hold"
+    },
+    {
+      "offset": 64,
+      "hexOffset": "40",
+      "id": "arpeggiatorPack3",
+      "name": "Arpeggiator pack 3",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Bit fields: bits 3–6 target track; bit 1 arpeggiator output"
+    }
+  ],
+  "performance_common_frame_layout": {
+    "frameBytes": 73,
+    "dataBytes": 65,
+    "dataStartByte": 7,
+    "dataEndByte": 71,
+    "terminatorByte": 72,
+    "parameterOffsets": "0x00–0x40"
   }
 }
