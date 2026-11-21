@@ -1449,3 +1449,16 @@ This is another indication that the descriptor loader maintains structured bit/s
 ### 39.5 Next data-flow question
 
 The Note On routine sets RAM[0x29:0x2A] from the pointer stored at 0x2B98/0x2B99. That pointer is calculated as 0x2900 + 12*PartIndex. The Note On routine visibly writes the first two bytes of this 12-byte intermediate record, while 0x1494 consumes all 12 bytes. The next pass must inventory every writer to 0x2900 + 12*PartIndex and reconstruct the remaining ten bytes, including whether they come from sound definitions, preloaded Part state, or another descriptor table. This is the immediate bridge between the MIDI Note On path and the descriptor-driven slot allocator.
+
+
+## 41. 0x02D1 is a reusable per-Part fixed-point converter, not only an initializer
+
+A direct-call cross-reference finds three reachable callers of 0x02D1:
+
+- 0x3F18: 16-Part initialization path. RAM[0x28]=PartIndex; RAM[0x29] is read from event-record +2; RAM[0x2A]=0x40.
+- 0x4849: Part update path. RAM[0x28]=RAM[0x6C]; RAM[0x29]=0; RAM[0x2A] is derived from RAM[0x6E] by a rotate-through-carry and +0x40.
+- 0x4C8B: dynamic controller/update path. RAM[0x28]=RAM[0x6C]; RAM[0x29] is a 0/1 direction flag; RAM[0x2A]=RAM[0x70], a value normalized around 0x40 in the preceding code.
+
+All three callers use the same 0x02D1 conversion and write the same two-byte location 0x2000 + 3*PartIndex. This makes 0x02D1 a shared per-Part fixed-point conversion/update primitive. The 0x4C70 caller's centering around 0x40 and explicit direction flag indicate a bipolar control value, but the exact MIDI controller or synthesis parameter has not yet been identified.
+
+The scale input at 0x2054 + PartIndex is read by 0x02D1; no direct writer to that address has been found in the current reachable-code scan. Indirect XDATA writes and any external/shared-memory initialization remain to be checked before concluding where that scale byte originates.
