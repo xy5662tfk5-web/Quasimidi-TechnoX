@@ -76,11 +76,11 @@ The realtime callback must not allocate memory, perform file I/O, block on a mut
 - **DrumState** resolves the drum program and key map; do not conflate the 32 kit names with the 24 note maps.
 - **VoiceState** stores note, velocity, channel/Part, allocation age, envelope state, pitch and backend-specific state.
 
-The current PartEditModel is a control/data model only. It does not create audio voices or transmit edited SysEx.
+The current PartEditModel is a control/data model. The processor now keeps editable values for all 50 × 4 factory Performance Part blocks, can rebuild an edited Part SysEx frame while preserving its original opaque bytes, and mirrors the selected Performance's four stored Parts into engine Part slots 13–16. The plugin defaults to Performance Omni, as specified by the manual; the Common Performance mode selects the active Parts 13–16. An optional Part Channels mode follows the Sequencer Multi mapping, where Part N corresponds to MIDI channel N.
 
 ## 5. Synthesis backend strategy
 
-Use an interface so verified sound-generation models can be added without changing MIDI routing, Part editing, voice allocation, or the JUCE wrapper.
+The first infrastructure is now present: a 21-slot VoiceManager, a lock-free 16-Part parameter store, per-key Drum parameter storage, per-Part Mod Wheel/Portamento/Soft Pedal/RPN state, Performance Common FX/arpeggiator controls, a generic ModulationMatrix, and an IMASSVoiceBackend interface. Documented CC/NRPN/RPN routes now update these stores, including separate Part NRPN, per-key Drum NRPN and Common FX/arpeggiator CC paths. Factory FX/arpeggiator defaults are extracted from the Common SysEx frame using the manual's offsets. The current NullMASSVoiceBackend intentionally emits silence. Use this interface so verified sound-generation models can be added without changing MIDI routing, Part editing, voice allocation, or the JUCE wrapper.
 
 A future backend should support:
 - preparation from verified sound/sample resources;
