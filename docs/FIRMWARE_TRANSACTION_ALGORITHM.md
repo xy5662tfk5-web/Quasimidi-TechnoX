@@ -1979,3 +1979,24 @@ The code around 0x26A0 reads multiple four-byte tuples from code-space tables an
 ### 61.4 Consequence for the reverse-engineering strategy
 
 The eight-byte records on page 0x80 are best treated as device/interface-visible endpoint state until proven otherwise. The next decisive step is to decode the table-driven packet families around 0x26A0 and correlate their command bytes with the record signature predicates. This is more promising than searching for a nonexistent RAM-side initializer.
+
+
+## 62. Reclassification of 0x26A0: table-driven external-interface self-test
+
+### 62.1 The ROM source is address 0x0000, not a sound-preset table
+
+The routine at 0x26A0 explicitly sets DPTR=0x0000 and uses `MOVC A,@A+DPTR` to read code-space bytes sequentially. The first bytes are the 8051 reset/interrupt vectors (`02 EB 32`, `FF...`, `02 27 F7`, `...`), followed by fixed numeric lookup data. These are not a named patch bank or a sequence of musical parameter presets.
+
+### 62.2 Write-then-compare structure
+
+The routine disables interrupts, calls 0x0E3A, selects external page 0x80, then repeatedly constructs four-byte packets from successive ROM bytes and sends them through 0x0DB7. The loop then performs a second pass using 0x0DCE and compares returned/read values against the same ROM byte stream. A mismatch takes a non-returning failure path; successful comparisons advance through the test sequence.
+
+The companion helpers 0x0E3A and 0x0E21 inspect state on page 0x20, switch to page 0x80, and issue additional 0x0DB7 packets while polling internal handshake bits. The routine therefore has the structure of an external-interface / memory-path diagnostic, not normal musical voice initialization.
+
+### 62.3 Correction to Section 61
+
+The table-driven sequence at 0x26A0 must not be used as evidence for sound-engine command meanings. It is a diagnostic pattern sourced from the firmware image itself. The 0x8000–0x8003 mailbox remains a shared four-byte output interface, but the command semantics must be recovered from non-diagnostic callers and from the external-page state transitions.
+
+### 62.4 Next high-value target
+
+Prioritize the non-diagnostic producers around 0x1E8A, 0x211F, 0x22F8, 0x236B, 0x26C9/0x26DE, and the note/event path around 0x4256. Correlate their packet bytes with the 8-byte endpoint record fields and the status/pointer registers on page 0x80. This avoids spending time interpreting a self-test as the synthesizer protocol.
