@@ -132,7 +132,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         if (message.isNoteOn()) {
             massEngine.noteOn(static_cast<std::uint8_t>(12 + slot), static_cast<std::uint8_t>(message.getChannel()),
                               static_cast<std::uint8_t>(message.getNoteNumber()),
-                              static_cast<std::uint8_t>(message.getVelocity()));
+                              static_cast<std::uint8_t>(message.getVelocityAs7BitInt()));
         } else if (message.isNoteOff()) {
             massEngine.noteOff(static_cast<std::uint8_t>(message.getChannel()),
                                static_cast<std::uint8_t>(message.getNoteNumber()));
