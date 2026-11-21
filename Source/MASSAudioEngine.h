@@ -71,20 +71,32 @@ private:
     std::array<std::atomic<int>, kControlCount> values_{};
 };
 
-// Lossless payload layout recovered from IC4 routine 0xB475:
-// 65 Common bytes followed by four 24-byte Part records. The 8-byte
-// descriptor copied to 0x62CD is deliberately kept separate/uninterpreted.
+// Lossless 169-byte Performance image recovered from IC4 routine 0xB475:
+// 8-byte name, 65 Common bytes, then four 24-byte Part records.
 class MASSPerformanceImageStore {
 public:
+    static constexpr std::size_t kNameByteCount = 8;
     static constexpr std::size_t kCommonByteCount = 65;
     static constexpr std::size_t kPartCount = 4;
     static constexpr std::size_t kPartByteCount = 24;
+    static constexpr std::size_t kSerializedSize =
+        kNameByteCount + kCommonByteCount + kPartCount * kPartByteCount;
     MASSPerformanceImageStore() { clear(); }
     void clear() noexcept {
+        for (auto& value : nameBytes_) value.store(0, std::memory_order_relaxed);
         for (auto& value : commonBytes_) value.store(0, std::memory_order_relaxed);
         for (auto& part : partBytes_)
             for (auto& value : part) value.store(0, std::memory_order_relaxed);
         loaded_.store(false, std::memory_order_release);
+    }
+    bool setNameByte(int index, int value) noexcept {
+        if (index < 0 || index >= static_cast<int>(kNameByteCount) || value < 0 || value > 127) return false;
+        nameBytes_[static_cast<std::size_t>(index)].store(value, std::memory_order_release);
+        return true;
+    }
+    int nameByte(int index) const noexcept {
+        if (index < 0 || index >= static_cast<int>(kNameByteCount)) return -1;
+        return nameBytes_[static_cast<std::size_t>(index)].load(std::memory_order_acquire);
     }
     bool setCommonByte(int index, int value) noexcept {
         if (index < 0 || index >= static_cast<int>(kCommonByteCount) || value < 0 || value > 127) return false;
@@ -108,9 +120,23 @@ public:
         return partBytes_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(byteIndex)]
             .load(std::memory_order_acquire);
     }
+    bool copyTo(std::array<std::uint8_t, kSerializedSize>& destination) const noexcept {
+        if (!isLoaded()) return false;
+        std::size_t offset = 0;
+        for (std::size_t i = 0; i < kNameByteCount; ++i)
+            destination[offset++] = static_cast<std::uint8_t>(nameByte(static_cast<int>(i)));
+        for (std::size_t i = 0; i < kCommonByteCount; ++i)
+            destination[offset++] = static_cast<std::uint8_t>(commonByte(static_cast<int>(i)));
+        for (std::size_t part = 0; part < kPartCount; ++part)
+            for (std::size_t byte = 0; byte < kPartByteCount; ++byte)
+                destination[offset++] = static_cast<std::uint8_t>(
+                    partByte(static_cast<int>(part), static_cast<int>(byte)));
+        return true;
+    }
     void setLoaded(bool loaded) noexcept { loaded_.store(loaded, std::memory_order_release); }
     bool isLoaded() const noexcept { return loaded_.load(std::memory_order_acquire); }
 private:
+    std::array<std::atomic<int>, kNameByteCount> nameBytes_{};
     std::array<std::atomic<int>, kCommonByteCount> commonBytes_{};
     std::array<std::array<std::atomic<int>, kPartByteCount>, kPartCount> partBytes_{};
     std::atomic<bool> loaded_{false};
@@ -371,6 +397,7 @@ public:
     bool setDrumParameter(int partIndex, int keyNumber, int parameterIndex, int value) noexcept { return drumParameters_.set(partIndex, keyNumber, parameterIndex, value); }
     int getDrumParameter(int partIndex, int keyNumber, int parameterIndex) const noexcept { return drumParameters_.get(partIndex, keyNumber, parameterIndex); }
 
+    bool setPerformanceNameByte(int index, int value) noexcept { return performanceImage_.setNameByte(index, value); }
     bool setPerformanceCommonByte(int index, int value) noexcept { return performanceImage_.setCommonByte(index, value); }
     bool setPerformancePartByte(int partIndex, int byteIndex, int value) noexcept {
         return performanceImage_.setPartByte(partIndex, byteIndex, value);

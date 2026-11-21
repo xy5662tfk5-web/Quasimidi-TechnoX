@@ -10,6 +10,7 @@ public:
     int noteOffCalls = 0;
     int resetVoiceCalls = 0;
     int prepareCalls = 0;
+    int renderedNameByte = -1;
     int renderedCommonByte = -1;
     int renderedPartByte = -1;
     bool renderedImageLoaded = false;
@@ -30,6 +31,7 @@ public:
                 const technox::MASSCommonControlStore&,
                 const technox::MASSPerformanceImageStore& image,
                 const technox::MASSDrumParameterStore&) noexcept override {
+        renderedNameByte = image.nameByte(0);
         renderedCommonByte = image.commonByte(0);
         renderedPartByte = image.partByte(3, 23);
         renderedImageLoaded = image.isLoaded();
@@ -311,10 +313,11 @@ int main() {
     assert(replacementBackend.noteOnCalls == 1);
     assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
 
-    // Recovered firmware image layout: 65 Common bytes + four 24-byte Parts.
+    // Recovered firmware image layout: 8-byte name + 65 Common + four 24-byte Parts.
     CountingBackend imageBackend;
     MASSAudioEngine imageEngine(&imageBackend);
     imageEngine.prepare(48000.0, 64);
+    assert(imageEngine.setPerformanceNameByte(0, 'T'));
     assert(imageEngine.setPerformanceCommonByte(0, 0x42));
     assert(imageEngine.setPerformancePartByte(3, 23, 0x65));
     imageEngine.markPerformanceImageLoaded();
@@ -322,8 +325,16 @@ int main() {
     float* imageChannels[] = {&imageSample};
     imageEngine.render(imageChannels, 1, 1);
     assert(imageBackend.renderedImageLoaded);
+    assert(imageBackend.renderedNameByte == 'T');
     assert(imageBackend.renderedCommonByte == 0x42);
     assert(imageBackend.renderedPartByte == 0x65);
+    std::array<std::uint8_t, MASSPerformanceImageStore::kSerializedSize> packedImage{};
+    assert(MASSPerformanceImageStore::kSerializedSize == 169);
+    assert(imageEngine.performanceImage().copyTo(packedImage));
+    assert(packedImage[0] == 'T');
+    assert(packedImage[8] == 0x42);
+    assert(packedImage[8 + 65 + 3 * 24 + 23] == 0x65);
+    assert(!imageEngine.setPerformanceNameByte(8, 0));
     assert(!imageEngine.setPerformanceCommonByte(65, 0));
     assert(!imageEngine.setPerformanceCommonByte(0, 128));
     assert(!imageEngine.setPerformancePartByte(4, 0, 0));

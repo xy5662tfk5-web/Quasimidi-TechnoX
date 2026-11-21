@@ -104,8 +104,13 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
     massEngine.clearPerformanceImage();
     const auto* selectedPerformance = performanceBank.at(static_cast<std::size_t>(performanceIndex));
     bool performanceImageValid = selectedPerformance != nullptr &&
+        selectedPerformance->nameBlock.completeMessage.size() == 17 &&
         selectedPerformance->commonBlock.completeMessage.size() == 74;
     if (performanceImageValid) {
+        const auto& nameFrame = selectedPerformance->nameBlock.completeMessage;
+        for (int byte = 0; byte < 8; ++byte)
+            performanceImageValid = massEngine.setPerformanceNameByte(byte, nameFrame[8 + static_cast<std::size_t>(byte)])
+                && performanceImageValid;
         const auto& commonFrame = selectedPerformance->commonBlock.completeMessage;
         for (int byte = 0; byte < 65; ++byte)
             performanceImageValid = massEngine.setPerformanceCommonByte(byte, commonFrame[8 + static_cast<std::size_t>(byte)])
