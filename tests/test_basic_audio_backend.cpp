@@ -77,6 +77,30 @@ int main() {
     offsetEngine.noteOn(12, 1, 69, 110);
     assert(offsetEngine.voiceManager().activeVoiceCount() == 1);
 
+    // Releasing during the attack must fade from the current envelope level,
+    // rather than subtracting a fixed sustain-level amount and cutting off.
+    BasicMASSVoiceBackend attackReleaseBackend;
+    MASSAudioEngine attackReleaseEngine(&attackReleaseBackend);
+    attackReleaseEngine.prepare(48000.0, 256);
+    assert(attackReleaseEngine.setPartParameter(12, PartParameter::level, 127));
+    assert(attackReleaseEngine.setPartParameter(12, PartParameter::cutoffFrequency, 127));
+    assert(attackReleaseEngine.setPartParameter(12, PartParameter::egAttack, 127));
+    assert(attackReleaseEngine.setPartParameter(12, PartParameter::egRelease, 0));
+    std::array<float, 256> attackLeft{};
+    std::array<float, 256> attackRight{};
+    float* attackChannels[] = {attackLeft.data(), attackRight.data()};
+    attackReleaseEngine.noteOn(12, 1, 60, 127);
+    attackReleaseEngine.render(attackChannels, 2, 128);
+    attackReleaseEngine.noteOff(1, 60);
+    float* releaseChannels[] = {attackLeft.data() + 128, attackRight.data() + 128};
+    attackReleaseEngine.render(releaseChannels, 2, 128);
+    double earlyReleaseEnergy = 0.0;
+    for (int i = 128; i < 256; ++i)
+        earlyReleaseEnergy += std::abs(attackLeft[static_cast<std::size_t>(i)]) +
+                              std::abs(attackRight[static_cast<std::size_t>(i)]);
+    assert(earlyReleaseEnergy > 0.0);
+    assert(attackReleaseEngine.voiceManager().activeVoiceCount() == 1);
+
     // MIDI Note On with velocity zero must release the backend envelope,
     // not merely mark the voice-manager slot as releasing.
     engine.noteOn(12, 1, 69, 110);
