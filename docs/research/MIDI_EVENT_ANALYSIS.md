@@ -253,3 +253,21 @@ Call-site inspection separates the fixed-window writes into three families:
 ### Strong conclusion
 
 The fixed `0x8000–0x8003` block is a shared command/data port used by initialization, slot/descriptor processing, and state synchronization. It is not merely the MIDI note trigger. The values sent are structured tuples, while register 3 carries the E7 handshake state. The physical peripheral and command meanings are still unknown.
+
+## 23. Correction: 0x26A2 does not switch ROM banks
+
+The earlier "possible bank switching" interpretation was incorrect. SFR `0xA8` is the 8051 `IE` (Interrupt Enable) register, not a ROM-bank register. In `0x26A2`, the firmware:
+1. pushes `IE` to preserve it;
+2. writes `0x00` to `IE`, disabling interrupts during the transfer;
+3. calls `0x0E3A` to select/prepare the external interface;
+4. selects `P2=0x80`;
+5. begins reading code memory at `DPTR=0x0000` with `MOVC`;
+6. restores the original `IE` value at `0x27F4`.
+
+Thus this is an interrupt-protected bulk transfer from the program code space to the fixed external command window, not evidence of ROM banking. Address `0x0000` is the actual code image start (the reset vector bytes are `02 EB 32`), so the first bytes sent are literally the firmware image bytes interpreted in 3-byte records.
+
+The first transfer loop consumes code bytes in 3-byte groups, masks the third byte to its low three bits, adds a group selector (`0x00` or `0x80`) and sends the resulting tuple through `0x0DB7`. A second phase resets DPTR to zero and repeatedly compares values read by `MOVC` with status/data read through `0x0DCE`; it advances in 3-byte record steps and has a complementary-data pass. This is consistent with a boot/program-load or command-table synchronization protocol for an external peripheral. It does not yet establish whether the peripheral executes M.A.S.S. synthesis or merely stores/relays program data.
+
+## 24. Updated interpretation of the fixed 0x8000 interface
+
+The fixed `0x8000–0x8003` interface is now more strongly characterized as a low-level serial/parallel mailbox or peripheral transfer port: firmware disables interrupts, selects P2 page `0x80`, sends 3-byte records encoded into the four register writes, and polls for matching/acknowledgment values. This bulk path is distinct from the per-note descriptor path, although both ultimately use the same `0x0DB7` primitive. The exact peripheral and the payload format remain unknown.
