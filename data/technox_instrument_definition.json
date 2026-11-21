@@ -2536,5 +2536,167 @@
       "map": "Technox Old Box"
     }
   ],
-  "bank_select_method": "1"
+  "bank_select_method": "1",
+  "controller_semantics": [
+    {
+      "cc": 0,
+      "name": "Bank Select",
+      "kind": "standard",
+      "meaning": "Selects a sound bank; confirm MSB/LSB convention and value-to-A–D mapping on hardware."
+    },
+    {
+      "cc": 1,
+      "name": "Modulation",
+      "kind": "standard",
+      "meaning": "Modulation wheel amount."
+    },
+    {
+      "cc": 5,
+      "name": "Portamento Time",
+      "kind": "standard",
+      "meaning": "Portamento time."
+    },
+    {
+      "cc": 6,
+      "name": "Data Entry",
+      "kind": "standard",
+      "meaning": "Writes the currently selected RPN/NRPN value; parameter number must be known."
+    },
+    {
+      "cc": 7,
+      "name": "Volume",
+      "kind": "standard",
+      "meaning": "Channel volume."
+    },
+    {
+      "cc": 10,
+      "name": "Pan",
+      "kind": "standard",
+      "meaning": "Stereo pan."
+    },
+    {
+      "cc": 64,
+      "name": "Hold Pedal",
+      "kind": "standard",
+      "meaning": "Sustain/hold switch."
+    },
+    {
+      "cc": 65,
+      "name": "Portamento On/Off",
+      "kind": "standard",
+      "meaning": "Portamento switch."
+    },
+    {
+      "cc": 67,
+      "name": "Soft Pedal",
+      "kind": "standard",
+      "meaning": "Soft-pedal switch."
+    },
+    {
+      "cc": 80,
+      "name": "FX1-Type",
+      "kind": "vendor-labelled",
+      "meaning": "TechnoX instrument definition labels this controller as FX1 type; value map is not documented here."
+    },
+    {
+      "cc": 81,
+      "name": "FX2-Type",
+      "kind": "vendor-labelled",
+      "meaning": "TechnoX instrument definition labels this controller as FX2 type; value map is not documented here."
+    },
+    {
+      "cc": 82,
+      "name": "Arp. Resolution",
+      "kind": "vendor-labelled",
+      "meaning": "TechnoX instrument definition labels this controller as arpeggiator resolution; value map is not documented here."
+    },
+    {
+      "cc": 83,
+      "name": "Arp. Speed",
+      "kind": "vendor-labelled",
+      "meaning": "TechnoX instrument definition labels this controller as arpeggiator speed; value map is not documented here."
+    },
+    {
+      "cc": 91,
+      "name": "FX1-Send",
+      "kind": "vendor-labelled",
+      "meaning": "TechnoX instrument definition labels this controller as FX1 send."
+    },
+    {
+      "cc": 93,
+      "name": "FX2-Send",
+      "kind": "vendor-labelled",
+      "meaning": "TechnoX instrument definition labels this controller as FX2 send."
+    },
+    {
+      "cc": 98,
+      "name": "NRPN LSB",
+      "kind": "standard",
+      "meaning": "NRPN parameter-number LSB."
+    },
+    {
+      "cc": 99,
+      "name": "NRPN MSB",
+      "kind": "standard",
+      "meaning": "NRPN parameter-number MSB."
+    },
+    {
+      "cc": 100,
+      "name": "RPN LSB",
+      "kind": "standard",
+      "meaning": "RPN parameter-number LSB."
+    },
+    {
+      "cc": 101,
+      "name": "RPN MSB",
+      "kind": "standard",
+      "meaning": "RPN parameter-number MSB."
+    },
+    {
+      "cc": 120,
+      "name": "All Sounds Off",
+      "kind": "standard",
+      "meaning": "All sound off."
+    },
+    {
+      "cc": 121,
+      "name": "Reset Controllers",
+      "kind": "standard",
+      "meaning": "Reset controllers."
+    },
+    {
+      "cc": 123,
+      "name": "All Notes Off",
+      "kind": "standard",
+      "meaning": "All notes off."
+    },
+    {
+      "cc": 124,
+      "name": "Omni Off",
+      "kind": "standard",
+      "meaning": "Omni mode off."
+    },
+    {
+      "cc": 125,
+      "name": "Omni On",
+      "kind": "standard",
+      "meaning": "Omni mode on."
+    },
+    {
+      "cc": 126,
+      "name": "Mono On",
+      "kind": "standard",
+      "meaning": "Mono mode on."
+    },
+    {
+      "cc": 127,
+      "name": "Poly On",
+      "kind": "standard",
+      "meaning": "Poly mode on."
+    }
+  ],
+  "sysex_parameter_mapping": {
+    "status": "unverified",
+    "note": "Controller labels do not establish which Part SysEx byte, if any, they modify. No offset bindings are asserted."
+  }
 }
