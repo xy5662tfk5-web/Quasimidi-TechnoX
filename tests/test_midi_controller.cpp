@@ -28,8 +28,11 @@ int main() {
     cc = router.handleControlChange(1, 6, 48);
     assert(cc && cc->parameter == PartParameter::egAttack && cc->rawValue == 48);
     assert(!router.handleControlChange(1, 101, 0));
-    assert(!router.handleControlChange(1, 100, 0));
+    assert(!router.handleControlChange(1, 100, 1));
     assert(!router.handleControlChange(1, 6, 64));
+    const auto rpn = router.decodeRpnDataEntry(1, 64);
+    assert(rpn && rpn->parameterIndex == 1 && rpn->rawValue == 64);
+    assert(!router.decodeRpnDataEntry(17, 64));
     assert(!router.handleControlChange(1, 99, 0x18));
     assert(!router.handleControlChange(1, 98, 0x1a));
     assert(!router.handleControlChange(1, 6, 100));
