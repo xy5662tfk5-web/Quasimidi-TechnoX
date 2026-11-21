@@ -4,6 +4,8 @@
 // It describes writes to XDATA 0x8000..0x8003 only; it does not assign
 // a physical device or audio meaning to the mailbox bytes.
 
+#include "TechnoXFirmwareTransaction.h"
+
 #include <array>
 #include <cstdint>
 
