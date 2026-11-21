@@ -10,22 +10,22 @@ spec2 = importlib.util.spec_from_file_location("analyze_technox_parts", ANALYZER
 module = importlib.util.module_from_spec(spec2); sys.modules[spec2.name] = module; spec2.loader.exec_module(module)
 
 class PartAnalysisTests(unittest.TestCase):
-    def test_byte_statistics_keep_offsets_opaque(self):
+    def test_byte_statistics_keep_manual_offsets(self):
         frames = []
         for performance in range(5, 55):
-            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,5])+b"Test    "+b"\xF7")
-            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,0])+bytes(65)+b"\xF7")
-            for part in range(1,5):
-                payload = bytes([part] * 24)
-                frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,part])+payload+b"\xF7")
-        # Build an SMF directly using the existing test helper.
-        test_module_path = ROOT / "tests" / "test_parse_technox_mid.py"
-        spec3 = importlib.util.spec_from_file_location("test_parse_technox_mid", test_module_path)
+            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,5]) + b"\x00Test    " + b"\xF7")
+            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,0]) + bytes(66) + b"\xF7")
+            for selector in range(1,5):
+                data = bytes([0]) + bytes([selector] * 24)
+                frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,selector]) + data + b"\xF7")
+        test_path = ROOT / "tests" / "test_parse_technox_mid.py"
+        spec3 = importlib.util.spec_from_file_location("test_parse_technox_mid", test_path)
         test_module = importlib.util.module_from_spec(spec3); sys.modules[spec3.name] = test_module; spec3.loader.exec_module(test_module)
         result = module.analyze(test_module.smf(frames))
-        self.assertEqual(result["part_frames"],200)
-        self.assertEqual([p["part_number"] for p in result["parts"]],[13,14,15,16])
-        self.assertEqual(result["parts"][0]["byte_statistics"][0]["constant_value"],1)
-        self.assertEqual(result["parts"][3]["byte_statistics"][23]["constant_value"],4)
+        self.assertEqual(result["part_frames"], 200)
+        self.assertEqual([p["part_number"] for p in result["parts"]], [13,14,15,16])
+        self.assertEqual(result["parts"][0]["byte_statistics"][0]["constant_value"], 1)
+        self.assertEqual(result["parts"][3]["byte_statistics"][23]["constant_value"], 4)
 
-if __name__ == "__main__": unittest.main()
+if __name__ == "__main__":
+    unittest.main()
