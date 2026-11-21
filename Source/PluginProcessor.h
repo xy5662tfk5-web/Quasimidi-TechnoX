@@ -29,7 +29,7 @@ public:
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.0; }
+    double getTailLengthSeconds() const override { return 3.0; }
 
     int getNumPrograms() override { return static_cast<int>(performanceBank.count()); }
     int getCurrentProgram() override { return static_cast<int>(performanceBank.selectedIndex()); }
