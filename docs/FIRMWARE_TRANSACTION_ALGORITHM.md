@@ -1681,7 +1681,7 @@ It then computes transformed values using the code table at 0x1288 and, on anoth
 
 If internal bit 0x08 is set, the handler jumps to 0x1BE2. Otherwise it reads three descriptor bytes through DPTR, saves the advanced pointer, and writes the first byte through the record pointer in RAM[0x2E]. The third byte is masked to three bits and may have ACC.7 set according to internal bit 0x0D. If internal bit 0xE0 (ACC.0 at the point tested) is set, it also writes a value and calls 0x2128 to adjust the record's selector fields.
 
-It selects XDATA page 0x80 and prepares R5 from RAM[0x2B]. Depending on internal bit 0x0A and the low nibble of RAM[0x2B], it may initialize a four-byte record at offsets 0–3. A further group of conditions involving internal flags 0x01–0x03, the upper bits of R3, RAM[0x40], and ACC.3 determines whether internal bit 0xE4 is set or cleared before calling 0x0DB7. It then restores A0 from RAM[0x2D] and jumps to 0x19C2. The exact semantic labels of the packet fields remain open.
+It selects XDATA page 0x80 and prepares R5 from RAM[0x2B]. Depending on internal bit 0x0A and the low nibble of RAM[0x2B], it may initialize a four-byte record at offsets 0–3. A further group of conditions involving internal flags 0x01–0x03, the upper bits of R3, RAM[0x40], and ACC.3 determines whether internal bit 0xE4 is set or cleared before calling 0x0DB7. The earlier test at 0x228C is JB ACC.0: it tests bit 0 of the byte most recently loaded into A from F0, not an independent internal flag. It then restores A0 from RAM[0x2D] and jumps to 0x19C2. The exact semantic labels of the packet fields remain open.
 
 ### 51.6 0x2301 and 0x2374 — record normalization and pointer progression
 
