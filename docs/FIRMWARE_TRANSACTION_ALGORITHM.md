@@ -959,3 +959,22 @@ The currently observed accesses support this provisional layout for each slot at
 The +9..+13 references are cross-slot reads: they belong to the next eight-byte slot, not to extra fields inside the current slot. This is why the 0x0C59 routine can compute a transition between adjacent slots.
 
 The slot array is therefore a separate structure from the 24-byte records at 0x7C15 + 0x18*index. Their relationship is still unproven; do not merge these two layouts in the emulator data model yet.
+
+
+## 29. Slot service routine 0x0A57 connects the scanner to the packet path
+
+The reachable cross-references show 0x0A57 is entered from two places:
+
+- 0x087B, after the slot scanner finds status class 0x10 in the current slot's status byte;
+- 0x0DB1, after a helper has written a new value to slot offset +1, set internal bit 0x09, and prepared the slot for servicing.
+
+At entry, 0x0A57 reads slot +1 into F0 and slot +4 into R4. If +4 is nonzero, it reads a comparison value from XDATA page 0x20 at offset 0x40 + RAM[0x30], then compares that with slot +7. A mismatch calls helper 0x1848 and sets internal bit 0x09.
+
+The routine then examines slot +3 and +2, branches on their flag bits, and either:
+- prepares R2/R3/R4 and jumps to the indexed update path at 0x0B3F;
+- updates slot-derived values through helper 0x1848;
+- or loads a three-byte value and jumps to the shared continuation at 0x0BD1.
+
+The 0x0B3F path can emit a packet through 0x0DB7 or take the direct read/modify/write path at 0x0B5C. Thus 0x0A57 is a confirmed service/transform stage for the eight-byte slot array, and the slot scanner reaches the external packet interface through it.
+
+The exact meaning of the XDATA 0x20:0x40+RAM[0x30] comparison and the slot flags remains open. It is not yet safe to call these fields pitch, envelope, note, or voice status.
