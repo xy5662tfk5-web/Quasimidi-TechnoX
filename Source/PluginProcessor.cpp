@@ -153,6 +153,9 @@ bool QuasimidiTechnoXAudioProcessor::setPartMidiChannel(int partIndex, int midiC
 {
     if (partIndex < 0 || partIndex >= 4 || midiChannel < 1 || midiChannel > 16)
         return false;
+    for (int other = 0; other < 4; ++other)
+        if (other != partIndex && getPartMidiChannel(other) == midiChannel)
+            return false;
     partMidiChannels[static_cast<std::size_t>(partIndex)].store(midiChannel, std::memory_order_release);
     return true;
 }
@@ -163,6 +166,25 @@ int QuasimidiTechnoXAudioProcessor::partSlotForMidiChannel(int channel) const no
         if (getPartMidiChannel(slot) == channel)
             return slot;
     return -1;
+}
+
+bool QuasimidiTechnoXAudioProcessor::getEditedPartSysEx(
+    int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const
+{
+    const auto* performance = performanceBank.at(performanceIndex < 0 ? 50 : static_cast<std::size_t>(performanceIndex));
+    if (performance == nullptr || partIndex < 0 || partIndex >= 4)
+        return false;
+    auto model = performance->makePartEditModel(static_cast<std::size_t>(partIndex));
+    if (!model.isLoaded())
+        return false;
+    for (std::size_t parameter = 0; parameter < 24; ++parameter) {
+        const int value = getPartParameterRaw(performanceIndex, partIndex,
+            static_cast<technox::PartParameter>(parameter));
+        if (value < 0 || !model.setRawValue(parameter, static_cast<std::uint8_t>(value)))
+            return false;
+    }
+    destination = model.editedSysEx();
+    return true;
 }
 
 juce::String QuasimidiTechnoXAudioProcessor::getCurrentPartSoundName(int partIndex) const
