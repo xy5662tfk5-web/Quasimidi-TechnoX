@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include <array>
 
 class QuasimidiTechnoXAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                                    private juce::Timer
@@ -14,11 +15,21 @@ public:
 
 private:
     void timerCallback() override;
+    void refreshPartControls();
 
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
     juce::ComboBox performanceSelector;
     juce::Label performanceLabel;
+    juce::ComboBox partSelector;
+    juce::ComboBox midiChannelSelector;
+    juce::Label partLabel;
+    juce::Label midiChannelLabel;
+    std::array<juce::Slider, 24> parameterSliders;
+    std::array<juce::Label, 24> parameterLabels;
+    int selectedPartSlot = 0;
+    int lastDisplayedPerformance = -1;
+    bool refreshingControls = false;
     int partNumber = 13;
     int midiChannel = 1;
     int parameterNumber = 1;
