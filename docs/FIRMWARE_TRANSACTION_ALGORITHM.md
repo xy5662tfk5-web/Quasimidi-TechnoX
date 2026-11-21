@@ -641,3 +641,74 @@ Two code paths now independently emit four-byte writes to the same external XDAT
 - 0x0DB7 uses A0=0x80 plus R0=0..3 to write [R5, R2, R3, R4 & 0xBF].
 
 The 0x224C and 0x2301 handlers prepare arguments and call 0x0DB7. This unifies the previously separate observations into one external four-byte transport window. The device identity, command/address interpretation, timing, and acknowledgement semantics remain open.
+
+
+## 19. Decoding the 0x1EDD packet fields and loop context
+
+### 19.1 Descriptor input fields at 0x1EDD entry
+
+The handler reads five consecutive bytes from the descriptor pointer (after the three P3 strobes have been applied):
+
+- first byte -> R2
+- second byte -> R5
+- third byte -> R6
+- fourth byte -> F0
+- fifth byte -> R4
+
+The descriptor pointer is then saved back to RAM[0x36:0x37]. The fifth input byte is subsequently transformed together with F0; these incoming register assignments should not be confused with the final packet fields, because R3/R4/R5/R6/R7 are modified later.
+
+### 19.2 Final field preparation before the writes
+
+The instruction sequence around 0x2085–0x20C4 performs these operations:
+
+1. Copies RAM[0x04] (register-bank R4 in the active register bank) into R2, then derives R4 from F0 using SWAP A followed by RR A. R3 is the high portion of this transformed value: R3 = R4 & 0xF8.
+2. Reads the byte at XDATA address RAM[0x2E] through R1. If bit 2 of that byte is clear, it takes the alternate path at 0x210F. If bit 2 is set, R2 is transformed by SWAP/RL and mask 0x1F, and R4 is masked to its low three bits.
+3. If RAM[0x3E] is nonzero, it becomes R5; R6 is derived from R3 using RLC and mask 0xFC; R7 is derived from R4 using RLC; R3 and R4 are then cleared. If RAM[0x3E] is zero, R5/R6/R7 are all cleared.
+4. Internal bit 0x0D controls whether internal bit 0x0C is set and whether ACC.7 is set in the outgoing R4/R7 fields. ACC.7 here is a transient bit of the accumulator value being prepared, not a persistent flag.
+
+The alternate branch at 0x210F instead sets R2=0, masks R4 to three bits, conditionally sets its ACC.7 bit based on internal bit 0x0D, selects A0=0x80, and calls 0x0DB7.
+
+### 19.3 Exact three-packet sequence at 0x8000–0x8003
+
+When internal bit 0x0A is set, the handler emits an additional packet:
+
+- 0x8000 = RAM[0x2B] - 2
+- 0x8001 = XDATA[RAM[0x2E] - 0x0F] from the currently selected A0 page
+- 0x8002 = XDATA[RAM[0x2E] - 0x0E] from the currently selected A0 page
+- 0x8003 = (XDATA[RAM[0x2E] - 0x0D] & 0x07), with ACC.7 conditionally set when internal bit 0x0C is set
+
+The source offsets follow from: A=RAM[0x2E], CLR C, SUBB A,#0x10, INC A, then R0 is used for three consecutive MOVX reads. This is a read from the selected page, not from absolute XDATA page zero unless the caller selected that page.
+
+The handler then always emits the second packet:
+
+- 0x8000 = RAM[0x2B]
+- 0x8001 = R5
+- 0x8002 = R6
+- 0x8003 = R7
+
+And the third packet:
+
+- 0x8000 = RAM[0x2B] - 1
+- 0x8001 = R2
+- 0x8002 = R3
+- 0x8003 = R4
+
+The second and third packets are written as direct DPTR MOVX stores to four consecutive addresses. This exact mapping supersedes the earlier abbreviated description that did not state the source offsets of the optional packet.
+
+### 19.4 Caller initialization and iteration variables
+
+At the visible setup path beginning at 0x1700, the firmware derives RAM[0x2B] from the high nibble of RAM[0x2D], clears RAM[0x2E], sets RAM[0x44]=0x70, and reads the initial descriptor-pointer bytes from the selected XDATA page at offsets 0x61 and 0x60 into RAM[0x36:0x37]. It then calls 0x189D, which performs the descriptor/mode dispatch.
+
+Thus, in this entry path:
+
+- RAM[0x2D] is the selected XDATA page/bank selector.
+- RAM[0x2B] starts as the high-nibble group derived from that selector and increments once per eight-byte record.
+- RAM[0x2E] is the output-record offset and starts at zero.
+- RAM[0x36:0x37] is the descriptor-stream pointer loaded from page offsets 0x61/0x60.
+- RAM[0x2C] is the remaining-record loop counter; its exact initializer is outside this 0x1700 setup slice and must be traced at the caller above it.
+
+The 0x19C2 continuation advances RAM[0x2E] by eight and increments RAM[0x2B], then decrements RAM[0x2C]. The descriptor pointer is advanced separately by each handler according to the number of bytes consumed.
+
+### 19.5 Remaining uncertainty
+
+This gives a byte-accurate software-level packet layout and the immediate source fields. It still does not identify whether the external receiver interprets the first byte as a voice/channel/address, whether the remaining bytes are data/flags, or whether the write window is memory-mapped to a dedicated IC, FPGA/CPLD, or glue logic. That requires the board schematic/chip-pin trace or captured bus activity.
