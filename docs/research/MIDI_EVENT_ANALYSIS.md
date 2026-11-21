@@ -122,3 +122,14 @@ Further inspection of `0x418E`, `0xBC3F`, and `0xB3BC` narrows the interpretatio
 Consequently, the best-established current chain is:
 `MIDI Note On/Off -> 0x57A8 -> 0x593D -> event slots 0x0C..0x0F -> 0x5671 -> 0x418E -> lookup/table conversion -> 0x446B -> 0x1494`.
 The final hardware voice trigger and sample/DSP interface remain unresolved. This is now the next reverse-engineering boundary.
+
+## 12. Correction: 0x418E has two call contexts; do not label its 0x09 branch as the general MIDI Note On path
+
+There are two reachable direct call sites for `0x418E`:
+
+- `0x3624`: caller supplies `R5=0x02`, `R3=0x38`, and `R7` from the preceding setup routine. This is the context in which `0x418E` can take its internal `R7==0x09` branch.
+- `0x572F`: the general MIDI event dispatcher supplies `R7=eventID` (`0x0C–0x0F`), `R5` from a per-event value, and `R3=RAM[0x06]`. This call takes the non-`0x09` branch in `0x418E`.
+
+Therefore, the previous section's description of the `0x418E` `R7==0x09` branch as a direct Note On staging path was too strong. It is a separate setup/event-type branch. The general MIDI route is still confirmed through `0x57A8 -> 0x593D -> 0x5671`, but the exact function of its `0x572F -> 0x418E` staging call must be described from its non-`0x09` branch and downstream consumers.
+
+The safe current conclusion: four event-slot IDs are dispatched and written into per-slot structures; their exact mapping to four Parts and the final hardware voice command are not yet proven.
