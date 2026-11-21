@@ -1294,3 +1294,70 @@ For each PartIndex, 0x3ECE:
 This confirms that the 12-byte page-0x29 records are initialized/serviced for all 16 Parts. The +2 field is read as a per-Part descriptor selector; +10 is explicitly initialized to 0x7F in this path. The helper 0x0D0E then maps these values and uses them to update the eight-byte slot array.
 
 The four indices 0x0C–0x0F in the Note On dispatcher are therefore the four Performance Parts being triggered in that path, while the underlying Part descriptor/slot infrastructure is initialized across all 16 Parts.
+
+
+## 38. Corrected MCS-51 decode and confirmed MIDI Note On → Part record path
+
+### 38.1 Disassembler instruction-length correction
+
+The instruction-length table in tools/disassemble_technox_8051.py previously treated every opcode from 0x94 through 0x9F as two bytes. That was incorrect for 0x96–0x9F:
+
+- 0x94: SUBB A,#immediate — 2 bytes.
+- 0x95: SUBB A,direct — 2 bytes.
+- 0x96–0x97: SUBB A,@R0 / @R1 — 1 byte.
+- 0x98–0x9F: SUBB A,R0…R7 — 1 byte.
+
+The length table has been corrected. Unit tests now cover all opcodes 0x96–0x9F and decode examples 0x96 and 0x9F explicitly. This matters because the old lengths could shift instruction boundaries and corrupt later call/branch cross-references.
+
+The specific 0x1EDD and 0x0DB7 windows were re-read with corrected instruction lengths. The expanded reachability pass, seeded with the computed-dispatch destinations, now covers 17,546 instruction addresses and confirms 16 direct call sites to 0x0DB7:
+0x02C0, 0x0A4F, 0x0B53, 0x0D07, 0x0E1A, 0x0E67, 0x1045, 0x110A, 0x1E8A, 0x211F, 0x22F8, 0x236B, 0x26C9, 0x26DE, 0x2767, and 0x277E.
+
+### 38.2 MIDI event byte fields are now connected to the Part dispatcher
+
+At 0x57A8, the parser receives the MIDI status byte in R7, data byte 1 in R5, and data byte 2 in R3. It stores:
+
+- RAM[0x60] = status high nibble (message type).
+- RAM[0x63] = status low nibble (MIDI channel).
+- RAM[0x61] = data byte 1.
+- RAM[0x62] = data byte 2.
+
+The Part-routing block at 0x597E–0x59BA dispatches selected Performance Parts 13–16 using zero-based Part indices 0x0C–0x0F. For each selected Part it sets R7 to the Part index, passes the message-type nibble in R5, passes data byte 1 in R3, copies data byte 2 to RAM[0x67], and calls 0x5671. The alternate route at 0x59FB passes the MIDI channel from RAM[0x63] as the Part/channel index.
+
+### 38.3 Note On arguments passed to 0x4256 are confirmed
+
+At 0x5671, the dispatcher saves:
+
+- RAM[0x64] = Part index (incoming R7).
+- RAM[0x66] = data byte 1 (incoming R3).
+- RAM[0x67] remains data byte 2 from the Part router.
+
+It branches on the message-type nibble in R5. For Note On (status high nibble 0x09), the path reaches 0x56BB or 0x56C5. Both call sites load:
+
+- R7 = RAM[0x64] — Part index.
+- R5 = RAM[0x66] — MIDI note number.
+- R3 = RAM[0x67] — MIDI velocity.
+
+They then call 0x4256. At entry, 0x4256 saves these as RAM[0x6E] (Part index), RAM[0x6F] (note), and RAM[0x70] (velocity). This is direct firmware evidence of the Note On argument contract; it is no longer just an inference from the routine's later calculations.
+
+### 38.4 The 24-byte 0x7C15 Part record is the live runtime parameter source
+
+For Part index P, the record base is S = 0x7C15 + 0x18*P. The Note On path reads offsets that match the manual's Part parameter map:
+
+| Record address | Relative offset | Manual parameter | Observed Note On use |
+|---|---:|---|---|
+| 0x7C17 + 0x18*P | +2 | Track Mode | Selects the follow-on descriptor page: P, P+0xC0, or P+0xE0 |
+| 0x7C1C + 0x18*P | +7 | Transpose | Read during note/pitch calculation |
+| 0x7C19 + 0x18*P | +4 | Panorama | Read and tested against 0x10; exact branch meaning still open |
+| 0x7C26 + 0x18*P | +17 | Velocity Curve | Passed with velocity to 0xABBF for table-based remapping |
+
+The Track Mode branch is particularly clear: mode value 2 selects RAM[0x28] = P+0xC0 before calling 0x1494; mode value 3 selects P+0xE0; other values select P. These values correspond to the manual's Mono and Lead modes, while Poly/default follows the base page. The precise internal meaning of the +0xC0 and +0xE0 descriptor pages remains to be decoded.
+
+The velocity-curve path loads the incoming velocity into R7, reads Part offset +17 into R5, and calls 0xABBF. That helper uses the table at 0xA8BF to remap the velocity before the resulting value is written into the Part's intermediate runtime state. This connects the manual's Velocity Curve parameter to an actual firmware lookup path.
+
+The routine also calls 0xAC00 with the Part index and note, connecting Note On to the active-key bitmap maintained in XDATA pages 0x35/0x36. It then selects descriptor pages and calls 0x1494, the descriptor loader already traced in earlier sections. This establishes a concrete path from parsed MIDI Note On, through the live Part parameter record, into descriptor loading and subsequent hardware-facing preparation.
+
+### 38.5 Current conclusion and next target
+
+The 0x7C15 + 24*P table is not merely an arbitrary 16-entry structure: its offsets line up with the manual's documented Part parameters, and the Note On routine reads several of those exact offsets for transpose, velocity-curve mapping, and track-mode selection. The manual and firmware now corroborate one another on this runtime Part-state structure.
+
+The next pass should follow the three descriptor-page variants (P, P+0xC0, P+0xE0) through 0x1494 and the downstream record/transport paths, then correlate the resulting descriptor bytes with the 0x8000–0x8003 transport and the separate 0x7Cxx peripheral state. The receiving hardware and final sample/voice-generation algorithm remain unidentified.
