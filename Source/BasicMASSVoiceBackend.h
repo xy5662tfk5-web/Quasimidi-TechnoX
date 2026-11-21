@@ -33,7 +33,10 @@ public:
         auto& state = states_[static_cast<std::size_t>(voiceIndex)];
         if (state.active) {
             state.gate = false;
-            if (state.stage != Stage::off) state.stage = Stage::release;
+            if (state.stage != Stage::off && state.stage != Stage::release) {
+                state.releaseStartEnvelope = state.envelope;
+                state.stage = Stage::release;
+            }
         }
     }
 
@@ -117,6 +120,7 @@ private:
         double phase = 0.0;
         double lfoPhase = 0.0;
         float envelope = 0.0f;
+        float releaseStartEnvelope = 0.0f;
         float filterIc1 = 0.0f;
         float filterIc2 = 0.0f;
         std::uint8_t note = 0;
@@ -156,7 +160,9 @@ private:
                 if (!state.gate) state.stage = Stage::release;
                 break;
             case Stage::release:
-                state.envelope -= 0.72f / (release * sr);
+                // Release from the envelope's actual level at Note Off.
+                // A fixed 0.72 decrement truncated notes released during attack.
+                state.envelope -= state.releaseStartEnvelope / (release * sr);
                 if (state.envelope <= 0.00001f) {
                     state.envelope = 0.0f;
                     state.stage = Stage::off;
