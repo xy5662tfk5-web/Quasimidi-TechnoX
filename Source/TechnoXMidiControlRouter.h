@@ -45,6 +45,12 @@ public:
                 rpnMsb_[ch] = static_cast<std::uint8_t>(value);
                 nrpnMsb_[ch] = nrpnLsb_[ch] = 0x7f;
                 return std::nullopt;
+            case 121:
+                nrpnMsb_[ch] = nrpnLsb_[ch] = 0x7f;
+                rpnMsb_[ch] = rpnLsb_[ch] = 0x7f;
+                bankSelect_[ch] = 0;
+                modulationWheel_[ch] = 0;
+                return std::nullopt;
             case 91: return change(PartParameter::fx1Send, scale(value, 63));
             case 93: return change(PartParameter::fx2Send, scale(value, 63));
             case 126: return change(PartParameter::trackMode, 2); // Mono
