@@ -33,12 +33,12 @@ inline constexpr std::array<PartParameterDescriptor, 24> kPartParameterDescripto
     {"Portamento time", 127, 0}
 }};
 
-// Lossless editor model for one documented 32-byte Part SysEx frame.
-// Parameter bytes map to the official manual's PART-Parameter offsets 00..17.
+// Lossless editor model for one documented 33-byte Part SysEx frame.
+// The reserved byte at frame offset 7 is skipped; manual offsets 00..17 map to frame bytes 8..31.
 class PartEditModel {
 public:
-    static constexpr std::size_t kFrameSize = 32;
-    static constexpr std::size_t kDataOffset = 7;
+    static constexpr std::size_t kFrameSize = 33;
+    static constexpr std::size_t kDataOffset = 8;
     static constexpr std::size_t kDataSize = 24;
 
     PartEditModel() = default;
@@ -89,6 +89,17 @@ public:
         return setRawValue(index, value);
     }
 
+    // UI-facing signed/offset values are converted back to the stored 7-bit value.
+    bool setDisplayValue(PartParameter parameter, int displayValue) noexcept {
+        const auto index = static_cast<std::size_t>(parameter);
+        if (index >= kPartParameterDescriptors.size())
+            return false;
+        const int raw = displayValue - kPartParameterDescriptors[index].displayOffset;
+        if (raw < 0 || raw > kPartParameterDescriptors[index].maximum)
+            return false;
+        return setRawValue(index, static_cast<std::uint8_t>(raw));
+    }
+
     static constexpr const PartParameterDescriptor* descriptor(std::size_t index) noexcept {
         return index < kPartParameterDescriptors.size() ? &kPartParameterDescriptors[index] : nullptr;
     }
@@ -108,7 +119,7 @@ private:
         constexpr std::array<std::uint8_t, 5> header{{0xF0, 0x3F, 0x00, 0x22, 0x44}};
         for (std::size_t i = 0; i < header.size(); ++i)
             if (m[i] != header[i]) return false;
-        if (m[6] < 0x01 || m[6] > 0x04) return false;
+        if (m[5] < 5 || m[5] > 54 || m[6] < 0x01 || m[6] > 0x04) return false;
         for (std::size_t i = 1; i + 1 < m.size(); ++i)
             if (m[i] > 0x7F) return false;
         return true;
