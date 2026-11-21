@@ -2542,25 +2542,25 @@
       "cc": 0,
       "name": "Bank Select",
       "kind": "standard",
-      "meaning": "Selects a sound bank; confirm MSB/LSB convention and value-to-A–D mapping on hardware."
+      "meaning": "Manual specifies values 0–3: 0=A, 1=B, 2=C, 3=D; follow with Program Change 0–127."
     },
     {
       "cc": 1,
       "name": "Modulation",
       "kind": "standard",
-      "meaning": "Modulation wheel amount."
+      "meaning": "Modulation wheel; manual says the default modulation-matrix route controls tone/cutoff."
     },
     {
       "cc": 5,
       "name": "Portamento Time",
       "kind": "standard",
-      "meaning": "Portamento time."
+      "meaning": "Portamento time controller."
     },
     {
       "cc": 6,
       "name": "Data Entry",
       "kind": "standard",
-      "meaning": "Writes the currently selected RPN/NRPN value; parameter number must be known."
+      "meaning": "Writes the value selected by NRPN or RPN."
     },
     {
       "cc": 7,
@@ -2570,19 +2570,19 @@
     },
     {
       "cc": 10,
-      "name": "Pan",
+      "name": "Panorama-position",
       "kind": "standard",
-      "meaning": "Stereo pan."
+      "meaning": "Channel panorama."
     },
     {
       "cc": 64,
-      "name": "Hold Pedal",
+      "name": "Hold-Pedal",
       "kind": "standard",
-      "meaning": "Sustain/hold switch."
+      "meaning": "Hold/sustain pedal."
     },
     {
       "cc": 65,
-      "name": "Portamento On/Off",
+      "name": "Porta on/off",
       "kind": "standard",
       "meaning": "Portamento switch."
     },
@@ -2595,68 +2595,68 @@
     {
       "cc": 80,
       "name": "FX1-Type",
-      "kind": "vendor-labelled",
-      "meaning": "TechnoX instrument definition labels this controller as FX1 type; value map is not documented here."
+      "kind": "technox",
+      "meaning": "Selects FX1 algorithm; value table is described in the FX1 section of the manual."
     },
     {
       "cc": 81,
       "name": "FX2-Type",
-      "kind": "vendor-labelled",
-      "meaning": "TechnoX instrument definition labels this controller as FX2 type; value map is not documented here."
+      "kind": "technox",
+      "meaning": "Selects FX2 algorithm; value table is described in the FX2 section of the manual."
     },
     {
       "cc": 82,
       "name": "Arp. Resolution",
-      "kind": "vendor-labelled",
-      "meaning": "TechnoX instrument definition labels this controller as arpeggiator resolution; value map is not documented here."
+      "kind": "technox",
+      "meaning": "Arpeggiator resolution."
     },
     {
       "cc": 83,
       "name": "Arp. Speed",
-      "kind": "vendor-labelled",
-      "meaning": "TechnoX instrument definition labels this controller as arpeggiator speed; value map is not documented here."
+      "kind": "technox",
+      "meaning": "Arpeggiator speed."
     },
     {
       "cc": 91,
       "name": "FX1-Send",
-      "kind": "vendor-labelled",
-      "meaning": "TechnoX instrument definition labels this controller as FX1 send."
+      "kind": "technox",
+      "meaning": "FX1 send level."
     },
     {
       "cc": 93,
       "name": "FX2-Send",
-      "kind": "vendor-labelled",
-      "meaning": "TechnoX instrument definition labels this controller as FX2 send."
+      "kind": "technox",
+      "meaning": "FX2 send level."
     },
     {
       "cc": 98,
       "name": "NRPN LSB",
       "kind": "standard",
-      "meaning": "NRPN parameter-number LSB."
+      "meaning": "Selects NRPN parameter LSB."
     },
     {
       "cc": 99,
       "name": "NRPN MSB",
       "kind": "standard",
-      "meaning": "NRPN parameter-number MSB."
+      "meaning": "Selects NRPN parameter MSB."
     },
     {
       "cc": 100,
       "name": "RPN LSB",
       "kind": "standard",
-      "meaning": "RPN parameter-number LSB."
+      "meaning": "Selects RPN parameter LSB."
     },
     {
       "cc": 101,
       "name": "RPN MSB",
       "kind": "standard",
-      "meaning": "RPN parameter-number MSB."
+      "meaning": "Selects RPN parameter MSB."
     },
     {
       "cc": 120,
       "name": "All Sounds Off",
       "kind": "standard",
-      "meaning": "All sound off."
+      "meaning": "All sounds off."
     },
     {
       "cc": 121,
@@ -2696,7 +2696,327 @@
     }
   ],
   "sysex_parameter_mapping": {
-    "status": "unverified",
-    "note": "Controller labels do not establish which Part SysEx byte, if any, they modify. No offset bindings are asserted."
+    "status": "documented",
+    "source": "Quasimidi TechnoX Owner's Manual, sections 17–18, printed pages 32–38",
+    "note": "The 24 Part parameter offsets are documented. The MIDI CC/NRPN/RPN control mappings are documented separately. Do not assume every CC maps one-to-one to a Part SysEx byte."
+  },
+  "part_parameter_map": [
+    {
+      "offset": 0,
+      "hexOffset": "00",
+      "id": "bankNumber",
+      "name": "Bank number",
+      "minimum": 0,
+      "maximum": 3,
+      "notes": "0=A, 1=B, 2=C, 3=D"
+    },
+    {
+      "offset": 1,
+      "hexOffset": "01",
+      "id": "soundNumber",
+      "name": "Sound number",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Zero-based program number"
+    },
+    {
+      "offset": 2,
+      "hexOffset": "02",
+      "id": "trackMode",
+      "name": "Track mode",
+      "minimum": 0,
+      "maximum": 3,
+      "notes": "0=muted, 1=poly, 2=mono, 3=lead"
+    },
+    {
+      "offset": 3,
+      "hexOffset": "03",
+      "id": "level",
+      "name": "Level",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Part volume"
+    },
+    {
+      "offset": 4,
+      "hexOffset": "04",
+      "id": "panorama",
+      "name": "Panorama",
+      "minimum": 0,
+      "maximum": 20,
+      "notes": "Off, fixed L/R, random, key-follow, velocity-follow"
+    },
+    {
+      "offset": 5,
+      "hexOffset": "05",
+      "id": "fx1Send",
+      "name": "FX1 send",
+      "minimum": 0,
+      "maximum": 63,
+      "notes": "Send to FX1"
+    },
+    {
+      "offset": 6,
+      "hexOffset": "06",
+      "id": "fx2Send",
+      "name": "FX2 send",
+      "minimum": 0,
+      "maximum": 63,
+      "notes": "Send to FX2"
+    },
+    {
+      "offset": 7,
+      "hexOffset": "07",
+      "id": "transpose",
+      "name": "Transpose",
+      "minimum": 0,
+      "maximum": 48,
+      "notes": "Display value = raw - 24 semitones"
+    },
+    {
+      "offset": 8,
+      "hexOffset": "08",
+      "id": "tune",
+      "name": "Tune",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 9,
+      "hexOffset": "09",
+      "id": "cutoffFrequency",
+      "name": "Cutoff frequency",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 10,
+      "hexOffset": "0A",
+      "id": "resonanceFrequency",
+      "name": "Resonance frequency",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 11,
+      "hexOffset": "0B",
+      "id": "egAttack",
+      "name": "EG attack",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 12,
+      "hexOffset": "0C",
+      "id": "egDecay",
+      "name": "EG decay",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 13,
+      "hexOffset": "0D",
+      "id": "egRelease",
+      "name": "EG release",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 14,
+      "hexOffset": "0E",
+      "id": "vibratoRate",
+      "name": "Vibrato rate",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 15,
+      "hexOffset": "0F",
+      "id": "vibratoDepth",
+      "name": "Vibrato depth",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 16,
+      "hexOffset": "10",
+      "id": "vibratoDelay",
+      "name": "Vibrato delay",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 17,
+      "hexOffset": "11",
+      "id": "velocityCurve",
+      "name": "Velocity curve number",
+      "minimum": 0,
+      "maximum": 14,
+      "notes": "Named curves listed in manual"
+    },
+    {
+      "offset": 18,
+      "hexOffset": "12",
+      "id": "holdPedal",
+      "name": "Hold pedal",
+      "minimum": 0,
+      "maximum": 1,
+      "notes": "0=off, 1=on"
+    },
+    {
+      "offset": 19,
+      "hexOffset": "13",
+      "id": "modulationDepth",
+      "name": "Modulation depth",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Per-part modulation amount"
+    },
+    {
+      "offset": 20,
+      "hexOffset": "14",
+      "id": "pitchSensitivity",
+      "name": "Pitch sensitivity",
+      "minimum": 0,
+      "maximum": 24,
+      "notes": "Display value = raw - 12 semitones"
+    },
+    {
+      "offset": 21,
+      "hexOffset": "15",
+      "id": "volumeModSensitivity",
+      "name": "Volume modulation sensitivity",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 22,
+      "hexOffset": "16",
+      "id": "toneModSensitivity",
+      "name": "Tone modulation sensitivity",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 23,
+      "hexOffset": "17",
+      "id": "portamentoTime",
+      "name": "Portamento time",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Portamento time"
+    }
+  ],
+  "nrpn_parameter_map": [
+    {
+      "msb": 1,
+      "lsb": 8,
+      "name": "Pitch modulation speed"
+    },
+    {
+      "msb": 1,
+      "lsb": 9,
+      "name": "Pitch modulation depth"
+    },
+    {
+      "msb": 1,
+      "lsb": 10,
+      "name": "Pitch modulation delay"
+    },
+    {
+      "msb": 1,
+      "lsb": 32,
+      "name": "Cutoff frequency"
+    },
+    {
+      "msb": 1,
+      "lsb": 33,
+      "name": "Resonance"
+    },
+    {
+      "msb": 1,
+      "lsb": 99,
+      "name": "EG attack"
+    },
+    {
+      "msb": 1,
+      "lsb": 100,
+      "name": "EG decay"
+    },
+    {
+      "msb": 1,
+      "lsb": 102,
+      "name": "EG release"
+    },
+    {
+      "msb": 24,
+      "lsb": "key number",
+      "name": "Drum pitch"
+    },
+    {
+      "msb": 26,
+      "lsb": "key number",
+      "name": "Drum level"
+    },
+    {
+      "msb": 28,
+      "lsb": "key number",
+      "name": "Drum panning position"
+    },
+    {
+      "msb": 29,
+      "lsb": "key number",
+      "name": "Drum instrument FX1 send"
+    },
+    {
+      "msb": 30,
+      "lsb": "key number",
+      "name": "Drum instrument FX2 send"
+    }
+  ],
+  "rpn_parameter_map": [
+    {
+      "msb": 0,
+      "lsb": 0,
+      "name": "Pitch-bend range"
+    },
+    {
+      "msb": 0,
+      "lsb": 1,
+      "name": "Fine tune"
+    },
+    {
+      "msb": 0,
+      "lsb": 2,
+      "name": "Coarse tune"
+    }
+  ],
+  "performance_sysex_layout": {
+    "status": "documented",
+    "header": "F0 3F <device/system-channel> 22 44",
+    "performance_address_high_byte_offset": 5,
+    "block_selector_offset": 6,
+    "bulk_dump_data_offset": 7,
+    "performance_address_high_range": "0x05..0x36 (50 Performances)",
+    "block_selectors": {
+      "0": "common",
+      "1": "Part 13",
+      "2": "Part 14",
+      "3": "Part 15",
+      "4": "Part 16",
+      "5": "Performance name"
+    },
+    "note": "The supplied bulk dump omits an explicit low address-offset byte; data begins at byte 7, matching the 24 Part parameter bytes and 65-byte common block described in the manual."
   }
 }
