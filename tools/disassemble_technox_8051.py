@@ -362,8 +362,9 @@ def main() -> None:
     receive_callers = [pc for pc in ordered if insns[pc].text.startswith(("LCALL", "ACALL"))
                        and insns[pc].text.endswith("0xA7C0")]
     print("  ACIA RX reader callers: " + (", ".join(f"0x{x:04X}" for x in receive_callers) or "none"))
-    for focus in (0x3DF0, 0x3DFE, 0x3E00, 0x3E20, 0x3E40, 0x3E60,
-                  0x3E80, 0x3EA0, 0x3EC0, 0x3EE0):
+    for focus in (0x3DF0, 0x3DFE, 0x3E00, 0x3E13, 0x3E20, 0x3E27,
+                  0x3E35, 0x3E42, 0x3E54, 0x3E57, 0x3E69, 0x3E70,
+                  0x3E80, 0x3E90, 0x3EA0, 0x3EB0, 0x3EC0, 0x3ECE, 0x3EE0):
         if focus not in insns:
             continue
         idx = ordered.index(focus)
