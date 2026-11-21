@@ -2360,7 +2360,7 @@
       "part_msb_0x01": {
         "8": "Pitch modulation speed",
         "9": "Pitch modulation depth",
-        "10": "Pitch modulation delay",
+        "16": "Pitch modulation delay",
         "32": "Cutoff",
         "33": "Resonance",
         "99": "EG attack",
