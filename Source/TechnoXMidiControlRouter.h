@@ -64,7 +64,7 @@ public:
         switch (lsb) {
             case 0x08: return change(PartParameter::vibratoRate, value);
             case 0x09: return change(PartParameter::vibratoDepth, value);
-            case 0x0a: return change(PartParameter::vibratoDelay, value);
+            case 0x10: return change(PartParameter::vibratoDelay, value);
             case 0x20: return change(PartParameter::cutoffFrequency, value);
             case 0x21: return change(PartParameter::resonance, value);
             case 0x63: return change(PartParameter::egAttack, value);
