@@ -190,6 +190,7 @@ public:
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void resetVoice(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
+    virtual bool isVoiceFinished(int voiceIndex) const noexcept = 0;
     virtual void render(float* const* channels, int channelCount, int sampleCount,
                         const VoiceManager& voices, const ModulationMatrix& matrix,
                         const MASSPartParameterStore& parts,
@@ -205,6 +206,7 @@ public:
     void noteOn(int, const VoiceSlot&) noexcept override {}
     void noteOff(int, const VoiceSlot&) noexcept override {}
     void resetVoice(int, const VoiceSlot&) noexcept override {}
+    bool isVoiceFinished(int) const noexcept override { return true; }
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
                 const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&,
@@ -287,6 +289,11 @@ public:
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
         backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_, commonControls_, drumParameters_);
+        for (std::size_t i = 0; i < voices_.voices().size(); ++i) {
+            const auto& voice = voices_.voices()[i];
+            if (voice.active && voice.releasing && backend_->isVoiceFinished(static_cast<int>(i)))
+                voices_.finishRelease(i);
+        }
     }
 
     void finishVoiceRelease(std::size_t voiceIndex) noexcept { voices_.finishRelease(voiceIndex); }
