@@ -25,6 +25,8 @@ private:
     juce::ComboBox midiChannelSelector;
     juce::Label partLabel;
     juce::Label midiChannelLabel;
+    juce::ComboBox routingModeSelector;
+    juce::Label routingModeLabel;
     std::array<juce::Slider, 24> parameterSliders;
     std::array<juce::Label, 24> parameterLabels;
     int selectedPartSlot = 0;
