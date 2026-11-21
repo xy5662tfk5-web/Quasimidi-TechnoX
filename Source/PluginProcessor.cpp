@@ -51,6 +51,15 @@ juce::String QuasimidiTechnoXAudioProcessor::getCurrentPerformanceName() const
                                    : juce::String("Bank not loaded");
 }
 
+juce::String QuasimidiTechnoXAudioProcessor::getCurrentPartSoundName(int partIndex) const
+{
+    const auto* performance = performanceBank.current();
+    if (performance == nullptr || partIndex < 0 || partIndex >= 4)
+        return {};
+    const auto part = performance->makePartEditModel(static_cast<std::size_t>(partIndex));
+    return soundCatalog.nameFor(part);
+}
+
 juce::AudioProcessorEditor* QuasimidiTechnoXAudioProcessor::createEditor()
 {
     return new QuasimidiTechnoXAudioProcessorEditor(*this);
