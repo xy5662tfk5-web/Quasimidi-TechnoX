@@ -109,21 +109,48 @@ class MASSModulationSourceStore {
 public:
     static constexpr std::size_t kPartCount = 16;
     MASSModulationSourceStore() {
-        for (auto& value : modWheel_)
-            value.store(0, std::memory_order_relaxed);
+        for (std::size_t i = 0; i < kPartCount; ++i) {
+            modWheel_[i].store(0, std::memory_order_relaxed);
+            pitchBend_[i].store(0, std::memory_order_relaxed);
+            expression_[i].store(127, std::memory_order_relaxed);
+        }
     }
     bool setModWheel(int partIndex, int value) noexcept {
-        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) || value < 0 || value > 127)
-            return false;
+        if (!valid(partIndex) || value < 0 || value > 127) return false;
         modWheel_[static_cast<std::size_t>(partIndex)].store(value, std::memory_order_release);
         return true;
     }
     int modWheel(int partIndex) const noexcept {
-        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return 0;
-        return modWheel_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire);
+        return valid(partIndex) ? modWheel_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 0;
+    }
+    bool setPitchBend(int partIndex, int value) noexcept {
+        if (!valid(partIndex) || value < -8192 || value > 8191) return false;
+        pitchBend_[static_cast<std::size_t>(partIndex)].store(value, std::memory_order_release);
+        return true;
+    }
+    int pitchBend(int partIndex) const noexcept {
+        return valid(partIndex) ? pitchBend_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 0;
+    }
+    bool setExpression(int partIndex, int value) noexcept {
+        if (!valid(partIndex) || value < 0 || value > 127) return false;
+        expression_[static_cast<std::size_t>(partIndex)].store(value, std::memory_order_release);
+        return true;
+    }
+    int expression(int partIndex) const noexcept {
+        return valid(partIndex) ? expression_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 127;
+    }
+    void reset(int partIndex) noexcept {
+        if (!valid(partIndex)) return;
+        const auto i = static_cast<std::size_t>(partIndex);
+        modWheel_[i].store(0, std::memory_order_release);
+        pitchBend_[i].store(0, std::memory_order_release);
+        expression_[i].store(127, std::memory_order_release);
     }
 private:
+    static bool valid(int partIndex) noexcept { return partIndex >= 0 && partIndex < static_cast<int>(kPartCount); }
     std::array<std::atomic<int>, kPartCount> modWheel_{};
+    std::array<std::atomic<int>, kPartCount> pitchBend_{};
+    std::array<std::atomic<int>, kPartCount> expression_{};
 };
 
 class MASSPartRuntimeControlStore {
@@ -190,6 +217,7 @@ public:
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void resetVoice(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
+    virtual bool isVoiceFinished(int voiceIndex) const noexcept = 0;
     virtual void render(float* const* channels, int channelCount, int sampleCount,
                         const VoiceManager& voices, const ModulationMatrix& matrix,
                         const MASSPartParameterStore& parts,
@@ -205,6 +233,7 @@ public:
     void noteOn(int, const VoiceSlot&) noexcept override {}
     void noteOff(int, const VoiceSlot&) noexcept override {}
     void resetVoice(int, const VoiceSlot&) noexcept override {}
+    bool isVoiceFinished(int) const noexcept override { return true; }
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
                 const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&,
@@ -277,16 +306,25 @@ public:
     }
     bool setModWheel(int partIndex, int value) noexcept { return modulationSources_.setModWheel(partIndex, value); }
     int getModWheel(int partIndex) const noexcept { return modulationSources_.modWheel(partIndex); }
+    bool setPitchBend(int partIndex, int value) noexcept { return modulationSources_.setPitchBend(partIndex, value); }
+    int getPitchBend(int partIndex) const noexcept { return modulationSources_.pitchBend(partIndex); }
+    bool setExpression(int partIndex, int value) noexcept { return modulationSources_.setExpression(partIndex, value); }
+    int getExpression(int partIndex) const noexcept { return modulationSources_.expression(partIndex); }
     bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
     bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
     bool portamento(int partIndex) const noexcept { return runtimeControls_.portamento(partIndex); }
     bool softPedal(int partIndex) const noexcept { return runtimeControls_.softPedal(partIndex); }
     bool setRpn(int partIndex, int parameterIndex, int value) noexcept { return runtimeControls_.setRpn(partIndex, parameterIndex, value); }
     int getRpn(int partIndex, int parameterIndex) const noexcept { return runtimeControls_.rpn(partIndex, parameterIndex); }
-    void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); setModWheel(partIndex, 0); }
+    void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); modulationSources_.reset(partIndex); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
         backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_, commonControls_, drumParameters_);
+        for (std::size_t i = 0; i < voices_.voices().size(); ++i) {
+            const auto& voice = voices_.voices()[i];
+            if (voice.active && voice.releasing && backend_->isVoiceFinished(static_cast<int>(i)))
+                voices_.finishRelease(i);
+        }
     }
 
     void finishVoiceRelease(std::size_t voiceIndex) noexcept { voices_.finishRelease(voiceIndex); }

@@ -126,6 +126,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                                                    juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+    buffer.clear();
     const int performanceIndex = getCurrentProgram();
 
     for (const auto metadata : midiMessages) {
@@ -164,6 +165,12 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             massEngine.allSoundsOff(message.getChannel());
         } else if (message.isAllNotesOff()) {
             massEngine.allNotesOff(message.getChannel());
+        } else if (message.isPitchWheel()) {
+            const int bend = message.getPitchWheelValue() - 8192;
+            for (int i = 0; i < targetCount; ++i) {
+                const int enginePart = 12 + targetSlots[static_cast<std::size_t>(i)];
+                massEngine.setPitchBend(enginePart, bend);
+            }
         } else if (message.isController()) {
             const int controller = message.getControllerNumber();
             const int value = message.getControllerValue();
@@ -195,6 +202,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 
                 if (controller == 1)
                     massEngine.setModWheel(enginePart, value);
+                else if (controller == 11)
+                    massEngine.setExpression(enginePart, value);
                 else if (controller == 65)
                     massEngine.setPortamento(enginePart, value >= 64);
                 else if (controller == 67)
@@ -217,8 +226,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         }
     }
 
-    // The M.A.S.S. synthesis backend is not implemented yet. MIDI/state editing
-    // is active, but audio remains intentionally silent until verified DSP exists.
+    // Render the first audible prototype voice backend. This generic oscillator
+    // is a development sound source, not decoded TechnoX ROM audio.
     massEngine.render(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), buffer.getNumSamples());
 }
 
