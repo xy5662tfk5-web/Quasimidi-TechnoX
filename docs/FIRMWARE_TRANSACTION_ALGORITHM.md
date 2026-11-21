@@ -1098,3 +1098,37 @@ This confirms the default behavior of the lookup field:
 - Nonzero selector values take the ROM-table mapping path or special-case branches.
 
 The six monotonic 128-byte ROM blocks at 0xA8BF–0xABBE are therefore optional mappings selected by a Part-record field, while zero selects the default 0xEF value. The user-facing name is manual-confirmed as Velocity Curve (Part parameter offset 0x11, range 0–14). The helper's exact internal mapping for all 15 values remains open.
+
+
+## 35. Manual Part parameters now explain several 0x4256 branches
+
+The official Part map in MANUAL_CONFIRMED_PROTOCOL.md identifies these offsets in each 24-byte record:
+
+- +0x02 = Track Mode (0 muted, 1 poly, 2 mono, 3 lead)
+- +0x04 = Panorama
+- +0x07 = Transpose
+- +0x11 = Velocity Curve (0–14)
+
+The 0x4256 note path reads these exact fields at their corresponding XDATA addresses:
+
+### Track Mode (+0x02, address 0x7C17 + 0x18*PartIndex)
+
+- At 0x4310–0x4323, a zero Track Mode skips the velocity-derived per-Part update at 0x2B77 + PartIndex.
+- At 0x4417, Track Mode is compared with 2; equality enables the descriptor pass RAM[0x28] = PartIndex + 0xC0 and calls 0x1494.
+- At 0x444A, Track Mode is compared with 3; equality enables the descriptor pass RAM[0x28] = PartIndex + 0xE0 and calls 0x1494.
+
+Thus the manual's Mono and Lead Track Modes select additional descriptor modes in the firmware. Poly mode uses the common passes but does not take these two extra mode branches. Muted mode is gated earlier.
+
+### Transpose (+0x07, address 0x7C1C + 0x18*PartIndex)
+
+This field is read early in 0x4256 and participates in the note/Part arithmetic whose result is written to event-record byte +0. This is a direct code path from the manual's Transpose parameter into the per-note descriptor.
+
+### Velocity Curve (+0x11, address 0x7C26 + 0x18*PartIndex)
+
+This field is passed to 0xABBF, which maps it through the ROM response-table region described in sections 33–34. The mapped byte is written to event-record byte +1.
+
+### Panorama (+0x04, address 0x7C19 + 0x18*PartIndex)
+
+This field is read later in 0x4256 and gates a subsequent branch. Its exact zero/nonzero behavior is visible, but the full mapping of the manual's 0–20 panorama values to the descriptor modes is not yet decoded.
+
+These matches are strong cross-validation: the firmware's computed addresses align exactly with the manual's 24-byte Part parameter offsets. The next pass can now use the manual labels as grounded names for these four fields while leaving the other event-record bytes and hardware packet semantics undecoded.
