@@ -46,8 +46,16 @@ def report(label: str, data: bytes) -> None:
     crc = f"{zlib.crc32(data) & 0xffffffff:08x}"
     sha1 = hashlib.sha1(data).hexdigest()
     expected = EXPECTED[label]
+    size_ok = len(data) == expected["size"]
+    crc_ok = crc == expected["crc32"]
+    sha1_ok = sha1 == expected["sha1"]
     print(f"{label.upper()}: size=0x{len(data):X} CRC32={crc} SHA1={sha1}")
-    print(f"  identity: {'MATCH' if len(data) == expected['size'] and crc == expected['crc32'] and sha1 == expected['sha1'] else 'MISMATCH'}")
+    print(f"  checks: size={'OK' if size_ok else 'FAIL'} crc32={'OK' if crc_ok else 'FAIL'} sha1={'OK' if sha1_ok else 'FAIL'}")
+    if not (size_ok and crc_ok and sha1_ok):
+        raise SystemExit(
+            f"{label.upper()} identity check failed: "
+            f"expected size=0x{expected['size']:X} CRC32={expected['crc32']} SHA1={expected['sha1']}"
+        )
 
 
 def print_vectors(code: bytes) -> None:
