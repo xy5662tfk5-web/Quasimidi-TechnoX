@@ -55,6 +55,14 @@ Firmware also performs actual `MOVX` reads/writes in the range MAME leaves as no
 
 This `0x7C00–0x7FFF` window is a stronger hardware-reverse-engineering lead than raw byte matches because the firmware performs real external-memory transactions there. It could be a peripheral/register interface, but its function is **not identified** and must not yet be called the sound chip. The separate `0xC000` routine writes `0xAA` and reads it back, apparently probing an external location; it also remains unexplained.
 
+A further register-level pattern is now visible in the `0x7C00` window:
+
+- Code `0xB630` writes `0x01` to `0x7C05`, then `0x00` to `0x7C06`.
+- Code `0xB64F` writes the sequential byte sequence `02 47 40 06 00` to `0x7C10–0x7C14`.
+- Code beginning at `0x2892` and several other routines repeatedly read `0x7D95`, then branch according to zero/non-zero status. `0x7CEE`, `0x7CEF`, `0x7CF0–0x7CF4`, and `0x7CFE` are also read by reachable code.
+
+This looks like a structured peripheral register interface rather than arbitrary unused memory. It is now the leading candidate region to investigate for the sound subsystem, but the register meanings, device identity, and relation to the 21-voice engine remain unproven. Next we will connect the MIDI receive routine's callers to these register transactions and determine whether Note On/Off or Performance changes trigger them.
+
 A computed jump at code `0xC0B3` loads DPTR with `0xC0BA` and executes `JMP @A+DPTR`. This is a **program-code jump table**, not an external-data access. The analysis distinguishes such code pointers from DPTR values followed by `MOVX`, avoiding false hardware-register classifications.
 
 ### First external-memory / I/O cross-reference
