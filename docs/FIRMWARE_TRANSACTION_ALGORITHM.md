@@ -1956,3 +1956,26 @@ The same eight-byte record geometry is therefore used by both endpoint matching 
 Confirmed: eight-byte XDATA records; scan in the page-0x80 region; signature filtering; record offsets +1/+2/+3/+4/+7 read by 0x0A57; +1 rewritten by 0x0D80; accepted records feed the 0x0A57 -> 0x0DB7 preparation/output chain.
 
 Not yet confirmed: the real hardware register meanings of the eight fields, whether the record is a hardware voice/channel descriptor or a transport/endpoint descriptor, and whether the 0x8000 packet directly controls the sound generator.
+
+
+## 61. Endpoint record origin: firmware writes versus device-side state
+
+### 61.1 Important negative finding
+
+The endpoint scan area is selected by setting the external XDATA page register A0/P2 to 0x80. A scan of all immediate `MOV P2,#0x80` sites and the surrounding code shows that the firmware's ordinary endpoint routines read records from this page and submit four-byte commands through 0x0DB7. No eight-byte record initializer or bulk writer for the scanned endpoint-record array has been identified.
+
+The confirmed direct packet writer 0x0DB7 writes only four consecutive bytes at XDATA 0x8000–0x8003. It does not populate the eight-byte candidate records used by 0x0D0E/0x0A57. Therefore, it would be incorrect to describe those eight-byte records as ordinary software-created Part descriptors.
+
+### 61.2 Multiple packet producers
+
+The four-byte output routine 0x0DB7 has callers in several independent subsystems, including early startup, endpoint lookup, descriptor processing, and record normalization. The call sites include 0x02C0, 0x0A4F, 0x0B53, 0x0D07, 0x0E1A, 0x0E67, 0x1045, 0x110A, 0x1E8A, 0x211F, 0x22F8, 0x236B, 0x26C9, 0x26DE, 0x2767, and 0x277E.
+
+This breadth indicates that 0x8000–0x8003 is a shared command/output mailbox, not a dedicated single-purpose voice-parameter register block. The command's meaning depends on the producer and the four bytes supplied.
+
+### 61.3 Table-driven command sequences
+
+The code around 0x26A0 reads multiple four-byte tuples from code-space tables and submits them through 0x0DB7. It also contains comparison/verification passes against table-derived values. This is consistent with initialization or configuration command sequences for the external device interface, but the exact target and command semantics remain unverified.
+
+### 61.4 Consequence for the reverse-engineering strategy
+
+The eight-byte records on page 0x80 are best treated as device/interface-visible endpoint state until proven otherwise. The next decisive step is to decode the table-driven packet families around 0x26A0 and correlate their command bytes with the record signature predicates. This is more promising than searching for a nonexistent RAM-side initializer.
