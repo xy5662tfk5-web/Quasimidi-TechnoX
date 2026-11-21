@@ -12,7 +12,7 @@
 
 namespace technox {
 struct OpaqueSysExBlock {
-    std::uint8_t type = 0;
+    std::uint8_t blockSelector = 0;
     std::vector<std::uint8_t> completeMessage; // original F0...F7 bytes
 };
 struct Performance {
