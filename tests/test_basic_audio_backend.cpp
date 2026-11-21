@@ -58,6 +58,7 @@ int main() {
     assert(!stealingEngine.voiceManager().voices()[0].releasing);
     assert(stealingEngine.voiceManager().voices()[0].note == 100);
     assert(stealingEngine.voiceManager().voices()[1].note == 41);
+    assert(stealingBackend.noteOffCalls == 1);
 
     // Duplicate Note Off messages must not restart the backend release.
     CountingBackend countingBackend;
