@@ -1277,3 +1277,20 @@ This proves a data path from the 12-byte Part event record into the eight-byte s
 - computed result -> slot +1 -> 0x0A57 -> 0x0DB7 / 0x8000 packet path.
 
 The exact user-facing names of event-record +2, event-record +10, and slot +5 are still not assigned. The important result is that they are not inert bytes: they jointly calculate a slot value that is subsequently serviced and can reach the external hardware interface.
+
+
+## 39. Boot/Part initialization iterates all 16 Part descriptors in page 0x29
+
+The code at 0x3E80 resets shared event state, then loops RAM[0x62] from 0 through 0x0F. For each index it calls 0x3ECE. This is a 16-Part initialization pass, distinct from the four Performance-Part Note On dispatch mask.
+
+For each PartIndex, 0x3ECE:
+- clears per-Part state bytes in XDATA regions 0x2040+, 0x2020+, 0x2FF9+, 0x303B+, and 0x2FB7+;
+- sets RAM[0x28] = PartIndex;
+- reads XDATA 0x2902 + 12*PartIndex into RAM[0x29];
+- sets RAM[0x2A] = 0x40 and calls 0x02D1;
+- writes 0x7F to XDATA 0x290A + 12*PartIndex and to RAM[0x2A];
+- calls 0x0D0E to service the Part's slot state.
+
+This confirms that the 12-byte page-0x29 records are initialized/serviced for all 16 Parts. The +2 field is read as a per-Part descriptor selector; +10 is explicitly initialized to 0x7F in this path. The helper 0x0D0E then maps these values and uses them to update the eight-byte slot array.
+
+The four indices 0x0C–0x0F in the Note On dispatcher are therefore the four Performance Parts being triggered in that path, while the underlying Part descriptor/slot infrastructure is initialized across all 16 Parts.
