@@ -114,7 +114,7 @@ def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
             if strict and len(f.raw) != EXPECTED_SIZES[f.block_type]:
                 raise MidiFormatError(f"unexpected size {len(f.raw)} for block {f.block_type:#04x}")
             if any(x > 0x7F for x in f.raw[1:-1]): raise MidiFormatError("non-7-bit data byte in SysEx payload")
-        name = group[0].raw[7:-1].decode("ascii", errors="replace").rstrip(" \x00")
+        name = group[0].raw[8:16].decode("ascii", errors="replace").rstrip(" \x00")
         result.append(Performance(indexes[0], name, group[0].raw, group[1].raw,
                                   [f.raw for f in group[2:6]]))
     if strict:
