@@ -67,7 +67,7 @@ The manual's address map identifies the four stored Performance Part blocks as P
 - CC1 Modulation: routed through the modulation matrix; the manual describes the default route as tone/cutoff control.
 - CC5 Portamento time, CC6 Data Entry, CC7 Volume, CC10 Panorama, CC64 Hold pedal, CC65 Portamento on/off, CC67 Soft Pedal.
 - CC80/81 select FX1/FX2 type; CC82/83 control arpeggiator resolution/speed; CC91/93 are FX1/FX2 sends.
-- NRPN selection uses CC99 (MSB), CC98 (LSB), then CC6 (Data Entry). Documented NRPN pairs include MSB 0x01 with LSB 0x08 pitch-mod speed, 0x09 pitch-mod depth, 0x0A pitch-mod delay, 0x20 cutoff, 0x21 resonance, 0x63 EG attack, 0x64 EG decay, and 0x66 EG release.
+- NRPN selection uses CC99 (MSB), CC98 (LSB), then CC6 (Data Entry). Documented NRPN pairs include MSB 0x01 with LSB 0x08 pitch-mod speed, 0x09 pitch-mod depth, 0x10 pitch-mod delay, 0x20 cutoff, 0x21 resonance, 0x63 EG attack, 0x64 EG decay, and 0x66 EG release.
 - Drum NRPNs use MSB 0x18 (pitch), 0x1A (level), 0x1C (pan), 0x1D (FX1 send), and 0x1E (FX2 send), with the note number as the LSB.
 - RPN selection uses CC101 (MSB), CC100 (LSB), then CC6. Documented RPNs: 0x0000 pitch-bend range, 0x0001 fine tune, 0x0002 coarse tune.
 
