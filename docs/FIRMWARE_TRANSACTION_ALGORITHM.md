@@ -1132,3 +1132,30 @@ This field is passed to 0xABBF, which maps it through the ROM response-table reg
 This field is read later in 0x4256 and gates a subsequent branch. Its exact zero/nonzero behavior is visible, but the full mapping of the manual's 0–20 panorama values to the descriptor modes is not yet decoded.
 
 These matches are strong cross-validation: the firmware's computed addresses align exactly with the manual's 24-byte Part parameter offsets. The next pass can now use the manual labels as grounded names for these four fields while leaving the other event-record bytes and hardware packet semantics undecoded.
+
+
+## 36. Computed 0xABBF output map for all documented Velocity Curve selectors
+
+Simulating the instruction sequence at 0xABBF with the Part-record selector in R5 and A gives the following return values in R7. For table cases, the listed ROM address is the exact MOVC source after the 0x80-byte bank-stride calculation.
+
+| Velocity Curve | MOVC source | Returned R7 |
+|---:|---:|---:|
+| 0 | — (early return) | 0xEF |
+| 1 | 0xA9AE | 0x7F |
+| 2 | 0xAA2E | 0x5F |
+| 3 | 0xAAAE | 0x4C |
+| 4 | 0xAB2E | 0x79 |
+| 5 | 0xABAE | 0x7D |
+| 6 | 0xAC2E | 0xE1 |
+| 7 | special branch / shared return | 0x07 |
+| 8 | — (masked selector becomes zero) | 0x91 |
+| 9 | 0xA950 | 0x01 |
+| 10 | 0xA9D0 | 0x07 |
+| 11 | 0xAA50 | 0x03 |
+| 12 | 0xAAD0 | 0x23 |
+| 13 | 0xAB50 | 0x36 |
+| 14 | 0xABD0 | 0x53 |
+
+Important boundary observation: selectors 6 and 14 read from 0xAC2E and 0xABD0, respectively, which lie beyond the six 0x80-byte blocks 0xA8BF–0xABBE and inside the surrounding code-address region. MOVC is allowed to read those bytes, so the returned values are literal ROM results; whether those two values are intentional table entries or code/data overlap remains to be checked against all call contexts.
+
+The map is now exact at the byte level for this helper, but it is not yet a complete model of the user-visible Velocity Curve behavior. In particular, the event descriptor byte +1 is only one stage in the downstream descriptor transformation.
