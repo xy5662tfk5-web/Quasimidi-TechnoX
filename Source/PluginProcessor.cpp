@@ -101,6 +101,25 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
     const int performanceIndex = getCurrentProgram();
     if (performanceIndex < 0 || performanceIndex >= 50)
         return;
+    massEngine.clearPerformanceImage();
+    const auto* selectedPerformance = performanceBank.at(static_cast<std::size_t>(performanceIndex));
+    bool performanceImageValid = selectedPerformance != nullptr &&
+        selectedPerformance->commonBlock.completeMessage.size() == 74;
+    if (performanceImageValid) {
+        const auto& commonFrame = selectedPerformance->commonBlock.completeMessage;
+        for (int byte = 0; byte < 65; ++byte)
+            performanceImageValid = massEngine.setPerformanceCommonByte(byte, commonFrame[8 + static_cast<std::size_t>(byte)])
+                && performanceImageValid;
+        for (int part = 0; part < 4; ++part) {
+            const auto& frame = selectedPerformance->parts[static_cast<std::size_t>(part)].completeMessage;
+            if (frame.size() != 33) { performanceImageValid = false; continue; }
+            for (int byte = 0; byte < 24; ++byte)
+                performanceImageValid = massEngine.setPerformancePartByte(part, byte,
+                    frame[8 + static_cast<std::size_t>(byte)]) && performanceImageValid;
+        }
+    }
+    massEngine.markPerformanceImageLoaded(performanceImageValid);
+
     for (int slot = 0; slot < 4; ++slot) {
         for (std::size_t parameter = 0; parameter < 24; ++parameter) {
             const int value = getPartParameterRaw(performanceIndex, slot,
@@ -305,8 +324,10 @@ bool QuasimidiTechnoXAudioProcessor::setPartParameterRaw(
     partValues[static_cast<std::size_t>(performanceIndex)]
               [static_cast<std::size_t>(partIndex)][parameterIndex]
                   .store(rawValue, std::memory_order_release);
-    if (performanceIndex == getCurrentProgram())
+    if (performanceIndex == getCurrentProgram()) {
         massEngine.setPartParameter(12 + partIndex, parameter, rawValue);
+        massEngine.setPerformancePartByte(partIndex, static_cast<int>(parameterIndex), rawValue);
+    }
     return true;
 }
 
@@ -328,8 +349,11 @@ bool QuasimidiTechnoXAudioProcessor::setCommonControlRaw(
         rawValue < 0 || rawValue > maxima[index])
         return false;
     commonValues[static_cast<std::size_t>(performanceIndex)][index].store(rawValue, std::memory_order_release);
-    if (performanceIndex == getCurrentProgram())
+    if (performanceIndex == getCurrentProgram()) {
         massEngine.setCommonControl(control, rawValue);
+        constexpr std::array<int, 5> payloadOffsets{{0x01, 0x2A, 0x32, 0x3C, 0x3D}};
+        massEngine.setPerformanceCommonByte(payloadOffsets[index], rawValue);
+    }
     return true;
 }
 

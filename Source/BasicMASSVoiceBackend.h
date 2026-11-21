@@ -52,7 +52,7 @@ public:
                 const VoiceManager& voices, const ModulationMatrix&,
                 const MASSPartParameterStore& parts, const MASSModulationSourceStore& sources,
                 const MASSPartRuntimeControlStore& runtimeControls, const MASSCommonControlStore&,
-                const MASSDrumParameterStore&) noexcept override {
+                const MASSPerformanceImageStore&, const MASSDrumParameterStore&) noexcept override {
         if (channels == nullptr || channelCount <= 0 || sampleCount <= 0) return;
 
         for (int sample = 0; sample < sampleCount; ++sample) {

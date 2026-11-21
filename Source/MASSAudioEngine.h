@@ -71,6 +71,51 @@ private:
     std::array<std::atomic<int>, kControlCount> values_{};
 };
 
+// Lossless payload layout recovered from IC4 routine 0xB475:
+// 65 Common bytes followed by four 24-byte Part records. The 8-byte
+// descriptor copied to 0x62CD is deliberately kept separate/uninterpreted.
+class MASSPerformanceImageStore {
+public:
+    static constexpr std::size_t kCommonByteCount = 65;
+    static constexpr std::size_t kPartCount = 4;
+    static constexpr std::size_t kPartByteCount = 24;
+    MASSPerformanceImageStore() { clear(); }
+    void clear() noexcept {
+        for (auto& value : commonBytes_) value.store(0, std::memory_order_relaxed);
+        for (auto& part : partBytes_)
+            for (auto& value : part) value.store(0, std::memory_order_relaxed);
+        loaded_.store(false, std::memory_order_release);
+    }
+    bool setCommonByte(int index, int value) noexcept {
+        if (index < 0 || index >= static_cast<int>(kCommonByteCount) || value < 0 || value > 127) return false;
+        commonBytes_[static_cast<std::size_t>(index)].store(value, std::memory_order_release);
+        return true;
+    }
+    int commonByte(int index) const noexcept {
+        if (index < 0 || index >= static_cast<int>(kCommonByteCount)) return -1;
+        return commonBytes_[static_cast<std::size_t>(index)].load(std::memory_order_acquire);
+    }
+    bool setPartByte(int partIndex, int byteIndex, int value) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            byteIndex < 0 || byteIndex >= static_cast<int>(kPartByteCount) || value < 0 || value > 127) return false;
+        partBytes_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(byteIndex)]
+            .store(value, std::memory_order_release);
+        return true;
+    }
+    int partByte(int partIndex, int byteIndex) const noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            byteIndex < 0 || byteIndex >= static_cast<int>(kPartByteCount)) return -1;
+        return partBytes_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(byteIndex)]
+            .load(std::memory_order_acquire);
+    }
+    void setLoaded(bool loaded) noexcept { loaded_.store(loaded, std::memory_order_release); }
+    bool isLoaded() const noexcept { return loaded_.load(std::memory_order_acquire); }
+private:
+    std::array<std::atomic<int>, kCommonByteCount> commonBytes_{};
+    std::array<std::array<std::atomic<int>, kPartByteCount>, kPartCount> partBytes_{};
+    std::atomic<bool> loaded_{false};
+};
+
 class MASSDrumParameterStore {
 public:
     static constexpr std::size_t kPartCount = 16;
@@ -224,6 +269,7 @@ public:
                         const MASSModulationSourceStore& sources,
                         const MASSPartRuntimeControlStore& runtimeControls,
                         const MASSCommonControlStore& common,
+                        const MASSPerformanceImageStore& performanceImage,
                         const MASSDrumParameterStore& drums) noexcept = 0;
 };
 
@@ -237,7 +283,8 @@ public:
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
                 const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&,
-                const MASSCommonControlStore&, const MASSDrumParameterStore&) noexcept override {
+                const MASSCommonControlStore&, const MASSPerformanceImageStore&,
+                const MASSDrumParameterStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
                 channels[channel][sample] = 0.0f;
@@ -324,6 +371,14 @@ public:
     bool setDrumParameter(int partIndex, int keyNumber, int parameterIndex, int value) noexcept { return drumParameters_.set(partIndex, keyNumber, parameterIndex, value); }
     int getDrumParameter(int partIndex, int keyNumber, int parameterIndex) const noexcept { return drumParameters_.get(partIndex, keyNumber, parameterIndex); }
 
+    bool setPerformanceCommonByte(int index, int value) noexcept { return performanceImage_.setCommonByte(index, value); }
+    bool setPerformancePartByte(int partIndex, int byteIndex, int value) noexcept {
+        return performanceImage_.setPartByte(partIndex, byteIndex, value);
+    }
+    void clearPerformanceImage() noexcept { performanceImage_.clear(); }
+    void markPerformanceImageLoaded(bool loaded = true) noexcept { performanceImage_.setLoaded(loaded); }
+    const MASSPerformanceImageStore& performanceImage() const noexcept { return performanceImage_; }
+
     bool setCommonControl(MASSCommonControl control, int value) noexcept { return commonControls_.set(control, value); }
     int getCommonControl(MASSCommonControl control) const noexcept { return commonControls_.get(control); }
     void clearCommonControl(MASSCommonControl control) noexcept { commonControls_.clear(control); }
@@ -349,7 +404,8 @@ public:
     void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); modulationSources_.reset(partIndex); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_, commonControls_, drumParameters_);
+        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_,
+                        modulationSources_, runtimeControls_, commonControls_, performanceImage_, drumParameters_);
         for (std::size_t i = 0; i < voices_.voices().size(); ++i) {
             const auto& voice = voices_.voices()[i];
             if (voice.active && voice.releasing && backend_->isVoiceFinished(static_cast<int>(i)))
@@ -376,6 +432,7 @@ private:
     MASSModulationSourceStore modulationSources_;
     MASSPartRuntimeControlStore runtimeControls_;
     MASSCommonControlStore commonControls_;
+    MASSPerformanceImageStore performanceImage_;
     MASSDrumParameterStore drumParameters_;
 };
 

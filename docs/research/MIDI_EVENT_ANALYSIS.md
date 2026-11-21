@@ -365,3 +365,25 @@ This means the sine-writing path is disabled by its initial state and requires s
 ### Revised conclusion
 
 Confirmed: IC4 contains a 64-entry signed sine lookup, and executable firmware can write indexed sine values into external XDATA. Not confirmed: that this path runs during normal note playback, its exact destination beyond the indirect XDATA pointer, or its role in M.A.S.S. Continue by finding all writes to page `0x20`, offset `0x50`, including indirect page/R1 accesses, and by mapping the dispatch entry that reaches `0x0C1A`.
+
+## 31. Firmware Performance image layout: 0xB475
+
+The full copy routine at `0xB475` reads a 16-bit source pointer from the external table at `0x0200 + 2*R7` (high byte, then low byte), then copies a fixed 169-byte record into the working XDATA areas:
+
+- 8 bytes to `0x62CD–0x62D4`; it writes a zero terminator at `0x62D5`.
+- 65 bytes to `0x7BD4–0x7C14`.
+- 4 groups of 24 bytes to `0x7D35–0x7D94`.
+
+The address arithmetic in the Part handlers establishes the exact Part-record base as `0x7C15 + 24*part`. For the four active Part IDs 12–15 this yields `0x7D35`, `0x7D4D`, `0x7D65`, and `0x7D7D`. Several independent accesses agree with the 24-byte `PartEditModel` layout: `0x7C00 + 24*part + 0x18` reads Part byte 3 (Level), `+0x19` reads byte 4 (Panorama), `+0x1C` reads byte 7 (Transpose), and `+0x26` reads byte 17 (Velocity curve).
+
+The 65-byte Common block occupies `0x7BD4–0x7C14` immediately before the first Part record at `0x7C15`. This matches the 65-byte payload of the existing 74-byte Common SysEx frame (8-byte SysEx header + 65 data bytes + `F7`); each 33-byte Part SysEx frame similarly contains an 8-byte header and 24 data bytes. The 8-byte block copied to `0x62CD` is a separate descriptor/header and is not yet mapped to the SysEx name frame.
+
+`0xB9C2` is not an eight-iteration copier: it makes one call to `0xB437`, which copies only the 8-byte header to `0x62CD`. The full 169-byte copy is `0xB475`, reached through `0xB8D3` in the initialization path of `0x4100`.
+
+### Startup loader correction
+
+The stream at ROM `0x38F7` is not the source of the `0x0200` pointer table and does not populate XDATA. Its three command records branch to the internal-RAM bit-operation handler at `0xEB67`; the earlier hypothesis that this startup routine decompresses the performance table into XDATA was incorrect. The origin/mapping of the external table at `0x0200` remains unresolved.
+
+### Implementation consequence
+
+The plugin now has a backend-facing raw Performance image store with the exact 65-byte Common + 4×24-byte Part payload layout. The existing SysEx parser feeds it directly, and edits to the mapped Common/Part controls update the image. This preserves unknown Common bytes for the future recovered DSP backend without pretending the 8-byte descriptor or audio algorithm has been decoded.

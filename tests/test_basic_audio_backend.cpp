@@ -10,6 +10,9 @@ public:
     int noteOffCalls = 0;
     int resetVoiceCalls = 0;
     int prepareCalls = 0;
+    int renderedCommonByte = -1;
+    int renderedPartByte = -1;
+    bool renderedImageLoaded = false;
     double preparedSampleRate = 0.0;
     int preparedBlockSize = 0;
     void prepare(double sampleRate, int blockSize) override {
@@ -24,7 +27,13 @@ public:
     void render(float* const*, int, int, const technox::VoiceManager&,
                 const technox::ModulationMatrix&, const technox::MASSPartParameterStore&,
                 const technox::MASSModulationSourceStore&, const technox::MASSPartRuntimeControlStore&,
-                const technox::MASSCommonControlStore&, const technox::MASSDrumParameterStore&) noexcept override {}
+                const technox::MASSCommonControlStore&,
+                const technox::MASSPerformanceImageStore& image,
+                const technox::MASSDrumParameterStore&) noexcept override {
+        renderedCommonByte = image.commonByte(0);
+        renderedPartByte = image.partByte(3, 23);
+        renderedImageLoaded = image.isLoaded();
+    }
 };
 
 int main() {
@@ -301,6 +310,27 @@ int main() {
     swappableEngine.noteOn(12, 1, 65, 100);
     assert(replacementBackend.noteOnCalls == 1);
     assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
+
+    // Recovered firmware image layout: 65 Common bytes + four 24-byte Parts.
+    CountingBackend imageBackend;
+    MASSAudioEngine imageEngine(&imageBackend);
+    imageEngine.prepare(48000.0, 64);
+    assert(imageEngine.setPerformanceCommonByte(0, 0x42));
+    assert(imageEngine.setPerformancePartByte(3, 23, 0x65));
+    imageEngine.markPerformanceImageLoaded();
+    float imageSample = 0.0f;
+    float* imageChannels[] = {&imageSample};
+    imageEngine.render(imageChannels, 1, 1);
+    assert(imageBackend.renderedImageLoaded);
+    assert(imageBackend.renderedCommonByte == 0x42);
+    assert(imageBackend.renderedPartByte == 0x65);
+    assert(!imageEngine.setPerformanceCommonByte(65, 0));
+    assert(!imageEngine.setPerformanceCommonByte(0, 128));
+    assert(!imageEngine.setPerformancePartByte(4, 0, 0));
+    assert(!imageEngine.setPerformancePartByte(0, 24, 0));
+    assert(!imageEngine.setPerformancePartByte(0, 0, 128));
+    imageEngine.clearPerformanceImage();
+    assert(!imageEngine.performanceImage().isLoaded());
 
     std::cout << "Basic MASS backend: note-on, finite stereo output, note-off and release passed\n";
     return 0;
