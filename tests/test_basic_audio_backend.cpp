@@ -77,6 +77,13 @@ int main() {
     offsetEngine.noteOn(12, 1, 69, 110);
     assert(offsetEngine.voiceManager().activeVoiceCount() == 1);
 
+    // MIDI Note On with velocity zero must release the backend envelope,
+    // not merely mark the voice-manager slot as releasing.
+    engine.noteOn(12, 1, 69, 110);
+    assert(engine.voiceManager().activeVoiceCount() == 1);
+    engine.noteOn(12, 1, 69, 0);
+    assert(engine.voiceManager().voices()[0].releasing);
+
     engine.noteOff(1, 69);
     assert(engine.voiceManager().voices()[0].releasing);
 
