@@ -10,12 +10,14 @@ An Intel-Mac-oriented JUCE project targeting Audio Unit, VST3 and Standalone bui
 - [x] Initial editor renders the SVG, overlays a dynamic LCD and responds to basic front-panel clicks.
 - [x] MIDI input is accepted by the plugin shell.
 - [ ] Verified hardware preset/parameter mapping and SysEx support.
-- [ ] Original TechnoX sound engine, sample playback, filters, modulation and effects.
+- [x] First audible generic oscillator prototype with per-voice ADSR, low-pass filter, pitch bend and modulation-wheel vibrato (development approximation only).
+- [ ] Original TechnoX sound engine, sample playback, verified filters, modulation and effects.
 - [ ] Intel macOS build and AU validation in Logic Pro X.
+- [x] Dependency-free smoke test for generic backend note-on/audio/note-off lifecycle.
 
 ## Important status note
 
-This is an **interactive interface/plugin scaffold**, not yet a sound emulation. The current audio processor intentionally outputs silence. The LCD preset/part values are UI placeholders and are not yet connected to verified factory patch data. No firmware or ROM images are included.
+This is an **interactive interface/plugin scaffold**, not yet a sound emulation. The current audio processor uses an audible generic oscillator test backend. It is not a reconstruction of the original TechnoX synthesis engine, sample playback, or factory sound character. The LCD preset/part values are UI placeholders and are not yet connected to verified factory patch data. No firmware or ROM images are included.
 
 Firmware dumps alone do not establish the original PCM ROM contents or reproduce the hardware DSP. Do not bundle copyrighted firmware or ROM data without authorization.
 
