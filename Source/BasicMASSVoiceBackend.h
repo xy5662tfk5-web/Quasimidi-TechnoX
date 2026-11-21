@@ -47,8 +47,8 @@ public:
 
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager& voices, const ModulationMatrix&,
-                const MASSPartParameterStore& parts, const MASSModulationSourceStore&,
-                const MASSPartRuntimeControlStore&, const MASSCommonControlStore&,
+                const MASSPartParameterStore& parts, const MASSModulationSourceStore& sources,
+                const MASSPartRuntimeControlStore& runtimeControls, const MASSCommonControlStore&,
                 const MASSDrumParameterStore&) noexcept override {
         if (channels == nullptr || channelCount <= 0 || sampleCount <= 0) return;
 
@@ -69,23 +69,36 @@ public:
                 const int rawRelease = parts.get(part, PartParameter::egRelease);
 
                 const float level = rawLevel < 0 ? 0.8f : static_cast<float>(rawLevel) / 127.0f;
+                const float expression = static_cast<float>(sources.expression(part)) / 127.0f;
+                const float modWheel = static_cast<float>(sources.modWheel(part)) / 127.0f;
                 const float attack = timeSeconds(rawAttack, 0.002f, 1.5f);
                 const float decay = timeSeconds(rawDecay, 0.01f, 2.0f);
                 const float release = timeSeconds(rawRelease, 0.01f, 3.0f);
                 updateEnvelope(state, attack, decay, release);
 
-                const double frequency = 440.0 * std::pow(2.0, (static_cast<double>(slot.note) - 69.0) / 12.0);
+                const int bendRaw = sources.pitchBend(part);
+                const int bendRange = runtimeControls.rpn(part, 0) >= 0
+                    ? runtimeControls.rpn(part, 0) : 2;
+                const double bendSemitones = (static_cast<double>(bendRaw) / 8192.0) *
+                    static_cast<double>(bendRange);
+                const double vibratoSemitones = static_cast<double>(modWheel) * 0.5 / 127.0 *
+                    std::sin(state.lfoPhase);
+                const double frequency = 440.0 * std::pow(2.0,
+                    (static_cast<double>(slot.note) - 69.0 + bendSemitones + vibratoSemitones) / 12.0);
+                state.lfoPhase += twoPi * 5.0 / sampleRate_;
+                if (state.lfoPhase >= twoPi) state.lfoPhase -= twoPi;
                 const float oscillator = static_cast<float>(std::sin(state.phase));
                 state.phase += twoPi * frequency / sampleRate_;
                 if (state.phase >= twoPi) state.phase -= twoPi;
 
                 const float cutoffNorm = rawCutoff < 0 ? 0.78f : static_cast<float>(rawCutoff) / 127.0f;
-                const float cutoffHz = 35.0f * std::pow(350.0f, cutoffNorm);
+                const float modulatedCutoff = juceSafeClamp(cutoffNorm + modWheel * 0.35f / 127.0f, 0.0f, 1.0f);
+                const float cutoffHz = 35.0f * std::pow(350.0f, modulatedCutoff);
                 const float resonanceNorm = rawResonance < 0 ? 0.0f : static_cast<float>(rawResonance) / 127.0f;
                 const float q = 0.707f + resonanceNorm * 9.0f;
                 const float filtered = lowPass(state, oscillator, cutoffHz, q);
                 const float velocity = static_cast<float>(slot.velocity) / 127.0f;
-                mixed += filtered * state.envelope * velocity * level * 0.18f;
+                mixed += filtered * state.envelope * velocity * level * expression * 0.18f;
 
                 if (state.stage == Stage::off) state.active = false;
             }
@@ -102,6 +115,7 @@ private:
         bool gate = false;
         Stage stage = Stage::off;
         double phase = 0.0;
+        double lfoPhase = 0.0;
         float envelope = 0.0f;
         float filterIc1 = 0.0f;
         float filterIc2 = 0.0f;
