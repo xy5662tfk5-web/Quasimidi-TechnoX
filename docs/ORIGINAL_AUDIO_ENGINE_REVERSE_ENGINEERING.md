@@ -171,3 +171,18 @@ Queue 3 should no longer be described as a third receive queue. Its producer `0x
 The queue consumers use internal counters and read/write indices, while the actual byte arrays are in external RAM pages `0x32`, `0x33`, and `0x34`. These are CPU-side MIDI transport buffers, not waveform/sample memory and not evidence of the audio ASIC's register map.
 
 Next, inspect the queue-1/queue-2 consumers and all callers of `0xA8A2`, then follow the queue-3 drain to the ACIA transmitter at `0xA7B3`. Separately trace `0x5B05` and `0x5B9E` into the MIDI parser and determine which subsequent code reaches the undocumented `0x7Cxx` window. The sound-device identity and Note On/Off register protocol remain unresolved.
+
+
+### New firmware finding: indexed 24-byte records in the 0x7Cxx window
+
+A fresh inspection of the CI disassembly artifact adds a more specific structure to the undocumented external-memory map. This is direct instruction-level evidence from the reachable IC4 disassembly, not a decoded hardware specification.
+
+- Routine `0xB665` calculates a record base as `0x7C15 + 0x18 * R7`. It then writes a series of initialization values at fixed offsets from that base. The stride `0x18` is 24 bytes.
+- Startup routine `0x35C7–0x35D7` sets `R7` to successive values `0…15` and calls `0xB665` for each. This establishes a 16-entry indexed table of 24-byte records in the `0x7Cxx` window.
+- Other call sites use indices 0 and 1 (`0x3771` / `0x3778`), and a later loop calls the same initializer with `R7=4` (`0xBDD3`). The different call contexts should be traced before assigning semantic labels.
+- The initialization routine writes a repeating pattern including offsets `+0…+0x17`, with visible constants such as `+2=0x01`, `+4=0x64`, `+5=0x08`, `+7=0x18`, a run of `0x40` values, then `0x4C, 0x1A, 0x40, 0x13` and a final zero. The first two bytes are cleared when `R5=0`.
+- The 16-entry count is consistent with a 16-channel/Part-oriented control structure, but this is only a hypothesis. It is **not** evidence that the records represent 16 audio voices, nor does it explain the manual's 21-voice polyphony.
+
+This narrows the next reverse-engineering task: identify the callers that populate or modify these records after initialization, map each record offset to MIDI note/velocity/program/controller state, and correlate writes with the status reads at `0x7D95` and `0x7CEF`. Until that correlation is complete, retain neutral names such as `peripheral_record[index][offset]` rather than names like `voice` or `oscillator`.
+
+The disassembly used for this pass is the successful CI artifact `technox-ic4-mcs51-disassembly` from workflow run `44918843762` (commit `e48932db5e48e31f629b5252aec95080c5a689cc`). The artifact is a static reachability listing; indirect control flow, runtime register-bank effects and physical hardware identity remain open questions.
