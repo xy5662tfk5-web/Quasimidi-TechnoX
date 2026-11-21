@@ -281,6 +281,14 @@ def main() -> None:
             idx = ordered.index(site)
             for nearby_pc in ordered[max(0, idx - 4):idx + 9]:
                 lines.append(f"    {nearby_pc:04X}  {insns[nearby_pc].raw:<11} {insns[nearby_pc].text}")
+    lines += ["", "ACIA INITIALIZATION CALLEES (first-level static cross-references)"]
+    for focus in (0xA7C6, 0xA819):
+        callers = [pc for pc in ordered if insns[pc].text.endswith(f"0x{focus:04X}")]
+        lines.append(f"Target 0x{focus:04X}; call sites: " + (", ".join(f"0x{x:04X}" for x in callers) or "none"))
+        if focus in insns:
+            idx = ordered.index(focus)
+            for nearby_pc in ordered[max(0, idx - 3):idx + 16]:
+                lines.append(f"  {nearby_pc:04X}  {insns[nearby_pc].raw:<11} {insns[nearby_pc].text}")
     # Lexical-neighborhood hints only: these are NOT proven register dataflow.
     lines += ["", "MOVX NEARBY DPTR-IMMEDIATE HINTS (heuristic, not proof)"]
     for index, pc in enumerate(ordered):
