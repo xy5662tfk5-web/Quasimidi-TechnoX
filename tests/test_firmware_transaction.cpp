@@ -57,6 +57,20 @@ int main() {
     lookup.values[0x03] = 0xA3;
     lookup.values[0x09] = 0xB9;
 
+    // Verify the real ROM table at 0x1208 independently of the injectable test table.
+    const auto romLookup = makeTechnoXLookupTable();
+    assert(romLookup.available);
+    assert(romLookup.values[0x00] == 0x00);
+    assert(romLookup.values[0x03] == 0x01);
+    assert(romLookup.values[0x09] == 0x03);
+    assert(romLookup.values[0x40] == 0x1F);
+    assert(romLookup.values[0x7F] == 0x7F);
+
+    const auto romDecoded = decodeDescriptor(memory, 0x29, 0x20, romLookup);
+    assert(romDecoded);
+    assert(romDecoded.descriptor.mappedThird == 0x01);
+    assert(romDecoded.descriptor.mappedEleventh == 0x03);
+
     const auto decoded = decodeDescriptor(memory, 0x29, 0x20, lookup);
     assert(decoded);
     assert(decoded.descriptor.first() == 0x65);
