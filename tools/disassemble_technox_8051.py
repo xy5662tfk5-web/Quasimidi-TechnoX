@@ -358,9 +358,10 @@ def main() -> None:
         print(f"  DPTR 0x{target:04X}, representative code 0x{site:04X}, total setup sites={len(sites)}:")
         for nearby_pc in ordered[idx:idx + 19]:
             print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
-    print("ACIA initialization helper contexts:")
-    for focus in (0xA7C6, 0xA819, 0xA86C):
-        callers = [pc for pc in ordered if insns[pc].text.endswith(f"0x{focus:04X}")]
+    print("MIDI serial routines and ACIA initialization helper contexts:")
+    for focus in (0xA7A0, 0xA7B3, 0xA7C0, 0xA7C6, 0xA819, 0xA86C, 0xB630):
+        callers = [pc for pc in ordered if insns[pc].text.startswith(("LCALL", "ACALL"))
+                   and insns[pc].text.endswith(f"0x{focus:04X}")]
         print(f"  target 0x{focus:04X}; callers: " + (", ".join(f"0x{x:04X}" for x in callers) or "none"))
         if focus in insns:
             idx = ordered.index(focus)
