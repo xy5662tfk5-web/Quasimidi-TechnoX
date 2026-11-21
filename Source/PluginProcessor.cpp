@@ -92,10 +92,11 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
         }
     }
     constexpr technox::MASSCommonControl controls[] = {
-        technox::MASSCommonControl::fx1Type, technox::MASSCommonControl::fx2Type,
-        technox::MASSCommonControl::arpResolution, technox::MASSCommonControl::arpSpeed
+        technox::MASSCommonControl::performanceMode, technox::MASSCommonControl::fx1Type,
+        technox::MASSCommonControl::fx2Type, technox::MASSCommonControl::arpResolution,
+        technox::MASSCommonControl::arpSpeed
     };
-    for (std::size_t i = 0; i < 4; ++i) {
+    for (std::size_t i = 0; i < 5; ++i) {
         const int value = commonValues[static_cast<std::size_t>(performanceIndex)][i]
             .load(std::memory_order_acquire);
         if (value >= 0)
