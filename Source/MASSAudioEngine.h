@@ -271,19 +271,23 @@ public:
     }
 
     void noteOff(std::uint8_t channel, std::uint8_t note) noexcept {
+        // Notify the backend only on the transition into Release. Repeated
+        // Note Off messages must not restart/extend an already running release.
+        const auto& before = voices_.voices();
+        for (std::size_t i = 0; i < before.size(); ++i)
+            if (before[i].active && !before[i].releasing &&
+                before[i].channel == channel && before[i].note == note)
+                backend_->noteOff(static_cast<int>(i), before[i]);
         voices_.noteOff(channel, note);
-        const auto& slots = voices_.voices();
-        for (std::size_t i = 0; i < slots.size(); ++i)
-            if (slots[i].active && slots[i].releasing && slots[i].channel == channel && slots[i].note == note)
-                backend_->noteOff(static_cast<int>(i), slots[i]);
     }
 
     void allNotesOff(int channel = 0) noexcept {
+        const auto& before = voices_.voices();
+        for (std::size_t i = 0; i < before.size(); ++i)
+            if (before[i].active && !before[i].releasing &&
+                (channel == 0 || before[i].channel == channel))
+                backend_->noteOff(static_cast<int>(i), before[i]);
         voices_.allNotesOff(channel);
-        const auto& slots = voices_.voices();
-        for (std::size_t i = 0; i < slots.size(); ++i)
-            if (slots[i].active && slots[i].releasing && (channel == 0 || slots[i].channel == channel))
-                backend_->noteOff(static_cast<int>(i), slots[i]);
     }
 
     void allSoundsOff(int channel = 0) noexcept {
