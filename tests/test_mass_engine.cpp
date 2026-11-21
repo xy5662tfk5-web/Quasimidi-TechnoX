@@ -15,6 +15,10 @@ int main() {
     engine.clearCommonControl(MASSCommonControl::fx1Type);
     assert(engine.getCommonControl(MASSCommonControl::fx1Type) == -1);
     assert(!engine.setPartParameter(16, PartParameter::cutoffFrequency, 91));
+    assert(engine.setDrumParameter(9, 60, 0, 48));
+    assert(engine.getDrumParameter(9, 60, 0) == 48);
+    assert(!engine.setDrumParameter(9, 60, 0, 49));
+    assert(!engine.setDrumParameter(16, 60, 0, 1));
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
     assert(!engine.setModWheel(16, 127));
