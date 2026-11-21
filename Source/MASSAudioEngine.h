@@ -1,10 +1,48 @@
 #pragma once
 #include "MASSModulationMatrix.h"
 #include "MASSVoiceManager.h"
+#include "TechnoXPartModel.h"
+#include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
 namespace technox {
+
+class MASSPartParameterStore {
+public:
+    static constexpr std::size_t kPartCount = 16;
+    static constexpr std::size_t kParameterCount = 24;
+
+    MASSPartParameterStore() {
+        for (auto& part : values_)
+            for (auto& value : part)
+                value.store(0, std::memory_order_relaxed);
+    }
+
+    bool set(int partIndex, PartParameter parameter, int rawValue) noexcept {
+        const auto parameterIndex = static_cast<std::size_t>(parameter);
+        const auto* descriptor = PartEditModel::descriptor(parameterIndex);
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
+            return false;
+        values_[static_cast<std::size_t>(partIndex)][parameterIndex]
+            .store(rawValue, std::memory_order_release);
+        return true;
+    }
+
+    int get(int partIndex, PartParameter parameter) const noexcept {
+        const auto parameterIndex = static_cast<std::size_t>(parameter);
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            parameterIndex >= kParameterCount)
+            return -1;
+        return values_[static_cast<std::size_t>(partIndex)][parameterIndex]
+            .load(std::memory_order_acquire);
+    }
+
+private:
+    std::array<std::array<std::atomic<int>, kParameterCount>, kPartCount> values_{};
+};
 
 // Backend contract only. A real implementation must be based on verified
 // TechnoX sample/algorithm evidence; the included null backend is intentionally silent.
@@ -15,7 +53,7 @@ public:
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void render(float* const* channels, int channelCount, int sampleCount,
-                        const VoiceManager& voices) noexcept = 0;
+                        const VoiceManager& voices, const MASSPartParameterStore& parts) noexcept = 0;
 };
 
 class NullMASSVoiceBackend final : public IMASSVoiceBackend {
@@ -24,7 +62,7 @@ public:
     void noteOn(int, const VoiceSlot&) noexcept override {}
     void noteOff(int, const VoiceSlot&) noexcept override {}
     void render(float* const* channels, int channelCount, int sampleCount,
-                const VoiceManager&) noexcept override {
+                const VoiceManager&, const MASSPartParameterStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
                 channels[channel][sample] = 0.0f;
@@ -63,20 +101,29 @@ public:
                 backend_->noteOff(static_cast<int>(i), slots[i]);
     }
 
+    bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
+        return partParameters_.set(partIndex, parameter, rawValue);
+    }
+    int getPartParameter(int partIndex, PartParameter parameter) const noexcept {
+        return partParameters_.get(partIndex, parameter);
+    }
+
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_);
+        backend_->render(channels, channelCount, sampleCount, voices_, partParameters_);
     }
 
     VoiceManager& voiceManager() noexcept { return voices_; }
     const VoiceManager& voiceManager() const noexcept { return voices_; }
     ModulationMatrix& modulationMatrix() noexcept { return modulation_; }
     const ModulationMatrix& modulationMatrix() const noexcept { return modulation_; }
+    const MASSPartParameterStore& partParameters() const noexcept { return partParameters_; }
 
 private:
     NullMASSVoiceBackend nullBackend_;
     IMASSVoiceBackend* backend_;
     VoiceManager voices_;
     ModulationMatrix modulation_;
+    MASSPartParameterStore partParameters_;
 };
 
 } // namespace technox
