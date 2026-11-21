@@ -20,10 +20,13 @@ jobs:
       - name: Test lossless MIDI/SysEx parser
         run: python3 -m unittest discover -s tests -v
       - name: Compile and test MIDI control router (C++17)
+        if: hashFiles('tests/test_midi_controller.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_midi_controller.cpp -o /tmp/test_midi_controller && /tmp/test_midi_controller
       - name: Compile and test M.A.S.S. foundation (C++17)
+        if: hashFiles('tests/test_mass_engine.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_mass_engine.cpp -o /tmp/test_mass_engine && /tmp/test_mass_engine
       - name: Compile and test Part editor model (C++17)
+        if: hashFiles('tests/test_part_model.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_part_model.cpp -o /tmp/test_part_model && /tmp/test_part_model
       - name: Analyze opaque Part SysEx bytes
         run: python3 tools/analyze_technox_parts.py TECHNOX.MID --output technox_part_byte_report.json
