@@ -7,6 +7,10 @@ int main() {
     engine.prepare(44100.0, 512);
     assert(engine.setPartParameter(12, PartParameter::cutoffFrequency, 91));
     assert(engine.getPartParameter(12, PartParameter::cutoffFrequency) == 91);
+    assert(engine.setCommonControl(MASSCommonControl::fx1Type, 21));
+    assert(engine.getCommonControl(MASSCommonControl::fx1Type) == 21);
+    assert(engine.setCommonControl(MASSCommonControl::arpResolution, 3));
+    assert(!engine.setCommonControl(MASSCommonControl::arpResolution, 4));
     assert(!engine.setPartParameter(16, PartParameter::cutoffFrequency, 91));
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
