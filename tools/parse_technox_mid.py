@@ -145,7 +145,7 @@ def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
             if any(x > 0x7F for x in f.raw[1:-1]):
                 raise MidiFormatError("non-7-bit data byte in SysEx payload")
         # Name block has one leading reserved zero followed by exactly 8 ASCII bytes.
-        name = group[0].raw[8:16].decode("ascii", errors="replace").rstrip(" \\x00")
+        name = group[0].raw[8:16].decode("ascii", errors="replace").rstrip(" \x00")
         result.append(Performance(indexes[0], name, group[0].raw, group[1].raw,
                                   [f.raw for f in group[2:6]]))
     if strict:
@@ -162,7 +162,7 @@ def export_json(perfs: List[Performance], path: Path):
              "common_frame_hex":p.common_frame.hex(" "),
              "parts":[{"part":i+1,"raw_sysex_hex":raw.hex(" ")} for i,raw in enumerate(p.part_frames)]}
              for p in perfs]}
-    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False)+"\\n", encoding="utf-8")
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
