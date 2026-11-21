@@ -11,6 +11,7 @@ Status: research branch opened; no claim of original DSP emulation yet.
 - The TechnoX IC4 dump is identified by MAME as version `1.05b`; IC51 is a 128 KiB `nm27c010_v105` sample-region dump. The driver applies the same program-ROM descrambler to TechnoX and Quasar, but does not transform IC51.
 - MAME marks TechnoX `NO_SOUND | NOT_WORKING`; it does not document or emulate the sound device, sample codec, or playback path.
 - IC51 is declared as a samples region, but its 128 KiB dump does not reconcile with period descriptions of a much larger sample memory. It is not safe to treat it as the complete waveform library.
+- The current raw IC51 scan finds 1,055 non-`0xFF` spans of at least 32 bytes; the first is `0x00000–0x023B5` (9,142 bytes) and the last is `0x1AAFC–0x1AE03` (776 bytes). These are occupancy runs only—not sample boundaries, codec blocks, or evidence of a specific waveform format.
 - The project already has the 50 factory Performance records, four Part blocks per Performance, 512 program names, the documented 24 Part parameters, and a working MIDI/audio prototype. Those control-layer assets do not identify the synthesis algorithms.
 
 ## First reverse-engineering pass
