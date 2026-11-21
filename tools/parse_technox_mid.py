@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List
 
 HEADER = bytes((0xF0, 0x3F, 0x00, 0x22, 0x44))
-EXPECTED_TYPES = (0x05, 0x00, 0x01, 0x02, 0x03, 0x04)
+EXPECTED_BLOCK_SELECTORS = (0x05, 0x00, 0x01, 0x02, 0x03, 0x04)
 EXPECTED_SIZES = {0x05: 16, 0x00: 73, 0x01: 32, 0x02: 32, 0x03: 32, 0x04: 32}
 
 class MidiFormatError(ValueError): pass
@@ -106,8 +106,8 @@ def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
         group = frames[base:base+6]
         if any(not f.raw.startswith(HEADER) or not f.raw.endswith(b"\xF7") for f in group):
             raise MidiFormatError(f"invalid TechnoX SysEx envelope at group {base//6}")
-        types = tuple(f.block_type for f in group)
-        if types != EXPECTED_TYPES: raise MidiFormatError(f"unexpected block sequence {types} at group {base//6}")
+        selectors = tuple(f.block_type for f in group)
+        if selectors != EXPECTED_BLOCK_SELECTORS: raise MidiFormatError(f"unexpected block selector sequence {selectors} at group {base//6}")
         indexes = [f.record_index for f in group]
         if len(set(indexes)) != 1: raise MidiFormatError(f"record index mismatch at group {base//6}")
         for f in group:
