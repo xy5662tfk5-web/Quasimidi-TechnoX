@@ -14,7 +14,8 @@ public:
 private:
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
-    int presetNumber = 1;
+    juce::ComboBox performanceSelector;
+    juce::Label performanceLabel;
     int partNumber = 1;
     int midiChannel = 1;
     int parameterNumber = 1;
