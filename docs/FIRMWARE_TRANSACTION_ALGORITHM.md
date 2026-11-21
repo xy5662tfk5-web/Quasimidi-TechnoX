@@ -206,3 +206,23 @@ This pseudocode deliberately leaves slot arbitration and hardware completion as 
 ## 11. Confidence policy
 
 Confirmed means directly visible in the disassembly and control/data flow described above. Hypothesis means a semantic interpretation not established by the current evidence. No unknown byte or register should be assigned a musical meaning solely from its value or address.
+
+
+## 12. Executable reference model added
+
+The dependency-free header `Source/TechnoXFirmwareTransaction.h` now implements:
+
+- a 256-page × 256-byte XDATA image with explicit page presence;
+- a 12-byte descriptor decoder;
+- injected lookup-table contents for the ROM table at 0x1208 (the table is not fabricated);
+- the exact first branch on descriptor byte +1;
+- a conservative branch planner for the observed 0x1522–0x1599 paths.
+
+The planner models these observed actions:
+- zero second byte + flag 0x06 clear: read `0x28D8 + mode`, then branch to `0x0E8E`;
+- zero second byte + flag 0x06 set: clear the selected slot byte's high bit, scan status, then either load replacement bytes and continue at `0x1599`, or retry at `0x1544`;
+- nonzero second byte: call `0x17D4` when `RAM[0x52]` is zero; if flag 0x06 is set, set bit 7 at the selected slot byte and write byte +1; flag 0x04 selects the retry edge.
+
+The planner reports intended actions and addresses; it does not perform the firmware's asynchronous resource wait, emulate the external controller, or claim a Note On semantic.
+
+Unit tests are in `tests/test_firmware_transaction.cpp`. They cover descriptor decoding, byte masking, lookup mapping, page/range errors, zero/nonzero branching, slot address calculation, and selected action sequences. A standalone GitHub Actions workflow compiles the test with C++17 and warnings-as-errors.
