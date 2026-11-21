@@ -28,6 +28,9 @@ jobs:
       - name: Compile and test Part editor model (C++17)
         if: hashFiles('tests/test_part_model.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_part_model.cpp -o /tmp/test_part_model && /tmp/test_part_model
+      - name: Compile and test Performance layer selection (C++17)
+        if: hashFiles('tests/test_performance_layers.cpp') != ''
+        run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_performance_layers.cpp -o /tmp/test_performance_layers && /tmp/test_performance_layers
       - name: Analyze opaque Part SysEx bytes
         run: python3 tools/analyze_technox_parts.py TECHNOX.MID --output technox_part_byte_report.json
       - name: Upload Part byte report
