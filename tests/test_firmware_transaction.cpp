@@ -23,6 +23,19 @@ int main() {
     assert(mailboxBit6Only.bytes[3] == 0x00);
     assert(!mailboxBit6Only.setInternalFlag0C);
 
+    // 0x0DCE toggles the handshake only when ACC.7 (R4 bit 7) differs
+    // from internal bit 0x0C, writing 0xC0 on set and 0x40 on clear.
+    const auto handshakeIdleLow = transitionMailboxHandshake(false, 0x00);
+    assert(!handshakeIdleLow.nextFlag0C && !handshakeIdleLow.writesFourthByte);
+    const auto handshakeSet = transitionMailboxHandshake(false, 0x80);
+    assert(handshakeSet.nextFlag0C && handshakeSet.writesFourthByte);
+    assert(handshakeSet.fourthByte == 0xC0);
+    const auto handshakeIdleHigh = transitionMailboxHandshake(true, 0x80);
+    assert(handshakeIdleHigh.nextFlag0C && !handshakeIdleHigh.writesFourthByte);
+    const auto handshakeClear = transitionMailboxHandshake(true, 0x00);
+    assert(!handshakeClear.nextFlag0C && handshakeClear.writesFourthByte);
+    assert(handshakeClear.fourthByte == 0x40);
+
     XDataMemory memory;
     XDataMemory::Page page{};
     page[0x20] = 0xE5; // first byte: high bit must be masked by the loader
