@@ -279,6 +279,29 @@ bool QuasimidiTechnoXAudioProcessor::setPartMidiChannel(int partIndex, int midiC
     return true;
 }
 
+MidiRoutingMode QuasimidiTechnoXAudioProcessor::getMidiRoutingMode() const noexcept
+{
+    return midiRoutingMode.load(std::memory_order_acquire) == 1
+        ? MidiRoutingMode::partChannels : MidiRoutingMode::performanceOmni;
+}
+
+void QuasimidiTechnoXAudioProcessor::setMidiRoutingMode(MidiRoutingMode mode) noexcept
+{
+    midiRoutingMode.store(static_cast<int>(mode), std::memory_order_release);
+}
+
+bool QuasimidiTechnoXAudioProcessor::isPerformancePartActive(int partIndex) const noexcept
+{
+    if (partIndex < 0 || partIndex >= 4)
+        return false;
+    const int performanceIndex = static_cast<int>(performanceBank.selectedIndex());
+    const int mode = getCommonControlRaw(performanceIndex, technox::MASSCommonControl::performanceMode);
+    if (mode < 0 || mode > 3 || partIndex > mode)
+        return false;
+    const int trackMode = getPartParameterRaw(performanceIndex, partIndex, technox::PartParameter::trackMode);
+    return trackMode > 0;
+}
+
 int QuasimidiTechnoXAudioProcessor::partSlotForMidiChannel(int channel) const noexcept
 {
     for (int slot = 0; slot < 4; ++slot)
