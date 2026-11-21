@@ -13,11 +13,11 @@ class PartAnalysisTests(unittest.TestCase):
     def test_byte_statistics_keep_offsets_opaque(self):
         frames = []
         for performance in range(5, 55):
-            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,5,performance])+b"Test    "+b"\xF7")
-            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,0,performance])+bytes(65)+b"\xF7")
+            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,5])+b"Test    "+b"\xF7")
+            frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,0])+bytes(65)+b"\xF7")
             for part in range(1,5):
                 payload = bytes([part] * 24)
-                frames.append(bytes([0xF0,0x3F,0,0x22,0x44,part,performance])+payload+b"\xF7")
+                frames.append(bytes([0xF0,0x3F,0,0x22,0x44,performance,part])+payload+b"\xF7")
         # Build an SMF directly using the existing test helper.
         test_module_path = ROOT / "tests" / "test_parse_technox_mid.py"
         spec3 = importlib.util.spec_from_file_location("test_parse_technox_mid", test_module_path)
