@@ -1462,3 +1462,61 @@ A direct-call cross-reference finds three reachable callers of 0x02D1:
 All three callers use the same 0x02D1 conversion and write the same two-byte location 0x2000 + 3*PartIndex. This makes 0x02D1 a shared per-Part fixed-point conversion/update primitive. The 0x4C70 caller's centering around 0x40 and explicit direction flag indicate a bipolar control value, but the exact MIDI controller or synthesis parameter has not yet been identified.
 
 The scale input at 0x2054 + PartIndex is read by 0x02D1; no direct writer to that address has been found in the current reachable-code scan. Indirect XDATA writes and any external/shared-memory initialization remain to be checked before concluding where that scale byte originates.
+
+
+## 40. Additional 12-byte descriptor writers and the high-level 0x0A57 output path
+
+### 40.1 0x3603 builds a larger part descriptor record
+
+The routine at 0x3603 is called five times from the initialization sequence at 0x37A6–0x3805. It computes the same record base used by Note On:
+
+`Base = 0x2900 + 0x0C * PartIndex`
+
+It then calls 0x418E with R5=0x02 and R3=0x38 before writing fields into the 12-byte record. The writes are:
+
+| Record offset | Value |
+|---:|---|
+| +0 | incoming R5 |
+| +1 | 0x64 |
+| +2 | 0x64 |
+| +3 | incoming R3 |
+| +4 | 0x00 |
+| +5…+9 | not written by this routine |
+| +10 | 0x7F |
+| +11 | incoming R3 |
+
+It sets RAM[0x28] to the Part index, RAM[0x29:0x2A] to the record pointer, and calls 0x1494. Thus 0x3603 is a second proven producer of the same descriptor-record format; unlike the Note On path, it initializes most of the constant fields.
+
+The five callers provide these Part/R5/R3 combinations: (0,0x3B,0xF0), (1,0x30,0x0F), (0,0x3B,0x00), (1,0x30,0x00), and (0,0x7F,0xFF). Their higher-level meaning still needs to be tied to the caller's initialization state.
+
+### 40.2 Other routines update descriptor bytes +2 and +10
+
+Several independent routines calculate the descriptor addresses from the same 12-byte stride:
+
+- 0x3F10–0x3F45 reads or writes offsets +2 and +10, then calls 0x0D0E.
+- 0x4803 has a branch that uses 0x02D1 to construct a selector, and another branch that writes the per-Part +2 and +10 fields before calling 0x0D0E.
+- 0x4B0A–0x4B34 updates the same +2 and +10 pair and calls 0x0D0E.
+- 0x6A79–0x6AA5 writes the +2 field, reads +10, and calls 0x0D0E.
+
+The +2 and +10 bytes are not arbitrary payload bytes: 0x0D0E maps both through the ROM table at 0x1208 before processing them. This is consistent with the extraction performed by 0x1494, which also maps descriptor bytes +2 and +10 through 0x1208.
+
+### 40.3 0x0D0E resolves a descriptor selector against the selected endpoint
+
+The helper first transforms RAM[0x29] and RAM[0x2A] independently through code-space table 0x1208. It then selects the XDATA page in RAM[0x50], examines the page's FC status/mode field, and scans endpoint records in the page-0x80 region. It accepts a candidate with the expected descriptor signature and calls 0x0D80 to prepare the endpoint record.
+
+The 0x0D80 path derives a value from the endpoint record, stores it into the endpoint's +1 field, sets internal bit 0x09, calls 0x0A57, then clears bit 0x09. This connects the 12-byte Part descriptor and its mapped +2/+10 selectors to the higher-level output routine.
+
+### 40.4 0x0A57 converts endpoint record fields into external-port traffic
+
+The routine at 0x0A57 reads fields relative to RAM[0x2E], including offsets +1, +2, +3, +4, and +7. It combines these with XDATA values in the 0x20xx range and calls arithmetic helper 0x1848 for transformed values. It then has two output branches:
+
+- The ordinary branch prepares R5/R2/R3/R4 and calls 0x0DB7, which writes four bytes to 0x8000–0x8003.
+- The alternate branch directly selects P2=0x80, writes a control byte to offset 3, performs a read at offset 4, and then writes a four-byte sequence to offsets 0–3. It updates internal bits 0x0C and 0x0D as part of this sequence.
+
+The alternate branch's read at 0x8004 is confirmed, but the returned value is overwritten before any conditional test; its status/acknowledgement meaning is therefore not established.
+
+This is now a concrete multi-stage path: Part descriptor fields at 0x2900+12*P → 0x1494 slot/descriptor processing → 0x0D0E endpoint selection and selector mapping → 0x0A57 field transformation → 0x8000–0x8003 external-port output. The port is therefore involved in actual descriptor-driven runtime operations, not merely an isolated initialization routine. The physical IC and the semantics of each transmitted byte remain unverified.
+
+### 40.5 Immediate next target
+
+The next pass should decode the endpoint record produced by 0x0D80, follow the full 0x0A57 arithmetic path for representative descriptor values, and identify which of the 12-byte descriptor fields are changed by 0x3F10, 0x4803, 0x4B0A, and 0x6A79. This should reveal whether the mapped +2/+10 pair selects a parameter family, endpoint register group, or another operation class.
