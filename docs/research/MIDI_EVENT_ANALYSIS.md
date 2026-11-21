@@ -299,3 +299,16 @@ The primitive `0x0DB7` writes:
 The companion readback helper `0x0DCE` uses the E7/E0C handshake state, writes `0x40` or `0xC0` to `0x8003` when the handshake state changes, and reads back registers `0x8000–0x8002`. The verification loops compare the returned index/data bytes and the low three bits of the selector against the source ROM bytes.
 
 This structure resembles an indexed two-plane external memory test: 256 indices × two selector values, with two full data bytes and three low-order bits per record. That is a structural description only; do not call it a specific RAM chip or assume a 19-bit physical word without schematic/chip evidence.
+
+## 27. Startup context of 0x26A2: likely peripheral memory self-test, not DSP firmware upload
+
+The only direct call site found for `0x26A2` is at `0x374E`. It is part of the startup/initialization sequence:
+- optional interrupt configuration at `0x3748–0x374B`;
+- call `0x26A2`;
+- restore/configure interrupt register at `0x3751–0x3757`;
+- initialize pointer/state at `0x3759–0x375F`;
+- continue into `0x00F8`, `0xB56C`, `0x5EF9`, `0xB5A9`, `0x6433`, and later subsystem initialization.
+
+The source bytes sent by `0x26A2` are literally the first `0x600` bytes of IC4 program ROM. This region includes reset/interrupt vectors, executable 8051 instructions, and a conspicuous 256-byte waveform-like table beginning at `0x001E`; it is not a separately identified DSP firmware image. The routine writes this ROM-derived pattern to 256 indices in each of two selector planes, verifies it, writes the bitwise complement, and verifies again. A mismatch causes an infinite wait at the compare instruction.
+
+This startup position and complement/readback pattern make **external memory/interface self-test** the strongest interpretation. It may validate memory attached to a coprocessor or another peripheral, but it is not evidence that IC4 uploads executable M.A.S.S. DSP code. The physical device and purpose of the two selector planes remain unknown.
