@@ -2,6 +2,9 @@
 #include <JuceHeader.h>
 #include "TechnoXPerformanceBank.h"
 #include "TechnoXSoundCatalog.h"
+#include "TechnoXMidiControlRouter.h"
+#include <array>
+#include <atomic>
 
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
@@ -32,6 +35,10 @@ public:
     const technox::PerformanceBank& getPerformanceBank() const noexcept { return performanceBank; }
     juce::String getCurrentPerformanceName() const;
     juce::String getCurrentPartSoundName(int partIndex) const;
+    int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
+    bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    int getPartMidiChannel(int partIndex) const noexcept;
+    bool setPartMidiChannel(int partIndex, int midiChannel) noexcept;
     const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
 
     void getStateInformation(juce::MemoryBlock& destData) override;
@@ -40,6 +47,12 @@ public:
 private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
+    technox::MidiControlRouter midiControlRouter;
+    std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
+    std::array<std::atomic<int>, 4> partMidiChannels{};
+
+    void initialisePartStates();
+    int partSlotForMidiChannel(int channel) const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
 };
