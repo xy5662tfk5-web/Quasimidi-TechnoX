@@ -608,7 +608,7 @@ Callers select A0=0x80 before entering this helper. Since R0 starts at zero, the
 - 0x8002 = R3
 - 0x8003 = R4 with ACC.6 cleared immediately before the write
 
-After the write, internal bit address 0x0C is cleared and then set only if ACC.7 of the modified R4 value is set. This is a concrete completion/control side effect; the physical meaning of bit 0x0C is not yet known.
+After the write, internal bit address 0x0C is cleared and then set only if ACC.7 of the modified R4 value is set. This is a software copy of the outgoing fourth byte's bit 7. The companion helper 0x0DCE uses it as protocol phase state; it is not established as a hardware acknowledgement.
 
 This independently confirms that the 0x8000–0x8003 range used directly by 0x1EDD is also the four-byte write window used by the page-0x80 helper. The repeated four-byte width is strong evidence of a shared external protocol, but not enough to name the receiving IC or decode the packet fields.
 
@@ -818,3 +818,20 @@ The remaining callers include:
 - 0x26C9/0x26DE and 0x2767/0x277E, which load packet fields from code-memory tables and emit pairs of packets; the latter pair complements the table bytes before transmission.
 
 The call-site survey is limited to the 16,349 instruction-aligned instructions reachable by the current static disassembler from reset/interrupt roots. Computed-jump destinations and indirect control flow may reveal additional callers after full control-flow recovery.
+
+
+## 23. Companion helper 0x0DCE exposes the packet handshake/phase mechanism
+
+The helper at 0x0DCE does not simply send another packet. It compares ACC.7 of incoming R4 with internal bit address 0x0C:
+
+- If R4.7=0 while bit 0x0C=1, it clears bit 0x0C and writes 0x40 to XDATA offset 3.
+- If R4.7=1 while bit 0x0C=0, it sets bit 0x0C and writes 0xC0 to XDATA offset 3.
+- If the two states already agree, it skips this control write.
+
+After the optional offset-3 write, it reads XDATA offset 4, then reads offsets 0, 1, 2, and 3 into R5, R2, R3, and R4 respectively, and returns.
+
+The companion sequence therefore uses the fourth packet byte's bit 7 as a phase/state selector. 0x0DB7 writes the packet with bit 6 cleared and mirrors bit 7 into internal bit 0x0C; 0x0DCE conditionally changes the offset-3 control value between 0x40 and 0xC0 when the requested phase differs, then reads the four packet bytes back.
+
+This is substantially stronger evidence for a stateful external protocol than a bare four-byte memory write. It suggests a toggle/phase-controlled interface with a control strobe at offset 3 and a status read at offset 4. It still does not prove whether the receiving device is a sound generator, a register bridge, or another controller; nor does it establish that the offset-4 read is an acknowledgement without board/bus evidence.
+
+The direct reachable call sites to 0x0DCE are 0x0E08, 0x0F? [not yet fully cross-checked], 0x10F0, 0x26FD, 0x271C, 0x279D, and 0x27BF. The exact complete caller set should be regenerated after the next CFG pass; this list is not treated as exhaustive.
