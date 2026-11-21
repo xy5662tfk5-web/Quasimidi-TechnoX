@@ -2148,3 +2148,27 @@ The caller block is shared by the channel-voice parser's Note On and Note Off pr
 ### 68.5 Revised chain
 
 The supported chain is now: MIDI channel-voice parser 0x57A8 (status/data extraction and Note On/Off classification) -> event handling/fan-out routine around 0x5940 -> per-Part calls to dispatcher 0x5671 -> conditional Part-state processing, including 0x4256 and other helpers. The XDATA 0x30E4–0x30E8 fields are packed mirrors of Part-record bytes, consulted by dispatcher guards; they are not the raw MIDI packet.
+
+
+## 69. Separate external-bus writes inside Part event preparation
+
+### 69.1 0x4256 does not directly call mailbox writer 0x0DB7
+
+A direct-call scan of the descrambled ROM confirms no LCALL 0x0DB7 inside 0x4256. Its body instead calls, among other helpers, 0xABBF, 0xAC00, 0xAC88, 0x695A, 0x418E, and 0x1494. The mailbox writer 0x0DB7 has a separate set of callers, including 0x0A57 (through 0x0D80), 0x0D07, 0x0E1A, 0x0E67, 0x1045, 0x110A, and table/transfer routines around 0x26C9–0x277E. Therefore the path from MIDI event handling to the 0x8000 mailbox is not yet demonstrated as a direct continuation of 0x4256.
+
+### 69.2 0xAC00 is an external-memory bus write sequence
+
+The code at 0xAC00 uses MOV P2,#0x35 / MOV P2,#0x36 (encoded 75 A0 35/36) and MOVX @R0,A / MOVX A,@R0 (encoded F2 / E2) to transfer a sequence of eight bit values through the external bus. It iterates bit positions 0–7, sets the corresponding bit in a byte, writes that byte at the selected external address, then switches the P2 page and reads/modifies the device-side value before continuing. This is materially different from writing four bytes to XDATA 0x8000–0x8003.
+
+### 69.3 0x4256 calls the external-bus helpers in Part context
+
+At 0x4337, 0x4256 passes R6/R5-derived values to 0xAC00 after writing a selector/value into XDATA 0x2Bxx. Later, at 0x43E5, it prepares a value and calls 0xAC88. The same routine then conditionally loads descriptor pointers and calls 0x1494 at 0x4400, 0x442C, 0x4455, and 0x44A6. Thus 0x4256 combines Part-record interpretation, external-bus transactions, and descriptor loading; it is not merely a mailbox packet builder.
+
+### 69.4 Current architectural distinction
+
+Two hardware-facing paths are now evidenced separately:
+
+- External bus: 0x4256 -> 0xAC00 / 0xAC88, using P2 page selection and MOVX @R0 operations.
+- Mailbox transaction: callers prepare R5/R2/R3/R4 and call 0x0DB7, which writes XDATA 0x8000–0x8003 and updates internal handshake bits.
+
+The exact external device identity and semantic meaning of the P2 pages remain unconfirmed. Likewise, a complete causal route from a MIDI Note On/Off event through Part processing to a particular 0x0DB7 caller remains to be reconstructed; do not assume the two paths are equivalent.
