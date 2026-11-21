@@ -127,10 +127,16 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 {
     juce::ScopedNoDenormals noDenormals;
     const int performanceIndex = getCurrentProgram();
-    const bool omniPerformance = getMidiRoutingMode() == MidiRoutingMode::performanceOmni;
 
     for (const auto metadata : midiMessages) {
         const auto& message = metadata.getMessage();
+        if (message.isController()) {
+            if (message.getControllerNumber() == 124)
+                setMidiRoutingMode(MidiRoutingMode::partChannels);
+            else if (message.getControllerNumber() == 125)
+                setMidiRoutingMode(MidiRoutingMode::performanceOmni);
+        }
+        const bool omniPerformance = getMidiRoutingMode() == MidiRoutingMode::performanceOmni;
         std::array<int, 4> targetSlots{};
         int targetCount = 0;
         if (omniPerformance) {
