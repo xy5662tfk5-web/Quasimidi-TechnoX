@@ -477,3 +477,31 @@ At 0x19BD, the routine loads DPTR with 0x1BC3 and executes JMP @A+DPTR. This is 
 - Model RAM[0x3E] and RAM[0x3F] as separate state bytes with the writers listed above.
 - Keep 0x104F in the page/endpoint initialization subsystem.
 - Do not complete the 0x189D model until the computed jump table at 0x1BC3 and its targets are decoded.
+
+
+## 16. Computed mode dispatch inside 0x189D — table recovered
+
+The computed jump at 0x19BD is now partially resolved from the descrambled ROM bytes.
+
+Control flow immediately before the jump:
+
+- At 0x19A2, A is masked with 0x38.
+- If the result equals 0x38, execution takes the separate special path beginning at 0x19A7.
+- Otherwise, the value is rotated right once at 0x19BD. For the aligned values 0x00, 0x08, 0x10, 0x18, 0x20, 0x28, and 0x30, this produces offsets 0, 4, 8, 12, 16, 20, and 24.
+- DPTR is loaded with 0x1BC3 and `JMP @A+DPTR` dispatches into a table of four-byte entries.
+
+Recovered table:
+
+| Masked input A | Table address | Bytes | Destination |
+|---:|---:|---|---:|
+| 0x00 | 0x1BC3 | 02 1C 2B 00 | 0x1C2B |
+| 0x08 | 0x1BC7 | 02 1C 61 00 | 0x1C61 |
+| 0x10 | 0x1BCB | 02 1E DD 00 | 0x1EDD |
+| 0x18 | 0x1BCF | 02 22 4C 00 | 0x224C |
+| 0x20 | 0x1BD3 | 02 23 01 00 | 0x2301 |
+| 0x28 | 0x1BD7 | 02 23 74 00 | 0x2374 |
+| 0x30 | 0x1BDB | 02 23 74 00 | 0x2374 |
+
+Each entry begins with an 8051 LJMP (opcode 0x02) followed by a 16-bit destination and a trailing zero byte. The computed jump therefore lands on the LJMP instruction, which transfers control to the corresponding handler. Inputs whose masked value is 0x38 do not use this table; they take the separate 0x19A7 path.
+
+This resolves the dispatch destinations but not the full semantics of each handler. The next reverse-engineering pass must disassemble each target with instruction-aligned control flow, trace its pointer accesses and P3-bit writes, and compare the common data-path operations. The target list is now grounded in the actual ROM bytes rather than inferred from nearby code.
