@@ -6,10 +6,18 @@
 
 class CountingBackend final : public technox::IMASSVoiceBackend {
 public:
+    int noteOnCalls = 0;
     int noteOffCalls = 0;
     int resetVoiceCalls = 0;
-    void prepare(double, int) override {}
-    void noteOn(int, const technox::VoiceSlot&) noexcept override {}
+    int prepareCalls = 0;
+    double preparedSampleRate = 0.0;
+    int preparedBlockSize = 0;
+    void prepare(double sampleRate, int blockSize) override {
+        ++prepareCalls;
+        preparedSampleRate = sampleRate;
+        preparedBlockSize = blockSize;
+    }
+    void noteOn(int, const technox::VoiceSlot&) noexcept override { ++noteOnCalls; }
     void noteOff(int, const technox::VoiceSlot&) noexcept override { ++noteOffCalls; }
     void resetVoice(int, const technox::VoiceSlot&) noexcept override { ++resetVoiceCalls; }
     bool isVoiceFinished(int) const noexcept override { return false; }
@@ -274,6 +282,25 @@ int main() {
         modulationDifference += std::abs(noWheelLeft[static_cast<std::size_t>(i)] -
                                          fullWheelLeft[static_cast<std::size_t>(i)]);
     assert(modulationDifference > 0.01);
+
+    // Backend hand-off: a recovered DSP can replace the prototype without
+    // rebuilding MIDI/Part routing, and receives the active host format.
+    CountingBackend prototypeBackend;
+    CountingBackend replacementBackend;
+    MASSAudioEngine swappableEngine(&prototypeBackend);
+    swappableEngine.prepare(96000.0, 512);
+    swappableEngine.noteOn(12, 1, 64, 100);
+    assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
+    swappableEngine.setBackend(&replacementBackend);
+    assert(prototypeBackend.resetVoiceCalls == 1);
+    assert(swappableEngine.voiceManager().activeVoiceCount() == 0);
+    assert(replacementBackend.prepareCalls == 1);
+    assert(replacementBackend.preparedSampleRate == 96000.0);
+    assert(replacementBackend.preparedBlockSize == 512);
+    assert(swappableEngine.backend() == &replacementBackend);
+    swappableEngine.noteOn(12, 1, 65, 100);
+    assert(replacementBackend.noteOnCalls == 1);
+    assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
 
     std::cout << "Basic MASS backend: note-on, finite stereo output, note-off and release passed\n";
     return 0;
