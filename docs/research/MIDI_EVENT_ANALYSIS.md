@@ -338,3 +338,15 @@ These instruction sequences prove the table is actively read by executable firmw
 ### Consequence for reverse engineering
 
 We now have a real, compact mathematical waveform embedded in IC4, plus executable references to it. Next trace the callers of `0x0C52` and the surrounding `0x0670` calculation to identify the destination structure and whether this is used by modulation, voice synthesis, startup diagnostics, or peripheral initialization. Keep this separate from the unresolved 6 MB sample-memory architecture and the 128 KB IC51 dump.
+## 29. Corrected control-flow interpretation of the sine-table reads
+
+Follow-up control-flow inspection narrows the interpretation of section 28:
+
+- `0x0C52` is **not** a standalone callable routine. It is an instruction inside a sequential code path at `0x0C18–0x0C58`: mask the computed phase with `0x3F`, read the signed sine byte from `0x001E + phase`, increment `R1`, and write the result through `MOVX @R1,A` (`F3`).
+- The only direct `LCALL` xref found to the following entry `0x0C59` is at `0x08B2`; it calls the code after the sine lookup/return, not the sine lookup itself.
+- The `0x0677` / `0x0686` reads sit inside a computed-dispatch region around `0x0648–0x06AA`. The dispatch table at `0x0652` contains eight 16-bit destinations (`0x0682`, `0x068D`, `0x0691`, `0x0697`, `0x06A0`, `0x0671`, `0x0682`, `0x0682`). Therefore the two table reads are branch bodies in a multi-case handler, not independent oscillator functions.
+- The `0x0670` area itself is reached through this computed dispatch, and there are no direct `LCALL` xrefs to `0x0670` or `0x06AA` in the descrambled image.
+
+**What is now proven:** the firmware computes a 6-bit phase/index, obtains a signed sine value from the 64-byte table, and writes that value to external XDATA via an indirect pointer. A second computed-dispatch handler also reads the same sine table.
+
+**What is not proven:** the target XDATA page/device, whether the generated values are audio-rate samples, and whether this code belongs to the main M.A.S.S. oscillator rather than modulation, envelope/LFO, or peripheral setup. Keep the wavetable finding as evidence of firmware-side waveform/math generation, not as proof that the complete sound engine has been recovered.
