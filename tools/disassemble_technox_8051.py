@@ -221,6 +221,8 @@ def main() -> None:
     ap.add_argument("--output", type=Path, default=Path("build/technox_ic4_disassembly.txt"))
     ap.add_argument("--entry", type=lambda x: int(x, 0), action="append")
     ap.add_argument("--max-instructions", type=int, default=50000)
+    ap.add_argument("--find-call", type=lambda x: int(x, 0), action="append",
+                    help="report only reachable direct LCALL/ACALL sites to this target")
     args = ap.parse_args()
     raw = args.ic4.read_bytes()
     report("ic4", raw)
@@ -240,6 +242,17 @@ def main() -> None:
     for pc in sorted(insns):
         x = insns[pc]
         lines.append(f"{pc:04X}     {x.raw:<11} {x.text}")
+    if args.find_call:
+        lines += ["", "REACHABLE CALL SITES (instruction-boundary validated)"]
+        for target in args.find_call:
+            sites = [pc for pc, insn in sorted(insns.items())
+                     if insn.text.endswith(f"0x{target:04X}")
+                     and insn.text.startswith(("LCALL", "ACALL"))]
+            lines.append(f"Target 0x{target:04X}: " +
+                         (", ".join(f"0x{x:04X}" for x in sites) or "none"))
+            for site in sites:
+                idx = ordered.index(site)
+                lines.append(f"  {site:04X} {insns[site].raw:<11} {insns[site].text}")
     lines += ["", "DIRECT CALL TARGETS"]
     lines += [f"0x{x:04X}" for x in sorted(calls)]
     lines += ["", "DIRECT BRANCH TARGETS"]
@@ -331,6 +344,13 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Disassembly: {len(insns)} instructions; {len(calls)} direct calls; {len(branches)} branch targets")
+    if args.find_call:
+        for target in args.find_call:
+            sites = [pc for pc, insn in sorted(insns.items())
+                     if insn.text.endswith(f"0x{target:04X}")
+                     and insn.text.startswith(("LCALL", "ACALL"))]
+            print(f"Reachable call sites for 0x{target:04X}: " +
+                  (", ".join(f"0x{x:04X}" for x in sites) or "none"))
     movx_count = sum(1 for pc in insns if code[pc] in movx_ops)
     print(f"MOVX sites: {movx_count}")
     print("Reachable MOV DPTR,# constants: " + ", ".join(f"0x{x:04X}" for x in sorted(dptr_constants)))
