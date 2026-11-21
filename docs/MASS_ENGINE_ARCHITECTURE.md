@@ -76,11 +76,11 @@ The realtime callback must not allocate memory, perform file I/O, block on a mut
 - **DrumState** resolves the drum program and key map; do not conflate the 32 kit names with the 24 note maps.
 - **VoiceState** stores note, velocity, channel/Part, allocation age, envelope state, pitch and backend-specific state.
 
-The current PartEditModel is a control/data model only. It does not create audio voices or transmit edited SysEx.
+The current PartEditModel is a control/data model. The processor now keeps editable values for all 50 × 4 factory Performance Part blocks, can rebuild an edited Part SysEx frame while preserving its original opaque bytes, and mirrors the selected Performance's four stored Parts into engine Part slots 13–16. MIDI note channels default to the matching Part numbers 13–16 in accordance with the manual's Sequencer Multi mapping.
 
 ## 5. Synthesis backend strategy
 
-Use an interface so verified sound-generation models can be added without changing MIDI routing, Part editing, voice allocation, or the JUCE wrapper.
+The first infrastructure is now present: a 21-slot VoiceManager, a lock-free 16-Part parameter store, a per-Part Mod Wheel source store, a generic ModulationMatrix, and an IMASSVoiceBackend interface. The current NullMASSVoiceBackend intentionally emits silence. Use this interface so verified sound-generation models can be added without changing MIDI routing, Part editing, voice allocation, or the JUCE wrapper.
 
 A future backend should support:
 - preparation from verified sound/sample resources;
