@@ -1784,3 +1784,30 @@ The established chain is:
 5. 0x0A57 services the slot and transforms its +1/+2/+3 fields into external-port traffic through 0x0DB7 or the alternate direct page-0x80 transaction.
 
 This chain is sufficient to say that the eight-byte slot array is an endpoint/runtime value structure and that its +1 field is descriptor-derived. It is not sufficient to name +1/+2/+3 as pitch, sample address, envelope, or another synthesis parameter. The next highest-value target is to trace writers of slot +5 and +2/+3, then resolve the XDATA 0x20 comparison used by +7.
+
+
+## 55. Consolidated partial layout of the 12-byte per-Part event descriptor
+
+The 12-byte record at XDATA `0x2900 + 12*PartIndex` is distinct from both the 24-byte Part edit record at `0x7C15 + 24*PartIndex` and the eight-byte endpoint slot. Combining the Note On writer (0x4256), initialization path (0x3603), descriptor resolver (0x0D0E), and setup/update callers gives this evidence-based partial map:
+
+| Offset | Proven observations | Current interpretation |
+|---:|---|---|
+| +0 | Rewritten by 0x4256 from note/Part arithmetic; also written by 0x3603 from its R5 argument | Event-dependent descriptor field; exact units unknown |
+| +1 | Rewritten by 0x4256 from 0xABBF using Part Velocity Curve and incoming velocity | Velocity-response mapped value in Note On path |
+| +2 | Read by 0x1494 and 0x0D0E; mapped through ROM table 0x1208; updated by 0x3F10, 0x4803, 0x4B0A, 0x6A79 | Descriptor selector, not yet a named synthesis parameter |
+| +3 | Written by 0x3603 from its R3 argument; other writers/consumers not fully classified | Setup-dependent field; semantics open |
+| +4 | Explicitly zeroed by 0x3603 | Control/descriptor field; semantics open |
+| +5…+9 | Not written by 0x3603; no complete producer map established | Unknown / retained state |
+| +10 | Initialized to 0x7F by 0x3ECE and 0x3603; read alongside +2 and mapped by 0x1208; updated by several setup routines | Paired descriptor selector / sentinel-capable field |
+| +11 | Written by 0x3603 from its R3 argument; no complete Note On rewrite established | Setup-dependent field; semantics open |
+
+### 55.1 What this narrows down
+
+- Offsets +2 and +10 form a pair used by the endpoint resolver. They are not simply raw oscillator or envelope values: each is passed through the same ROM mapping table before slot selection.
+- Offset +1 has a confirmed velocity-response role in the Note On path. The earlier generic label "first endpoint value" must not be confused with this descriptor byte.
+- The default 0x7F at +10 is a real initialization value. It may act as a sentinel or maximum selector; the precise meaning depends on the 0x1208 mapping and resolver comparisons.
+- The current evidence does not justify assigning note, pitch, sample address, filter, or envelope semantics to the unresolved fields.
+
+### 55.2 Immediate next trace
+
+The highest-value unresolved path is now the producer/consumer chain for descriptor offsets +5…+9 and +11, followed by the exact 0x1208 mapping and endpoint-match predicates in 0x0D0E. In parallel, the endpoint slot's +5 producer must be traced independently; it is a different structure and must not be conflated with descriptor offset +5.
