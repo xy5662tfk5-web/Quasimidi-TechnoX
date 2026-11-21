@@ -13,13 +13,13 @@ def analyze(midi_bytes: bytes):
         "performances": len(performances),
         "part_frames": len(performances) * 4,
         "frame_layout": {
-            "complete_frame_bytes": 32,
+            "complete_frame_bytes": 33,
             "header_hex": "F0 3F 00 22 44",
-            "type_byte_offset": 5,
-            "performance_index_offset": 6,
-            "opaque_data_start_offset": 7,
-            "opaque_data_bytes": 24,
-            "terminator_offset": 31
+            "type_byte_offset": 6,
+            "performance_index_offset": 5,
+            "opaque_data_start_offset": 8,
+            "reserved_byte_offset": 7,\n            "opaque_data_bytes": 24,
+            "terminator_offset": 32
         },
         "parts": []
     }
@@ -27,7 +27,7 @@ def analyze(midi_bytes: bytes):
         frames = [p.part_frames[part_number] for p in performances]
         offsets = []
         for data_index in range(24):
-            absolute_offset = 7 + data_index
+            absolute_offset = 8 + data_index
             values = [frame[absolute_offset] for frame in frames]
             counts = Counter(values)
             offsets.append({
