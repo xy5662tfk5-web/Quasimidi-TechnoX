@@ -19,6 +19,14 @@ class MCS51DisassemblerTests(unittest.TestCase):
             self.assertEqual(instruction_length(opcode), 1)  # SUBB A,@Ri / A,Rn
         self.assertEqual(instruction_length(0xB6), 3)  # CJNE @R0,#imm,rel
 
+
+    def test_subb_register_decode(self):
+        code = bytes([0x96, 0x9F])
+        n0, text0, _, _ = decode(code, 0)
+        n1, text1, _, _ = decode(code, 1)
+        self.assertEqual((n0, text0), (1, "SUBB A, @R0"))
+        self.assertEqual((n1, text1), (1, "SUBB A, R7"))
+
     def test_relative_branch_wrap_and_sign(self):
         self.assertEqual(rel_target(0x0100, 2, 0xFE), 0x0100)
         self.assertEqual(rel_target(0xFFFE, 2, 0x02), 0x0002)
