@@ -10,6 +10,17 @@ spec.loader.exec_module(parser)
 parse = parser.parse
 
 class TechnoxInsTests(unittest.TestCase):
+    def test_repository_instrument_file_has_512_programs_and_maps(self):
+        obj = parse(ROOT / "Technox.ins")
+        self.assertEqual(sum(len(b["programs"]) for b in obj["program_banks"]), 512)
+        self.assertEqual(len(obj["channel_10_drum_kits"]), 32)
+        self.assertEqual(len(obj["drum_map_sections"]), 24)
+        self.assertEqual(len(obj["drum_map_program_assignments"]), 40)
+        self.assertEqual(len(obj["controllers"]), 26)
+        self.assertEqual(obj["program_banks"][0]["programs"][0]["name"], "303 Lead")
+        self.assertEqual(obj["program_banks"][1]["programs"][53]["name"], "Acoustic Guitar")
+        self.assertEqual(obj["program_banks"][3]["programs"][127]["name"], "Silence")
+
     def test_four_complete_program_banks_and_maps(self):
         source = ""
         for letter in "ABCD":
