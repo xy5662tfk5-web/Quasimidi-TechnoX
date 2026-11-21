@@ -89,7 +89,15 @@ public:
         return setRawValue(index, value);
     }
 
-    bool setDisplayValue(PartParameter parameter, int displayValue) noexcept {\n        const auto index = static_cast<std::size_t>(parameter);\n        if (index >= kPartParameterDescriptors.size()) return false;\n        const int raw = displayValue - kPartParameterDescriptors[index].displayOffset;\n        if (raw < 0 || raw > kPartParameterDescriptors[index].maximum) return false;\n        return setParameterValue(parameter, static_cast<std::uint8_t>(raw));\n    }\n\n    static constexpr const PartParameterDescriptor* descriptor(std::size_t index) noexcept {
+    bool setDisplayValue(PartParameter parameter, int displayValue) noexcept {
+        const auto index = static_cast<std::size_t>(parameter);
+        if (index >= kPartParameterDescriptors.size()) return false;
+        const int raw = displayValue - kPartParameterDescriptors[index].displayOffset;
+        if (raw < 0 || raw > kPartParameterDescriptors[index].maximum) return false;
+        return setParameterValue(parameter, static_cast<std::uint8_t>(raw));
+    }
+
+    static constexpr const PartParameterDescriptor* descriptor(std::size_t index) noexcept {
         return index < kPartParameterDescriptors.size() ? &kPartParameterDescriptors[index] : nullptr;
     }
 
