@@ -8,6 +8,8 @@
 #include <atomic>
 #include <vector>
 
+enum class MidiRoutingMode : int { performanceOmni = 0, partChannels = 1 };
+
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
 public:
