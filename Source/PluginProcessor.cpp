@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "TechnoXSysEx.h"
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true))
@@ -19,7 +20,31 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                                                    juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    juce::ignoreUnused(midiMessages);
+    // Consume documented MIDI state changes. Audio generation remains disabled
+    // until the original sample format and synthesis architecture are verified.
+    juce::MidiBuffer::Iterator midiIterator(midiMessages);
+    juce::MidiMessage midiMessage;
+    int samplePosition = 0;
+    while (midiIterator.getNextEvent(midiMessage, samplePosition))
+    {
+        if (midiMessage.isSysEx())
+        {
+            const auto* raw = midiMessage.getRawData();
+            const auto rawSize = midiMessage.getRawDataSize();
+            if (raw != nullptr && rawSize > 0)
+            {
+                std::vector<std::uint8_t> packet(raw, raw + rawSize);
+                // Parse requests/dumps defensively; address-space routing and
+                // memory mutation will be added with the complete SysEx model.
+                (void) technox::parseRequest(packet);
+                (void) technox::parseDump(packet);
+            }
+        }
+        else
+        {
+            midiState.handle(midiMessage.getRawData(), midiMessage.getRawDataSize());
+        }
+    }
 
     // Deliberately silent foundation: the original TechnoX synthesis engine
     // has not yet been researched or implemented.
