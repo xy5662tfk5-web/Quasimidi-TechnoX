@@ -1520,3 +1520,35 @@ This is now a concrete multi-stage path: Part descriptor fields at 0x2900+12*P �
 ### 40.5 Immediate next target
 
 The next pass should decode the endpoint record produced by 0x0D80, follow the full 0x0A57 arithmetic path for representative descriptor values, and identify which of the 12-byte descriptor fields are changed by 0x3F10, 0x4803, 0x4B0A, and 0x6A79. This should reveal whether the mapped +2/+10 pair selects a parameter family, endpoint register group, or another operation class.
+
+
+## 41. Velocity Curve lookup bank recovered at 0xA8BF
+
+The 0xABBF helper is called from the Note On path with R7 = incoming velocity and R5 = the Part's offset +17 Velocity Curve value. When R5 is zero, the helper returns without remapping. For a nonzero curve index, it computes:
+
+`tableBase = 0xA8BF + 0x80 * (R5 - 1)`
+
+and reads `tableBase + velocity` with MOVC. This makes the Part Velocity Curve byte a direct selector for a 128-entry velocity-response table.
+
+Six contiguous monotonic 128-byte tables are present before the helper code begins at 0xABBF:
+
+| Curve selector | Table base | Output range | Shape observed |
+|---:|---:|---:|---|
+| 1 | 0xA8BF | 0x20–0x60 | Narrower centered range |
+| 2 | 0xA93F | 0x01–0x7F | Strong threshold / steep upper response |
+| 3 | 0xA9BF | 0x01–0x7F | Smooth nonlinear rise |
+| 4 | 0xAA3F | 0x01–0x7F | Stronger nonlinear rise |
+| 5 | 0xAABF | 0x01–0x7F | Broad near-linear rise |
+| 6 | 0xAB3F | 0x01–0x7F | Broad near-linear rise with a different low-end slope |
+
+All six tables are monotonic nondecreasing across the 128 MIDI velocity inputs. The first curve is intentionally different because it never reaches the full 0x7F range; the other five span the full 7-bit range. These are confirmed firmware velocity remapping curves, not inferred from sound.
+
+This closes one parameter loop end-to-end:
+
+- Part record offset +17 selects the curve.
+- MIDI Note On supplies the raw velocity.
+- 0x4256 passes velocity and curve selector to 0xABBF.
+- 0xABBF maps velocity through the selected 128-byte table.
+- The remapped value is written into the Part's intermediate descriptor/runtime record before 0x1494 continues.
+
+The six tables' musical labels (for example, soft, hard, fixed, or linear) are not assigned yet. The next useful comparison is the official manual's listed Velocity Curve names/numbers against these six numeric response shapes.
