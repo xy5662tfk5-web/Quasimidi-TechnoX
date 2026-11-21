@@ -104,5 +104,40 @@ int main() {
     assert(zeroControlPlan.actions[0] == LoaderAction::readModeControlByte);
     assert(zeroControlPlan.actions[1] == LoaderAction::jumpToZeroByteHandler);
 
+
+    // Firmware 0x1009 scans a packed list at P2=0x80, R0=0x80..0xF0,
+    // in steps of eight. The first 0xFF terminates the list.
+    XDataMemory mailboxMemory;
+    XDataMemory::Page mailboxPage{};
+    mailboxPage[0x80] = 0x16; // marker: (value & 0x7E) == 0x16
+    mailboxPage[0x88] = 0x02; // occupied entry, but not a mailbox marker
+    mailboxPage[0x90] = 0x97; // marker with high bit and low bit set
+    mailboxPage[0x98] = 0xFF; // terminator; later entries must be ignored
+    mailboxPage[0xA0] = 0x16;
+    mailboxMemory.loadPage(kMailboxScanPage, mailboxPage);
+
+    const auto mailboxScan = scanMailboxEntries(mailboxMemory, 7, true);
+    assert(mailboxScan);
+    assert(mailboxScan.visitedCount == 3);
+    assert(mailboxScan.writeCount == 2);
+    assert(mailboxScan.terminatedByEmpty);
+    assert(mailboxScan.nextSequence == 10);
+    assert(mailboxScan.visitedOffsets[0] == 0x80);
+    assert(mailboxScan.visitedOffsets[1] == 0x88);
+    assert(mailboxScan.visitedOffsets[2] == 0x90);
+    assert((mailboxScan.writes[0].bytes == std::array<std::uint8_t, 4>{7, 0x80, 0x01, 0x80}));
+    assert((mailboxScan.writes[1].bytes == std::array<std::uint8_t, 4>{9, 0x80, 0x01, 0x80}));
+    assert(mailboxScan.writes[0].setInternalFlag0C);
+    assert(mailboxScan.writes[1].setInternalFlag0C);
+
+    const auto mailboxScanFlagClear = scanMailboxEntries(mailboxMemory, 7, false);
+    assert(mailboxScanFlagClear.writeCount == 2);
+    assert(mailboxScanFlagClear.writes[0].bytes[3] == 0x00);
+    assert(!mailboxScanFlagClear.writes[0].setInternalFlag0C);
+
+    const auto missingMailboxPage = scanMailboxEntries(XDataMemory{}, 0, false);
+    assert(!missingMailboxPage);
+    assert(missingMailboxPage.error == MailboxScanError::sourcePageMissing);
+
     return 0;
 }
