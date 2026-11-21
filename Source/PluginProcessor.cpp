@@ -302,7 +302,7 @@ bool QuasimidiTechnoXAudioProcessor::getEditedPartSysEx(
 
 juce::String QuasimidiTechnoXAudioProcessor::getCurrentPartSoundName(int partIndex) const
 {
-    const int performance = getCurrentProgram();
+    const int performance = static_cast<int>(performanceBank.selectedIndex());
     const int bank = getPartParameterRaw(performance, partIndex, technox::PartParameter::bankNumber);
     const int sound = getPartParameterRaw(performance, partIndex, technox::PartParameter::soundNumber);
     return soundCatalog.nameFor(bank, sound);
