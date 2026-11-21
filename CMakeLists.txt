@@ -18,6 +18,7 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_binary_data(TechnoXAssets
     SOURCES
         assets/technox_front_panel.svg
+        TECHNOX.MID
 )
 
 juce_add_plugin(QuasimidiTechnoX
