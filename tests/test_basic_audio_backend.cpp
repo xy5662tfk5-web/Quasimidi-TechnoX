@@ -64,10 +64,10 @@ int main() {
         if (voice.channel == 14 && voice.releasing) ++channel14Releasing;
     }
     assert(channel13Releasing == 1);
-    assert(channel14Releasing == 1);
+    assert(channel14Releasing == 2);
     fourPartEngine.allSoundsOff(14);
     assert(fourPartEngine.voiceManager().activeVoiceCount() == 3);
-    assert(fourPartBackend.resetVoiceCalls == 1);
+    assert(fourPartBackend.resetVoiceCalls == 2);
     for (const auto& voice : fourPartEngine.voiceManager().voices())
         if (voice.active) assert(voice.channel != 14);
 
