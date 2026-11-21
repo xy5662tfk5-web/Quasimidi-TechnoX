@@ -5,7 +5,7 @@
 namespace {
 constexpr int kStateMagicV1 = 0x54584E50; // TXNP
 constexpr int kStateMagicV2 = 0x54584E32; // TXN2
-constexpr int kPartStateBytes = 50 * 4 * 24;
+constexpr int kPartStateBytes = 50 * 4 * 24 + 4;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -50,7 +50,10 @@ bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& l
     return output == juce::AudioChannelSet::mono() || output == juce::AudioChannelSet::stereo();
 }
 
-void QuasimidiTechnoXAudioProcessor::prepareToPlay(double, int) {}
+void QuasimidiTechnoXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+{
+    massEngine.prepare(sampleRate, samplesPerBlock);
+}
 void QuasimidiTechnoXAudioProcessor::releaseResources() {}
 
 void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
@@ -67,7 +70,16 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         if (slot < 0 || performanceIndex < 0 || performanceIndex >= 50)
             continue;
 
-        if (message.isController()) {
+        if (message.isNoteOn()) {
+            massEngine.noteOn(static_cast<std::uint8_t>(slot), static_cast<std::uint8_t>(message.getChannel()),
+                              static_cast<std::uint8_t>(message.getNoteNumber()),
+                              static_cast<std::uint8_t>(message.getVelocity()));
+        } else if (message.isNoteOff()) {
+            massEngine.noteOff(static_cast<std::uint8_t>(message.getChannel()),
+                               static_cast<std::uint8_t>(message.getNoteNumber()));
+        } else if (message.isAllNotesOff() || message.isAllSoundOff()) {
+            massEngine.allNotesOff(message.getChannel());
+        } else if (message.isController()) {
             const auto change = midiControlRouter.handleControlChange(
                 message.getChannel(), message.getControllerNumber(), message.getControllerValue());
             if (change.has_value())
@@ -80,7 +92,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 
     // The M.A.S.S. synthesis backend is not implemented yet. MIDI/state editing
     // is active, but audio remains intentionally silent until verified DSP exists.
-    buffer.clear();
+    massEngine.render(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), buffer.getNumSamples());
 }
 
 void QuasimidiTechnoXAudioProcessor::setCurrentProgram(int index)
