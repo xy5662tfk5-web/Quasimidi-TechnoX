@@ -19,7 +19,7 @@ private:
     std::unique_ptr<juce::Drawable> frontPanel;
     juce::ComboBox performanceSelector;
     juce::Label performanceLabel;
-    int partNumber = 1;
+    int partNumber = 13;
     int midiChannel = 1;
     int parameterNumber = 1;
     int valueNumber = 64;
