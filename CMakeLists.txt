@@ -46,6 +46,8 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSVoiceManager.h
     Source/MASSModulationMatrix.h
     Source/MASSAudioEngine.h
+    Source/MASSVoiceManager.h
+    Source/MASSModulationMatrix.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC
