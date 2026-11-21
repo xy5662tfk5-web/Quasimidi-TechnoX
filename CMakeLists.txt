@@ -6,7 +6,7 @@ include(CTest)
 # Configure with -DCMAKE_OSX_ARCHITECTURES=x86_64 for Intel Macs.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version" FORCE)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS version" FORCE)
 
 include(FetchContent)
 FetchContent_Declare(
