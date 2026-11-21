@@ -38,6 +38,25 @@ The byte-pattern scan is deliberately labelled as candidate data, not disassembl
 
 CI writes a text listing artifact named `technox-ic4-mcs51-disassembly`. The next analysis pass must annotate direct/indirect DPTR setup reaching each MOVX site, inspect ACIA access paths around `0xA000`, and correlate call graphs with MIDI status handling. The sound-chip address map remains unknown until code evidence or hardware documentation establishes it.
 
+### Confirmed MIDI and LCD access paths
+
+The reachable code now gives instruction-level confirmation of the MAME device map:
+
+- ACIA initialization at code `0xA7A0` loads DPTR with `0xA000` and performs two writes (`0xFF`, then `0x96`). A nearby routine at `0xA7B3` reads ACIA status at `0xA002`, polls bit `0xE1`, then writes the byte in R7 to `0xA001`. A separate routine at `0xA7C0` reads `0xA003` into R7. This is consistent with serial transmit/receive through the mapped 6850 ACIA. The called helper routines still need semantic analysis before interpreting the control bytes.
+- LCD initialization at `0xA601` writes command `0x38` to `0xB000`. Other routines write through `0xB000`/`0xB001`; the status routine reads `0xB002` and polls bit `0xE7`. This matches a command/data/busy-flag LCD interface.
+
+### Candidate undocumented external hardware window
+
+Firmware also performs actual `MOVX` reads/writes in the range MAME leaves as no-op:
+
+- At `0x7CC1`, it reads from `0x7C00`, then reads `0x7C07`; values are copied into internal RAM locations `0x309D` and `0x309B`.
+- At `0xB630`, it writes `0x01` to `0x7C05`, increments DPTR, then writes `0x00` to `0x7C06`.
+- At `0x877C`, it reads `0x7C06`.
+
+This `0x7C00–0x7FFF` window is a stronger hardware-reverse-engineering lead than raw byte matches because the firmware performs real external-memory transactions there. It could be a peripheral/register interface, but its function is **not identified** and must not yet be called the sound chip. The separate `0xC000` routine writes `0xAA` and reads it back, apparently probing an external location; it also remains unexplained.
+
+A computed jump at code `0xC0B3` loads DPTR with `0xC0BA` and executes `JMP @A+DPTR`. This is a **program-code jump table**, not an external-data access. The analysis distinguishes such code pointers from DPTR values followed by `MOVX`, avoiding false hardware-register classifications.
+
 ### First external-memory / I/O cross-reference
 
 The first reachable-code pass finds an immediate DPTR setup to `0xA000` at code address `0xA7A0`, and three setups to `0xB000` at `0xA601`, `0xA654`, and `0xA669`. These addresses match the MAME driver's ACIA and LCD mappings respectively. This is strong evidence that reachable firmware code references both mapped devices. It does **not yet** prove which MOVX instructions use those values: the next pass prints the local instruction context and must follow DPTR through each basic block and any calls before assigning reads/writes to the ACIA. The sound-generation interface is still unidentified.
