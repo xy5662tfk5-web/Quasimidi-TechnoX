@@ -80,3 +80,16 @@ These controller messages are control paths, not a promise that each CC is a dir
 ## Required next capture set
 
 Hardware captures are still useful to validate how the front-panel editor emits parameter changes, which SysEx address bytes are sent for live edits, and whether the supplied factory dump uses any device-specific encoding not shown in the manual.
+
+
+## MIDI control routing implemented in the editor/engine layer
+
+- Part CC writes: CC0 Bank Select (0–3), CC5 Portamento Time, CC7 Level, CC10 Panorama (scaled to the manual's 0–20 range), CC64 Hold Pedal, CC91/93 FX sends, CC126 Mono and CC127 Poly Track Mode.
+- Runtime Part controls: CC1 Mod Wheel source, CC65 Portamento On/Off, CC67 Soft Pedal, CC121 Reset All Controllers.
+- Common Performance controls: CC80/81 FX1/FX2 type, CC82 Arpeggiator resolution, CC83 Arpeggiator speed. Factory values are extracted from the Common SysEx frame at offsets 0x2A, 0x32, 0x3C (low two bits) and 0x3D respectively.
+- Part NRPN: MSB 0x01 with LSB values 0x08/0x09/0x10/0x20/0x21/0x63/0x64/0x66 for pitch modulation speed/depth/delay, cutoff, resonance and EG attack/decay/release.
+- Drum NRPN: MSB 0x18/0x1A/0x1C/0x1D/0x1E, with NRPN LSB as MIDI key number, for pitch/level/pan/FX1 send/FX2 send.
+- RPN: MSB 0x00 and LSB 0x00/0x01/0x02 for pitch-bend range/fine tune/coarse tune.
+- CC120 is treated as All Sounds Off; CC123 as All Notes Off.
+
+CC124/125 Omni mode are global MIDI-receive modes and are not yet mapped to the Part editor. The DSP backend remains silent; these routes update bounded control state only.
