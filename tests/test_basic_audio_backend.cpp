@@ -4,8 +4,35 @@
 #include <cmath>
 #include <iostream>
 
+class CountingBackend final : public technox::IMASSVoiceBackend {
+public:
+    int noteOffCalls = 0;
+    void prepare(double, int) override {}
+    void noteOn(int, const technox::VoiceSlot&) noexcept override {}
+    void noteOff(int, const technox::VoiceSlot&) noexcept override { ++noteOffCalls; }
+    void resetVoice(int, const technox::VoiceSlot&) noexcept override {}
+    bool isVoiceFinished(int) const noexcept override { return false; }
+    void render(float* const*, int, int, const technox::VoiceManager&,
+                const technox::ModulationMatrix&, const technox::MASSPartParameterStore&,
+                const technox::MASSModulationSourceStore&, const technox::MASSPartRuntimeControlStore&,
+                const technox::MASSCommonControlStore&, const technox::MASSDrumParameterStore&) noexcept override {}
+};
+
 int main() {
     using namespace technox;
+
+    // Duplicate Note Off messages must not restart the backend release.
+    CountingBackend countingBackend;
+    MASSAudioEngine countingEngine(&countingBackend);
+    countingEngine.prepare(48000.0, 128);
+    countingEngine.noteOn(12, 1, 64, 100);
+    countingEngine.noteOff(1, 64);
+    countingEngine.noteOff(1, 64);
+    assert(countingBackend.noteOffCalls == 1);
+    countingEngine.noteOn(13, 2, 65, 100);
+    countingEngine.allNotesOff(2);
+    countingEngine.allNotesOff(2);
+    assert(countingBackend.noteOffCalls == 2);
 
     BasicMASSVoiceBackend backend;
     MASSAudioEngine engine(&backend);
