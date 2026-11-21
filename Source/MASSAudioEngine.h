@@ -256,11 +256,15 @@ public:
 
     void noteOn(std::uint8_t part, std::uint8_t channel,
                 std::uint8_t note, std::uint8_t velocity) noexcept {
-        if (velocity > 0) {
-            const int target = voices_.allocationTarget();
-            if (target >= 0 && voices_.voices()[static_cast<std::size_t>(target)].active)
-                backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
+        // MIDI Note On with velocity zero is Note Off. Route it through the
+        // engine so the backend envelope/gate is released as well as the slot.
+        if (velocity == 0) {
+            noteOff(channel, note);
+            return;
         }
+        const int target = voices_.allocationTarget();
+        if (target >= 0 && voices_.voices()[static_cast<std::size_t>(target)].active)
+            backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
         const int voiceIndex = voices_.noteOn(part, channel, note, velocity);
         if (voiceIndex >= 0)
             backend_->noteOn(voiceIndex, voices_.voices()[static_cast<std::size_t>(voiceIndex)]);
