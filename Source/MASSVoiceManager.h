@@ -19,6 +19,11 @@ class VoiceManager {
 public:
     static constexpr std::size_t kVoiceCount = 21;
 
+    void reset() noexcept {
+        voices_.fill({});
+        age_ = 0;
+    }
+
     int allocationTarget() const noexcept {
         for (std::size_t i = 0; i < voices_.size(); ++i)
             if (!voices_[i].active) return static_cast<int>(i);
