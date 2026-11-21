@@ -63,7 +63,8 @@ def extract_sysex(data: bytes) -> List[Frame]:
             _, p = _read_vlq(tr, p)
             if p >= len(tr): raise MidiFormatError("missing event status")
             status = tr[p]
-            if status < 0x80:
+            has_status_byte = status >= 0x80
+            if not has_status_byte:
                 if running is None: raise MidiFormatError("running status without prior channel status")
                 status = running
             else: p += 1
@@ -89,8 +90,7 @@ def extract_sysex(data: bytes) -> List[Frame]:
             elif 0x80 <= status <= 0xEF:
                 running = status
                 n = 1 if (status & 0xF0) in (0xC0, 0xD0) else 2
-                data_pos = p if tr[p-1] >= 0x80 else p-1
-                p = data_pos + n
+                p += n
                 if p > len(tr): raise MidiFormatError("truncated channel event")
             else:
                 raise MidiFormatError(f"unsupported system status 0x{status:02X}")
