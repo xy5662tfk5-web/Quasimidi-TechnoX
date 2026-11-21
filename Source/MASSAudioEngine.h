@@ -263,7 +263,8 @@ public:
             return;
         }
         const int target = voices_.allocationTarget();
-        if (target >= 0 && voices_.voices()[static_cast<std::size_t>(target)].active)
+        if (target >= 0 && voices_.voices()[static_cast<std::size_t>(target)].active &&
+            !voices_.voices()[static_cast<std::size_t>(target)].releasing)
             backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
         const int voiceIndex = voices_.noteOn(part, channel, note, velocity);
         if (voiceIndex >= 0)
