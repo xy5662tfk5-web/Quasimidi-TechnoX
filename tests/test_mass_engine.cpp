@@ -62,7 +62,15 @@ int main() {
     audible.setPartParameter(12, PartParameter::egAttack, 0);
     audible.setPartParameter(12, PartParameter::egDecay, 0);
     audible.setPartParameter(12, PartParameter::egRelease, 0);
-    audible.noteOn(12, 1, 69, 127);
+    for (int part = 12; part < 16; ++part) {
+        audible.setPartParameter(part, PartParameter::level, 127);
+        audible.setPartParameter(part, PartParameter::cutoffFrequency, 127);
+        audible.setPartParameter(part, PartParameter::egAttack, 0);
+        audible.setPartParameter(part, PartParameter::egDecay, 0);
+        audible.setPartParameter(part, PartParameter::egRelease, 0);
+        audible.noteOn(static_cast<std::uint8_t>(part), 1, 69, 127);
+    }
+    assert(audible.voiceManager().activeVoiceCount() == 4);
     float left[512]{}, right[512]{};
     float* outputs[]={left,right};
     audible.render(outputs,2,512);
