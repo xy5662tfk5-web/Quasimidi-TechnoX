@@ -66,6 +66,8 @@ int main() {
     assert(decision.input.mode == 0x09);
     assert(decision.path == LoaderPath::zeroSecondByte);
 
+    page[0x21] = 0x64;
+    memory.loadPage(0x29, page);
     const auto nonzeroDecision = prepareLoaderDecision(memory, lookup, {0x29, 0x20, 0x03});
     assert(nonzeroDecision.valid);
     const auto nonzeroPlan = planLoaderBranch(nonzeroDecision,
@@ -73,13 +75,13 @@ int main() {
     assert(nonzeroPlan.valid);
     assert(nonzeroPlan.slotBase == 0x21E8);
     assert(nonzeroPlan.slotDataAddress == 0x224D);
-    assert(nonzeroPlan.actionCount == 3);
+    assert(nonzeroPlan.actionCount == 4);
     assert(nonzeroPlan.actions[0] == LoaderAction::callResourceManager17D4);
     assert(nonzeroPlan.actions[1] == LoaderAction::setSlotBusyBit);
     assert(nonzeroPlan.actions[2] == LoaderAction::writeSecondByte ||
            nonzeroPlan.actions[2] == LoaderAction::continueAt1599);
 
-    const auto zeroDecision = prepareLoaderDecision(memory, lookup, {0x29, 0x20, 0x03});
+    page[0x21] = 0;\n    memory.loadPage(0x29, page);\n    const auto zeroDecision = prepareLoaderDecision(memory, lookup, {0x29, 0x20, 0x03});
     const auto zeroControlPlan = planLoaderBranch(zeroDecision,
         LoaderRuntimeFlags{false, false, false, false});
     assert(zeroControlPlan.actionCount == 2);
