@@ -6,6 +6,12 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
 {
 }
 
+bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    const auto output = layouts.getMainOutputChannelSet();
+    return output == juce::AudioChannelSet::mono() || output == juce::AudioChannelSet::stereo();
+}
+
 void QuasimidiTechnoXAudioProcessor::prepareToPlay(double, int) {}
 void QuasimidiTechnoXAudioProcessor::releaseResources() {}
 
