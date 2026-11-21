@@ -68,6 +68,11 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
                    + "  Ch:" + juce::String(midiChannel).paddedLeft('0', 2),
                237, 56, 145, 15, juce::Justification::left, false);
 
+    g.setFont(juce::Font("Courier New", 8.5f, juce::Font::bold));
+    const auto soundName = audioProcessor.getCurrentPartSoundName(partNumber - 13);
+    g.drawText(soundName.isNotEmpty() ? soundName : juce::String("Sound catalog unavailable"),
+               237, 68, 145, 8, juce::Justification::left, false);
+
     g.setColour(juce::Colour(0xffe5e7ea));
     g.setFont(juce::Font(9.0f, juce::Font::bold));
     g.drawText("P" + juce::String(parameterNumber) + "  VAL " + juce::String(valueNumber),
