@@ -774,3 +774,47 @@ Because RAM[0x2B] begins with a zero low nibble and increments once per record, 
 Each slot is eight bytes wide. This is an exact address-space result from the arithmetic and loop, not a guess about the semantic identity of the slots. The selected XDATA page is RAM[0x2D], so the effective record locations are page RAM[0x2D], offsets 0x80 through 0xF8.
 
 This also clarifies why the four-byte packet's first byte changes as RAM[0x2B], RAM[0x2B]-1, or RAM[0x2B]-2: it is a group/index value derived from the selected page's low nibble and advanced with the slot iteration. Whether the external receiver calls this a voice number, channel, part, or address remains unproven.
+
+
+## 22. 0x0DB7 is a shared packet-output primitive, not a descriptor-only routine
+
+A fresh reachable-code cross-reference from the reset and interrupt entries found twelve direct call sites to 0x0DB7:
+
+0x02C0, 0x0A4F, 0x0B53, 0x0D07, 0x0E1A, 0x0E67, 0x1045, 0x110A, 0x26C9, 0x26DE, 0x2767, and 0x277E.
+
+This changes the interpretation of the helper: 0x0DB7 is a shared four-byte packet-output primitive used by multiple firmware subsystems. The descriptor handlers at 0x224C/0x2301 are only two of its callers. The exact four stores remain [R5, R2, R3, R4 & 0xBF], followed by the internal bit-0x0C update derived from ACC.7.
+
+### 22.1 A confirmed sixteen-packet initialization loop at 0x02A9–0x02C6
+
+This caller constructs a simple packet and emits it sixteen times:
+
+- It derives R5 = (RAM[0x2D] & 0x0F) << 4.
+- It chooses R4 = 0x00 or 0x80 according to bit 0 of RAM[0x2D].
+- It clears R2 and R3.
+- It sets R6 = 0x0F and selects A0=0x80.
+- It calls 0x0DB7, increments R5, and executes DJNZ R6 back to the call.
+
+Because DJNZ tests after decrement, the body executes sixteen times, with R5 taking the consecutive values base+0 through base+15. Each iteration writes [R5, 0, 0, R4] to XDATA 0x8000–0x8003. It restores A0 from RAM[0x2D] after the loop.
+
+This independently corroborates a sixteen-entry indexed external command space. It also matches the same group-base arithmetic used by the descriptor pass, but it does not prove that the entries are sixteen audio voices; they may be channels, slots, endpoints, or another indexed hardware resource.
+
+### 22.2 Endpoint-discovery caller at 0x1045
+
+The endpoint-discovery path prepares:
+
+- R5 = RAM[0x2B]
+- R2 = 0x80
+- R3 = 0x01
+- R4 = 0x00, with ACC.7 conditionally set from internal bit 0x0D
+
+It selects A0=0x80, calls 0x0DB7, then restores A0=RAM[0x2D]. This is a different packet class from the bulk zeroing loop and confirms that the helper's four fields are caller-defined arguments, not a fixed descriptor format.
+
+### 22.3 Other callers show distinct packet sources
+
+The remaining callers include:
+- 0x0E67, which prepares a mostly zero packet and conditionally changes the high bit of the fourth field.
+- 0x0E1A and 0x110A, which prepare control values after calls to 0x0DCE.
+- 0x0A4F, 0x0B53, and 0x0D07, which assemble fields from XDATA records and state before calling the helper.
+- 0x26C9/0x26DE and 0x2767/0x277E, which load packet fields from code-memory tables and emit pairs of packets; the latter pair complements the table bytes before transmission.
+
+The call-site survey is limited to the 16,349 instruction-aligned instructions reachable by the current static disassembler from reset/interrupt roots. Computed-jump destinations and indirect control flow may reveal additional callers after full control-flow recovery.
