@@ -2079,3 +2079,26 @@ The safest current model is:
 - 0xAD6E/0xADBF: repeated page-0x36 state-driven calls into 0x4256.
 
 The routine 0x4256 remains a Part/runtime-state preparation routine, not a proven final audio command writer. Its output feeds the 0x1494 descriptor loader and subsequent record-processing paths. The next decisive work is to resolve the event-class comparisons at 0x5670, follow the actual writes that populate RAM[0x67], and map the exact 0x1494 branch taken for the parser-originated call.
+
+
+## 66. Parser dispatch guards around the 0x4256 route
+
+### 66.1 Entry register contract and dispatch key
+
+At the entry of the routine beginning at 0x5670, the firmware saves incoming R7 to direct RAM 0x64 and incoming R3 to direct RAM 0x66. The dispatch then tests the incoming R5 value by arithmetic comparisons: it first tests the value corresponding to R5=0x09 (ADD A,#0xF7 followed by JZ), then tests R5=0x02 (ADD A,#0xFE followed by JZ), and continues through additional decrement/branch cases. This is an event-class dispatcher; the input R5 is not simply the MIDI status byte already decoded by the separate channel-voice parser at 0x57A8.
+
+The R5=0x09 branch initializes RAM[0x67] to zero. It then checks XDATA 0x30E4, compares XDATA 0x30E6 with saved R7/RAM[0x64], and on the matching path calls 0x9968 with R7=RAM[0x66], R5=RAM[0x67], and R3=RAM[0x67]. It subsequently tests XDATA 0x30E7. If 0x30E7 is nonzero, control leaves this path for 0x57A7; if it is zero, the routine reloads R7=RAM[0x64], R5=RAM[0x66], R3=RAM[0x67] and invokes 0x4256.
+
+### 66.2 RAM[0x67] is not a universally fixed event field
+
+Within the visible dispatcher path, RAM[0x67] is explicitly initialized to zero for the R5=0x09 class. Other branches use RAM[0x67] as an input to indexed arithmetic (for example, the path around 0x5770 shifts/masks RAM[0x66] and adds RAM[0x67] before forming an indexed XDATA access). This establishes RAM[0x67] as a branch-dependent auxiliary value, not a globally stable velocity or note field. Its producer for all entry classes remains to be traced.
+
+### 66.3 Keep MIDI Note On/Off classification separate
+
+The channel-voice parser at 0x57A8 independently extracts the status high nibble into RAM[0x60], channel nibble into RAM[0x63], data byte 1 into RAM[0x61], and data byte 2 into RAM[0x62]. It explicitly branches on status class 0x09 for Note On and class 0x08 for Note Off; Note On with data byte 2 equal to zero is redirected to the Note Off handling path. Those branches update active-note counter RAM[0x3039] and can call 0x4100.
+
+No direct control-flow proof currently connects the R5=0x09 dispatcher branch at 0x5670 to the Note On branch at 0x57E8, nor proves that the 0x4256 call is itself Note On. Therefore the current evidence supports a distinct event-class dispatcher feeding Part preparation, while Note On/Off are separately identified in 0x57A8. The two paths must not be conflated until their caller and queue hand-off are traced.
+
+### 66.4 Next trace target
+
+Resolve the caller of the 0x5670 dispatcher and the producer of its R5/R7/R3 arguments; trace the staging bytes at XDATA 0x30E4–0x30E8; then follow the 0x4256 branch through 0x1494 and determine whether its state changes reach the endpoint scan/0x0DB7 output path. This is the shortest route to a defensible Note On-to-hardware-command chain.
