@@ -4,8 +4,10 @@
 
 namespace {
 constexpr int kStateMagicV1 = 0x54584E50; // TXNP
-constexpr int kStateMagicV2 = 0x54584E32; // TXN2
-constexpr int kPartStateBytes = 50 * 4 * 24 + 50 * 4 + 4;
+constexpr int kStateMagicV2 = 0x54584E32; // TXN2: Part values + MIDI channels
+constexpr int kStateMagicV3 = 0x54584E33; // TXN3: Part + Common values + MIDI channels
+constexpr int kPartStateBytesV2 = 50 * 4 * 24 + 4;
+constexpr int kPartStateBytesV3 = 50 * 4 * 24 + 50 * 4 + 4;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -275,7 +277,7 @@ juce::AudioProcessorEditor* QuasimidiTechnoXAudioProcessor::createEditor()
 void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     juce::MemoryOutputStream stream(destData, false);
-    stream.writeInt(kStateMagicV2);
+    stream.writeInt(kStateMagicV3);
     stream.writeInt(getCurrentProgram());
     for (const auto& performance : partValues)
         for (const auto& part : performance)
@@ -299,7 +301,10 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         setCurrentProgram(program);
         return;
     }
-    if (magic != kStateMagicV2 || sizeInBytes < 8 + kPartStateBytes)
+    if (magic != kStateMagicV2 && magic != kStateMagicV3)
+        return;
+    const int requiredBytes = magic == kStateMagicV2 ? kPartStateBytesV2 : kPartStateBytesV3;
+    if (sizeInBytes < 8 + requiredBytes)
         return;
 
     for (std::size_t performance = 0; performance < partValues.size(); ++performance) {
@@ -312,13 +317,21 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
             }
         }
     }
-    constexpr int commonMaxima[4] = {21, 21, 3, 127};
-    for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
-        for (std::size_t control = 0; control < 4; ++control) {
-            const int value = static_cast<unsigned char>(stream.readByte());
-            commonValues[performance][control].store(
-                juce::jlimit(0, commonMaxima[control], value), std::memory_order_release);
-        }
+
+    if (magic == kStateMagicV3) {
+        constexpr int commonMaxima[4] = {21, 21, 3, 127};
+        for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
+            for (std::size_t control = 0; control < 4; ++control) {
+                const int value = static_cast<unsigned char>(stream.readByte());
+                commonValues[performance][control].store(
+                    juce::jlimit(0, commonMaxima[control], value), std::memory_order_release);
+            }
+    } else {
+        for (auto& performance : commonValues)
+            for (auto& value : performance)
+                value.store(0, std::memory_order_release);
+    }
+
     for (auto& channel : partMidiChannels) {
         const int restoredChannel = static_cast<unsigned char>(stream.readByte());
         if (restoredChannel >= 1 && restoredChannel <= 16)
