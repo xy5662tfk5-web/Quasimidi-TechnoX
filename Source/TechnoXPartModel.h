@@ -2,14 +2,39 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 #include <utility>
 #include <vector>
 
 namespace technox {
 
-// Conservative editing model for one 32-byte Part SysEx frame.
-// Until a byte-to-parameter map is verified, bytes are exposed only as raw 7-bit data.
+enum class PartParameter : std::size_t {
+    bankNumber = 0, soundNumber, trackMode, level, panorama, fx1Send, fx2Send,
+    transpose, tune, cutoffFrequency, resonance, egAttack, egDecay, egRelease,
+    vibratoRate, vibratoDepth, vibratoDelay, velocityCurve, holdPedal,
+    modulationDepth, pitchSensitivity, volumeModSensitivity, toneModSensitivity,
+    portamentoTime
+};
+
+struct PartParameterDescriptor {
+    const char* name;
+    std::uint8_t maximum;
+    int displayOffset;
+};
+
+inline constexpr std::array<PartParameterDescriptor, 24> kPartParameterDescriptors{{
+    {"Bank", 3, 0}, {"Sound", 127, 0}, {"Track mode", 3, 0}, {"Level", 127, 0},
+    {"Panorama", 20, 0}, {"FX1 send", 63, 0}, {"FX2 send", 63, 0},
+    {"Transpose", 48, -24}, {"Tune", 127, -64}, {"Cutoff", 127, -64},
+    {"Resonance", 127, -64}, {"EG attack", 127, -64}, {"EG decay", 127, -64},
+    {"EG release", 127, -64}, {"Vibrato rate", 127, -64}, {"Vibrato depth", 127, -64},
+    {"Vibrato delay", 127, -64}, {"Velocity curve", 14, 0}, {"Hold pedal", 1, 0},
+    {"Modulation depth", 127, 0}, {"Pitch sensitivity", 24, -12},
+    {"Volume modulation sensitivity", 127, -64}, {"Tone modulation sensitivity", 127, -64},
+    {"Portamento time", 127, 0}
+}};
+
+// Lossless editor model for one documented 32-byte Part SysEx frame.
+// Parameter bytes map to the official manual's PART-Parameter offsets 00..17.
 class PartEditModel {
 public:
     static constexpr std::size_t kFrameSize = 32;
@@ -31,13 +56,22 @@ public:
 
     bool isLoaded() const noexcept { return !original_.empty(); }
     bool isDirty() const noexcept { return dirty_; }
-    std::size_t partType() const noexcept { return isLoaded() ? edited_[6] : 0; }
     std::size_t sourcePerformanceIndex() const noexcept { return isLoaded() ? edited_[5] : 0; }
+    std::size_t partSlotIndex() const noexcept { return isLoaded() ? edited_[6] : 0; }
+    // The factory Performance dump stores its four editable Part blocks as parts 13–16.
+    std::size_t partNumber() const noexcept {
+        return isLoaded() && edited_[6] >= 1 && edited_[6] <= 4 ? 12 + edited_[6] : 0;
+    }
 
-    // Zero-based index into the 24 opaque data bytes; -1 means unavailable.
     int rawValue(std::size_t index) const noexcept {
         if (!isLoaded() || index >= kDataSize) return -1;
         return static_cast<int>(edited_[kDataOffset + index]);
+    }
+
+    int parameterValue(PartParameter parameter) const noexcept {
+        const auto index = static_cast<std::size_t>(parameter);
+        const int raw = rawValue(index);
+        return raw < 0 ? raw : raw + kPartParameterDescriptors[index].displayOffset;
     }
 
     bool setRawValue(std::size_t index, std::uint8_t value) noexcept {
@@ -45,6 +79,18 @@ public:
         edited_[kDataOffset + index] = value;
         dirty_ = edited_ != original_;
         return true;
+    }
+
+    bool setParameterValue(PartParameter parameter, std::uint8_t value) noexcept {
+        const auto index = static_cast<std::size_t>(parameter);
+        if (index >= kPartParameterDescriptors.size() ||
+            value > kPartParameterDescriptors[index].maximum)
+            return false;
+        return setRawValue(index, value);
+    }
+
+    static constexpr const PartParameterDescriptor* descriptor(std::size_t index) noexcept {
+        return index < kPartParameterDescriptors.size() ? &kPartParameterDescriptors[index] : nullptr;
     }
 
     const std::vector<std::uint8_t>& originalSysEx() const noexcept { return original_; }
