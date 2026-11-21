@@ -25,7 +25,7 @@ class PartAnalysisTests(unittest.TestCase):
         result = module.analyze(test_module.smf(frames))
         self.assertEqual(result["part_frames"],200)
         self.assertEqual([p["part_number"] for p in result["parts"]],[13,14,15,16])
-        self.assertEqual(result["parts"][0]["byte_statistics"][0]["constant_value"],1)
+        self.assertEqual(result["parts"][0]["parameter_statistics"][0]["constant_value"],1)
         self.assertEqual(result["parts"][3]["byte_statistics"][23]["constant_value"],4)
 
 if __name__ == "__main__": unittest.main()
