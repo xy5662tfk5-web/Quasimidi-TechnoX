@@ -4,6 +4,7 @@
 #include "TechnoXSoundCatalog.h"
 #include "TechnoXMidiControlRouter.h"
 #include "MASSAudioEngine.h"
+#include "BasicMASSVoiceBackend.h"
 #include <array>
 #include <atomic>
 #include <vector>
@@ -58,7 +59,8 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MidiControlRouter midiControlRouter;
-    technox::MASSAudioEngine massEngine;
+    technox::BasicMASSVoiceBackend synthBackend;
+    technox::MASSAudioEngine massEngine{&synthBackend};
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
