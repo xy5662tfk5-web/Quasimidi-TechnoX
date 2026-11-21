@@ -84,7 +84,7 @@ public:
                     ? runtimeControls.rpn(part, 0) : 2;
                 const double bendSemitones = (static_cast<double>(bendRaw) / 8192.0) *
                     static_cast<double>(bendRange);
-                const double vibratoSemitones = static_cast<double>(modWheel) * 0.5 / 127.0 *
+                const double vibratoSemitones = static_cast<double>(modWheel) * 0.5 *
                     std::sin(state.lfoPhase);
                 const double frequency = 440.0 * std::pow(2.0,
                     (static_cast<double>(slot.note) - 69.0 + bendSemitones + vibratoSemitones) / 12.0);
@@ -95,7 +95,7 @@ public:
                 if (state.phase >= twoPi) state.phase -= twoPi;
 
                 const float cutoffNorm = rawCutoff < 0 ? 0.78f : static_cast<float>(rawCutoff) / 127.0f;
-                const float modulatedCutoff = juceSafeClamp(cutoffNorm + modWheel * 0.35f / 127.0f, 0.0f, 1.0f);
+                const float modulatedCutoff = juceSafeClamp(cutoffNorm + modWheel * 0.35f, 0.0f, 1.0f);
                 const float cutoffHz = 35.0f * std::pow(350.0f, modulatedCutoff);
                 const float resonanceNorm = rawResonance < 0 ? 0.0f : static_cast<float>(rawResonance) / 127.0f;
                 const float q = 0.707f + resonanceNorm * 9.0f;
