@@ -31,8 +31,8 @@ public:
 
     bool isLoaded() const noexcept { return !original_.empty(); }
     bool isDirty() const noexcept { return dirty_; }
-    std::size_t partType() const noexcept { return isLoaded() ? edited_[5] : 0; }
-    std::size_t sourcePerformanceIndex() const noexcept { return isLoaded() ? edited_[6] : 0; }
+    std::size_t partType() const noexcept { return isLoaded() ? edited_[6] : 0; }
+    std::size_t sourcePerformanceIndex() const noexcept { return isLoaded() ? edited_[5] : 0; }
 
     // Zero-based index into the 24 opaque data bytes; -1 means unavailable.
     int rawValue(std::size_t index) const noexcept {
@@ -62,7 +62,7 @@ private:
         constexpr std::array<std::uint8_t, 5> header{{0xF0, 0x3F, 0x00, 0x22, 0x44}};
         for (std::size_t i = 0; i < header.size(); ++i)
             if (m[i] != header[i]) return false;
-        if (m[5] < 0x01 || m[5] > 0x04) return false;
+        if (m[6] < 0x01 || m[6] > 0x04) return false;
         for (std::size_t i = 1; i + 1 < m.size(); ++i)
             if (m[i] > 0x7F) return false;
         return true;
