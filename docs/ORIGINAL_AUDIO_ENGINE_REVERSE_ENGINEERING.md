@@ -151,3 +151,23 @@ The most valuable missing evidence is a complete, sharp photo set of the TechnoX
 - Do not assume the 128 KiB IC51 image is the complete factory sound library.
 - Do not call the current sine-wave test backend an authentic TechnoX sound engine.
 - Do not merge research or DSP branches into the user's main working branch without approval.
+
+
+### Queue-direction correction and current consumer evidence
+
+A closer read of the queue routines changes the working interpretation of the third buffer:
+
+- `0xA7DE` is a producer for XDATA page `0x32` (queue 1); it stores the byte in R7 at `0x3200 + write_index`.
+- `0xA7FC` is the matching consumer for page `0x32`; it decrements the queue count, reads from `0x3200 + read_index`, advances the read index, and returns the byte in R7.
+- `0xA831` is a producer for page `0x33` (queue 2); it stores R7 at `0x3300 + write_index`.
+- `0xA84F` is the matching consumer for page `0x33`; it decrements the count, reads the next byte, advances the read index, and returns it in R7.
+- `0xA884` is a producer for page `0x34` (queue 3); it stores R7 at `0x3400 + write_index`.
+- `0xA8A2` is the matching consumer for page `0x34`; it reads the next byte and returns it in R7.
+
+The receive interrupt at `0x3DF0–0x3E76` directly feeds queue 1 through `0xA7DE`, and conditionally feeds queue 2 through `0xA831` when the `0x99` status gate is active and the `0x7D95` status read is zero. The consumer cross-references found so far include `0x5B9E` for queue 1 and `0x5B05` for queue 2; queue 1 also has callers at `0x3DA8` and `0x3DC2`, whose exact execution context needs a fresh listing.
+
+Queue 3 should no longer be described as a third receive queue. Its producer `0xA884` has callers in routines around `0x9AEE–0x9B79` that construct outgoing MIDI bytes. For example, `0x9B69` enqueues the sequence `90 14 00` by calling `0xA884` three times. This is strong evidence that queue 3 is an **outgoing MIDI-byte queue**. The complete drain-to-ACIA transmit path still needs to be traced before marking that direction fully confirmed.
+
+The queue consumers use internal counters and read/write indices, while the actual byte arrays are in external RAM pages `0x32`, `0x33`, and `0x34`. These are CPU-side MIDI transport buffers, not waveform/sample memory and not evidence of the audio ASIC's register map.
+
+Next, inspect the queue-1/queue-2 consumers and all callers of `0xA8A2`, then follow the queue-3 drain to the ACIA transmitter at `0xA7B3`. Separately trace `0x5B05` and `0x5B9E` into the MIDI parser and determine which subsequent code reaches the undocumented `0x7Cxx` window. The sound-device identity and Note On/Off register protocol remain unresolved.
