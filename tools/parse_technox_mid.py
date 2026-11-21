@@ -18,9 +18,9 @@ class Frame:
     track: int
     event_offset: int
     @property
-    def record_index(self): return self.raw[6] if len(self.raw) > 6 else None
+    def record_index(self): return self.raw[5] if len(self.raw) > 5 else None
     @property
-    def block_type(self): return self.raw[5] if len(self.raw) > 5 else None
+    def block_type(self): return self.raw[6] if len(self.raw) > 6 else None
 
 @dataclass
 class Performance:
