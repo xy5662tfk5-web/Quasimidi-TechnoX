@@ -1879,3 +1879,17 @@ This is a separate data product from the 12-byte event descriptor at 0x2900 and 
 The 0x3F10 path invokes 0x02D1 before it reloads the Part descriptor's +2 field, sets +10 to 0x7F, and calls 0x0D0E. Therefore 0x02D1 prepares a per-Part derived value in XDATA 0x2000, while 0x0D0E separately resolves/services the endpoint slot. The two calls are adjacent in one setup path, but they perform different jobs.
 
 The next step is to identify the readers of each two-byte cell in XDATA 0x2000 and establish whether the value participates in the later 0x0A57 arithmetic or in a different runtime path.
+
+
+### 58.4 Additional call sites confirm this is shared Part setup arithmetic
+
+The ROM contains four direct calls to 0x02D1: 0x3F18, 0x4849, 0x4C8B, and 0x62C5.
+
+The callers prepare different input pairs before invoking the same helper:
+
+- 0x3F18: Part index is copied into RAM[0x28], RAM[0x29] receives the Part's current selector value, and RAM[0x2A] is initialized to 0x40.
+- 0x4849: RAM[0x28] receives the Part index, RAM[0x29] is cleared, and RAM[0x2A] is formed from a state bit plus 0x40.
+- 0x4C8B: RAM[0x29] is derived from a masked runtime value and RAM[0x2A] receives the corresponding second input.
+- 0x62C5: RAM[0x28] receives the Part index, RAM[0x29] is cleared, and RAM[0x2A] is set to 0x40.
+
+This caller diversity confirms that 0x02D1 is a reusable per-Part conversion helper, not a one-off initialization step. Its two-byte output at `0x2000 + 2*PartIndex` is an intermediate numeric result. We still need to find the consumers of that cell before assigning it a synthesis-parameter name.
