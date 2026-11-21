@@ -19,6 +19,25 @@ class VoiceManager {
 public:
     static constexpr std::size_t kVoiceCount = 21;
 
+    int allocationTarget() const noexcept {
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (!voices_[i].active) return static_cast<int>(i);
+        int selected = -1;
+        std::uint64_t oldest = ~std::uint64_t{0};
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (voices_[i].releasing && voices_[i].age < oldest) {
+                oldest = voices_[i].age;
+                selected = static_cast<int>(i);
+            }
+        if (selected >= 0) return selected;
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (voices_[i].age < oldest) {
+                oldest = voices_[i].age;
+                selected = static_cast<int>(i);
+            }
+        return selected;
+    }
+
     int noteOn(std::uint8_t part, std::uint8_t channel, std::uint8_t note, std::uint8_t velocity) noexcept {
         if (velocity == 0) {
             noteOff(channel, note);
