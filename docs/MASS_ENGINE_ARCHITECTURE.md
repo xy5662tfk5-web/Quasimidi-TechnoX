@@ -80,7 +80,7 @@ The current PartEditModel is a control/data model. The processor now keeps edita
 
 ## 5. Synthesis backend strategy
 
-The first infrastructure is now present: a 21-slot VoiceManager, a lock-free 16-Part parameter store, a per-Part Mod Wheel source store, a generic ModulationMatrix, and an IMASSVoiceBackend interface. The current NullMASSVoiceBackend intentionally emits silence. Use this interface so verified sound-generation models can be added without changing MIDI routing, Part editing, voice allocation, or the JUCE wrapper.
+The first infrastructure is now present: a 21-slot VoiceManager, a lock-free 16-Part parameter store, per-key Drum parameter storage, per-Part Mod Wheel/Portamento/Soft Pedal/RPN state, Performance Common FX/arpeggiator controls, a generic ModulationMatrix, and an IMASSVoiceBackend interface. Documented CC/NRPN/RPN routes now update these stores, including separate Part NRPN, per-key Drum NRPN and Common FX/arpeggiator CC paths. Factory FX/arpeggiator defaults are extracted from the Common SysEx frame using the manual's offsets. The current NullMASSVoiceBackend intentionally emits silence. Use this interface so verified sound-generation models can be added without changing MIDI routing, Part editing, voice allocation, or the JUCE wrapper.
 
 A future backend should support:
 - preparation from verified sound/sample resources;
