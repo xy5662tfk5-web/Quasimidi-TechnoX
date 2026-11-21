@@ -312,3 +312,29 @@ The only direct call site found for `0x26A2` is at `0x374E`. It is part of the s
 The source bytes sent by `0x26A2` are literally the first `0x600` bytes of IC4 program ROM. This region includes reset/interrupt vectors, executable 8051 instructions, and a conspicuous 256-byte waveform-like table beginning at `0x001E`; it is not a separately identified DSP firmware image. The routine writes this ROM-derived pattern to 256 indices in each of two selector planes, verifies it, writes the bitwise complement, and verifies again. A mismatch causes an infinite wait at the compare instruction.
 
 This startup position and complement/readback pattern make **external memory/interface self-test** the strongest interpretation. It may validate memory attached to a coprocessor or another peripheral, but it is not evidence that IC4 uploads executable M.A.S.S. DSP code. The physical device and purpose of the two selector planes remain unknown.
+
+## 28. IC4 ROM contains a confirmed 64-point signed sine lookup table
+
+A fresh byte-level inspection of the descrambled IC4 image corrects the earlier broad description of the first 0x600 bytes as a "waveform-like table". The actual layout is mixed code and data:
+
+- `0x0000–0x001D`: reset/interrupt vectors and jump stubs.
+- `0x001E–0x005D`: exactly 64 bytes forming a signed sine cycle.
+- `0x005E` onward: additional mixed lookup/control data and executable code; it is not one continuous 256-byte waveform table.
+
+The 64-byte sequence at `0x001E–0x005D` is:
+
+`00 0C 19 25 31 3C 47 51 5A 62 6A 70 75 7A 7D 7E 7F 7E 7D 7A 75 70 6A 62 5A 51 47 3C 31 25 19 0C 00 F4 E7 DB CF C4 B9 AF A6 9E 96 90 8B 86 83 82 81 82 83 86 8B 90 96 9E A6 AF B9 C4 CF DB E7 F4`
+
+This is a 64-step sine wave encoded as signed 8-bit samples (approximately -127..+127, with the positive and negative half-cycles meeting at zero). It is not PCM content from IC51 and is not evidence of a factory multisample bank.
+
+### Code references to the sine table
+
+The descrambled code contains direct `MOV DPTR,#0x001E` / `MOVC A,@A+DPTR` lookups at:
+- `0x0677` and `0x0686`, in a shared calculation path around `0x0670–0x06AA`;
+- `0x0C52`, immediately followed by `INC R1` and `MOVX @R1,A` (`F3`), then `RET`.
+
+These instruction sequences prove the table is actively read by executable firmware and, in the `0x0C52` path, the resulting value is written through an indirect external-data pointer. The exact consumer of that output is not yet established: it may be a modulation/shape/control table or another peripheral-side data structure. Do not yet label it as the TechnoX audio oscillator's actual wavetable.
+
+### Consequence for reverse engineering
+
+We now have a real, compact mathematical waveform embedded in IC4, plus executable references to it. Next trace the callers of `0x0C52` and the surrounding `0x0670` calculation to identify the destination structure and whether this is used by modulation, voice synthesis, startup diagnostics, or peripheral initialization. Keep this separate from the unresolved 6 MB sample-memory architecture and the 128 KB IC51 dump.
