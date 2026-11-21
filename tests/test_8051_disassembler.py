@@ -13,6 +13,10 @@ class MCS51DisassemblerTests(unittest.TestCase):
         self.assertEqual(instruction_length(0x11), 2)  # ACALL
         self.assertEqual(instruction_length(0x90), 3)  # MOV DPTR,#imm16
         self.assertEqual(instruction_length(0xE0), 1)  # MOVX A,@DPTR
+        self.assertEqual(instruction_length(0x94), 2)  # SUBB A,#imm
+        self.assertEqual(instruction_length(0x95), 2)  # SUBB A,direct
+        for opcode in range(0x96, 0xA0):
+            self.assertEqual(instruction_length(opcode), 1)  # SUBB A,@Ri / A,Rn
         self.assertEqual(instruction_length(0xB6), 3)  # CJNE @R0,#imm,rel
 
     def test_relative_branch_wrap_and_sign(self):
