@@ -34,7 +34,7 @@ class ParserTests(unittest.TestCase):
 
     def test_decode_one_observed_performance_layout(self):
         frames = []
-        frames.append(b"\xf0\x3f\x00\x22\x44\x05\x05" + b"\x00Fantasy" + b"\xf7")
+        frames.append(b"\xf0\x3f\x00\x22\x44\x05\x05" + b"\x00Fantasy " + b"\xf7")
         frames.append(b"\xf0\x3f\x00\x22\x44\x05\x00" + bytes(66) + b"\xf7")
         for part_type in (1, 2, 3, 4):
             frames.append(b"\xf0\x3f\x00\x22\x44\x05" + bytes([part_type]) + bytes(25) + b"\xf7")
