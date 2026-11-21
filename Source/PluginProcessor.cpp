@@ -187,6 +187,8 @@ void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& dest
         for (const auto& part : performance)
             for (const auto& parameter : part)
                 stream.writeByte(static_cast<char>(parameter.load(std::memory_order_acquire)));
+    for (const auto& channel : partMidiChannels)
+        stream.writeByte(static_cast<char>(channel.load(std::memory_order_acquire)));
 }
 
 void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -212,6 +214,11 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
                     juce::jlimit(0, static_cast<int>(maximum), value), std::memory_order_release);
             }
         }
+    }
+    for (auto& channel : partMidiChannels) {
+        const int restoredChannel = static_cast<unsigned char>(stream.readByte());
+        if (restoredChannel >= 1 && restoredChannel <= 16)
+            channel.store(restoredChannel, std::memory_order_release);
     }
     setCurrentProgram(program);
 }
