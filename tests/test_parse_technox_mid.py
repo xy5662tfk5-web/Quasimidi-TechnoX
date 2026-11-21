@@ -1,6 +1,6 @@
 import importlib.util, struct, unittest, sys
 from pathlib import Path
-MODULE = Path(__file__).with_name("parse_technox_mid.py")
+MODULE = Path(__file__).parents[1] / "tools" / "parse_technox_mid.py"
 spec = importlib.util.spec_from_file_location("parse_technox_mid", MODULE)
 parser = importlib.util.module_from_spec(spec); sys.modules[spec.name] = parser; spec.loader.exec_module(parser)
 ROOT = MODULE.parents[1]
