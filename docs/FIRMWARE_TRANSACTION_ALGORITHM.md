@@ -2052,3 +2052,30 @@ This establishes that 0x4256 is a Part-aware event-to-runtime-state preparation 
 ### 64.4 Immediate next target
 
 Trace writes to RAM[0x64], RAM[0x66], and RAM[0x67] in the parser before 0x56BB/0x56C5, then follow the 0x1494 branch selected by each event type. In parallel, identify which 0x4256 caller is the true incoming MIDI Note On path versus internal/timer or outgoing-event paths; the other direct call sites at 0x5AC0, 0xAD6E, and 0xADBF must not be conflated with the MIDI parser solely because they share the callee.
+
+
+## 65. Classifying the 0x4256 entry paths and event ABI
+
+### 65.1 Confirmed parser-side call sites
+
+The parser block at 0x5670 begins by saving incoming R7 to RAM[0x64] and R3 to RAM[0x66]. It derives a dispatch class from R5 (the accumulator value is transformed by adding 0xF7 and compared against a small set of branch values), then selects one of several event paths. In the two branches at 0x56BB and 0x56C5, it reloads R7=RAM[0x64], R5=RAM[0x66], R3=RAM[0x67] and calls 0x4256. These are parser-originated calls, not diagnostic calls.
+
+The parser also has separate branches around 0x56A0–0x56D0 that call 0x9968 or 0x51B6, indicating that not every parsed event enters 0x4256. The branch at 0x56BB/0x56C5 is conditional on parser dispatch state and should be treated as a specific event class rather than all MIDI messages.
+
+### 65.2 Queue-side call at 0x5AC0
+
+At 0x5AC0 the code reads event bytes from the 0x30E6/0x2B9F staging area, loads a value from 0x30E8 as a continuation/queue condition, and calls 0x4256. This sits immediately before the queue/transmit handling code around 0x5AE3, which also reads the 0x30E6 event staging byte and sends bytes through the ACIA helper 0xA7B3. It is therefore an event-queue path, but its relationship to the parser-originated calls at 0x56BB/0x56C5 must be resolved before calling it a second Note On route.
+
+### 65.3 Remaining callers
+
+The other direct callers, 0xAD6E and 0xADBF, occur in two repeated loops that select XDATA page 0x36, read/update bit state, save registers, and invoke 0x4256 with a computed index and fixed/derived arguments. Their surrounding structure is periodic or table-driven state processing, not the linear MIDI parser. They are likely internal event/Part refresh paths; no note-on semantic is assigned without tracing the producer data and the loop's trigger.
+
+### 65.4 Revised event-path conclusion
+
+The safest current model is:
+
+- 0x56BB/0x56C5: parser-originated, class-specific Part update path into 0x4256.
+- 0x5AC0: queued event-staging path into 0x4256, with adjacent MIDI transmit/queue logic.
+- 0xAD6E/0xADBF: repeated page-0x36 state-driven calls into 0x4256.
+
+The routine 0x4256 remains a Part/runtime-state preparation routine, not a proven final audio command writer. Its output feeds the 0x1494 descriptor loader and subsequent record-processing paths. The next decisive work is to resolve the event-class comparisons at 0x5670, follow the actual writes that populate RAM[0x67], and map the exact 0x1494 branch taken for the parser-originated call.
