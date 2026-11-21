@@ -241,6 +241,39 @@ int main() {
     }
     assert(engine.voiceManager().activeVoiceCount() == 0);
 
+    // Regression: full-scale Mod Wheel must produce a measurable vibrato
+    // difference. This catches accidental double-normalization (127x too quiet).
+    BasicMASSVoiceBackend noWheelBackend;
+    BasicMASSVoiceBackend fullWheelBackend;
+    MASSAudioEngine noWheelEngine(&noWheelBackend);
+    MASSAudioEngine fullWheelEngine(&fullWheelBackend);
+    constexpr int modulationSamples = 4096;
+    noWheelEngine.prepare(48000.0, modulationSamples);
+    fullWheelEngine.prepare(48000.0, modulationSamples);
+    for (MASSAudioEngine* candidate : {&noWheelEngine, &fullWheelEngine}) {
+        assert(candidate->setPartParameter(12, PartParameter::level, 127));
+        assert(candidate->setPartParameter(12, PartParameter::cutoffFrequency, 127));
+        assert(candidate->setPartParameter(12, PartParameter::resonance, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egAttack, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egDecay, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egRelease, 0));
+    }
+    assert(noWheelEngine.setModWheel(12, 0));
+    assert(fullWheelEngine.setModWheel(12, 127));
+    noWheelEngine.noteOn(12, 1, 69, 110);
+    fullWheelEngine.noteOn(12, 1, 69, 110);
+    std::array<float, modulationSamples> noWheelLeft{}, noWheelRight{};
+    std::array<float, modulationSamples> fullWheelLeft{}, fullWheelRight{};
+    float* noWheelChannels[] = {noWheelLeft.data(), noWheelRight.data()};
+    float* fullWheelChannels[] = {fullWheelLeft.data(), fullWheelRight.data()};
+    noWheelEngine.render(noWheelChannels, 2, modulationSamples);
+    fullWheelEngine.render(fullWheelChannels, 2, modulationSamples);
+    double modulationDifference = 0.0;
+    for (int i = 0; i < modulationSamples; ++i)
+        modulationDifference += std::abs(noWheelLeft[static_cast<std::size_t>(i)] -
+                                         fullWheelLeft[static_cast<std::size_t>(i)]);
+    assert(modulationDifference > 0.01);
+
     std::cout << "Basic MASS backend: note-on, finite stereo output, note-off and release passed\n";
     return 0;
 }
