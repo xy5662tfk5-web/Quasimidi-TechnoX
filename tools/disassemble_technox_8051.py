@@ -259,11 +259,23 @@ def main() -> None:
     lines += ["", "REACHABLE MOV DPTR,# CONSTANTS (static immediate operands)"]
     for value, count in sorted(dptr_constants.items(), key=lambda item: (-item[1], item[0])):
         lines.append(f"0x{value:04X}: {count} occurrence(s)")
-    lines += ["", "MAME-MAPPED I/O ADDRESS SETUPS AND LOCAL CONTEXT"]
-    for target in (0xA000, 0xB000):
+    io_targets = [
+        (0x3900, "MAME no-op read window"), (0x390B, "MAME no-op read"),
+        (0x7C00, "MAME no-op read/write window"), (0x8000, "MAME no-op read/write window"),
+        (0x8001, "MAME no-op read/write window"), (0x8002, "MAME no-op read/write window"),
+        (0x8003, "MAME no-op read/write window"), (0xA000, "ACIA write"),
+        (0xA001, "ACIA write"), (0xA002, "ACIA read"), (0xA003, "ACIA read"),
+        (0xB000, "LCD write"), (0xB001, "LCD write"), (0xB002, "LCD read"),
+        (0xB003, "LCD read"), (0xC000, "MAME no-op write window"),
+        (0xFF10, "MAME no-op read/write"),
+    ]
+    lines += ["", "MAME-MAPPED EXTERNAL I/O / NO-OP ADDRESS SETUPS AND LOCAL CONTEXT"]
+    for target, label in io_targets:
         matches = [pc for pc in ordered if code[pc] == 0x90 and
                    ((code[pc + 1] << 8) | code[pc + 2]) == target]
-        lines.append(f"DPTR <- 0x{target:04X}: " + (", ".join(f"0x{x:04X}" for x in matches) or "no reachable immediate setup"))
+        if not matches:
+            continue
+        lines.append(f"{label}: DPTR <- 0x{target:04X} at " + ", ".join(f"0x{x:04X}" for x in matches))
         for site in matches:
             lines.append(f"  context around 0x{site:04X}:")
             idx = ordered.index(site)
@@ -287,8 +299,16 @@ def main() -> None:
     movx_count = sum(1 for pc in insns if code[pc] in movx_ops)
     print(f"MOVX sites: {movx_count}")
     print("Reachable MOV DPTR,# constants: " + ", ".join(f"0x{x:04X}" for x in sorted(dptr_constants)))
-    print("MAME-mapped I/O instruction contexts:")
-    for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
+    print("MAME-mapped external I/O/no-op address contexts:")
+    for target, label in ((0x3900,"no-op 0x3900"),(0x390B,"no-op 0x390B"),
+                          (0x7C00,"no-op 0x7C00"),(0x8000,"no-op 0x8000"),
+                          (0x8001,"no-op 0x8001"),(0x8002,"no-op 0x8002"),
+                          (0x8003,"no-op 0x8003"),(0xA000,"ACIA write"),
+                          (0xA001,"ACIA write"),(0xA002,"ACIA read"),
+                          (0xA003,"ACIA read"),(0xB000,"LCD write"),
+                          (0xB001,"LCD write"),(0xB002,"LCD read"),
+                          (0xB003,"LCD read"),(0xC000,"no-op 0xC000"),
+                          (0xFF10,"no-op 0xFF10")):
         sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
         for site in sites:
             idx = ordered.index(site)
