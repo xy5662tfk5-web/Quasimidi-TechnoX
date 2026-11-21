@@ -1296,9 +1296,9 @@ This confirms that the 12-byte page-0x29 records are initialized/serviced for al
 The four indices 0x0C–0x0F in the Note On dispatcher are therefore the four Performance Parts being triggered in that path, while the underlying Part descriptor/slot infrastructure is initialized across all 16 Parts.
 
 
-## 42. Corrected MCS-51 decode and confirmed MIDI Note On → Part record path
+## 46. Corrected MCS-51 decode and confirmed MIDI Note On → Part record path
 
-### 38.1 Disassembler instruction-length correction
+### 46.1 Disassembler instruction-length correction
 
 The instruction-length table in tools/disassemble_technox_8051.py previously treated every opcode from 0x94 through 0x9F as two bytes. That was incorrect for 0x96–0x9F:
 
@@ -1312,7 +1312,7 @@ The length table has been corrected. Unit tests now cover all opcodes 0x96–0x9
 The specific 0x1EDD and 0x0DB7 windows were re-read with corrected instruction lengths. The expanded reachability pass, seeded with the computed-dispatch destinations, now covers 17,546 instruction addresses and confirms 16 direct call sites to 0x0DB7:
 0x02C0, 0x0A4F, 0x0B53, 0x0D07, 0x0E1A, 0x0E67, 0x1045, 0x110A, 0x1E8A, 0x211F, 0x22F8, 0x236B, 0x26C9, 0x26DE, 0x2767, and 0x277E.
 
-### 38.2 MIDI event byte fields are now connected to the Part dispatcher
+### 46.2 MIDI event byte fields are now connected to the Part dispatcher
 
 At 0x57A8, the parser receives the MIDI status byte in R7, data byte 1 in R5, and data byte 2 in R3. It stores:
 
@@ -1323,7 +1323,7 @@ At 0x57A8, the parser receives the MIDI status byte in R7, data byte 1 in R5, an
 
 The Part-routing block at 0x597E–0x59BA dispatches selected Performance Parts 13–16 using zero-based Part indices 0x0C–0x0F. For each selected Part it sets R7 to the Part index, passes the message-type nibble in R5, passes data byte 1 in R3, copies data byte 2 to RAM[0x67], and calls 0x5671. The alternate route at 0x59FB passes the MIDI channel from RAM[0x63] as the Part/channel index.
 
-### 38.3 Note On arguments passed to 0x4256 are confirmed
+### 46.3 Note On arguments passed to 0x4256 are confirmed
 
 At 0x5671, the dispatcher saves:
 
@@ -1339,7 +1339,7 @@ It branches on the message-type nibble in R5. For Note On (status high nibble 0x
 
 They then call 0x4256. At entry, 0x4256 saves these as RAM[0x6E] (Part index), RAM[0x6F] (note), and RAM[0x70] (velocity). This is direct firmware evidence of the Note On argument contract; it is no longer just an inference from the routine's later calculations.
 
-### 38.4 The 24-byte 0x7C15 Part record is the live runtime parameter source
+### 46.4 The 24-byte 0x7C15 Part record is the live runtime parameter source
 
 For Part index P, the record base is S = 0x7C15 + 0x18*P. The Note On path reads offsets that match the manual's Part parameter map:
 
@@ -1356,7 +1356,7 @@ The velocity-curve path loads the incoming velocity into R7, reads Part offset +
 
 The routine also calls 0xAC00 with the Part index and note, connecting Note On to the active-key bitmap maintained in XDATA pages 0x35/0x36. It then selects descriptor pages and calls 0x1494, the descriptor loader already traced in earlier sections. This establishes a concrete path from parsed MIDI Note On, through the live Part parameter record, into descriptor loading and subsequent hardware-facing preparation.
 
-### 38.5 Current conclusion and next target
+### 46.5 Current conclusion and next target
 
 The 0x7C15 + 24*P table is not merely an arbitrary 16-entry structure: its offsets line up with the manual's documented Part parameters, and the Note On routine reads several of those exact offsets for transpose, velocity-curve mapping, and track-mode selection. The manual and firmware now corroborate one another on this runtime Part-state structure.
 
@@ -1385,9 +1385,9 @@ This establishes a second descriptor-to-Part-state path alongside the 0x0D80 slo
 The meaning of the 0x2054 scale byte, the two constant records, and the 0x2000 word is still unknown. Treat it as a per-Part fixed-point parameter output, not yet as a named pitch, frequency, envelope, or volume register.
 
 
-## 43. 0x1494 descriptor selector flags and per-Part slot page
+## 47. 0x1494 descriptor selector flags and per-Part slot page
 
-### 39.1 RAM[0x28] is a packed Part selector, not a plain bank number
+### 47.1 RAM[0x28] is a packed Part selector, not a plain bank number
 
 At 0x1494 the firmware first copies bits from RAM[0x28] into internal state:
 
@@ -1407,7 +1407,7 @@ It then masks RAM[0x28] with 0x0F, leaving the zero-based Part index. Therefore 
 
 This confirms that the +0xC0 and +0xE0 values in the Note On routine are packed mode/operation flags layered onto the Part index, not separate physical banks.
 
-### 39.2 Descriptor layout loaded by 0x1494
+### 47.2 Descriptor layout loaded by 0x1494
 
 The descriptor pointer is supplied in RAM[0x29:0x2A]. The loader reads its 12-byte record and extracts:
 
@@ -1432,7 +1432,7 @@ The loader also derives the Part index from RAM[0x28] and computes a per-Part ex
 
 If internal bit 0x06 is clear, RAM[0x2F] is added to this base to select an entry within the page. If bit 0x06 is set, the base is used without that offset at this stage. The loader then follows different slot/entry paths depending on RAM[0x30] (descriptor byte +1) and the selector flags.
 
-### 39.3 Zero and nonzero descriptor-byte-1 paths
+### 47.3 Zero and nonzero descriptor-byte-1 paths
 
 - If RAM[0x30] is zero and internal bit 0x06 is clear, the code reads a value from 0x28D8+PartIndex into RAM[0x45] and jumps to 0x0E8E.
 - If RAM[0x30] is zero and bit 0x06 is set, it clears bit 7 in the selected slot byte and scans the per-Part slot page for an entry whose status bit permits reuse. The scan updates RAM[0x2F] and the selected slot pointer.
@@ -1440,13 +1440,13 @@ If internal bit 0x06 is clear, RAM[0x2F] is added to this base to select an entr
 
 These paths establish a per-Part 0x80-byte slot/entry page and a busy/valid high-bit convention in its entries. They do not yet identify the downstream hardware or prove that each slot is one physical audio voice.
 
-### 39.4 0x1408 selects a byte lane and bit mask in the 0x2Axx area
+### 47.4 0x1408 selects a byte lane and bit mask in the 0x2Axx area
 
 The helper at 0x1408 computes a small dispatch index from R5 and R6, then uses a code-space jump table at 0x1416 to return one of eight bit masks (01, 02, 04, 08, 10, 20, 40, 80) in R5 and a DPTR low address derived from R5. The resulting pointer is in the 0x2Axx external-RAM page. The caller at 0x0E8E uses this helper while inspecting or updating the slot/entry map.
 
 This is another indication that the descriptor loader maintains structured bit/slot state in external RAM, rather than writing a simple linear set of sound-chip registers.
 
-### 39.5 Next data-flow question
+### 47.5 Next data-flow question
 
 The Note On routine sets RAM[0x29:0x2A] from the pointer stored at 0x2B98/0x2B99. That pointer is calculated as 0x2900 + 12*PartIndex. The Note On routine visibly writes the first two bytes of this 12-byte intermediate record, while 0x1494 consumes all 12 bytes. The next pass must inventory every writer to 0x2900 + 12*PartIndex and reconstruct the remaining ten bytes, including whether they come from sound definitions, preloaded Part state, or another descriptor table. This is the immediate bridge between the MIDI Note On path and the descriptor-driven slot allocator.
 
@@ -1464,9 +1464,9 @@ All three callers use the same 0x02D1 conversion and write the same two-byte loc
 The scale input at 0x2054 + PartIndex is read by 0x02D1; no direct writer to that address has been found in the current reachable-code scan. Indirect XDATA writes and any external/shared-memory initialization remain to be checked before concluding where that scale byte originates.
 
 
-## 44. Additional 12-byte descriptor writers and the high-level 0x0A57 output path
+## 48. Additional 12-byte descriptor writers and the high-level 0x0A57 output path
 
-### 40.1 0x3603 builds a larger part descriptor record
+### 48.1 0x3603 builds a larger part descriptor record
 
 The routine at 0x3603 is called five times from the initialization sequence at 0x37A6–0x3805. It computes the same record base used by Note On:
 
@@ -1489,7 +1489,7 @@ It sets RAM[0x28] to the Part index, RAM[0x29:0x2A] to the record pointer, and c
 
 The five callers provide these Part/R5/R3 combinations: (0,0x3B,0xF0), (1,0x30,0x0F), (0,0x3B,0x00), (1,0x30,0x00), and (0,0x7F,0xFF). Their higher-level meaning still needs to be tied to the caller's initialization state.
 
-### 40.2 Other routines update descriptor bytes +2 and +10
+### 48.2 Other routines update descriptor bytes +2 and +10
 
 Several independent routines calculate the descriptor addresses from the same 12-byte stride:
 
@@ -1500,13 +1500,13 @@ Several independent routines calculate the descriptor addresses from the same 12
 
 The +2 and +10 bytes are not arbitrary payload bytes: 0x0D0E maps both through the ROM table at 0x1208 before processing them. This is consistent with the extraction performed by 0x1494, which also maps descriptor bytes +2 and +10 through 0x1208.
 
-### 40.3 0x0D0E resolves a descriptor selector against the selected endpoint
+### 48.3 0x0D0E resolves a descriptor selector against the selected endpoint
 
 The helper first transforms RAM[0x29] and RAM[0x2A] independently through code-space table 0x1208. It then selects the XDATA page in RAM[0x50], examines the page's FC status/mode field, and scans endpoint records in the page-0x80 region. It accepts a candidate with the expected descriptor signature and calls 0x0D80 to prepare the endpoint record.
 
 The 0x0D80 path derives a value from the endpoint record, stores it into the endpoint's +1 field, sets internal bit 0x09, calls 0x0A57, then clears bit 0x09. This connects the 12-byte Part descriptor and its mapped +2/+10 selectors to the higher-level output routine.
 
-### 40.4 0x0A57 converts endpoint record fields into external-port traffic
+### 48.4 0x0A57 converts endpoint record fields into external-port traffic
 
 The routine at 0x0A57 reads fields relative to RAM[0x2E], including offsets +1, +2, +3, +4, and +7. It combines these with XDATA values in the 0x20xx range and calls arithmetic helper 0x1848 for transformed values. It then has two output branches:
 
@@ -1517,12 +1517,12 @@ The alternate branch's read at 0x8004 is confirmed, but the returned value is ov
 
 This is now a concrete multi-stage path: Part descriptor fields at 0x2900+12*P → 0x1494 slot/descriptor processing → 0x0D0E endpoint selection and selector mapping → 0x0A57 field transformation → 0x8000–0x8003 external-port output. The port is therefore involved in actual descriptor-driven runtime operations, not merely an isolated initialization routine. The physical IC and the semantics of each transmitted byte remain unverified.
 
-### 40.5 Immediate next target
+### 48.5 Immediate next target
 
 The next pass should decode the endpoint record produced by 0x0D80, follow the full 0x0A57 arithmetic path for representative descriptor values, and identify which of the 12-byte descriptor fields are changed by 0x3F10, 0x4803, 0x4B0A, and 0x6A79. This should reveal whether the mapped +2/+10 pair selects a parameter family, endpoint register group, or another operation class.
 
 
-## 45. Velocity Curve lookup bank recovered at 0xA8BF
+## 49. Velocity Curve lookup bank recovered at 0xA8BF
 
 The 0xABBF helper is called from the Note On path with R7 = incoming velocity and R5 = the Part's offset +17 Velocity Curve value. When R5 is zero, the helper returns without remapping. For a nonzero curve index, it computes:
 
