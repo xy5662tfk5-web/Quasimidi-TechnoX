@@ -128,9 +128,29 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
     const int performanceIndex = getCurrentProgram();
+    const int numSamples = buffer.getNumSamples();
+    const int channelCount = buffer.getNumChannels();
+    int renderedSamples = 0;
 
-    for (const auto metadata : midiMessages) {
-        const auto& message = metadata.getMessage();
+    // Render audio up to each MIDI event before applying it. Ignoring
+    // MidiMessageMetadata::samplePosition made every note/controller change
+    // take effect at the start of the block and caused timing jitter.
+    const auto renderUntil = [this, &buffer, channelCount, &renderedSamples](int endSample)
+    {
+        const int end = juce::jlimit(renderedSamples, buffer.getNumSamples(), endSample);
+        const int count = end - renderedSamples;
+        if (count <= 0)
+            return;
+
+        std::array<float*, 2> channels{};
+        for (int channel = 0; channel < channelCount; ++channel)
+            channels[static_cast<std::size_t>(channel)] = buffer.getWritePointer(channel, renderedSamples);
+        massEngine.render(channels.data(), channelCount, count);
+        renderedSamples = end;
+    };
+
+    const auto handleMessage = [this, performanceIndex](const juce::MidiMessage& message)
+    {
         if (message.isController()) {
             if (message.getControllerNumber() == 124)
                 setMidiRoutingMode(MidiRoutingMode::partChannels);
@@ -167,15 +187,11 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             massEngine.allNotesOff(message.getChannel());
         } else if (message.isPitchWheel()) {
             const int bend = message.getPitchWheelValue() - 8192;
-            for (int i = 0; i < targetCount; ++i) {
-                const int enginePart = 12 + targetSlots[static_cast<std::size_t>(i)];
-                massEngine.setPitchBend(enginePart, bend);
-            }
+            for (int i = 0; i < targetCount; ++i)
+                massEngine.setPitchBend(12 + targetSlots[static_cast<std::size_t>(i)], bend);
         } else if (message.isController()) {
             const int controller = message.getControllerNumber();
             const int value = message.getControllerValue();
-
-            // Common Performance CCs are independent of the currently active layer count.
             if (controller == 80)
                 setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx1Type, value);
             else if (controller == 81)
@@ -185,8 +201,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             else if (controller == 83)
                 setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpSpeed, value);
 
-            const auto partChange = midiControlRouter.handleControlChange(
-                message.getChannel(), controller, value);
+            const auto partChange = midiControlRouter.handleControlChange(message.getChannel(), controller, value);
             const auto drumChange = controller == 6
                 ? midiControlRouter.decodeDrumNrpnDataEntry(message.getChannel(), value)
                 : std::optional<technox::MidiControlRouter::DrumParameterChange>{};
@@ -199,7 +214,6 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                 const int enginePart = 12 + slot;
                 if (partChange.has_value())
                     setPartParameterRaw(performanceIndex, slot, partChange->parameter, partChange->rawValue);
-
                 if (controller == 1)
                     massEngine.setModWheel(enginePart, value);
                 else if (controller == 11)
@@ -210,7 +224,6 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                     massEngine.setSoftPedal(enginePart, value >= 64);
                 else if (controller == 121)
                     massEngine.resetPartControllers(enginePart);
-
                 if (drumChange.has_value())
                     massEngine.setDrumParameter(enginePart, drumChange->keyNumber,
                                                 drumChange->parameterIndex, drumChange->rawValue);
@@ -224,13 +237,15 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                                     message.getProgramChangeNumber());
             }
         }
+    };
+
+    for (const auto metadata : midiMessages) {
+        const int eventSample = juce::jlimit(renderedSamples, numSamples, metadata.samplePosition);
+        renderUntil(eventSample);
+        handleMessage(metadata.getMessage());
     }
-
-    // Render the first audible prototype voice backend. This generic oscillator
-    // is a development sound source, not decoded TechnoX ROM audio.
-    massEngine.render(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), buffer.getNumSamples());
+    renderUntil(numSamples);
 }
-
 void QuasimidiTechnoXAudioProcessor::setCurrentProgram(int index)
 {
     if (index >= 0 && performanceBank.select(static_cast<std::size_t>(index)))
