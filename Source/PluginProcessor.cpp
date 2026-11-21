@@ -6,8 +6,11 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true))
 {
     int midiSize = 0;
+    int catalogSize = 0;
     if (const auto* midiData = BinaryData::getNamedResource("TECHNOX_MID", midiSize))
         performanceBank.loadFromMidi(midiData, midiSize);
+    if (const auto* catalogData = BinaryData::getNamedResource("technox_ins_json", catalogSize))
+        soundCatalog.loadFromJson(catalogData, catalogSize);
 }
 
 bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
