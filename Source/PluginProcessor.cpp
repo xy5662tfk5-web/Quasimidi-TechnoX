@@ -144,6 +144,11 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             const auto change = midiControlRouter.handleControlChange(
                 message.getChannel(), message.getControllerNumber(), message.getControllerValue());
             if (message.getControllerNumber() == 6) {
+                const auto drum = midiControlRouter.decodeDrumNrpnDataEntry(
+                    message.getChannel(), message.getControllerValue());
+                if (drum.has_value())
+                    massEngine.setDrumParameter(12 + slot, drum->keyNumber,
+                                                drum->parameterIndex, drum->rawValue);
                 const auto rpn = midiControlRouter.decodeRpnDataEntry(
                     message.getChannel(), message.getControllerValue());
                 if (rpn.has_value())
