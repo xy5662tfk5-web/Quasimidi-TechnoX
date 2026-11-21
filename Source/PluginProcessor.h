@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <vector>
+#include <memory>
 
 enum class MidiRoutingMode : int { performanceOmni = 0, partChannels = 1 };
 
@@ -52,6 +53,10 @@ public:
     bool isPerformancePartActive(int partIndex) const noexcept;
     const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
 
+    // Call while audio processing is stopped. Ownership is transferred to the
+    // processor; this is the integration point for the recovered original DSP.
+    bool installVoiceBackend(std::unique_ptr<technox::IMASSVoiceBackend> backend) noexcept;
+
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
@@ -59,8 +64,8 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MidiControlRouter midiControlRouter;
-    technox::BasicMASSVoiceBackend synthBackend;
-    technox::MASSAudioEngine massEngine{&synthBackend};
+    std::unique_ptr<technox::IMASSVoiceBackend> voiceBackend;
+    technox::MASSAudioEngine massEngine;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
