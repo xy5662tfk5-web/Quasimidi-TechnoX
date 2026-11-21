@@ -127,7 +127,7 @@ def export_json(perfs: List[Performance], path: Path):
            "note":"Undocumented bytes remain opaque and are preserved as complete SysEx frames.",
            "performances":[{"index":p.index,"name":p.name,"name_frame_hex":p.name_frame.hex(" "),
              "common_frame_hex":p.common_frame.hex(" "),
-             "parts":[{"part":i+1,"raw_sysex_hex":raw.hex(" ")} for i,raw in enumerate(p.part_frames)]}
+             "parts":[{"part":i+13,"block_selector":i+1,"raw_sysex_hex":raw.hex(" ")} for i,raw in enumerate(p.part_frames)]}
              for p in perfs]}
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
 
