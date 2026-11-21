@@ -358,6 +358,28 @@ def main() -> None:
         print(f"  DPTR 0x{target:04X}, representative code 0x{site:04X}, total setup sites={len(sites)}:")
         for nearby_pc in ordered[idx:idx + 19]:
             print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
+    print("MIDI receive dispatch context (single known call to ACIA RX byte reader):")
+    receive_callers = [pc for pc in ordered if insns[pc].text.startswith(("LCALL", "ACALL"))
+                       and insns[pc].text.endswith("0xA7C0")]
+    print("  ACIA RX reader callers: " + (", ".join(f"0x{x:04X}" for x in receive_callers) or "none"))
+    for focus in (0x3DF0, 0x3DFE, 0x3E00, 0x3E20, 0x3E40, 0x3E60,
+                  0x3E80, 0x3EA0, 0x3EC0, 0x3EE0):
+        if focus not in insns:
+            continue
+        idx = ordered.index(focus)
+        print(f"  code near 0x{focus:04X}:")
+        for nearby_pc in ordered[idx:idx + 12]:
+            print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
+    print("Voice/peripheral setup routine B61B-B664:")
+    for focus in (0xB61B, 0xB630, 0xB64F, 0xB665):
+        if focus not in insns:
+            continue
+        idx = ordered.index(focus)
+        callers = [pc for pc in ordered if insns[pc].text.startswith(("LCALL", "ACALL"))
+                   and insns[pc].text.endswith(f"0x{focus:04X}")]
+        print(f"  entry 0x{focus:04X}; direct callers: " + (", ".join(f"0x{x:04X}" for x in callers) or "none"))
+        for nearby_pc in ordered[idx:idx + 18]:
+            print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
     print("MIDI serial routines and ACIA initialization helper contexts:")
     for focus in (0xA7A0, 0xA7B3, 0xA7C0, 0xA7C6, 0xA819, 0xA86C, 0xB630):
         callers = [pc for pc in ordered if insns[pc].text.startswith(("LCALL", "ACALL"))
