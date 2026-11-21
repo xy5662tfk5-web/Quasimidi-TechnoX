@@ -5,9 +5,11 @@
 namespace {
 constexpr int kStateMagicV1 = 0x54584E50; // TXNP
 constexpr int kStateMagicV2 = 0x54584E32; // TXN2: Part values + MIDI channels
-constexpr int kStateMagicV3 = 0x54584E33; // TXN3: Part + Common values + MIDI channels
+constexpr int kStateMagicV3 = 0x54584E33; // TXN3: Part + four Common values + MIDI channels
+constexpr int kStateMagicV4 = 0x54584E34; // TXN4: Part + five Common values + MIDI channels + routing mode
 constexpr int kPartStateBytesV2 = 50 * 4 * 24 + 4;
 constexpr int kPartStateBytesV3 = 50 * 4 * 24 + 50 * 4 + 4;
+constexpr int kPartStateBytesV4 = 50 * 4 * 24 + 50 * 5 + 4 + 1;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -316,7 +318,7 @@ juce::AudioProcessorEditor* QuasimidiTechnoXAudioProcessor::createEditor()
 void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     juce::MemoryOutputStream stream(destData, false);
-    stream.writeInt(kStateMagicV3);
+    stream.writeInt(kStateMagicV4);
     stream.writeInt(getCurrentProgram());
     for (const auto& performance : partValues)
         for (const auto& part : performance)
