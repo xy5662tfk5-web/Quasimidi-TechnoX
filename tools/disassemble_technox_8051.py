@@ -348,6 +348,16 @@ def main() -> None:
     for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
         sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
         print(f"{label} DPTR 0x{target:04X} setup sites: " + (", ".join(f"0x{x:04X}" for x in sites) or "none"))
+    print("Undocumented 0x7C00 peripheral-window representative contexts:")
+    for target in (0x7C00, 0x7C05, 0x7C06, 0x7C07, 0x7C10, 0x7CEE, 0x7CEF, 0x7CF0, 0x7CFE, 0x7D95):
+        sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target and has_local_movx(pc)]
+        if not sites:
+            continue
+        site = sites[0]
+        idx = ordered.index(site)
+        print(f"  DPTR 0x{target:04X}, representative code 0x{site:04X}, total setup sites={len(sites)}:")
+        for nearby_pc in ordered[idx:idx + 19]:
+            print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
     print("ACIA initialization helper contexts:")
     for focus in (0xA7C6, 0xA819, 0xA86C):
         callers = [pc for pc in ordered if insns[pc].text.endswith(f"0x{focus:04X}")]
