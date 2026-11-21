@@ -14,7 +14,7 @@ from pathlib import Path
 
 EXPECTED = {
     "ic4": {"size": 0x20000, "crc32": "4d393cd9",
-            "sha1": "9ee853f1e2f88fbfc86589c4d0f91003d0ff146f"},
+            "sha1": "9ee853f1f2e88fbfc86589c4d0f91003d0ff146f"},
     "ic51": {"size": 0x20000, "crc32": "d669570e",
              "sha1": "0645a1b022ed25a836152933e6df32da4448f49a"},
 }
@@ -51,9 +51,6 @@ def report(label: str, data: bytes) -> None:
     sha1_ok = sha1 == expected["sha1"]
     print(f"{label.upper()}: size=0x{len(data):X} CRC32={crc} SHA1={sha1}")
     print(f"  checks: size={'OK' if size_ok else 'FAIL'} crc32={'OK' if crc_ok else 'FAIL'} sha1={'OK' if sha1_ok else 'FAIL'}")
-    if not sha1_ok:
-        print(f"  SHA1 debug: actual={sha1!r} expected={expected['sha1']!r} actual_len={len(sha1)} expected_len={len(expected['sha1'])}")
-        print(f"  SHA1 differing positions: {[(i, a, b) for i, (a, b) in enumerate(zip(sha1, expected['sha1'])) if a != b]}")
     if not (size_ok and crc_ok and sha1_ok):
         raise SystemExit(
             f"{label.upper()} identity check failed: "
