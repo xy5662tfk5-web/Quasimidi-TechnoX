@@ -702,7 +702,7 @@ At the visible setup path beginning at 0x1700, the firmware derives RAM[0x2B] fr
 Thus, in this entry path:
 
 - RAM[0x2D] is the selected XDATA page/bank selector.
-- RAM[0x2B] starts as the high-nibble group derived from that selector and increments once per eight-byte record.
+- RAM[0x2B] starts as (RAM[0x2D] & 0x0F) shifted into the high nibble, and increments once per eight-byte record.
 - RAM[0x2E] is the output-record offset and starts at zero.
 - RAM[0x36:0x37] is the descriptor-stream pointer loaded from page offsets 0x61/0x60.
 - RAM[0x2C] is the remaining-record loop counter; its exact initializer is outside this 0x1700 setup slice and must be traced at the caller above it.
@@ -722,7 +722,7 @@ The instruction-aligned setup at 0x196B–0x197B establishes:
 
 - A = RAM[0x2B] & 0x0F
 - SWAP A; RR A; ORL A,#0x80
-- RAM[0x2E] = the resulting offset
+- RAM[0x2E] = 0x80 | ((RAM[0x2B] & 0x0F) << 3)
 - RAM[0x2C] = 0x10
 - RAM[0x36:0x37] = the current descriptor pointer from DPTR
 
@@ -746,3 +746,31 @@ This makes 0xFF and the 0x38 class structurally distinct control values: 0xFF is
 RAM[0x2C] is initialized to exactly 16 at 0x1975 and decremented once at 0x19C2 after each completed record. The routine can also exit early through the 0xFF sentinel path. Consequently, the normal maximum is sixteen record slots, but a sentinel can terminate processing before all sixteen have been visited.
 
 The current code establishes record count and stride, but does not yet prove that all sixteen slots correspond one-to-one with physical voices. That mapping still depends on the meaning of the group/index byte RAM[0x2B] and the receiver's interpretation of the emitted packets.
+
+
+## 21. Selected page and the sixteen output-slot addresses
+
+The caller-side path at 0x1614–0x1618 sets RAM[0x2D] = RAM[0x3E] & 0x1F. At 0x16C3 the firmware writes RAM[0x2D] to SFR A0, selecting the XDATA page used by subsequent MOVX @R0/@R1 accesses.
+
+At 0x1700, the group/index initialization is exactly:
+
+- A = RAM[0x2D]
+- SWAP A
+- clear internal bit 0x0D; set it if original A.0 (RAM[0x2D].0) was set
+- ANL A,#0xF0
+- RAM[0x2B] = A
+
+Therefore RAM[0x2B] is not the high nibble of RAM[0x2D]. It is the low nibble of RAM[0x2D], shifted into the high nibble: RAM[0x2B] = (RAM[0x2D] & 0x0F) << 4.
+
+The slot-base calculation at 0x196B–0x1973 then gives:
+
+RAM[0x2E] = 0x80 | ((RAM[0x2B] & 0x0F) << 3)
+
+Because RAM[0x2B] begins with a zero low nibble and increments once per record, the sixteen consecutive output record offsets are:
+
+0x80, 0x88, 0x90, 0x98, 0xA0, 0xA8, 0xB0, 0xB8,
+0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8.
+
+Each slot is eight bytes wide. This is an exact address-space result from the arithmetic and loop, not a guess about the semantic identity of the slots. The selected XDATA page is RAM[0x2D], so the effective record locations are page RAM[0x2D], offsets 0x80 through 0xF8.
+
+This also clarifies why the four-byte packet's first byte changes as RAM[0x2B], RAM[0x2B]-1, or RAM[0x2B]-2: it is a group/index value derived from the selected page's low nibble and advanced with the slot iteration. Whether the external receiver calls this a voice number, channel, part, or address remains unproven.
