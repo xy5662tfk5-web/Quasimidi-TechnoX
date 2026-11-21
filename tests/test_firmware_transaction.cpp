@@ -1,4 +1,5 @@
 #include "../Source/TechnoXFirmwareTransaction.h"
+#include "../Source/TechnoXMailboxProtocol.h"
 
 #include <cassert>
 #include <cstdint>
@@ -6,6 +7,19 @@
 using namespace technox::firmware;
 
 int main() {
+    // 0x0DB7 writes R5, R2, R3, then R4 with ACC.6 cleared.
+    // Internal flag 0x0C mirrors bit 7 of the modified fourth byte.
+    const auto mailboxLow = makeMailboxWrite(0x12, 0x34, 0x56, 0x7F);
+    assert(mailboxLow.kBaseAddress == 0x8000);
+    assert((mailboxLow.bytes == std::array<std::uint8_t, 4>{0x12, 0x34, 0x56, 0x3F}));
+    assert(!mailboxLow.setInternalFlag0C);
+    const auto mailboxHigh = makeMailboxWrite(0xA1, 0xB2, 0xC3, 0xFF);
+    assert((mailboxHigh.bytes == std::array<std::uint8_t, 4>{0xA1, 0xB2, 0xC3, 0xBF}));
+    assert(mailboxHigh.setInternalFlag0C);
+    const auto mailboxFlagOnly = makeMailboxWrite(0, 0, 0, 0x80);
+    assert(mailboxFlagOnly.bytes[3] == 0x80);
+    assert(mailboxFlagOnly.setInternalFlag0C);
+
     XDataMemory memory;
     XDataMemory::Page page{};
     page[0x20] = 0xE5; // first byte: high bit must be masked by the loader
