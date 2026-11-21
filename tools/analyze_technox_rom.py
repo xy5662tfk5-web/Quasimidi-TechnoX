@@ -125,7 +125,7 @@ def main() -> None:
         print(f"\nWrote descrambled IC4 working copy: {args.write_descrambled_ic4}")
 
     if args.ic51.exists():
-        inspect_ic51(args.ic51)
+        inspect_ic51(args.ic51.read_bytes())
     else:
         print(f"\nIC51 not found at {args.ic51}; skipped. No IC51 transform was applied.")
 
