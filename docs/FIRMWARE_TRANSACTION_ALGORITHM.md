@@ -1252,3 +1252,28 @@ The initializer at 0xB665 uses base S = 0x7C15 + 0x18*PartIndex and writes the f
 The initializer does not write offset +3, so its default Level value must be supplied by another initialization or data-loading path. The conditional zeroing of +0/+1 also depends on the caller's R5 argument; it is not unconditional for every call.
 
 The FX2 Send exception is tied to zero-based PartIndex 9 (one-based Part 10). This matches the instrument's dedicated drum-Part position, but the firmware alone does not prove why FX2 Send is forced to zero there.
+
+
+## 38. Descriptor bytes +2 and +10 drive a slot update through 0x0D0E and 0x0D80
+
+The routine at 0x0D0E is a separate slot-service path used by callers at 0x3F45, 0x4880, 0x4B34, and 0x6AA2. It first maps RAM[0x29] and RAM[0x2A] through the ROM table at 0x1208, then selects the page in RAM[0x50] and checks the page's offset-FC mode nibble against RAM[0x28].
+
+It scans page offsets 0x70–0x7F for a candidate entry, derives the slot index into RAM[0x2B], and computes slot base RAM[0x2E] = 0x80 + 8*index. The slot is serviced only when its status tests pass:
+- (slot[+0] & 0x38) is not 0x38;
+- (slot[+0] & 0x38) equals 0x10;
+- (slot[+0] & 0x7A) equals 0x12.
+
+A matching slot is passed to 0x0D80.
+
+### 38.1 0x0D80 computes slot +1 from slot +5 and the mapped descriptor pair
+
+The 0x0D80 helper reads slot offset +5. If it is zero, it writes zero to slot offset +1. Otherwise it uses the mapped RAM[0x29] and RAM[0x2A] values in two MUL AB operations, producing a nonzero scaled/combined result in B (SFR 0xF0). It writes that result to slot offset +1, sets internal bit 0x09, calls the slot service routine 0x0A57, clears bit 0x09, and returns.
+
+This proves a data path from the 12-byte Part event record into the eight-byte slot array:
+
+- event-record +2 -> RAM[0x29] -> ROM table 0x1208 -> 0x0D80 arithmetic;
+- event-record +10 -> RAM[0x2A] -> ROM table 0x1208 -> 0x0D80 arithmetic;
+- slot +5 -> multiplier/input to the same arithmetic;
+- computed result -> slot +1 -> 0x0A57 -> 0x0DB7 / 0x8000 packet path.
+
+The exact user-facing names of event-record +2, event-record +10, and slot +5 are still not assigned. The important result is that they are not inert bytes: they jointly calculate a slot value that is subsequently serviced and can reach the external hardware interface.
