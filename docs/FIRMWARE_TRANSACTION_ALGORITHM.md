@@ -1296,7 +1296,7 @@ This confirms that the 12-byte page-0x29 records are initialized/serviced for al
 The four indices 0x0C–0x0F in the Note On dispatcher are therefore the four Performance Parts being triggered in that path, while the underlying Part descriptor/slot infrastructure is initialized across all 16 Parts.
 
 
-## 38. Corrected MCS-51 decode and confirmed MIDI Note On → Part record path
+## 42. Corrected MCS-51 decode and confirmed MIDI Note On → Part record path
 
 ### 38.1 Disassembler instruction-length correction
 
@@ -1385,7 +1385,7 @@ This establishes a second descriptor-to-Part-state path alongside the 0x0D80 slo
 The meaning of the 0x2054 scale byte, the two constant records, and the 0x2000 word is still unknown. Treat it as a per-Part fixed-point parameter output, not yet as a named pitch, frequency, envelope, or volume register.
 
 
-## 39. 0x1494 descriptor selector flags and per-Part slot page
+## 43. 0x1494 descriptor selector flags and per-Part slot page
 
 ### 39.1 RAM[0x28] is a packed Part selector, not a plain bank number
 
@@ -1464,7 +1464,7 @@ All three callers use the same 0x02D1 conversion and write the same two-byte loc
 The scale input at 0x2054 + PartIndex is read by 0x02D1; no direct writer to that address has been found in the current reachable-code scan. Indirect XDATA writes and any external/shared-memory initialization remain to be checked before concluding where that scale byte originates.
 
 
-## 40. Additional 12-byte descriptor writers and the high-level 0x0A57 output path
+## 44. Additional 12-byte descriptor writers and the high-level 0x0A57 output path
 
 ### 40.1 0x3603 builds a larger part descriptor record
 
@@ -1522,7 +1522,7 @@ This is now a concrete multi-stage path: Part descriptor fields at 0x2900+12*P �
 The next pass should decode the endpoint record produced by 0x0D80, follow the full 0x0A57 arithmetic path for representative descriptor values, and identify which of the 12-byte descriptor fields are changed by 0x3F10, 0x4803, 0x4B0A, and 0x6A79. This should reveal whether the mapped +2/+10 pair selects a parameter family, endpoint register group, or another operation class.
 
 
-## 41. Velocity Curve lookup bank recovered at 0xA8BF
+## 45. Velocity Curve lookup bank recovered at 0xA8BF
 
 The 0xABBF helper is called from the Note On path with R7 = incoming velocity and R5 = the Part's offset +17 Velocity Curve value. When R5 is zero, the helper returns without remapping. For a nonzero curve index, it computes:
 
@@ -1551,4 +1551,4 @@ This closes one parameter loop end-to-end:
 - 0xABBF maps velocity through the selected 128-byte table.
 - The remapped value is written into the Part's intermediate descriptor/runtime record before 0x1494 continues.
 
-The six tables' musical labels (for example, soft, hard, fixed, or linear) are not assigned yet. The next useful comparison is the official manual's listed Velocity Curve names/numbers against these six numeric response shapes.
+The manual documents Velocity Curve values 0–14, so these six contiguous arrays account only for selectors 1–6. The computed address for selectors 7–14 advances into the code region beginning at 0xABBF; the firmware still performs MOVC there, but those bytes are not six additional clean monotonic tables. Section 36 records the raw selector/output behavior observed in a separate simulation; it must be validated with the exact R1/R7 state at every caller before assigning labels to selectors 7–14. Do not describe the six arrays as the complete manual range. The six tables' musical labels (for example, soft, hard, fixed, or linear) are not assigned yet.
