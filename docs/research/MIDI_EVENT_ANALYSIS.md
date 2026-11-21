@@ -271,3 +271,31 @@ The first transfer loop consumes code bytes in 3-byte groups, masks the third by
 ## 24. Updated interpretation of the fixed 0x8000 interface
 
 The fixed `0x8000–0x8003` interface is now more strongly characterized as a low-level serial/parallel mailbox or peripheral transfer port: firmware disables interrupts, selects P2 page `0x80`, sends 3-byte records encoded into the four register writes, and polls for matching/acknowledgment values. This bulk path is distinct from the per-note descriptor path, although both ultimately use the same `0x0DB7` primitive. The exact peripheral and the payload format remain unknown.
+
+## 25. Exact transfer size and loop structure of 0x26A2 (corrected)
+
+A cycle-by-cycle re-evaluation corrects the earlier size estimate. The routine does **not** stream 0xC00 bytes. It processes exactly 256 indexed entries, with two bank/plane selections per index:
+
+- `R5` is initialized to `0x00` and decremented once per entry by `DJNZ R5`. Starting at zero gives 256 iterations (0x00, 0xFF ... 0x01).
+- For each index, it reads six consecutive code bytes from `DPTR` and issues two four-register writes:
+  - first triplet: `R2=code[n]`, `R3=code[n+1]`, `R4=(code[n+2] & 7) + 0x00`;
+  - second triplet: `R2=code[n+3]`, `R3=code[n+4]`, `R4=(code[n+5] & 7) + 0x80`.
+  - `R5` supplies the index in both writes.
+- Six code bytes are consumed per index, so the first pass covers exactly `0x0000–0x05FF` (1536 bytes), not 0x0000–0x0BFF.
+- The readback phase resets DPTR to zero and checks both selections (`R4=0x00` and `R4=0x80`) against the original code bytes. The compare loops are tight self-loops on mismatch, so a mismatch stalls the routine rather than returning a failure code.
+- A second write phase again covers `0x0000–0x05FF`, but bitwise-complements each source byte before sending it; the third byte is then masked to its low three bits and combined with the bank selector.
+- The final readback phase compares against the complemented source bytes, again stalling at the mismatch compare if a byte differs.
+
+Therefore the routine performs two 1536-byte write passes (normal and complemented) and two corresponding verification passes. It is best described as an external-memory/peripheral transfer-and-integrity test or initialization handshake. It is **not yet proven** to upload executable DSP firmware. The exact meaning of the 256 index values, the two `0x00/0x80` selections, and the low-three-bit field still requires hardware evidence.
+
+## 26. Register-level shape of each indexed transfer
+
+The primitive `0x0DB7` writes:
+- `0x8000 = R5` — index (0..255 in decrementing order);
+- `0x8001 = R2` — first payload byte;
+- `0x8002 = R3` — second payload byte;
+- `0x8003 = R4` — selector in bit 7 plus three payload/control bits in bits 0..2.
+
+The companion readback helper `0x0DCE` uses the E7/E0C handshake state, writes `0x40` or `0xC0` to `0x8003` when the handshake state changes, and reads back registers `0x8000–0x8002`. The verification loops compare the returned index/data bytes and the low three bits of the selector against the source ROM bytes.
+
+This structure resembles an indexed two-plane external memory test: 256 indices × two selector values, with two full data bytes and three low-order bits per record. That is a structural description only; do not call it a specific RAM chip or assume a 19-bit physical word without schematic/chip evidence.
