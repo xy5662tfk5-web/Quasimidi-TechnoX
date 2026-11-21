@@ -146,3 +146,39 @@ That branch:
 - uses the mapped value and a flag bit from the selector to form an index/value pair, calls `0xB3BC`, and writes the resulting pair to `0x2905 + 0x0C*eventID`.
 
 This is a concrete per-event-slot parameter mapping operation. It does not yet show a hardware voice trigger; next trace is `0x6AA6`, table `0x5C3D`, and readers of the `0x2905/0x2909` per-slot records.
+
+## 14. Important correction: the general MIDI Note On path is 0x5671 -> 0x4256, not 0x418E
+
+Re-reading the full dispatcher shows that `0x5671` first classifies the MIDI message class in `R5`. For Note On (`R5=0x09`), it reaches `0x5697`. If the per-slot enable/selection checks pass, it calls `0x4256` with:
+- `R7 = event slot ID (0x0C–0x0F)`
+- `R5 = first MIDI data byte (note number)`
+- `R3 = second MIDI data byte (velocity)`
+
+This is the directly relevant Note On route. `0x418E` is called later from a different event/setup branch around `0x572F`; it must not be presented as the main Note On handler.
+
+### What 0x4256 does with a Note On
+
+- Saves the event ID, note number and velocity.
+- Computes the per-slot record base `0x2900 + 0x0C*eventID`, stores it in XDATA `0x2B98–0x2B99`.
+- Reads a per-slot value from `0x7C00 + 0x18*eventID + 0x1C`, combines it with XDATA `0x3700`, and normalizes the resulting 16-bit value into a bounded address/range before storing it in the per-slot record.
+- Reads another per-slot field at `0x7C00 + 0x18*eventID + 0x26`, passes it through `0xABBF`, and stores the mapped result at `0x2901 + 0x0C*eventID`.
+- Reads further per-slot control fields at offsets `0x17`, `0x19`, `0xD7`, and `0xA2`. Depending on their values, it calls `0xAC00`, `0xAC88`, `0x695A`, and ultimately builds a 13-byte descriptor for `0x1494` using the record pointer in `0x2B98–0x2B99`.
+
+This proves that Note On is converted through per-slot parameter records and descriptor transactions. It still does not prove that the final descriptor is a direct sample/DSP start command; that requires tracing the descriptor's downstream consumer and physical interface.
+
+## 15. 0x6AA6 and the threshold table at 0x73FA
+
+The separate helper `0x6AA6` is reached from the non-`0x09` branch of `0x418E`. It receives event ID, a selector (clamped to 0–3), and a value. It scans 14 ascending 16-bit thresholds in code memory at `0x73FA`:
+
+`0000, 005F, 0100, 0135, 0149, 0157, 0200, 022A, 023B, 0247, 025E, 0300, 030C, 036F`.
+
+The first threshold greater than or equal to the input selects a bucket; the routine writes the preceding bucket index to XDATA `0x3063 + eventID`. If no threshold matches, it returns without that write. This is a quantization/range lookup for an event-slot parameter, not a MIDI Note On or a sample trigger.
+
+The four-entry lookup table at `0x5C3D` begins `07, 07, 06, 06`; `0x418E` uses it to map the clamped selector before writing the mapped value to `0x2909 + 0x0C*eventID`.
+
+## 16. Confirmed next boundary
+
+The most promising chain to follow now is:
+`0x5671 (Note On) -> 0x4256 -> per-slot XDATA 0x7Cxx -> 0xABBF / 0xAC00 / 0xAC88 -> descriptor 0x1494 -> 0x16C3 / 0x189D`.
+
+The key unresolved question is what the per-slot `0x7Cxx` fields and the resulting 13-byte descriptor mean at the hardware boundary.
