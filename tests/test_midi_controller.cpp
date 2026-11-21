@@ -36,6 +36,10 @@ int main() {
     assert(!router.handleControlChange(1, 99, 0x18));
     assert(!router.handleControlChange(1, 98, 0x1a));
     assert(!router.handleControlChange(1, 6, 100));
+    cc = router.handleControlChange(1, 126, 0);
+    assert(cc && cc->parameter == PartParameter::trackMode && cc->rawValue == 2);
+    cc = router.handleControlChange(1, 127, 0);
+    assert(cc && cc->rawValue == 1);
     assert(!router.handleControlChange(17, 7, 100));
     return 0;
 }
