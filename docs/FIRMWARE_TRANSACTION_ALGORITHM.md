@@ -1216,3 +1216,39 @@ These are numeric mapping tables, not strings or obvious command identifiers. Th
 ### 19.5 Consequence for sound-engine reconstruction
 
 Do not equate every call to 0x0DB7 with Note On, voice allocation, or a sound-chip register write. The helper is a transport primitive. The next task is to classify each caller by its higher-level purpose and correlate the four transmitted bytes with the separate 0x7Cxx indexed-record subsystem, MIDI event handlers, and hardware evidence. The undocumented 0x7C00–0x7FFF window remains a stronger candidate for the runtime voice/peripheral state than the 0x8000–0x8003 port alone, but its physical device and register semantics are still not proven.
+
+
+## 37. Firmware defaults for the 24-byte Part record
+
+The initializer at 0xB665 uses base S = 0x7C15 + 0x18*PartIndex and writes the following defaults (offsets are relative to S). These values are cross-checked against the official Part parameter map:
+
+| Offset | Manual parameter | Firmware initialization |
+|---:|---|---:|
+| +0 | Bank number | writes 0 only when initializer argument R5 is 0 |
+| +1 | Sound number | writes 0 only when initializer argument R5 is 0 |
+| +2 | Track Mode | 0x01 (Poly) |
+| +3 | Level | not written by this initializer |
+| +4 | Panorama | 0x08 |
+| +5 | FX1 Send | 0x3F |
+| +6 | FX2 Send | 0x00 for PartIndex 9; otherwise 0x3F |
+| +7 | Transpose | 0x18 |
+| +8 | Fine Tune | 0x40 |
+| +9 | Cutoff | 0x40 |
+| +10 | Resonance | 0x40 |
+| +11 | EG Attack | 0x40 |
+| +12 | EG Decay | 0x40 |
+| +13 | EG Release | 0x40 |
+| +14 | Vibrato Rate | 0x40 |
+| +15 | Vibrato Depth | 0x40 |
+| +16 | Vibrato Delay | 0x40 |
+| +17 | Velocity Curve | 0x00 |
+| +18 | Hold Pedal | 0x01 |
+| +19 | Modulation Depth | 0x4C |
+| +20 | Pitch Sensitivity | 0x1A |
+| +21 | Volume Modulation Sensitivity | 0x40 |
+| +22 | Tone Modulation Sensitivity | 0x13 |
+| +23 | Portamento Time | 0x00 |
+
+The initializer does not write offset +3, so its default Level value must be supplied by another initialization or data-loading path. The conditional zeroing of +0/+1 also depends on the caller's R5 argument; it is not unconditional for every call.
+
+The FX2 Send exception is tied to zero-based PartIndex 9 (one-based Part 10). This matches the instrument's dedicated drum-Part position, but the firmware alone does not prove why FX2 Send is forced to zero there.
