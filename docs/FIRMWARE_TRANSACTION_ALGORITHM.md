@@ -2125,3 +2125,26 @@ The interrupt handler at 0x3DF0 also reads 0x30E5 and 0x30E4 while processing a 
 ### 67.5 Revised conclusion
 
 The 0x5670 dispatcher must be interpreted as a Part-state/event dispatcher whose guards consult the packed mirror of record 0x7C10–0x7C14. It is not yet proven to be called directly from the MIDI Note On/Off parser. The MIDI channel-voice parser at 0x57A8 remains the separately established Note On/Off path. The next trace should identify the dispatch mechanism/caller for 0x5670 and follow the Part-record changes into 0x4256/0x1494 and the downstream endpoint transaction machinery.
+
+
+## 68. Correct entry point and Note On/Off fan-out into 0x5671
+
+### 68.1 Address correction
+
+The byte at 0x5670 is RET (0x22); the dispatcher body begins at 0x5671. There are no direct LCALL/LJMP references to 0x5670. Five direct LCALLs target 0x5671, at 0x598A, 0x5999, 0x59A8, 0x59B7, and 0x5A04. The earlier shorthand “dispatcher 0x5670” should therefore be read as the code block beginning at 0x5671, not a callable entry at 0x5670.
+
+### 68.2 Proven upstream MIDI Note On/Off relationship
+
+The callers at 0x598A–0x59B7 are inside the routine beginning at 0x5940. That routine is reached from the channel-voice parser at 0x57A8 through the Note On/Note Off handling flow. It fans out four per-Part invocations using R7 values 0x0C, 0x0D, 0x0E, and 0x0F, while passing the saved event bytes from RAM[0x60], RAM[0x61], and RAM[0x62] into the 0x5671 dispatcher. A fifth call at 0x5A04 passes R7=RAM[0x63] and the same event-byte tuple. Thus 0x5671 is indeed reached from the MIDI channel-voice event-processing path, but it is a per-Part fan-out/eligibility stage rather than the status-byte decoder itself.
+
+### 68.3 Exact dispatcher arguments
+
+The repeated caller sequence loads R7 with 0x0C..0x0F (or RAM[0x63] in the final path), R5 from RAM[0x61], and R3 from RAM[0x62], then calls 0x5671. RAM[0x60] (status class) is tested in the surrounding parser logic; RAM[0x61] and RAM[0x62] are the two MIDI data bytes; RAM[0x63] is the extracted MIDI channel nibble. This clarifies the event ABI: the dispatcher receives an index/selector in R7, MIDI data byte 1 in R5, and MIDI data byte 2 in R3. It does not receive the raw status byte in R5.
+
+### 68.4 Note On versus Note Off scope
+
+The caller block is shared by the channel-voice parser's Note On and Note Off processing, so calls into 0x5671 are not exclusive to Note On. The parser separately treats Note On velocity zero as Note Off. The exact internal sub-branch in 0x5671 depends on the event data and Part-state tests; no single 0x4256 call should be labeled “Note On” without retaining that upstream status context.
+
+### 68.5 Revised chain
+
+The supported chain is now: MIDI channel-voice parser 0x57A8 (status/data extraction and Note On/Off classification) -> event handling/fan-out routine around 0x5940 -> per-Part calls to dispatcher 0x5671 -> conditional Part-state processing, including 0x4256 and other helpers. The XDATA 0x30E4–0x30E8 fields are packed mirrors of Part-record bytes, consulted by dispatcher guards; they are not the raw MIDI packet.
