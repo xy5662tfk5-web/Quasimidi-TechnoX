@@ -1598,3 +1598,51 @@ Handler 0x6D81 reads Part offset +20 from 0x7C15 + 0x18*PartIndex + 0x14 and sto
 This closes the previously open writer path for 0x2054 + PartIndex. The 0x02D1 routine reads this derived magnitude and uses its low nibble as a fixed-point scale factor. Therefore 0x2054 is a per-Part Pitch Sensitivity magnitude, not an unexplained external value.
 
 The 0x02D1 routine then applies that sensitivity to a signed/bipolar input and writes a 16-bit result at 0x2000 + 3*PartIndex. The evidence now strongly identifies this as the firmware's per-Part pitch-control scaling path. The exact external consumer and the meaning of the third byte at +2 remain to be traced.
+
+
+## 50. Endpoint record calculation, signed scaling, and packet-field roles
+
+### 50.1 0x0D80 writes endpoint-record byte +1 from the mapped descriptor selectors
+
+The 0x0D80 helper receives the mapped selector values in RAM[0x29] and RAM[0x2A], plus the 12-byte Part descriptor's byte +5. It reads endpoint-record byte +5 through R1 = RAM[0x2E] + 5.
+
+- If endpoint byte +5 is zero, the computed value in B/F0 is zero.
+- Otherwise it multiplies the endpoint byte +5 by RAM[0x29] after a one-bit rotate, then multiplies the intermediate result by RAM[0x2A] after another one-bit rotate.
+- If the result is zero while both mapped selectors are nonzero, it substitutes 1.
+
+It writes the resulting byte to endpoint-record offset +1, sets internal bit 0x09, calls 0x0A57, then clears bit 0x09. This makes endpoint-record +1 a derived value rather than a direct copy of one descriptor byte.
+
+### 50.2 0x1848 is a signed two-stage fixed-point scaling kernel
+
+The four reachable call sites are 0x0A83, 0x0ADF, 0x1FC6, and 0x2024. The routine:
+
+- handles signed operands using ACC.7 and internal bit 0x03;
+- uses two MUL AB stages, with RL A / ORL A,#1 before each multiply;
+- exchanges A and B to use the high product byte in the next stage;
+- adds R2 as a final offset;
+- checks PSW.OV and saturates to 0x7F or 0x81 on signed overflow;
+- repeats a correction path when the intermediate result remains negative.
+
+At the 0x0A83 call site, the inputs are especially clear: A is read from XDATA address 0x2040 + RAM[0x30], B is endpoint-record byte +4, and R2 is endpoint-record byte +1. The other three call sites use table-derived and intermediate values from the 0x1EDD descriptor path.
+
+The routine is therefore a signed fixed-point multiply/scale operation with saturation. The exact rounding and scale equation should be validated with a complete 8051 instruction-level test harness before it is replaced by a simplified arithmetic formula.
+
+### 50.3 The four-byte port packet carries a group field and transformed payload
+
+Across the descriptor paths, the first byte written to 0x8000 is repeatedly RAM[0x2B], RAM[0x2B]-1, or RAM[0x2B]-2. RAM[0x2B] is the group/index counter advanced by the common 0x19C2 record loop. This strongly supports interpreting packet byte 0 as a group/endpoint selector rather than a note number or velocity.
+
+The remaining three bytes are assembled from descriptor/endpoint fields and arithmetic results. The fourth byte is special: 0x0DB7 clears bit 6 before writing it, then uses bit 7 to update internal bit 0x0C. The alternate 0x0A57 branch toggles a 0x40/0xC0 control value at 0x8003 and performs a read at 0x8004 before writing the packet body. This is evidence of a control/strobe convention in the port protocol, although the exact electrical handshake and receiving IC are not identified.
+
+### 50.4 Reconstructed path so far
+
+The firmware-supported chain is now:
+
+1. MIDI parser and Part router produce Part index, note, and velocity.
+2. 0x4256 reads the live 24-byte Part record, remaps velocity, updates active-key state, and selects the descriptor page.
+3. 0x1494 extracts the 12-byte descriptor and manages the Part's 0x80-byte slot page.
+4. 0x0D0E maps descriptor selectors and resolves an endpoint.
+5. 0x0D80 derives endpoint-record byte +1.
+6. 0x0A57 combines endpoint fields, XDATA 0x20xx values, lookup tables, and signed fixed-point scaling.
+7. 0x0DB7 or the alternate direct-output branch writes the four-byte transaction to 0x8000–0x8003.
+
+This is the first end-to-end firmware path from a real MIDI Note On to the external four-byte interface. It still does not identify the physical receiver or prove the exact synthesis algorithm; those require hardware/bus evidence and validation of the remaining descriptor fields.
