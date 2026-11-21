@@ -162,6 +162,21 @@ struct LoaderBranchPlan {
     }
 };
 
+struct LoaderInputs {
+    std::uint8_t page = 0;
+    std::uint8_t offset = 0;
+    std::uint8_t mode = 0;
+};
+
+struct LoaderDecision {
+    LoaderInputs input{};
+    Descriptor descriptor{};
+    LoaderPath path = LoaderPath::zeroSecondByte;
+    // 0x1494's first branch is classified exactly. Subsequent slot arbitration
+    // and external-interface writes are intentionally not guessed here.
+    bool valid = false;
+};
+
 inline LoaderBranchPlan planLoaderBranch(const LoaderDecision& decision,
                                          LoaderRuntimeFlags flags) noexcept {
     LoaderBranchPlan plan{};
@@ -214,21 +229,6 @@ inline LoaderBranchPlan planLoaderBranch(const LoaderDecision& decision,
         plan.append(LoaderAction::continueAt1599);
     return plan;
 }
-
-struct LoaderInputs {
-    std::uint8_t page = 0;
-    std::uint8_t offset = 0;
-    std::uint8_t mode = 0;
-};
-
-struct LoaderDecision {
-    LoaderInputs input{};
-    Descriptor descriptor{};
-    LoaderPath path = LoaderPath::zeroSecondByte;
-    // 0x1494's first branch is classified exactly. Subsequent slot arbitration
-    // and external-interface writes are intentionally not guessed here.
-    bool valid = false;
-};
 
 inline LoaderDecision prepareLoaderDecision(const XDataMemory& memory,
                                             const LookupTable& lookup,
