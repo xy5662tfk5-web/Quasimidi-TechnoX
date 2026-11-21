@@ -31,7 +31,7 @@ juce_add_plugin(QuasimidiTechnoX
     FORMATS AU VST3 Standalone
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
-    NEEDS_MIDI_OUTPUT TRUE
+    NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD FALSE
@@ -44,6 +44,11 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/PluginEditor.cpp
     Source/TechnoXPartModel.h
     Source/TechnoXSoundCatalog.h
+    Source/TechnoXPerformanceLayers.h
+    Source/TechnoXMidiControlRouter.h
+    Source/MASSVoiceManager.h
+    Source/MASSModulationMatrix.h
+    Source/MASSAudioEngine.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC

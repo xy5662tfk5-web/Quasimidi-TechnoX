@@ -2,6 +2,13 @@
 #include <JuceHeader.h>
 #include "TechnoXPerformanceBank.h"
 #include "TechnoXSoundCatalog.h"
+#include "TechnoXMidiControlRouter.h"
+#include "MASSAudioEngine.h"
+#include <array>
+#include <atomic>
+#include <vector>
+
+enum class MidiRoutingMode : int { performanceOmni = 0, partChannels = 1 };
 
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
@@ -19,7 +26,7 @@ public:
 
     const juce::String getName() const override { return JucePlugin_Name; }
     bool acceptsMidi() const override { return true; }
-    bool producesMidi() const override { return true; }
+    bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
@@ -32,6 +39,16 @@ public:
     const technox::PerformanceBank& getPerformanceBank() const noexcept { return performanceBank; }
     juce::String getCurrentPerformanceName() const;
     juce::String getCurrentPartSoundName(int partIndex) const;
+    int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
+    bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    int getCommonControlRaw(int performanceIndex, technox::MASSCommonControl control) const noexcept;
+    bool setCommonControlRaw(int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept;
+    bool getEditedPartSysEx(int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const;
+    int getPartMidiChannel(int partIndex) const noexcept;
+    bool setPartMidiChannel(int partIndex, int midiChannel) noexcept;
+    MidiRoutingMode getMidiRoutingMode() const noexcept;
+    void setMidiRoutingMode(MidiRoutingMode mode) noexcept;
+    bool isPerformancePartActive(int partIndex) const noexcept;
     const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
 
     void getStateInformation(juce::MemoryBlock& destData) override;
@@ -40,6 +57,17 @@ public:
 private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
+    technox::MidiControlRouter midiControlRouter;
+    technox::MASSAudioEngine massEngine;
+    std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
+    std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
+    std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
+    std::array<std::atomic<int>, 4> partMidiChannels{};
+
+    void initialisePartStates();
+    void initialiseCommonControlsFromBank() noexcept;
+    void syncCurrentPerformanceToEngine() noexcept;
+    int partSlotForMidiChannel(int channel) const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
 };
