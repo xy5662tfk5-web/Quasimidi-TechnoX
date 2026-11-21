@@ -70,8 +70,8 @@ These controller messages are control paths, not a promise that each CC is a dir
 
 ## Editing model
 
-\`Source/TechnoXPartModel.h\` introduces a conservative editable Part model. It validates the observed envelope, exposes 24 raw byte slots, permits bounded 7-bit edits, preserves the original complete SysEx frame, and supports revert. It deliberately does not label any byte as oscillator, filter, envelope, effect, bank, or program until controlled device captures establish those semantics.
+\`Source/TechnoXPartModel.h\` introduces a conservative editable Part model. It validates the observed envelope, exposes 24 named parameters with documented ranges and signed display offsets, permits bounded edits, preserves the original complete SysEx frame, and supports revert. Raw-byte access remains available so original bytes can be preserved and any future unknown extensions can be round-tripped.
 
 ## Required next capture set
 
-To identify fields safely, capture the same Part repeatedly while changing exactly one hardware control at a time. Keep the MIDI channel, Performance, selected Part, and all other controls fixed. For each pair, compare the full SysEx frame and incoming/outgoing CC/RPN/NRPN events. Repeat each change at minimum, midpoint, and maximum. A byte mapping is promoted to confirmed only when the change is repeatable and reversible.
+Hardware captures are still useful to validate how the front-panel editor emits parameter changes, which SysEx address bytes are sent for live edits, and whether the supplied factory dump uses any device-specific encoding not shown in the manual.
