@@ -250,7 +250,8 @@ int main() {
     constexpr int modulationSamples = 4096;
     noWheelEngine.prepare(48000.0, modulationSamples);
     fullWheelEngine.prepare(48000.0, modulationSamples);
-    for (MASSAudioEngine* candidate : {&noWheelEngine, &fullWheelEngine}) {
+    const std::array<MASSAudioEngine*, 2> candidates{{&noWheelEngine, &fullWheelEngine}};
+    for (MASSAudioEngine* candidate : candidates) {
         assert(candidate->setPartParameter(12, PartParameter::level, 127));
         assert(candidate->setPartParameter(12, PartParameter::cutoffFrequency, 127));
         assert(candidate->setPartParameter(12, PartParameter::resonance, 0));
