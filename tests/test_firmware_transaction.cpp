@@ -125,10 +125,6 @@ int main() {
     assert(nonzeroPlanWithoutBit06.valid);
     assert(nonzeroPlanWithoutBit06.slotDataAddress == 0x224D); // bit 0x06 clear adds byte 0
 
-    const auto zeroScanPlan = planLoaderBranch(zeroDecision,
-        LoaderRuntimeFlags{true, false, false, false});
-    assert(zeroScanPlan.actionCount == 3);
-    assert(zeroScanPlan.actions[2] == LoaderAction::returnToModeControl);
     assert(nonzeroPlan.actionCount == 4);
     assert(nonzeroPlan.actions[0] == LoaderAction::callResourceManager17D4);
     assert(nonzeroPlan.actions[1] == LoaderAction::setSlotBusyBit);
@@ -143,6 +139,11 @@ int main() {
     assert(zeroControlPlan.actionCount == 2);
     assert(zeroControlPlan.actions[0] == LoaderAction::readModeControlByte);
     assert(zeroControlPlan.actions[1] == LoaderAction::jumpToZeroByteHandler);
+
+    const auto zeroScanPlan = planLoaderBranch(zeroDecision,
+        LoaderRuntimeFlags{true, false, false, false});
+    assert(zeroScanPlan.actionCount == 3);
+    assert(zeroScanPlan.actions[2] == LoaderAction::returnToModeControl);
 
     // 0x1009 uses the XDATA page selected by RAM[0x2D]. At call site 0x1045,
     // R4 is zero and E7 is set iff internal flag 0x0D is set.
