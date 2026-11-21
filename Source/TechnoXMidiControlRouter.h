@@ -58,6 +58,20 @@ public:
         return validChannel(channel) ? modulationWheel_[static_cast<std::size_t>(channel - 1)] : 0;
     }
 
+    struct RpnParameterChange {
+        std::uint8_t parameterIndex; // 0 = pitch-bend range, 1 = fine tune, 2 = coarse tune
+        std::uint8_t rawValue;
+    };
+
+    std::optional<RpnParameterChange> decodeRpnDataEntry(int channel, int value) const noexcept {
+        if (!validChannel(channel) || value < 0 || value > 127)
+            return std::nullopt;
+        const auto ch = static_cast<std::size_t>(channel - 1);
+        if (rpnMsb_[ch] != 0x00 || rpnLsb_[ch] > 0x02)
+            return std::nullopt;
+        return RpnParameterChange{rpnLsb_[ch], static_cast<std::uint8_t>(value)};
+    }
+
     static std::optional<PartParameterChange> decodePartNrpn(int msb, int lsb, int value) noexcept {
         if (value < 0 || value > 127 || msb < 0 || msb > 127 || lsb < 0 || lsb > 127 || msb != 0x01)
             return std::nullopt;
