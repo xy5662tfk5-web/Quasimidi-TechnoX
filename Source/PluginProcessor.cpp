@@ -5,7 +5,7 @@
 namespace {
 constexpr int kStateMagicV1 = 0x54584E50; // TXNP
 constexpr int kStateMagicV2 = 0x54584E32; // TXN2
-constexpr int kPartStateBytes = 50 * 4 * 24 + 4;
+constexpr int kPartStateBytes = 50 * 4 * 24 + 50 * 4 + 4;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -15,6 +15,9 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         for (auto& part : performance)
             for (auto& parameter : part)
                 parameter.store(0, std::memory_order_relaxed);
+    for (auto& performance : commonValues)
+        for (auto& value : performance)
+            value.store(0, std::memory_order_relaxed);
     for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
         partMidiChannels[part].store(static_cast<int>(part + 13), std::memory_order_relaxed);
 
@@ -59,6 +62,15 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
                     static_cast<technox::PartParameter>(parameter), value);
         }
     }
+    constexpr technox::MASSCommonControl controls[] = {
+        technox::MASSCommonControl::fx1Type, technox::MASSCommonControl::fx2Type,
+        technox::MASSCommonControl::arpResolution, technox::MASSCommonControl::arpSpeed
+    };
+    for (std::size_t i = 0; i < 4; ++i) {
+        const int value = commonValues[static_cast<std::size_t>(performanceIndex)][i]
+            .load(std::memory_order_acquire);
+        massEngine.setCommonControl(controls[i], value);
+    }
 }
 
 bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -101,7 +113,15 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isController()) {
             const auto change = midiControlRouter.handleControlChange(
                 message.getChannel(), message.getControllerNumber(), message.getControllerValue());
-            if (message.getControllerNumber() == 1)
+            if (message.getControllerNumber() == 80)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx1Type, message.getControllerValue());
+            else if (message.getControllerNumber() == 81)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx2Type, message.getControllerValue());
+            else if (message.getControllerNumber() == 82)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpResolution, message.getControllerValue());
+            else if (message.getControllerNumber() == 83)
+                setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpSpeed, message.getControllerValue());
+            else if (message.getControllerNumber() == 1)
                 massEngine.setModWheel(12 + slot, message.getControllerValue());
             else if (message.getControllerNumber() == 65)
                 massEngine.setPortamento(12 + slot, message.getControllerValue() >= 64);
@@ -168,6 +188,29 @@ bool QuasimidiTechnoXAudioProcessor::setPartParameterRaw(
                   .store(rawValue, std::memory_order_release);
     if (performanceIndex == getCurrentProgram())
         massEngine.setPartParameter(12 + partIndex, parameter, rawValue);
+    return true;
+}
+
+int QuasimidiTechnoXAudioProcessor::getCommonControlRaw(
+    int performanceIndex, technox::MASSCommonControl control) const noexcept
+{
+    const auto index = static_cast<std::size_t>(control);
+    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 4)
+        return -1;
+    return commonValues[static_cast<std::size_t>(performanceIndex)][index].load(std::memory_order_acquire);
+}
+
+bool QuasimidiTechnoXAudioProcessor::setCommonControlRaw(
+    int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept
+{
+    const auto index = static_cast<std::size_t>(control);
+    constexpr int maxima[4] = {21, 21, 3, 127};
+    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 4 ||
+        rawValue < 0 || rawValue > maxima[index])
+        return false;
+    commonValues[static_cast<std::size_t>(performanceIndex)][index].store(rawValue, std::memory_order_release);
+    if (performanceIndex == getCurrentProgram())
+        massEngine.setCommonControl(control, rawValue);
     return true;
 }
 
@@ -238,6 +281,9 @@ void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& dest
         for (const auto& part : performance)
             for (const auto& parameter : part)
                 stream.writeByte(static_cast<char>(parameter.load(std::memory_order_acquire)));
+    for (const auto& performance : commonValues)
+        for (const auto& value : performance)
+            stream.writeByte(static_cast<char>(value.load(std::memory_order_acquire)));
     for (const auto& channel : partMidiChannels)
         stream.writeByte(static_cast<char>(channel.load(std::memory_order_acquire)));
 }
@@ -266,6 +312,13 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
             }
         }
     }
+    constexpr int commonMaxima[4] = {21, 21, 3, 127};
+    for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
+        for (std::size_t control = 0; control < 4; ++control) {
+            const int value = static_cast<unsigned char>(stream.readByte());
+            commonValues[performance][control].store(
+                juce::jlimit(0, commonMaxima[control], value), std::memory_order_release);
+        }
     for (auto& channel : partMidiChannels) {
         const int restoredChannel = static_cast<unsigned char>(stream.readByte());
         if (restoredChannel >= 1 && restoredChannel <= 16)
