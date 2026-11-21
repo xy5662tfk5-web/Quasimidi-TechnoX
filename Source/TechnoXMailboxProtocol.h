@@ -28,6 +28,30 @@ inline MailboxWrite makeMailboxWrite(std::uint8_t r5, std::uint8_t r2,
     return result;
 }
 
+// Exact state transition from firmware helper 0x0DCE. ACC.7 (loaded from R4)
+// is compared with internal bit 0x0C. On a mismatch, the flag toggles and the
+// firmware writes 0xC0 (set) or 0x40 (clear) to XDATA 0x8003. On a match,
+// byte 0x8003 is left untouched.
+struct MailboxHandshakeTransition {
+    bool nextFlag0C = false;
+    bool writesFourthByte = false;
+    std::uint8_t fourthByte = 0;
+};
+
+inline MailboxHandshakeTransition transitionMailboxHandshake(
+    bool flag0C, std::uint8_t r4) noexcept {
+    MailboxHandshakeTransition result{};
+    result.nextFlag0C = flag0C;
+    const bool requestedFlag = (r4 & 0x80) != 0;
+    if (requestedFlag == flag0C)
+        return result;
+
+    result.nextFlag0C = requestedFlag;
+    result.writesFourthByte = true;
+    result.fourthByte = requestedFlag ? 0xC0 : 0x40;
+    return result;
+}
+
 constexpr std::uint8_t kMailboxScanPage = 0x80;
 constexpr std::uint8_t kMailboxScanFirstOffset = 0x80;
 constexpr std::uint8_t kMailboxScanEndOffset = 0xF8;
