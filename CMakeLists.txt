@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(QuasimidiTechnoX VERSION 0.1.0)
 
+include(CTest)
+
 # Configure with -DCMAKE_OSX_ARCHITECTURES=x86_64 for Intel Macs.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -68,3 +70,15 @@ target_link_libraries(QuasimidiTechnoX PRIVATE
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+
+
+# Firmware transaction decoder tests are dependency-free and do not instantiate JUCE.
+if (BUILD_TESTING)
+    add_executable(technox_firmware_transaction_tests
+        tests/test_firmware_transaction.cpp
+    )
+    target_compile_features(technox_firmware_transaction_tests PRIVATE cxx_std_17)
+    add_test(NAME technox_firmware_transaction_tests
+        COMMAND technox_firmware_transaction_tests
+    )
+endif()
