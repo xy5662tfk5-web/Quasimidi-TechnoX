@@ -1026,3 +1026,30 @@ The 0x4256 routine calculates the per-Part 24-byte record address using 0x7C15 +
 The 0x1494 loader consumes those descriptor pointers and reaches the 0x189D / 0x1BC3 dispatch machinery. The decoded handlers construct the external four-byte transactions described in sections 17–24, including the writes through 0x0DB7 and the direct 0x8000–0x8003 path.
 
 This establishes a concrete software route from MIDI Note On to the external hardware interface through the Part record and descriptor system. It does not yet establish the receiving IC's identity or prove which packet fields correspond to pitch, sample address, envelope, or other synthesis parameters.
+
+
+## 31. 0x4256 builds a per-Part 12-byte descriptor and invokes five descriptor modes
+
+At entry, 0x4256 saves:
+- R7 (zero-based Part index) -> RAM[0x6E]
+- R5 (note number) -> RAM[0x6F]
+- R3 (velocity) -> RAM[0x70]
+
+It computes 12 * PartIndex and stores the resulting XDATA source pointer in 0x2B98/0x2B99 as:
+
+- high byte = 0x29
+- low byte = 12 * PartIndex
+
+Therefore RAM[0x29:0x2A] later receives a pointer into page 0x29 at offset 12 * PartIndex, i.e. the per-Part 12-byte intermediate record at XDATA 0x2900 + 12*PartIndex. This is the source record consumed by 0x1494; it is distinct from the 24-byte Part state record at 0x7C15 + 24*PartIndex.
+
+After preparing the intermediate record and its related state, 0x4256 reloads the pointer from 0x2B98/0x2B99 and calls 0x1494 under several mode values:
+
+1. RAM[0x28] = PartIndex + 0x10; call at 0x4403.
+2. RAM[0x28] = PartIndex + 0xC0; conditional call at 0x442C.
+3. RAM[0x28] = PartIndex + 0xE0; conditional call at 0x4455.
+4. RAM[0x28] = PartIndex; call at 0x4467.
+5. A final fixed descriptor call with RAM[0x28]=0x09, RAM[0x29]=0x29, RAM[0x2A]=0x6C; call at 0x44A6.
+
+These are five distinct descriptor/mode passes for one note/Part event. The mode byte selects the descriptor interpretation in the 0x1494/0x189D machinery; the page-0x29 record pointer supplies the event-specific source fields.
+
+This narrows the next task to decoding the 12-byte record's individual offsets and the mode-specific descriptor tables selected by RAM[0x28]. Only after that can we name the outgoing 0x8000 packet fields as note, pitch, sample, envelope, or other synthesis parameters.
