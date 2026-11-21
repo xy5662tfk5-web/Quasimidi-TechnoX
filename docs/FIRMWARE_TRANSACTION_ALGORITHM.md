@@ -661,7 +661,7 @@ The descriptor pointer is then saved back to RAM[0x36:0x37]. The fifth input byt
 
 The instruction sequence around 0x2085–0x20C4 performs these operations:
 
-1. Copies RAM[0x04] (register-bank R4 in the active register bank) into R2, then derives R4 from F0 using SWAP A followed by RR A. R3 is the high portion of this transformed value: R3 = R4 & 0xF8.
+1. Copies direct IRAM byte 0x04 into R2 (address 0x04 is register-bank-0 R4; this is an absolute direct address, not a claim about the currently selected register bank), then derives R4 from F0 using SWAP A followed by RR A. R3 is the high portion of this transformed value: R3 = R4 & 0xF8.
 2. Reads the byte at XDATA address RAM[0x2E] through R1. If bit 2 of that byte is clear, it takes the alternate path at 0x210F. If bit 2 is set, R2 is transformed by SWAP/RL and mask 0x1F, and R4 is masked to its low three bits.
 3. If RAM[0x3E] is nonzero, it becomes R5; R6 is derived from R3 using RLC and mask 0xFC; R7 is derived from R4 using RLC; R3 and R4 are then cleared. If RAM[0x3E] is zero, R5/R6/R7 are all cleared.
 4. Internal bit 0x0D controls whether internal bit 0x0C is set and whether ACC.7 is set in the outgoing R4/R7 fields. ACC.7 here is a transient bit of the accumulator value being prepared, not a persistent flag.
@@ -712,3 +712,37 @@ The 0x19C2 continuation advances RAM[0x2E] by eight and increments RAM[0x2B], th
 ### 19.5 Remaining uncertainty
 
 This gives a byte-accurate software-level packet layout and the immediate source fields. It still does not identify whether the external receiver interprets the first byte as a voice/channel/address, whether the remaining bytes are data/flags, or whether the write window is memory-mapped to a dedicated IC, FPGA/CPLD, or glue logic. That requires the board schematic/chip-pin trace or captured bus activity.
+
+
+## 20. Descriptor-loop cardinality and sentinel handling
+
+### 20.1 The pass is explicitly bounded to sixteen records
+
+The instruction-aligned setup at 0x196B–0x197B establishes:
+
+- A = RAM[0x2B] & 0x0F
+- SWAP A; RR A; ORL A,#0x80
+- RAM[0x2E] = the resulting offset
+- RAM[0x2C] = 0x10
+- RAM[0x36:0x37] = the current descriptor pointer from DPTR
+
+The common continuation at 0x19C2 advances RAM[0x2E] by eight, increments RAM[0x2B], and executes DJNZ RAM[0x2C],0x1986. Therefore this pass has a hard count of sixteen iterations, with one eight-byte record stride per completed iteration. This is a firmware constant, not an estimate based on a table's apparent size.
+
+The loop body begins at 0x1986 by restoring DPTR from RAM[0x36:0x37], then reads the next descriptor/control byte. The handler-specific path advances RAM[0x36:0x37] by the number of descriptor bytes it consumes; the common loop does not impose a fixed descriptor-byte stride.
+
+### 20.2 End markers and special 0x38 records
+
+At 0x199C the fetched byte is compared with 0xFF. The sentinel takes the separate 0x19E1 path rather than entering the 0x1BC3 dispatch table.
+
+For non-0xFF values, the firmware masks A with 0x38 and compares it to 0x38:
+
+- A masked value of 0x38 takes the special 0x19A7 record path.
+- Other values are rotated right once and used as the computed offset into the LJMP table at 0x1BC3.
+
+This makes 0xFF and the 0x38 class structurally distinct control values: 0xFF is an end/sentinel branch, while 0x38 is a valid special record class that is written into the record area and advances the eight-byte output slot.
+
+### 20.3 Interpretation of the loop counter
+
+RAM[0x2C] is initialized to exactly 16 at 0x1975 and decremented once at 0x19C2 after each completed record. The routine can also exit early through the 0xFF sentinel path. Consequently, the normal maximum is sixteen record slots, but a sentinel can terminate processing before all sixteen have been visited.
+
+The current code establishes record count and stride, but does not yet prove that all sixteen slots correspond one-to-one with physical voices. That mapping still depends on the meaning of the group/index byte RAM[0x2B] and the receiver's interpretation of the emitted packets.
