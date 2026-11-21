@@ -287,6 +287,14 @@ def main() -> None:
     movx_count = sum(1 for pc in insns if code[pc] in movx_ops)
     print(f"MOVX sites: {movx_count}")
     print("Reachable MOV DPTR,# constants: " + ", ".join(f"0x{x:04X}" for x in sorted(dptr_constants)))
+    print("MAME-mapped I/O instruction contexts:")
+    for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
+        sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
+        for site in sites:
+            idx = ordered.index(site)
+            print(f"  {label} DPTR 0x{target:04X} at code 0x{site:04X}:")
+            for nearby_pc in ordered[max(0, idx - 3):idx + 7]:
+                print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
     for target, label in ((0xA000, "ACIA"), (0xB000, "LCD")):
         sites = [pc for pc in ordered if code[pc] == 0x90 and ((code[pc+1] << 8) | code[pc+2]) == target]
         print(f"{label} DPTR 0x{target:04X} setup sites: " + (", ".join(f"0x{x:04X}" for x in sites) or "none"))
