@@ -91,27 +91,77 @@ def decode(code: bytes, pc: int) -> tuple[int, str, list[int], str]:
         else: m = f"CJNE R{op&7}, #0x{b1:02X}, {rel(b2)}"
     else:
         m = f"DB 0x{op:02X}"
-        # Mark common 1/2-byte opcodes with recognizable names in the report.
-        names = {0x00:"NOP",0x03:"RR A",0x04:"INC A",0x13:"RRC A",
-                 0x14:"DEC A",0x22:"RET",0x23:"RL A",0x32:"RETI",
-                 0x33:"RLC A",0x73:"JMP @A+DPTR",0x83:"MOVC A,@A+PC",
-                 0x84:"DIV AB",0x93:"MOVC A,@A+DPTR",0xA3:"INC DPTR",
-                 0xA4:"MUL AB",0xC3:"CLR C",0xD3:"SETB C",
-                 0xD4:"DA A",0xE4:"CLR A",0xF4:"CPL A"}
-        if op in names: m = names[op]
-        elif op in (0x05,0x15,0x24,0x25,0x34,0x35,0x44,0x45,0x54,0x55,0x64,0x65,0x74,0x94,0x95,0xE5,0xF5):
-            m = f"OP_{op:02X} 0x{b1:02X}"
+        if op == 0x00: m = "NOP"
+        elif op == 0x03: m = "RR A"
+        elif op == 0x04: m = "INC A"
+        elif op == 0x05: m = f"INC {direct(b1)}"
+        elif op in (0x06,0x07): m = f"INC @R{op&1}"
         elif 0x08 <= op <= 0x0F: m = f"INC R{op&7}"
+        elif op == 0x13: m = "RRC A"
+        elif op == 0x14: m = "DEC A"
+        elif op == 0x15: m = f"DEC {direct(b1)}"
+        elif op in (0x16,0x17): m = f"DEC @R{op&1}"
         elif 0x18 <= op <= 0x1F: m = f"DEC R{op&7}"
-        elif 0x28 <= op <= 0x2F: m = f"ADD A, R{op&7}"
-        elif 0x38 <= op <= 0x3F: m = f"ADDC A, R{op&7}"
-        elif 0x48 <= op <= 0x4F: m = f"ORL A, R{op&7}"
-        elif 0x58 <= op <= 0x5F: m = f"ANL A, R{op&7}"
-        elif 0x68 <= op <= 0x6F: m = f"XRL A, R{op&7}"
+        elif op in (0x23,0x33): m = "RL A" if op == 0x23 else "RLC A"
+        elif op in range(0x24,0x30) or op in range(0x34,0x40) or op in range(0x94,0xA0):
+            group = 0x20 if op < 0x30 else (0x30 if op < 0x40 else 0x90)
+            mnemonic = {0x20:"ADD",0x30:"ADDC",0x90:"SUBB"}[group]
+            form = op & 0x0F
+            operand = (f"#0x{b1:02X}" if form == 4 else direct(b1) if form == 5
+                       else f"@R{form&1}" if form in (6,7) else f"R{form&7}")
+            m = f"{mnemonic} A, {operand}"
+        elif op == 0x32: m = "RETI"
+        elif op == 0x22: m = "RET"
+        elif op in (0x42,0x52,0x62):
+            m = f"{ {0x42:'ORL',0x52:'ANL',0x62:'XRL'}[op] } {direct(b1)}, A"
+        elif 0x44 <= op <= 0x4F or 0x54 <= op <= 0x5F or 0x64 <= op <= 0x6F:
+            base = op & 0xF0
+            mnemonic = {0x40:"ORL",0x50:"ANL",0x60:"XRL"}[base]
+            form = op & 0x0F
+            operand = (f"#0x{b1:02X}" if form == 4 else direct(b1) if form == 5
+                       else f"@R{form&1}" if form in (6,7) else f"R{form&7}")
+            m = f"{mnemonic} A, {operand}"
+        elif op == 0x72: m = f"ORL C, {direct(b1)}"
+        elif op == 0x82: m = f"ANL C, {direct(b1)}"
+        elif op == 0xA0: m = f"ORL C, /{direct(b1)}"
+        elif op == 0xB0: m = f"ANL C, /{direct(b1)}"
+        elif op == 0x73: m = "JMP @A+DPTR"
+        elif op == 0x74: m = f"MOV A, #0x{b1:02X}"
+        elif op in (0x76,0x77): m = f"MOV @R{op&1}, #0x{b1:02X}"
         elif 0x78 <= op <= 0x7F: m = f"MOV R{op&7}, #0x{b1:02X}"
+        elif op == 0x83: m = "MOVC A, @A+PC"
+        elif op == 0x84: m = "DIV AB"
+        elif op == 0x86 or op == 0x87: m = f"MOV {direct(b1)}, @R{op&1}"
+        elif 0x88 <= op <= 0x8F: m = f"MOV {direct(b1)}, R{op&7}"
+        elif op == 0x93: m = "MOVC A, @A+DPTR"
+        elif op == 0xA2: m = f"MOV C, {direct(b1)}"
+        elif op == 0xA3: m = "INC DPTR"
+        elif op == 0xA4: m = "MUL AB"
+        elif op in (0xA6,0xA7): m = f"MOV @R{op&1}, {direct(b1)}"
+        elif 0xA8 <= op <= 0xAF: m = f"MOV R{op&7}, {direct(b1)}"
+        elif op == 0xB2: m = f"CPL {direct(b1)}"
+        elif op == 0xB3: m = "CPL C"
+        elif op == 0xC0: m = f"PUSH {direct(b1)}"
+        elif op == 0xC2: m = f"CLR {direct(b1)}"
+        elif op == 0xC3: m = "CLR C"
+        elif op == 0xC4: m = "SWAP A"
+        elif op == 0xC5: m = f"XCH A, {direct(b1)}"
+        elif op in (0xC6,0xC7): m = f"XCH A, @R{op&1}"
+        elif 0xC8 <= op <= 0xCF: m = f"XCH A, R{op&7}"
+        elif op == 0xD0: m = f"POP {direct(b1)}"
+        elif op == 0xD2: m = f"SETB {direct(b1)}"
+        elif op == 0xD3: m = "SETB C"
+        elif op == 0xD4: m = "DA A"
+        elif op in (0xD6,0xD7): m = f"XCHD A, @R{op&1}"
+        elif op == 0xE4: m = "CLR A"
+        elif op == 0xE5: m = f"MOV A, {direct(b1)}"
+        elif op in (0xE6,0xE7): m = f"MOV A, @R{op&1}"
         elif 0xE8 <= op <= 0xEF: m = f"MOV A, R{op&7}"
+        elif op == 0xF4: m = "CPL A"
+        elif op == 0xF5: m = f"MOV {direct(b1)}, A"
+        elif op in (0xF6,0xF7): m = f"MOV @R{op&1}, A"
         elif 0xF8 <= op <= 0xFF: m = f"MOV R{op&7}, A"
-        elif op in (0xA5,): m = "RESERVED 0xA5"
+        elif op == 0xA5: m = "RESERVED 0xA5"
     return n, m, raw, ""
 
 
