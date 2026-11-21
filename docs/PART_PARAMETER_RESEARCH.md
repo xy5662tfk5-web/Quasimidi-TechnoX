@@ -2,6 +2,8 @@
 
 ## Confirmed instrument-definition facts
 
+The extracted metadata is checked into `data/technox_ins.json`: four 128-entry single-sound banks (512 names), 32 Channel 10 drum kits, 24 drum maps, and 26 controller labels. The same file includes the manual-confirmed CC, NRPN, and RPN control paths used by the future editor.
+
 \`Technox.ins\` declares four single-sound banks A–D with 128 entries each (512 total), a separate 32-entry Channel 10 drum-kit table, 24 named drum-note maps, 40 bank/program-to-drum-map assignments, and 26 named MIDI controllers.
 
 Program numbers are zero-based in the instrument file. The \`BankSelMethod=1\` field is preserved as authored; do not infer the actual MIDI Bank Select MSB/LSB values from this field alone.
