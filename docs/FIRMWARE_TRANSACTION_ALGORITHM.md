@@ -1075,7 +1075,7 @@ The helper at 0xABBF is called by 0x4256 after reading the Part-record byte at 0
 
 The helper's table base is code address 0xA8BF. It computes a bank offset using R5-1 multiplied by 0x80, adds that to 0xA8BF, and then performs MOVC A,@A+DPTR using a mode-dependent A index. The helper has special branches for boundary selector values; the general table path uses the 0x80-byte bank stride.
 
-The ROM region 0xA8BF–0xABBE is exactly 0x300 bytes: six 0x80-byte blocks. All values are in the range 1–0x7F, and each block is monotonically nondecreasing with a distinct response shape (one near-linear, others stepped or curved). This is consistent with a family of response/velocity curves, although the firmware does not provide a literal label and the helper's two fixed lookup indices still need to be fully explained.
+The ROM region 0xA8BF–0xABBE is exactly 0x300 bytes: six 0x80-byte blocks. All values are in the range 1–0x7F, and each block is monotonically nondecreasing with a distinct response shape (one near-linear, others stepped or curved). This is consistent with a family of response/velocity curves. The Owner's Manual supplies the user-facing label Velocity Curve; the helper's two fixed lookup indices and mapping of all 15 manual values still need to be fully explained.
 
 The safe conclusion is:
 - 0x7C26 + 24*PartIndex supplies a per-Part lookup selector.
