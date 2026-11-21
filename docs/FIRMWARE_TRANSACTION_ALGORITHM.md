@@ -1729,3 +1729,26 @@ The shared structure of 0x2128 and 0x21B7 supports describing them as selector/r
 ### 52.5 Consequence for the dispatch-family model
 
 The computed handlers operate inside a loop that builds a sequence of eight-byte destination records and terminates it with 0xFF or a 0x38 marker, depending on the source descriptor byte. This is a stronger description than treating each handler as an independent hardware command. The 0x0DB7 calls observed in selected handlers are downstream output steps from records prepared by this walker; the record markers and loop counters themselves are not evidence of note-on/off semantics.
+
+
+## 53. Arithmetic subhelpers reached by the descriptor handlers
+
+### 53.1 0x09B9 — change-detected signed parameter update
+
+The helper is called by the 0x1C61 path after intermediate fields have been prepared in the record at RAM[0x2E]. It addresses record offsets +0x0E and +0x0F, compares those stored bytes with input R4 and R5 using subtraction, and returns immediately when both values already match. When they differ, it writes R4/R5 into those two record bytes.
+
+The remaining path forms a signed multi-byte intermediate from record offsets +1, +2, and +3 and the input pair R4/R5. It uses MUL AB, carry propagation, and internal bit 0x03 to select signed correction. The resulting multi-byte value is combined with the record's existing fields. On the output path it selects A0=0x80 and calls 0x0DB7; one branch returns without sending when the stored pair did not change. This supports classifying 0x09B9 as a change-detected parameter calculation/update helper, not a MIDI event parser. The numeric units of the pair and resulting packet remain unknown.
+
+### 53.2 0x2381 — indexed read from a 48-byte-stride external table
+
+The helper saves F0, multiplies the incoming accumulator value by 0x30, adds the 16-bit base pointer RAM[0x39:0x38], and then adds an offset derived from RAM[0x2F]. It performs the same conditional P3 control-line envelope used by the descriptor handlers, reads one XDATA byte through DPTR, restores the P3 lines, and returns. The address expression is therefore:
+
+`RAM[0x39:0x38] + 0x30 * input_index + derived_offset(RAM[0x2F])`
+
+The 0x30 stride is directly visible; the table's semantic record type is not yet known. In 0x1EDD, this helper supplies one of the lookup values used in the subsequent signed fixed-point calculation.
+
+### 53.3 0x23C7 — conditional per-record scale factor
+
+This helper inspects the current record's first byte at RAM[0x2E] and masks it with 0x41. If neither bit is present, it returns without changing R2. When both bits are set, it initializes a scale accumulator and may map RAM[0x41] and RAM[0x43] through code tables at 0x11E0 and 0x11E8, multiplying the resulting factors into R2. When the record's masked value is not 0x41, internal bit 0x06 selects whether the helper calls 0x1890 using RAM[0x41] or RAM[0x43], returning the mapped value in R2.
+
+The routine therefore applies an optional record-dependent scale/mapping factor to R2. The source fields and lookup tables are confirmed; their user-facing parameter names are not. In the 0x1EDD path it is called after intermediate arithmetic and before the result is committed to the output record.
