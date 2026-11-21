@@ -1852,3 +1852,30 @@ The strongest grounded interpretation is therefore: descriptor +2 supplies a Par
 ### 57.1 Next high-value target
 
 Decode 0x02D1 and compare its output with the values written by 0x3F10/0x4B0A/0x6A79. Then follow the 0x0D0E scan's exact comparison operands against candidate slot metadata. This is the shortest route to a defensible selector/slot matching rule.
+
+
+## 58. 0x02D1 is a per-Part fixed-point conversion routine, not the endpoint matcher
+
+A direct instruction-level trace of 0x02D1 corrects an important possible ambiguity: this helper is not itself the slot-scanning routine. It performs a per-Part numeric conversion and writes a two-byte result into XDATA at `0x2000 + 2*PartIndex`.
+
+### 58.1 Input and calibration lookup
+
+- It addresses XDATA `0x2054 + PartIndex` and reads a per-Part calibration/scale byte.
+- The high nibble of that byte is retained as a multiplier/scale term.
+- It reads RAM[0x29] and RAM[0x2A] as a paired 16-bit input and performs shifts, carry handling, and a conditional magnitude/sign normalization.
+- Internal bit 0x03 selects one of two code-space lookup bases, `0x00C8` or `0x0098`.
+- Four consecutive MOVC reads obtain a four-byte lookup tuple. The routine then uses MUL AB and multi-byte additions/subtractions to combine that tuple with the input and the per-Part scale.
+
+This is fixed-point/table-driven arithmetic. The exact physical unit and parameter represented by the resulting number are not established by the routine alone.
+
+### 58.2 Output contract
+
+At the end, 0x02D1 computes the destination as `0x2000 + 2*RAM[0x28]`, writes the high result byte first and the low result byte second, and returns. Thus each Part has a two-byte derived value in the 0x2000 region.
+
+This is a separate data product from the 12-byte event descriptor at 0x2900 and the eight-byte endpoint slots at page offsets 0x80 onward. It must not be described as a direct write to the external 0x8000–0x8003 port.
+
+### 58.3 Consequence for the endpoint investigation
+
+The 0x3F10 path invokes 0x02D1 before it reloads the Part descriptor's +2 field, sets +10 to 0x7F, and calls 0x0D0E. Therefore 0x02D1 prepares a per-Part derived value in XDATA 0x2000, while 0x0D0E separately resolves/services the endpoint slot. The two calls are adjacent in one setup path, but they perform different jobs.
+
+The next step is to identify the readers of each two-byte cell in XDATA 0x2000 and establish whether the value participates in the later 0x0A57 arithmetic or in a different runtime path.
