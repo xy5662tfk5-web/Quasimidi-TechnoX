@@ -242,7 +242,7 @@ int QuasimidiTechnoXAudioProcessor::getCommonControlRaw(
     int performanceIndex, technox::MASSCommonControl control) const noexcept
 {
     const auto index = static_cast<std::size_t>(control);
-    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 4)
+    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 5)
         return -1;
     return commonValues[static_cast<std::size_t>(performanceIndex)][index].load(std::memory_order_acquire);
 }
@@ -251,8 +251,8 @@ bool QuasimidiTechnoXAudioProcessor::setCommonControlRaw(
     int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept
 {
     const auto index = static_cast<std::size_t>(control);
-    constexpr int maxima[4] = {21, 21, 3, 127};
-    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 4 ||
+    constexpr int maxima[5] = {3, 21, 21, 3, 127};
+    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 5 ||
         rawValue < 0 || rawValue > maxima[index])
         return false;
     commonValues[static_cast<std::size_t>(performanceIndex)][index].store(rawValue, std::memory_order_release);
