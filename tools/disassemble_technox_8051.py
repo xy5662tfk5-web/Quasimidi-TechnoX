@@ -372,7 +372,7 @@ def main() -> None:
         for nearby_pc in ordered[idx:idx + 12]:
             print(f"    {nearby_pc:04X} {insns[nearby_pc].raw:<8} {insns[nearby_pc].text}")
     print("MIDI byte handlers and real-time event callees:")
-    for focus in (0xA7DE, 0xA831, 0x9B69, 0xB3AF):
+    for focus in (0xA7FC, 0xA84F, 0xA884, 0xA7DE, 0xA831, 0x9B69, 0xB3AF):
         callers = [pc for pc in ordered if insns[pc].text.startswith(("LCALL", "ACALL"))
                    and insns[pc].text.endswith(f"0x{focus:04X}")]
         print(f"  target 0x{focus:04X}; direct callers: " + (", ".join(f"0x{x:04X}" for x in callers) or "none"))
