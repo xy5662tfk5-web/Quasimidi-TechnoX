@@ -67,17 +67,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure (x86_64)
-        run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
         run: cmake --build build --config Release --parallel 2
-      - name: Verify Monterey deployment target
+      - name: Verify Catalina (10.15) deployment target
         run: |
           APP="build/QuasimidiTechnoX_artefacts/Release/Standalone/Quasimidi TechnoX Lab.app"
           BIN="$APP/Contents/MacOS/Quasimidi TechnoX Lab"
           echo "Standalone bundle minimum OS:"
           /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP/Contents/Info.plist" || true
           echo "Standalone executable build version:"
-          xcrun vtool -show-build "$BIN"
+          xcrun vtool -show-build "$BIN" | tee /tmp/technox-build-version.txt
+          grep -q "minos 10.15" /tmp/technox-build-version.txt
       - name: Package Intel plugin formats
         run: |
           cd build/QuasimidiTechnoX_artefacts/Release
