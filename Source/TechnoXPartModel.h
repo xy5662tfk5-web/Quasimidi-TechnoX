@@ -89,17 +89,6 @@ public:
         return setRawValue(index, value);
     }
 
-    // UI-facing signed/offset values are converted back to the stored 7-bit value.
-    bool setDisplayValue(PartParameter parameter, int displayValue) noexcept {
-        const auto index = static_cast<std::size_t>(parameter);
-        if (index >= kPartParameterDescriptors.size())
-            return false;
-        const int raw = displayValue - kPartParameterDescriptors[index].displayOffset;
-        if (raw < 0 || raw > kPartParameterDescriptors[index].maximum)
-            return false;
-        return setRawValue(index, static_cast<std::uint8_t>(raw));
-    }
-
     bool setDisplayValue(PartParameter parameter, int displayValue) noexcept {
         const auto index = static_cast<std::size_t>(parameter);
         if (index >= kPartParameterDescriptors.size()) return false;
