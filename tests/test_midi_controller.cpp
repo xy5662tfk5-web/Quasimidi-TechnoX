@@ -36,8 +36,11 @@ int main() {
     assert(!router.handleControlChange(1, 121, 0));
     assert(!router.decodeRpnDataEntry(1, 64));
     assert(!router.handleControlChange(1, 99, 0x18));
-    assert(!router.handleControlChange(1, 98, 0x1a));
+    assert(!router.handleControlChange(1, 98, 0x2a));
     assert(!router.handleControlChange(1, 6, 100));
+    const auto drum = router.decodeDrumNrpnDataEntry(1, 48);
+    assert(drum && drum->parameterIndex == 0 && drum->keyNumber == 0x2a && drum->rawValue == 48);
+    assert(!router.decodeDrumNrpnDataEntry(1, 49));
     cc = router.handleControlChange(1, 126, 0);
     assert(cc && cc->parameter == PartParameter::trackMode && cc->rawValue == 2);
     cc = router.handleControlChange(1, 127, 0);
