@@ -161,7 +161,8 @@ enum class LoaderAction : std::uint8_t {
     callResourceManager17D4,
     setSlotBusyBit,
     writeSecondByte,
-    returnToModeControl
+    returnToModeControl,
+    retryAt1544
 };
 
 struct LoaderRuntimeFlags {
@@ -221,8 +222,8 @@ inline LoaderBranchPlan planLoaderBranch(const LoaderDecision& decision,
             return plan;
         }
 
-        // 0x1534..0x156E clear the busy bit, scan status, and either
-        // retry the zero-byte path or load replacement descriptor bytes.
+        // 0x1534..0x156E clear the busy bit and scan status; the no-match path
+        // returns to 0x1525, while a match loads replacement descriptor bytes.
         plan.append(LoaderAction::clearSlotBusyBit);
         plan.append(LoaderAction::scanSlotStatus);
         if (flags.bitE7) {
