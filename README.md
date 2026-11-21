@@ -1,24 +1,38 @@
 # Quasimidi TechnoX Lab
 
-An Intel-Mac-oriented AU/VST3/Standalone research project for a Quasimidi TechnoX-inspired instrument interface and, ultimately, a documented software emulation.
+An Intel-Mac-oriented JUCE project targeting Audio Unit, VST3 and Standalone builds.
 
-## Current status
+## Current implementation
 
-- [x] User-supplied 1200 × 112 SVG front-panel concept imported.
-- [x] SVG namespace corrected to the standard W3C namespace.
-- [ ] JUCE project and AU/VST3/Standalone targets.
-- [ ] Interactive controls and LCD state.
-- [ ] SysEx import/export and patch-bank handling.
-- [ ] Sound ROM research and lawful acquisition/verification.
-- [ ] Audio engine, voice allocation, filters, modulation and effects.
-- [ ] Comparison against hardware reference recordings.
+- [x] User-supplied 1200 × 112 SVG front-panel artwork imported.
+- [x] JUCE 7.0.12 CMake project created.
+- [x] AU, VST3 and Standalone plugin formats declared.
+- [x] Initial editor renders the SVG, overlays a dynamic LCD and responds to basic front-panel clicks.
+- [x] MIDI input is accepted by the plugin shell.
+- [ ] Verified hardware preset/parameter mapping and SysEx support.
+- [ ] Original TechnoX sound engine, sample playback, filters, modulation and effects.
+- [ ] Intel macOS build and AU validation in Logic Pro X.
 
-**Important:** this initial scaffold is an interface asset and project plan, not an audio emulation. Firmware dumps alone do not establish the original PCM ROM contents or reproduce the hardware DSP. Do not bundle copyrighted firmware or ROM data without authorization.
+## Important status note
 
-## Build target
+This is an **interactive interface/plugin scaffold**, not yet a sound emulation. The current audio processor intentionally outputs silence. The LCD preset/part values are UI placeholders and are not yet connected to verified factory patch data. No firmware or ROM images are included.
 
-Planned formats: Audio Unit, VST3 and Standalone. Initial platform target: Intel macOS. JUCE will be integrated after the UI and source layout are agreed.
+Firmware dumps alone do not establish the original PCM ROM contents or reproduce the hardware DSP. Do not bundle copyrighted firmware or ROM data without authorization.
 
-## Asset
+## Build on Intel macOS
 
-`assets/technox_front_panel.svg` — supplied front-panel artwork, with only the malformed SVG namespace corrected. The artwork is a project mock-up, not verified as a pixel-accurate factory panel.
+Install Xcode Command Line Tools and CMake, then run:
+
+```bash
+cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+JUCE 7.0.12 is fetched by CMake. The project declares AU, VST3 and Standalone formats. Build and host validation are still pending.
+
+## Project map
+
+- `assets/technox_front_panel.svg` — supplied front-panel illustration.
+- `Source/PluginProcessor.*` — JUCE processor shell.
+- `Source/PluginEditor.*` — SVG panel and basic LCD/control interaction.
+- `PROJECT_PLAN.md` — engineering roadmap.
