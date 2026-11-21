@@ -59,6 +59,7 @@ private:
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
     void initialisePartStates();
+    void initialiseCommonControlsFromBank() noexcept;
     void syncCurrentPerformanceToEngine() noexcept;
     int partSlotForMidiChannel(int channel) const noexcept;
 
