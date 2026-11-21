@@ -27,6 +27,10 @@ int main() {
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
     assert(!engine.setModWheel(16, 127));
+    assert(engine.setPitchBend(15, 8191) && engine.getPitchBend(15) == 8191);
+    assert(!engine.setPitchBend(15, 8192));
+    assert(engine.setExpression(15, 64) && engine.getExpression(15) == 64);
+    assert(!engine.setExpression(15, 128));
     assert(engine.setRpn(12, 0, 12) && engine.getRpn(12, 0) == 12);
     assert(engine.setRpn(12, 1, 64) && engine.getRpn(12, 1) == 64);
     assert(!engine.setRpn(12, 3, 1));
@@ -34,6 +38,7 @@ int main() {
     assert(engine.setSoftPedal(12, true) && engine.softPedal(12));
     engine.resetPartControllers(12);
     assert(!engine.portamento(12) && !engine.softPedal(12) && engine.getModWheel(12) == 0);
+    assert(engine.getPitchBend(12) == 0 && engine.getExpression(12) == 127);
     assert(engine.getRpn(12, 0) == -1 && engine.getRpn(12, 1) == -1);
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
