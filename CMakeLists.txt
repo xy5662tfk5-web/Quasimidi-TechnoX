@@ -37,6 +37,8 @@ juce_add_plugin(QuasimidiTechnoX
     COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
+juce_generate_juce_header(QuasimidiTechnoX)
+
 target_sources(QuasimidiTechnoX PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
