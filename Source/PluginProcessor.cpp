@@ -16,7 +16,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
             for (auto& parameter : part)
                 parameter.store(0, std::memory_order_relaxed);
     for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
-        partMidiChannels[part].store(static_cast<int>(part + 1), std::memory_order_relaxed);
+        partMidiChannels[part].store(static_cast<int>(part + 13), std::memory_order_relaxed);
 
     int midiSize = 0;
     int catalogSize = 0;
