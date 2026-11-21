@@ -1893,3 +1893,36 @@ The callers prepare different input pairs before invoking the same helper:
 - 0x62C5: RAM[0x28] receives the Part index, RAM[0x29] is cleared, and RAM[0x2A] is set to 0x40.
 
 This caller diversity confirms that 0x02D1 is a reusable per-Part conversion helper, not a one-off initialization step. Its two-byte output at `0x2000 + 2*PartIndex` is an intermediate numeric result. We still need to find the consumers of that cell before assigning it a synthesis-parameter name.
+
+
+## 59. Consumer audit of the 0x2000 per-Part result and endpoint matcher
+
+### 59.1 0x2000 + 2*PartIndex: producer confirmed, direct consumer not yet found
+
+A full scan of direct `MOV DPTR,#0x20xx` instruction operands in the descrambled 64-KiB code image finds one direct reference to base `0x2000`: the store routine at 0x0392. It writes the two-byte result produced by 0x02D1 to `0x2000 + 2*RAM[0x28]`.
+
+Other direct references in the 0x2050–0x2068 range are separate state cells (including the Part calibration byte at 0x2054 and mode/state bytes at 0x2064–0x2068). No direct immediate-address read of the per-Part result array was found in this pass.
+
+This is an important negative result, not proof that the array is unused: indirect DPTR construction, register-indirect XDATA access, or a descriptor-driven access can evade a literal-address scan. The next pass must trace the dynamic address-generation patterns rather than assume a consumer.
+
+### 59.2 Exact selector preprocessing in 0x0D0E
+
+The entry sequence is unambiguous:
+
+1. Load code-space table base 0x1208.
+2. Convert RAM[0x29] with MOVC and store the converted value back to RAM[0x29].
+3. Convert RAM[0x2A] with the same table and store it back to RAM[0x2A].
+4. If RAM[0x50] is 0xFF, return immediately.
+5. Otherwise copy RAM[0x50] into RAM[0x2D] and the page register A0, then enter the endpoint scan.
+
+Thus the two selector inputs are destructively normalized before matching, and RAM[0x50] supplies the selected XDATA page. This confirms the table is part of the endpoint lookup path, but does not by itself establish the semantic meaning of the selector pair.
+
+### 59.3 Candidate record filtering
+
+The scan walks the endpoint-record area using the firmware's eight-byte record stride. Candidate records are not accepted merely because a slot exists: the code reads successive record bytes and applies masked signature tests before calling 0x0D80. The decisive control-flow fact is that 0x0D80 is reached only after all three tests pass; failed candidates advance the scan loop.
+
+The current pass establishes the existence and ordering of those signature gates, but does not yet assign human-readable meanings to the masked fields. We will preserve them as raw signature predicates until the slot producer/initializer is decoded and the compared offsets are matched to their write sites.
+
+### 59.4 Revised priority
+
+The 0x2000 result array is not yet a proven audio-parameter store. The higher-value immediate target is now the endpoint record lifecycle: find who creates/initializes the eight-byte records, map every field write against the three 0x0D0E tests, then connect the accepted record to the 0x0A57 / 0x0DB7 output path.
