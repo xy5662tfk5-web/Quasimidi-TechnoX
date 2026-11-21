@@ -56,6 +56,7 @@ private:
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
     void initialisePartStates();
+    void syncCurrentPerformanceToEngine() noexcept;
     int partSlotForMidiChannel(int channel) const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
