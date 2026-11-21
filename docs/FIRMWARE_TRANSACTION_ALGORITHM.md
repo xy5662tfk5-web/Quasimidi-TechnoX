@@ -2029,3 +2029,26 @@ Immediately before 0x236B, the code prepares a value from RAM[0x2B] with its low
 These four callers are not one uniform packet family: 0x1E8A and 0x236B are in record-walk paths; 0x211F is coupled to descriptor-selector normalization; 0x22F8 is gated by multiple internal state predicates. The shared 0x0DB7 mailbox therefore carries context-dependent operations. No packet has yet been assigned a sound-chip register meaning.
 
 Next, recover the exact live R5/R2/R3/R4 values at each call boundary and compare them with the corresponding page-0x80 record bytes and the post-call status transitions. In parallel, trace 0x4256 from its entry through its Part-record lookup to identify which packet-producing branch is reached for an actual MIDI Note On.
+
+
+## 64. MIDI event to Part-processing routine 0x4256
+
+### 64.1 Confirmed call chain
+
+The descrambled ROM contains direct LCALL 0x4256 sites at 0x56BB, 0x56C5, 0x5AC0, 0xAD6E, and 0xADBF. The two calls at 0x56BB/0x56C5 occur in the MIDI event-processing region around 0x5670–0x573A. Immediately before each call, the caller loads R7 from RAM[0x64], R5 from RAM[0x66], and R3 from RAM[0x67]. This is the strongest currently confirmed route from the parsed event state into the Part-processing routine.
+
+The surrounding parser maintains event/channel fields in RAM[0x60]–RAM[0x67], checks event classes and channel-related state, and has separate branches for event handling. The exact semantic mapping of RAM[0x64], RAM[0x66], and RAM[0x67] should remain tied to the parser's writes rather than assumed from register convention alone; the observed call ABI is R7=RAM[0x64], R5=RAM[0x66], R3=RAM[0x67].
+
+### 64.2 What 0x4256 does at entry
+
+At 0x4256 the routine saves R7/R5/R3 into RAM[0x6E]/RAM[0x6F]/RAM[0x70]. It computes a 12-byte per-index workspace address in XDATA 0x2900 + 0x0C*RAM[0x6E], stores the incoming R5/R3 values in its first two bytes, then consults the 24-byte Part/runtime record at 0x7C00 + 0x18*PartIndex. It applies range checks and reads several fields at offsets including +0x1C, +0x26, +0x17, +0x19, and +0x1D. The value at +0x26 is passed through 0xABBF, the established velocity-curve mapper, before being written into the 12-byte workspace.
+
+The routine also checks runtime state at XDATA 0x3700+PartIndex and 0x2F00+PartIndex, including a threshold comparison against 0x40. Depending on those conditions, it calls 0x695A, manipulates per-Part bitmaps through 0xAC00/0xAC88, loads descriptor selectors from the 0x2B98 area, and calls 0x1494. The descriptor-loader calls use distinct offsets (including Part-relative offsets 0x10, 0xC0, and 0xE0 in different branches), followed by a common final load path.
+
+### 64.3 Important interpretation boundary
+
+This establishes that 0x4256 is a Part-aware event-to-runtime-state preparation routine. It consumes a Part index plus two event values, consults velocity-curve and runtime-state data, updates the 12-byte intermediate descriptor/workspace, and invokes the dynamic descriptor loader. It does not directly call 0x0DB7 in the inspected body, and therefore it is not itself the final four-byte hardware packet writer. The downstream descriptor/record routines must be followed to determine when and how a note event reaches page 0x80 / mailbox 0x8000–0x8003.
+
+### 64.4 Immediate next target
+
+Trace writes to RAM[0x64], RAM[0x66], and RAM[0x67] in the parser before 0x56BB/0x56C5, then follow the 0x1494 branch selected by each event type. In parallel, identify which 0x4256 caller is the true incoming MIDI Note On path versus internal/timer or outgoing-event paths; the other direct call sites at 0x5AC0, 0xAD6E, and 0xADBF must not be conflated with the MIDI parser solely because they share the callee.
