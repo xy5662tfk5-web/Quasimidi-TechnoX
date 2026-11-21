@@ -14,20 +14,21 @@ RPN/NRPN selectors (98–101) and Data Entry (6) are represented as MIDI control
 
 ## Part SysEx observations
 
-The supplied bank dump contains 200 Part frames: four 32-byte frames for each of 50 Performances. The manual-confirmed frame envelope is:
+The supplied bank dump contains 200 Part frames: four 33-byte complete frames for each of 50 Performances. The manual-confirmed frame envelope is:
 
 - bytes 0–4: \`F0 3F 00 22 44\`
-- byte 5: Performance address high byte (0x05..0x36, Performance 1–50)
+- byte 5: Performance source/address high byte (0x05..0x36, Performance 1–50)
 - byte 6: block selector (0x01..0x04 for Parts 13–16)
-- bytes 7–30: 24 Part parameter bytes (offsets 0x00–0x17)
-- byte 31: \`F7\`
+- byte 7: reserved zero byte in this bulk dump
+- bytes 8–31: 24 Part parameter bytes (offsets 0x00–0x17)
+- byte 32: \`F7\`
 
 The manual supplies the official 24-byte Part parameter map. The four Performance dump blocks are Parts 13–16. The parser retains every complete frame unchanged. Source: [Quasimidi TechnoX Owner’s Manual](https://www.deepsonic.ch/deep/docs_manuals/quasimidi_technox_manual.pdf), printed pages 32–38.
 
 
 ## Official Part parameter map (manual, printed page 37)
 
-The manual maps the 24 data bytes directly to Part parameter offsets 0x00–0x17. In the supplied 32-byte bulk-dump frame these are bytes 7–30.
+The manual maps the 24 data bytes directly to Part parameter offsets 0x00–0x17. In the supplied 33-byte complete bulk-dump frame these are bytes 8–31; byte 7 is a reserved zero byte.
 
 | Offset | Parameter | Raw range | Display conversion |
 |---:|---|---:|---|
@@ -56,7 +57,7 @@ The manual maps the 24 data bytes directly to Part parameter offsets 0x00–0x17
 | 16 | Tone modulation sensitivity | 0–127 | raw − 64 |
 | 17 | Portamento time | 0–127 | — |
 
-The manual's address map identifies the four stored Performance Part blocks as Parts 13, 14, 15, and 16 (block selectors 0x01–0x04). Selector 0x00 is the common block; selector 0x05 is the Performance name. The Performance address high byte runs from 0x05 through 0x36 for the 50 factory RAM Performances.
+The manual's address map identifies the four stored Performance Part blocks as Parts 13, 14, 15, and 16 (block selectors 0x01–0x04). The Performance index is byte 5 and the block selector is byte 6. Selector 0x00 is the common block; selector 0x05 is the Performance name. The Performance address high byte runs from 0x05 through 0x36 for the 50 factory RAM Performances.
 
 ## Documented MIDI controller paths
 
@@ -72,7 +73,7 @@ These controller messages are control paths, not a promise that each CC is a dir
 
 ## Editing model
 
-\`Source/TechnoXPartModel.h\` introduces a conservative editable Part model. It validates the observed envelope, exposes 24 named parameters with documented ranges and signed display offsets, permits bounded edits, preserves the original complete SysEx frame, and supports revert. Raw-byte access remains available so original bytes can be preserved and any future unknown extensions can be round-tripped.
+\`Source/TechnoXPartModel.h\` introduces a conservative editable Part model. It validates the observed 33-byte envelope, skips the reserved byte at offset 7, exposes 24 named parameters with documented ranges and signed display offsets, permits bounded edits, preserves the original complete SysEx frame, and supports revert. Raw-byte access remains available so original bytes can be preserved and any future unknown extensions can be round-tripped.
 
 ## Required next capture set
 
