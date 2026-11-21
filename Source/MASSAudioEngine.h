@@ -74,7 +74,8 @@ public:
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void render(float* const* channels, int channelCount, int sampleCount,
-                        const VoiceManager& voices, const MASSPartParameterStore& parts,
+                        const VoiceManager& voices, const ModulationMatrix& matrix,
+                        const MASSPartParameterStore& parts,
                         const MASSModulationSourceStore& sources) noexcept = 0;
 };
 
@@ -84,7 +85,7 @@ public:
     void noteOn(int, const VoiceSlot&) noexcept override {}
     void noteOff(int, const VoiceSlot&) noexcept override {}
     void render(float* const* channels, int channelCount, int sampleCount,
-                const VoiceManager&, const MASSPartParameterStore&,
+                const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
                 const MASSModulationSourceStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
@@ -103,6 +104,11 @@ public:
 
     void noteOn(std::uint8_t part, std::uint8_t channel,
                 std::uint8_t note, std::uint8_t velocity) noexcept {
+        if (velocity > 0) {
+            const int target = voices_.allocationTarget();
+            if (target >= 0 && voices_.voices()[static_cast<std::size_t>(target)].active)
+                backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
+        }
         const int voiceIndex = voices_.noteOn(part, channel, note, velocity);
         if (voiceIndex >= 0)
             backend_->noteOn(voiceIndex, voices_.voices()[static_cast<std::size_t>(voiceIndex)]);
@@ -134,9 +140,10 @@ public:
     int getModWheel(int partIndex) const noexcept { return modulationSources_.modWheel(partIndex); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_, partParameters_, modulationSources_);
+        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_);
     }
 
+    void finishVoiceRelease(std::size_t voiceIndex) noexcept { voices_.finishRelease(voiceIndex); }
     VoiceManager& voiceManager() noexcept { return voices_; }
     const VoiceManager& voiceManager() const noexcept { return voices_; }
     ModulationMatrix& modulationMatrix() noexcept { return modulation_; }
