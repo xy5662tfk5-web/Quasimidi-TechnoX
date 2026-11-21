@@ -8,7 +8,7 @@ Program numbers are zero-based in the instrument file. The \`BankSelMethod=1\` f
 
 ## Controller interpretation
 
-The structured metadata separates standard MIDI controller meanings from TechnoX-specific labels. CC 80–83 and 91/93 are vendor-labelled by the .ins file. The labels are evidence of intended functions, but their exact value tables, channel scope, and relationship to SysEx Part bytes remain unverified.
+The structured metadata separates standard MIDI controller meanings from TechnoX-specific labels. The owner manual confirms the functions of CC 80–83 and 91/93. The separate NRPN/RPN table documents the parameter-selection paths; not every controller is a direct write to a Part SysEx byte.
 
 RPN/NRPN selectors (98–101) and Data Entry (6) are represented as MIDI control paths. A parameter can only be assigned after the corresponding RPN/NRPN number and value behavior have been established.
 
@@ -20,7 +20,7 @@ The supplied bank dump contains 200 Part frames: four 32-byte frames for each of
 - bytes 7–30: 24 opaque 7-bit data bytes
 - byte 31: \`F7\`
 
-The manual now supplies the official 24-byte Part parameter map. The exact data offset is aligned with the supplied frame size and the bulk-dump records; the parser retains every complete frame unchanged.
+The manual supplies the official 24-byte Part parameter map. The four Performance dump blocks are Parts 13–16. The parser retains every complete frame unchanged.
 
 
 ## Official Part parameter map (manual, printed page 37)
