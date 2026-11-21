@@ -78,10 +78,12 @@ int main() {
     assert(nonzeroPlan.actionCount == 4);
     assert(nonzeroPlan.actions[0] == LoaderAction::callResourceManager17D4);
     assert(nonzeroPlan.actions[1] == LoaderAction::setSlotBusyBit);
-    assert(nonzeroPlan.actions[2] == LoaderAction::writeSecondByte ||
-           nonzeroPlan.actions[2] == LoaderAction::continueAt1599);
+    assert(nonzeroPlan.actions[2] == LoaderAction::writeSecondByte);
+    assert(nonzeroPlan.actions[3] == LoaderAction::continueAt1599);
 
-    page[0x21] = 0;\n    memory.loadPage(0x29, page);\n    const auto zeroDecision = prepareLoaderDecision(memory, lookup, {0x29, 0x20, 0x03});
+    page[0x21] = 0;
+    memory.loadPage(0x29, page);
+    const auto zeroDecision = prepareLoaderDecision(memory, lookup, {0x29, 0x20, 0x03});
     const auto zeroControlPlan = planLoaderBranch(zeroDecision,
         LoaderRuntimeFlags{false, false, false, false});
     assert(zeroControlPlan.actionCount == 2);
