@@ -65,6 +65,42 @@ private:
     std::array<std::atomic<int>, kPartCount> modWheel_{};
 };
 
+class MASSPartRuntimeControlStore {
+public:
+    static constexpr std::size_t kPartCount = 16;
+    MASSPartRuntimeControlStore() {
+        for (std::size_t i = 0; i < kPartCount; ++i) {
+            portamento_[i].store(0, std::memory_order_relaxed);
+            softPedal_[i].store(0, std::memory_order_relaxed);
+        }
+    }
+    bool setPortamento(int partIndex, bool enabled) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return false;
+        portamento_[static_cast<std::size_t>(partIndex)].store(enabled ? 1 : 0, std::memory_order_release);
+        return true;
+    }
+    bool setSoftPedal(int partIndex, bool enabled) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return false;
+        softPedal_[static_cast<std::size_t>(partIndex)].store(enabled ? 1 : 0, std::memory_order_release);
+        return true;
+    }
+    bool portamento(int partIndex) const noexcept {
+        return partIndex >= 0 && partIndex < static_cast<int>(kPartCount) &&
+            portamento_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) != 0;
+    }
+    bool softPedal(int partIndex) const noexcept {
+        return partIndex >= 0 && partIndex < static_cast<int>(kPartCount) &&
+            softPedal_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) != 0;
+    }
+    void reset(int partIndex) noexcept {
+        setPortamento(partIndex, false);
+        setSoftPedal(partIndex, false);
+    }
+private:
+    std::array<std::atomic<int>, kPartCount> portamento_{};
+    std::array<std::atomic<int>, kPartCount> softPedal_{};
+};
+
 // Backend contract only. A real implementation must be based on verified
 // TechnoX sample/algorithm evidence; the included null backend is intentionally silent.
 class IMASSVoiceBackend {
@@ -73,10 +109,12 @@ public:
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
+    virtual void resetVoice(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void render(float* const* channels, int channelCount, int sampleCount,
                         const VoiceManager& voices, const ModulationMatrix& matrix,
                         const MASSPartParameterStore& parts,
-                        const MASSModulationSourceStore& sources) noexcept = 0;
+                        const MASSModulationSourceStore& sources,
+                        const MASSPartRuntimeControlStore& runtimeControls) noexcept = 0;
 };
 
 class NullMASSVoiceBackend final : public IMASSVoiceBackend {
@@ -84,9 +122,10 @@ public:
     void prepare(double, int) override {}
     void noteOn(int, const VoiceSlot&) noexcept override {}
     void noteOff(int, const VoiceSlot&) noexcept override {}
+    void resetVoice(int, const VoiceSlot&) noexcept override {}
     void render(float* const* channels, int channelCount, int sampleCount,
                 const VoiceManager&, const ModulationMatrix&, const MASSPartParameterStore&,
-                const MASSModulationSourceStore&) noexcept override {
+                const MASSModulationSourceStore&, const MASSPartRuntimeControlStore&) noexcept override {
         for (int channel = 0; channel < channelCount; ++channel)
             for (int sample = 0; sample < sampleCount; ++sample)
                 channels[channel][sample] = 0.0f;
@@ -130,6 +169,16 @@ public:
                 backend_->noteOff(static_cast<int>(i), slots[i]);
     }
 
+    void allSoundsOff(int channel = 0) noexcept {
+        const auto& slots = voices_.voices();
+        for (std::size_t i = 0; i < slots.size(); ++i) {
+            if (slots[i].active && (channel == 0 || slots[i].channel == channel)) {
+                backend_->resetVoice(static_cast<int>(i), slots[i]);
+                voices_.finishRelease(i);
+            }
+        }
+    }
+
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         return partParameters_.set(partIndex, parameter, rawValue);
     }
@@ -138,9 +187,14 @@ public:
     }
     bool setModWheel(int partIndex, int value) noexcept { return modulationSources_.setModWheel(partIndex, value); }
     int getModWheel(int partIndex) const noexcept { return modulationSources_.modWheel(partIndex); }
+    bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
+    bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
+    bool portamento(int partIndex) const noexcept { return runtimeControls_.portamento(partIndex); }
+    bool softPedal(int partIndex) const noexcept { return runtimeControls_.softPedal(partIndex); }
+    void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); setModWheel(partIndex, 0); }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
-        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_);
+        backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_, modulationSources_, runtimeControls_);
     }
 
     void finishVoiceRelease(std::size_t voiceIndex) noexcept { voices_.finishRelease(voiceIndex); }
@@ -157,6 +211,7 @@ private:
     ModulationMatrix modulation_;
     MASSPartParameterStore partParameters_;
     MASSModulationSourceStore modulationSources_;
+    MASSPartRuntimeControlStore runtimeControls_;
 };
 
 } // namespace technox
