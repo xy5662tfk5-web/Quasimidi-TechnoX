@@ -19,8 +19,8 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(parser.extract_sysex(smf([f]))[0].raw,f)
     def test_address_high_and_block_selector_order(self):
         frame = parser.Frame(b"\xf0\x3f\x00\x22\x44\x06\x01" + bytes(24) + b"\xf7", 0, 0)
-        self.assertEqual(frame.record_index, 6)
-        self.assertEqual(frame.block_type, 1)
+        self.assertEqual(frame.performance_address, 6)
+        self.assertEqual(frame.block_selector, 1)
     def test_incomplete_sysex_rejected(self):
         raw=b"MThd"+struct.pack(">IHHH",6,0,1,96)+b"MTrk"+struct.pack(">I",5)+b"\x00\xf0\x02\x3f\x00"
         with self.assertRaises(parser.MidiFormatError): parser.extract_sysex(raw)
