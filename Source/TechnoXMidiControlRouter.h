@@ -47,6 +47,8 @@ public:
                 return std::nullopt;
             case 91: return change(PartParameter::fx1Send, scale(value, 63));
             case 93: return change(PartParameter::fx2Send, scale(value, 63));
+            case 126: return change(PartParameter::trackMode, 2); // Mono
+            case 127: return change(PartParameter::trackMode, 1); // Poly
             default: return std::nullopt;
         }
     }
