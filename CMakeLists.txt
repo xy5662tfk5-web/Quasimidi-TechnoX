@@ -39,6 +39,7 @@ juce_add_plugin(QuasimidiTechnoX
 target_sources(QuasimidiTechnoX PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/TechnoXPartModel.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC
