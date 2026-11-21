@@ -38,6 +38,18 @@ class MCS51DisassemblerTests(unittest.TestCase):
         self.assertEqual(text, "LJMP 0xEB32")
         self.assertEqual(raw, [0x02, 0xEB, 0x32])
 
+    def test_call_search_uses_instruction_boundaries(self):
+        # 0x12 0x0D 0xB7 inside MOV DPTR immediate is data, not an LCALL.
+        code = bytearray([0x00] * 0x10000)
+        code[0x0100:0x0103] = bytes([0x90, 0x12, 0x0D])
+        code[0x0103:0x0106] = bytes([0x12, 0x0D, 0xB7])
+        code[0x0DB7] = 0x22
+        insns, calls, _ = disassemble(bytes(code), [0x0100], 100)
+        sites = [pc for pc, insn in insns.items()
+                 if insn.text == "LCALL 0x0DB7"]
+        self.assertEqual(sites, [0x0103])
+        self.assertIn(0x0DB7, calls)
+
     def test_reachable_calls_and_branches(self):
         code = bytearray([0x00] * 0x10000)
         code[0x0100:0x0105] = bytes([0x12, 0x02, 0x00, 0x80, 0xFE])
