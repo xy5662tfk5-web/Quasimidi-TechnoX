@@ -216,3 +216,28 @@ This establishes a mailbox-like register protocol with status, mode, and 16-bit 
 ## 20. Critical consequence for the emulator
 
 The firmware evidence currently supports implementing the host-side transaction/mailbox protocol and descriptor staging, but not the audio chip's internal synthesis algorithm. Keep the existing oscillator backend explicitly marked as a test sound source. Do not label it as the original TechnoX/M.A.S.S. engine until the peripheral identity, command semantics, sample/voice memory map, and waveform decoding are established.
+
+## 21. A second, distinct external interface: P2=0x80 exposes a four-byte command window
+
+The earlier `0x16C3` sequence uses a page selected by `RAM[0x2D]`. It must be kept separate from the fixed page-`0x80` interface.
+
+The routine `0x0DB7` is now fully confirmed as a four-byte transaction:
+- caller selects `P2=0x80` (SFR `0xA0`);
+- writes `R5` to `MOVX @R0` at offset `0x00` (absolute XDATA `0x8000`);
+- writes `R2` at offset `0x01` (`0x8001`);
+- writes `R3` at offset `0x02` (`0x8002`);
+- writes `R4` at offset `0x03` (`0x8003`);
+- updates internal flag `0x0C` to mirror flag `E7`.
+
+The companion `0x0DCE` conditionally changes bit 7/6 of register `0x8003`: it writes `0xC0` when E7 becomes set and `0x40` when E7 becomes clear, then reads back `0x8002`. It avoids a redundant write when the mirrored state already matches.
+
+The transaction is invoked from multiple subsystems (`0x02C0`, `0x0A4F`, `0x0B53`, `0x0D07`, `0x0E1A`, `0x1045`, `0x110A`, `0x26C9`, `0x26DE`, `0x2767`, `0x277E`). This makes it a shared low-level device command interface, not a one-off MIDI path.
+
+### What can and cannot be concluded
+
+- Confirmed: four byte-wide write registers at external address window `0x8000–0x8003`, selected by 8051 port 2 = `0x80`.
+- Confirmed: register 3 contains a handshake/state field using masks `0xC0`; register 2 is read immediately after state transitions.
+- Not confirmed: physical chip identity, whether the target is the M.A.S.S. voice processor, a sample-memory controller, a DMA/mailbox controller, or another peripheral.
+- Not confirmed: the semantics of the four command bytes. The call sites use different values, so the next step is to classify call-site tuples and correlate them with the selected slot, descriptor pointer, and status returned by register 2.
+
+This fixed `0x8000–0x8003` window is distinct from the variable page-`0x7Cxx` parameter records and from the page-selected `FB/FC/FE/FF` mailbox sequence at `0x16C3`. Treating all three as one DSP register map would be incorrect.
