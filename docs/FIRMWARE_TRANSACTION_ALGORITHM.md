@@ -1646,3 +1646,53 @@ The firmware-supported chain is now:
 7. 0x0DB7 or the alternate direct-output branch writes the four-byte transaction to 0x8000–0x8003.
 
 This is the first end-to-end firmware path from a real MIDI Note On to the external four-byte interface. It still does not identify the physical receiver or prove the exact synthesis algorithm; those require hardware/bus evidence and validation of the remaining descriptor fields.
+
+
+## 51. Computed-dispatch handlers at 0x1BC3 and the record-loop sentinel at 0x19A7
+
+The seven four-byte entries at 0x1BC3–0x1BDB dispatch to 0x1C2B, 0x1C61, 0x1EDD, 0x224C, 0x2301, and 0x2374 (the last target is repeated). The following findings are based on instruction boundaries from the repository's MCS-51 length table; unknown opcode semantics are not guessed.
+
+### 51.1 Shared setup and pin-control pattern
+
+Handlers 0x1C2B, 0x1C61, 0x1EDD, 0x224C, and 0x2301 all consume the descriptor pointer in RAM[0x36:0x37]. Several copy it into DPTR, test internal bit addresses 0x00–0x02, and conditionally clear P3 bits 0xB5, 0xB4, and 0xB1 before performing MOVX reads. They then set those three P3 bits again after the read sequence. This is a repeated bus/control-line envelope around external-memory access. The pins' exact electrical function is not identified; the code alone does not prove a chip-select or latch protocol.
+
+### 51.2 0x1C2B — short descriptor probe / route
+
+- If internal bit 0x0A is set, it jumps to 0x1BEF.
+- Otherwise it forms DPTR = RAM[0x36:0x37] + 3.
+- It conditionally clears the three P3 bits according to internal flags 0x00–0x02, reads one XDATA byte, then restores all three P3 bits.
+- It tests bit 3 of the just-read accumulator. If clear, it advances DPTR once, stores the resulting pointer back to RAM[0x36:0x37], and jumps to the common continuation at 0x19C2. If set, it transfers to 0x224C.
+
+This handler is a compact descriptor-field test and pointer advance. It does not itself emit a four-byte packet.
+
+### 51.3 0x1C61 — multi-byte descriptor transform and endpoint update
+
+This handler reads a sequence of bytes through DPTR into B/F0 and R2–R7, preserving the advanced pointer in RAM[0x36:0x37]. It writes fields through MOVX @R1 using a destination base derived from RAM[0x2E]. One destination byte is merged: when the relevant ACC.3 condition is clear, the old destination's low three bits are retained while the new value supplies the upper bits; otherwise the loaded value is used directly. It masks one field with 0x7F and stores several adjacent values.
+
+The subsequent arithmetic uses the lookup data at 0x11F0/0x11FC, DIV AB, MUL AB, and shifts/rotates to form a multi-byte intermediate quantity. Later code combines it with RAM[0x2F], RAM[0x34], and an indexed structure reached through the pointer at internal RAM 0x9E/0x9F. It then calls helper 0x09B9 on one path or 0x0DB7 after preparing values on another; a second path writes result bytes into the record at RAM[0x2E]+ offsets and calls 0x0DB7 with page 0x80 selected. The exact numeric units of these fields remain unknown.
+
+### 51.4 0x1EDD — extended descriptor calculation and slot/endpoint state
+
+This handler first clears RAM[0x3E], then reads descriptor bytes through DPTR into R2–R7 and F0, advancing and saving the pointer. A zero second byte returns through 0x1EC5 after restoring P3 control bits and advancing the descriptor pointer by seven. Otherwise it writes several fields through the record pointer in RAM[0x2E], including a packed field derived from R5 and RAM[0x42].
+
+It then computes transformed values using the code table at 0x1288 and, on another path, 0x1308. The arithmetic includes signed/bit-conditioned multiplication and calls 0x2381, 0x1848, and 0x23C7. It stores intermediate results into the record at RAM[0x2E] and consults RAM[0x3F], RAM[0x40], RAM[0x41], and RAM[0x43] while selecting the output branch. One branch jumps back to the common continuation at 0x19C2; another reaches 0x0DB7 with page 0x80 selected. These accesses show that this handler participates in descriptor-to-endpoint preparation, but do not independently establish the receiving IC or the meaning of every computed field.
+
+### 51.5 0x224C — conditional endpoint packet path
+
+If internal bit 0x08 is set, the handler jumps to 0x1BE2. Otherwise it reads three descriptor bytes through DPTR, saves the advanced pointer, and writes the first byte through the record pointer in RAM[0x2E]. The third byte is masked to three bits and may have ACC.7 set according to internal bit 0x0D. If internal bit 0xE0 (ACC.0 at the point tested) is set, it also writes a value and calls 0x2128 to adjust the record's selector fields.
+
+It selects XDATA page 0x80 and prepares R5 from RAM[0x2B]. Depending on internal bit 0x0A and the low nibble of RAM[0x2B], it may initialize a four-byte record at offsets 0–3. A further group of conditions involving internal flags 0x01–0x03, the upper bits of R3, RAM[0x40], and ACC.3 determines whether internal bit 0xE4 is set or cleared before calling 0x0DB7. It then restores A0 from RAM[0x2D] and jumps to 0x19C2. The exact semantic labels of the packet fields remain open.
+
+### 51.6 0x2301 and 0x2374 — record normalization and pointer progression
+
+0x2301 optionally resets RAM[0x2E] to 0xF8 or initializes 0x38 markers in the record slots, then advances the descriptor pointer by one byte and reads two values. It writes those values and a masked third field through the record pointer, calls 0x2128 and 0x21B7 to normalize selector/range fields, prepares the group value in R5, calls 0x0DB7 with page 0x80 selected, restores A0 from RAM[0x2D], and jumps to 0x19CD.
+
+0x2374 is deliberately small: it increments the 16-bit descriptor pointer RAM[0x36:0x37] by one and jumps to 0x19C2. Since two table entries target it, this is a pointer-advance/skip handler rather than a separate payload transformation.
+
+### 51.7 0x19A7 — per-record marker and loop control
+
+The special 0x38 computed-dispatch case enters 0x19A7 with A=0x38. It writes that marker to XDATA at the current record offset RAM[0x2E], increments DPTR and saves it back to RAM[0x36:0x37], advances RAM[0x2E] by eight, increments RAM[0x2B], decrements RAM[0x2C], and loops to 0x1986 while RAM[0x2C] is nonzero; otherwise it returns. This is a record-loop marker/stride operation. The byte 0x38 should not be labelled as a hardware command without additional evidence.
+
+### 51.8 Current interpretation
+
+The computed-dispatch family is not a single uniform "voice start" routine. It contains at least: a descriptor probe (0x1C2B), a larger numeric/record transformation (0x1C61), an extended descriptor calculation (0x1EDD), an endpoint packet preparation path (0x224C), a record normalization/output path (0x2301), and a one-byte pointer advance (0x2374). Several paths converge on 0x0DB7, whose four-byte page-0x80 output behavior is already documented in Section 50. The physical receiver and exact packet-field meanings remain unconfirmed.
