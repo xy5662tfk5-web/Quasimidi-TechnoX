@@ -15,8 +15,8 @@ def analyze(midi_bytes: bytes):
         "frame_layout": {
             "complete_frame_bytes": 32,
             "header_hex": "F0 3F 00 22 44",
-            "type_byte_offset": 5,
-            "performance_index_offset": 6,
+            "performance_address_high_offset": 5,
+            "block_selector_offset": 6,
             "opaque_data_start_offset": 7,
             "opaque_data_bytes": 24,
             "terminator_offset": 31
@@ -41,8 +41,8 @@ def analyze(midi_bytes: bytes):
                               for value, count in counts.most_common()]
             })
         report["parts"].append({
-            "part_number": part_number + 1,
-            "sysex_type": part_number + 1,
+            "part_number": part_number + 13,
+            "block_selector": part_number + 1,
             "performance_count": len(frames),
             "byte_statistics": offsets
         })
