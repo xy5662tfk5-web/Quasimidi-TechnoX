@@ -12,6 +12,8 @@ jobs:
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
+      - name: Test lossless MIDI/SysEx parser
+        run: python3 -m unittest discover -s tests -v
       - name: Configure (x86_64)
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
