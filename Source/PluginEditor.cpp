@@ -70,7 +70,7 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.setFont(juce::Font("Courier New", 8.5f, juce::Font::bold));
     const auto soundName = audioProcessor.getCurrentPartSoundName(partNumber - 13);
-    g.drawText(soundName.isNotEmpty() ? soundName : juce::String("Sound catalog unavailable"),
+    g.drawText(!soundName.isEmpty() ? soundName : juce::String("Sound catalog unavailable"),
                237, 68, 145, 8, juce::Justification::left, false);
 
     g.setColour(juce::Colour(0xffe5e7ea));
