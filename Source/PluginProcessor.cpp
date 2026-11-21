@@ -94,13 +94,21 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isNoteOff()) {
             massEngine.noteOff(static_cast<std::uint8_t>(message.getChannel()),
                                static_cast<std::uint8_t>(message.getNoteNumber()));
-        } else if (message.isAllNotesOff() || message.isAllSoundOff()) {
+        } else if (message.isAllSoundOff()) {
+            massEngine.allSoundsOff(message.getChannel());
+        } else if (message.isAllNotesOff()) {
             massEngine.allNotesOff(message.getChannel());
         } else if (message.isController()) {
             const auto change = midiControlRouter.handleControlChange(
                 message.getChannel(), message.getControllerNumber(), message.getControllerValue());
             if (message.getControllerNumber() == 1)
                 massEngine.setModWheel(12 + slot, message.getControllerValue());
+            else if (message.getControllerNumber() == 65)
+                massEngine.setPortamento(12 + slot, message.getControllerValue() >= 64);
+            else if (message.getControllerNumber() == 67)
+                massEngine.setSoftPedal(12 + slot, message.getControllerValue() >= 64);
+            else if (message.getControllerNumber() == 121)
+                massEngine.resetPartControllers(12 + slot);
             if (change.has_value())
                 setPartParameterRaw(performanceIndex, slot, change->parameter, change->rawValue);
         } else if (message.isProgramChange()) {
