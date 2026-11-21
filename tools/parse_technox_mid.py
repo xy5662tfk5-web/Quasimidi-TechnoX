@@ -8,7 +8,7 @@ from typing import List
 
 HEADER = bytes((0xF0, 0x3F, 0x00, 0x22, 0x44))
 EXPECTED_BLOCK_SELECTORS = (0x05, 0x00, 0x01, 0x02, 0x03, 0x04)
-EXPECTED_SIZES = {0x05: 16, 0x00: 73, 0x01: 32, 0x02: 32, 0x03: 32, 0x04: 32}
+EXPECTED_SIZES = {0x05: 17, 0x00: 74, 0x01: 33, 0x02: 33, 0x03: 33, 0x04: 33}
 
 class MidiFormatError(ValueError): pass
 
@@ -127,7 +127,7 @@ def export_json(perfs: List[Performance], path: Path):
            "note":"Undocumented bytes remain opaque and are preserved as complete SysEx frames.",
            "performances":[{"index":p.index,"name":p.name,"name_frame_hex":p.name_frame.hex(" "),
              "common_frame_hex":p.common_frame.hex(" "),
-             "parts":[{"part":i+1,"raw_sysex_hex":raw.hex(" ")} for i,raw in enumerate(p.part_frames)]}
+             "parts":[{"part":i+13,"block_selector":i+1,"raw_sysex_hex":raw.hex(" ")} for i,raw in enumerate(p.part_frames)]}
              for p in perfs]}
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")
 
