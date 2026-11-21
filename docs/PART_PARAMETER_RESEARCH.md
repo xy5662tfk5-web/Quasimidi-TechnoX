@@ -58,6 +58,19 @@ The manual maps the 24 data bytes directly to Part parameter offsets 0x00–0x17
 
 The manual's address map identifies the four stored Performance Part blocks as Parts 13, 14, 15, and 16 (block selectors 0x01–0x04). Selector 0x00 is the common block; selector 0x05 is the Performance name. The Performance address high byte runs from 0x05 through 0x36 for the 50 factory RAM Performances.
 
+
+## Performance common block
+
+The 73-byte common frame contains 65 data bytes at offsets 0x00–0x40. The manual documents these groups:
+
+- 0x00–0x08: Performance level/mode, controller assignment, and foot-controller settings.
+- 0x09–0x28: 32 modulation-matrix depths (4 sources × 8 destinations), raw 0–127 representing −64…+63.
+- 0x29–0x30: FX1 activity, type, and six parameter pages.
+- 0x31–0x3B: FX2 activity, type, and nine parameter pages.
+- 0x3C–0x40: Arpeggiator bitfields, speed, and gate.
+
+The exact offsets and ranges are stored in data/technox_instrument_definition.json. The common block is retained losslessly in the C++ Performance record; a typed CommonEditModel is the next data-model task.
+
 ## Documented MIDI controller paths
 
 - CC0 Bank Select: values 0–3 select banks A–D; follow with Program Change 0–127.
