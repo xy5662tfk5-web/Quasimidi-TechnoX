@@ -45,10 +45,13 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         firmwareMachine = std::make_unique<technox::TechnoX8032Machine>();
         if (firmwareMachine->loadIC4Rom(
                 reinterpret_cast<const std::uint8_t*>(firmwareData),
-                static_cast<std::size_t>(firmwareRomSize)))
+                static_cast<std::size_t>(firmwareRomSize))) {
             firmwareMachine->reset();
-        else
+            if (firmwareMachine->runUntilProgramCounter(0xeb8d, 50000) == 0)
+                firmwareMachine.reset();
+        } else {
             firmwareMachine.reset();
+        }
     }
     initialisePartStates();
     initialiseCommonControlsFromBank();
