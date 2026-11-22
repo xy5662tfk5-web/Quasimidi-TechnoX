@@ -262,6 +262,88 @@ int main() {
     assert(divideZeroCpu.registers().psw.overflow);
     assert(!divideZeroCpu.registers().psw.carry);
 
+    // CJNE sets carry from unsigned comparison and branches only on inequality.
+    TestBus cjneBus;
+    cjneBus.code[0] = 0x74; cjneBus.code[1] = 0x40; // MOV A,#40
+    cjneBus.code[2] = 0xb4; cjneBus.code[3] = 0x42; cjneBus.code[4] = 0x02; // CJNE A,#42,+2
+    cjneBus.code[7] = 0x78; cjneBus.code[8] = 0x42; // MOV R0,#42
+    cjneBus.code[9] = 0xb8; cjneBus.code[10] = 0x42; cjneBus.code[11] = 0x02; // CJNE R0,#42,+2 (equal)
+    MCS51Core cjneCpu;
+    assert(cjneCpu.step(cjneBus) == MCS51StepResult::executed);
+    assert(cjneCpu.step(cjneBus) == MCS51StepResult::executed);
+    assert(cjneCpu.registers().pc == 7);
+    assert(cjneCpu.registers().psw.carry);
+    assert(cjneCpu.step(cjneBus) == MCS51StepResult::executed);
+    assert(cjneCpu.step(cjneBus) == MCS51StepResult::executed);
+    assert(cjneCpu.registers().pc == 12);
+    assert(!cjneCpu.registers().psw.carry);
+
+    // DJNZ loops exactly until the decremented register reaches zero.
+    TestBus djnzBus;
+    djnzBus.code[0] = 0x79; djnzBus.code[1] = 0x02; // MOV R1,#2
+    djnzBus.code[2] = 0xd9; djnzBus.code[3] = 0xfe; // DJNZ R1,-2
+    MCS51Core djnzCpu;
+    assert(djnzCpu.step(djnzBus) == MCS51StepResult::executed);
+    assert(djnzCpu.step(djnzBus) == MCS51StepResult::executed);
+    assert(djnzCpu.registers().pc == 2);
+    assert(djnzBus.internal[1] == 1);
+    assert(djnzCpu.step(djnzBus) == MCS51StepResult::executed);
+    assert(djnzCpu.registers().pc == 4);
+    assert(djnzBus.internal[1] == 0);
+
+    // XCH/XCHD preserve the untouched nibble and exchange the intended data.
+    TestBus exchangeBus;
+    exchangeBus.code[0] = 0x78; exchangeBus.code[1] = 0x40; // MOV R0,#40
+    exchangeBus.code[2] = 0x74; exchangeBus.code[3] = 0xaa; // MOV A,#AA
+    exchangeBus.code[4] = 0xc6; // XCH A,@R0
+    exchangeBus.code[5] = 0x74; exchangeBus.code[6] = 0xab; // MOV A,#AB
+    exchangeBus.code[7] = 0xd6; // XCHD A,@R0
+    exchangeBus.internal[0x40] = 0x55;
+    MCS51Core exchangeCpu;
+    for (int i = 0; i < 3; ++i)
+        assert(exchangeCpu.step(exchangeBus) == MCS51StepResult::executed);
+    assert(exchangeCpu.registers().a == 0x55);
+    assert(exchangeBus.internal[0x40] == 0xaa);
+    assert(exchangeCpu.step(exchangeBus) == MCS51StepResult::executed);
+    assert(exchangeCpu.step(exchangeBus) == MCS51StepResult::executed);
+    assert(exchangeCpu.registers().a == 0xad);
+    assert(exchangeBus.internal[0x40] == 0xab);
+
+    // Decimal adjust after packed-BCD addition: 15 + 27 -> 42.
+    TestBus decimalBus;
+    decimalBus.code[0] = 0x74; decimalBus.code[1] = 0x15;
+    decimalBus.code[2] = 0x24; decimalBus.code[3] = 0x27;
+    decimalBus.code[4] = 0xd4; // DA A
+    MCS51Core decimalCpu;
+    for (int i = 0; i < 3; ++i)
+        assert(decimalCpu.step(decimalBus) == MCS51StepResult::executed);
+    assert(decimalCpu.registers().a == 0x42);
+
+    // MOV transfer forms between direct, register and indirect operands.
+    TestBus moveBus;
+    moveBus.code[0] = 0x78; moveBus.code[1] = 0x40; // MOV R0,#40
+    moveBus.code[2] = 0x75; moveBus.code[3] = 0x30; moveBus.code[4] = 0x5a; // direct 30=5A
+    moveBus.code[5] = 0x86; moveBus.code[6] = 0x31; // MOV direct 31,@R0 (internal[40] initially 00)
+    moveBus.code[7] = 0xa6; moveBus.code[8] = 0x30; // MOV @R0,direct 30
+    moveBus.code[9] = 0x88; moveBus.code[10] = 0x32; // MOV direct 32,R0
+    moveBus.code[11] = 0xa8; moveBus.code[12] = 0x30; // MOV R0,direct 30
+    MCS51Core moveCpu;
+    for (int i = 0; i < 6; ++i)
+        assert(moveCpu.step(moveBus) == MCS51StepResult::executed);
+    assert(moveBus.internal[0x31] == 0x00);
+    assert(moveBus.internal[0x40] == 0x5a);
+    assert(moveBus.internal[0x32] == 0x40);
+    assert(moveBus.internal[0] == 0x5a);
+
+    // Architectural SFR mirrors, including the parity bit, stay coherent.
+    TestBus parityBus;
+    parityBus.code[0] = 0x74; parityBus.code[1] = 0x07;
+    MCS51Core parityCpu;
+    assert(parityCpu.step(parityBus) == MCS51StepResult::executed);
+    assert(parityBus.internal[0xe0] == 0x07);
+    assert(parityBus.internal[0xd0] == parityCpu.registers().psw.pack());
+    assert((parityBus.internal[0xd0] & 1u) == 1u);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
