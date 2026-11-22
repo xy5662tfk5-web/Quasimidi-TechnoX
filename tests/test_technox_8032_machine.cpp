@@ -460,6 +460,13 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto ic51Reads = firmwareMachine.ic51ReadTraceCount();
+        std::printf("IC51 source reads: total=%llu bank0=%llu bank1=%llu trace=%zu\\n",
+                    static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()),
+                    static_cast<unsigned long long>(firmwareMachine.ic51ReadsByBank(0)),
+                    static_cast<unsigned long long>(firmwareMachine.ic51ReadsByBank(1)),
+                    ic51Reads);
+        if (!realIC51.empty())
+            assert(firmwareMachine.ic51ReadCount() > 0u);
         std::printf("IC51 source reads (last 12):\\n");
         const auto firstRecentRead = ic51Reads > 12u ? ic51Reads - 12u : 0u;
         for (std::size_t i = firstRecentRead; i < ic51Reads; ++i) {
