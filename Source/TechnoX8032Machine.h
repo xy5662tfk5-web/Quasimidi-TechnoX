@@ -208,16 +208,11 @@ private:
 
     void refreshAciaInterrupt() noexcept {
         // ACIA IRQ is wired to the 8032 INT1 input in the published MAME map.
-        auto tcon = internal_[0x88];
         const bool irqActive = (aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0;
-        if (irqActive) {
-            tcon = static_cast<std::uint8_t>(tcon | 0x08u); // IE1
+        if (irqActive)
             portPins_[3] = static_cast<std::uint8_t>(portPins_[3] & ~0x08u); // INT1 active low
-        } else {
-            tcon = static_cast<std::uint8_t>(tcon & ~0x08u);
+        else
             portPins_[3] = static_cast<std::uint8_t>(portPins_[3] | 0x08u);
-        }
-        internal_[0x88] = tcon;
     }
 
     MCS51Core cpu_{};
