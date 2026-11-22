@@ -106,6 +106,38 @@ void testResourceSelectionRecordParser() {
         nullptr, page.size(), 0, parsed));
 }
 
+void testCommandRegisterFieldDecoders() {
+    MASSResourceCommand command{};
+    command.opcode = 0x0d;
+    command.kind = MASSResourceCommandKind::pitchParameter;
+    command.length = 7;
+    command.bytes = {{0x0d, 0x21, 0x32, 0x43, 0x54, 0x65, 0x76}};
+
+    MASSPitchParameterRegisterFields pitch{};
+    assert(MASSResourceCommandFieldDecoder::decodePitchParameter(command, pitch));
+    assert(pitch.opcode == 0x0d && pitch.r2 == 0x21 && pitch.r3 == 0x32);
+    assert(pitch.r4 == 0x43 && pitch.r7 == 0x54 &&
+           pitch.r6 == 0x65 && pitch.r5 == 0x76);
+
+    command.opcode = 0x12;
+    command.kind = MASSResourceCommandKind::multiParameter;
+    command.bytes = {{0x12, 0x23, 0x34, 0x45, 0x56, 0x67, 0x78}};
+    MASSMultiParameterRegisterFields multi{};
+    assert(MASSResourceCommandFieldDecoder::decodeMultiParameter(command, multi));
+    assert(multi.opcode == 0x12 && multi.r3 == 0x23 && multi.r5 == 0x34);
+    assert(multi.r6 == 0x45 && multi.f0 == 0x56 &&
+           multi.r4 == 0x67 && multi.r7 == 0x78);
+    assert(!multi.takesFillerPath());
+
+    command.bytes[1] = 0;
+    command.kind = MASSResourceCommandKind::emptyMultiParameter;
+    assert(MASSResourceCommandFieldDecoder::decodeMultiParameter(command, multi));
+    assert(multi.takesFillerPath());
+
+    command.opcode = 0x22;
+    assert(!MASSResourceCommandFieldDecoder::decodeMultiParameter(command, multi));
+}
+
 void testFourByteParameterPacketBuilder() {
     MASSResourceCommand command{};
     command.opcode = 0x1b;
@@ -381,6 +413,7 @@ void testActualIC51(const char* path) {
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testResourceSelectionRecordParser();
+    testCommandRegisterFieldDecoders();
     testFourByteParameterPacketBuilder();
     testTerminalHardwarePacketBuilder();
     testDescriptorParser();

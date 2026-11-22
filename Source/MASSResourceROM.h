@@ -330,6 +330,57 @@ struct MASSResourceCommand {
     std::array<std::uint8_t, 8> bytes{};
 };
 
+// Register-level input maps recovered directly from command handlers.
+// These types deliberately retain 8051 register names: they do not assign
+// unsupported musical meanings to individual bytes.
+struct MASSPitchParameterRegisterFields {
+    std::uint8_t opcode = 0; // F0
+    std::uint8_t r2 = 0;     // stream byte +1
+    std::uint8_t r3 = 0;     // stream byte +2
+    std::uint8_t r4 = 0;     // stream byte +3
+    std::uint8_t r7 = 0;     // stream byte +4
+    std::uint8_t r6 = 0;     // stream byte +5
+    std::uint8_t r5 = 0;     // stream byte +6
+};
+
+struct MASSMultiParameterRegisterFields {
+    std::uint8_t opcode = 0; // R2
+    std::uint8_t r3 = 0;     // stream byte +1 (zero selects skip/filler path)
+    std::uint8_t r5 = 0;     // stream byte +2
+    std::uint8_t r6 = 0;     // stream byte +3
+    std::uint8_t f0 = 0;     // stream byte +4
+    std::uint8_t r4 = 0;     // stream byte +5
+    std::uint8_t r7 = 0;     // stream byte +6
+
+    bool takesFillerPath() const noexcept { return r3 == 0; }
+};
+
+class MASSResourceCommandFieldDecoder {
+public:
+    static bool decodePitchParameter(const MASSResourceCommand& command,
+                                     MASSPitchParameterRegisterFields& result) noexcept {
+        if (command.kind != MASSResourceCommandKind::pitchParameter ||
+            command.length != 7 || (command.opcode & 0x38) != 0x08)
+            return false;
+        result = {command.bytes[0], command.bytes[1], command.bytes[2],
+                  command.bytes[3], command.bytes[4], command.bytes[5],
+                  command.bytes[6]};
+        return true;
+    }
+
+    static bool decodeMultiParameter(const MASSResourceCommand& command,
+                                     MASSMultiParameterRegisterFields& result) noexcept {
+        if ((command.kind != MASSResourceCommandKind::multiParameter &&
+             command.kind != MASSResourceCommandKind::emptyMultiParameter) ||
+            command.length != 7 || (command.opcode & 0x38) != 0x10)
+            return false;
+        result = {command.bytes[0], command.bytes[1], command.bytes[2],
+                  command.bytes[3], command.bytes[4], command.bytes[5],
+                  command.bytes[6]};
+        return true;
+    }
+};
+
 struct MASSHardwareCommandPacket {
     // 0x0DB7 writes R5, R2, R3, R4 to XDATA 0x8000..0x8003.
     std::array<std::uint8_t, 4> bytes{};
