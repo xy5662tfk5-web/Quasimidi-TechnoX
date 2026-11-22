@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <vector>
@@ -213,7 +214,12 @@ int main(int argc, char** argv) {
         firmwareMachine.reset();
         assert(firmwareMachine.step() == technox::MCS51StepResult::executed);
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
-        assert(firmwareMachine.runInstructions(512) == 512);
+        const auto executed = firmwareMachine.runInstructions(50000);
+        std::printf("IC4 boot trace: instructions=%zu PC=%04X SP=%02X cycles=%llu\\n",
+                    executed, firmwareMachine.cpu().registers().pc,
+                    firmwareMachine.cpu().registers().sp,
+                    static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
+        assert(executed == 50000);
         assert(firmwareMachine.cpu().totalCycles() != 0);
     }
     return 0;
