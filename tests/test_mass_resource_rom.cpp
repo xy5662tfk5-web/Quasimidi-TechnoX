@@ -21,6 +21,63 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testFirmwareROMTableView() {
+    std::vector<std::uint8_t> synthetic(0x20000, 0xff);
+    synthetic[0x1288] = 0x12;
+    synthetic[0x1308 + 0x12] = 0x58;
+    synthetic[0x11e0] = 0x80;
+    MASSFirmwareROMView view;
+    assert(!view.isAttached());
+    assert(!view.attach(nullptr, synthetic.size()));
+    assert(!view.attach(synthetic.data(), 0x1407));
+    assert(view.attach(synthetic.data(), synthetic.size()));
+    std::uint8_t value = 0;
+    assert(view.read(MASSFirmwareLookupTable::modulationScale11E0, 0, value) && value == 0x80);
+    assert(view.lookupNonlinearScale(0, value) && value == 0x58);
+    assert(!view.read(MASSFirmwareLookupTable::nonlinearScale1288, 128, value));
+    assert(!view.read(MASSFirmwareLookupTable::quantizeMap1308, 256, value));
+    view.detach();
+    assert(!view.isAttached());
+    assert(!view.read(MASSFirmwareLookupTable::nonlinearScale1288, 0, value));
+}
+
+void testActualFirmwareROMTables(const char* path) {
+    std::ifstream file(path, std::ios::binary);
+    assert(file.good());
+    std::vector<std::uint8_t> image(
+        (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    assert(image.size() == 0x20000);
+    MASSFirmwareROMView view;
+    assert(view.attach(image.data(), image.size()));
+    std::uint8_t value = 0;
+    assert(view.read(MASSFirmwareLookupTable::modulationScale11E0, 0, value) && value == 0x80);
+    assert(view.read(MASSFirmwareLookupTable::modulationScale11E0, 7, value) && value == 0xf0);
+    assert(view.read(MASSFirmwareLookupTable::modulationScale11E8, 0, value) && value == 0x10);
+    assert(view.read(MASSFirmwareLookupTable::modulationScale11E8, 7, value) && value == 0xe0);
+    assert(view.read(MASSFirmwareLookupTable::interpolationCurve11F0, 0, value) && value == 0x80);
+    assert(view.read(MASSFirmwareLookupTable::interpolationCurve11F0, 11, value) && value == 0xf2);
+    assert(view.read(MASSFirmwareLookupTable::interpolationCurve11FC, 0, value) && value == 0xcb);
+    assert(view.read(MASSFirmwareLookupTable::interpolationCurve11FC, 11, value) && value == 0x88);
+    assert(view.read(MASSFirmwareLookupTable::parameterMap1208, 0, value) && value == 0x00);
+    assert(view.read(MASSFirmwareLookupTable::parameterMap1208, 127, value) && value == 0x7f);
+    assert(view.read(MASSFirmwareLookupTable::nonlinearScale1288, 0, value) && value == 0x00);
+    assert(view.read(MASSFirmwareLookupTable::nonlinearScale1288, 127, value) && value == 0xff);
+    assert(view.read(MASSFirmwareLookupTable::quantizeMap1308, 0, value) && value == 0x00);
+    assert(view.read(MASSFirmwareLookupTable::quantizeMap1308, 255, value) && value == 0xf8);
+    for (const auto table : {MASSFirmwareLookupTable::parameterMap1208,
+                             MASSFirmwareLookupTable::nonlinearScale1288,
+                             MASSFirmwareLookupTable::quantizeMap1308}) {
+        std::uint8_t previous = 0;
+        for (std::size_t i = 0; i < MASSFirmwareROMView::tableLength(table); ++i) {
+            assert(view.read(table, i, value));
+            if (i != 0) assert(value >= previous);
+            previous = value;
+        }
+    }
+    for (std::size_t index = 0; index < 128; ++index)
+        assert(view.lookupNonlinearScale(static_cast<std::uint8_t>(index), value));
+}
+
 void testPointerTableAndPartMapping() {
     std::vector<std::uint8_t> image(MASSResourceROM::kImageSize, 0xff);
     writePointerBE(image, MASSResourceBank::bank0, 5, 0x1234);
@@ -472,6 +529,9 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testFirmwareROMTableView();
+    if (argc > 2)
+        testActualFirmwareROMTables(argv[2]);
     testResourceSelectionRecordParser();
     testCommandRegisterFieldDecoders();
     testMultiParameterPacketSequenceBuilder();

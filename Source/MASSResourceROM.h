@@ -18,6 +18,66 @@ enum class MASSResourceBank : std::uint8_t {
     bank1 = 1
 };
 
+// Fixed IC4 v1.05 lookup tables reached by MOVC instructions.
+enum class MASSFirmwareLookupTable : std::uint8_t {
+    modulationScale11E0, modulationScale11E8,
+    interpolationCurve11F0, interpolationCurve11FC,
+    parameterMap1208, nonlinearScale1288, quantizeMap1308
+};
+
+class MASSFirmwareROMView {
+public:
+    static constexpr std::size_t kMinimumImageSize = 0x1408;
+    bool attach(const std::uint8_t* image, std::size_t imageSize) noexcept {
+        if (image == nullptr || imageSize < kMinimumImageSize) return false;
+        image_ = image; imageSize_ = imageSize; return true;
+    }
+    void detach() noexcept { image_ = nullptr; imageSize_ = 0; }
+    bool isAttached() const noexcept { return image_ != nullptr; }
+
+    static constexpr std::uint16_t tableAddress(MASSFirmwareLookupTable table) noexcept {
+        switch (table) {
+            case MASSFirmwareLookupTable::modulationScale11E0: return 0x11e0;
+            case MASSFirmwareLookupTable::modulationScale11E8: return 0x11e8;
+            case MASSFirmwareLookupTable::interpolationCurve11F0: return 0x11f0;
+            case MASSFirmwareLookupTable::interpolationCurve11FC: return 0x11fc;
+            case MASSFirmwareLookupTable::parameterMap1208: return 0x1208;
+            case MASSFirmwareLookupTable::nonlinearScale1288: return 0x1288;
+            case MASSFirmwareLookupTable::quantizeMap1308: return 0x1308;
+        }
+        return 0;
+    }
+    static constexpr std::size_t tableLength(MASSFirmwareLookupTable table) noexcept {
+        switch (table) {
+            case MASSFirmwareLookupTable::modulationScale11E0: return 8;
+            case MASSFirmwareLookupTable::modulationScale11E8: return 8;
+            case MASSFirmwareLookupTable::interpolationCurve11F0: return 12;
+            case MASSFirmwareLookupTable::interpolationCurve11FC: return 12;
+            case MASSFirmwareLookupTable::parameterMap1208: return 128;
+            case MASSFirmwareLookupTable::nonlinearScale1288: return 128;
+            case MASSFirmwareLookupTable::quantizeMap1308: return 256;
+        }
+        return 0;
+    }
+    bool read(MASSFirmwareLookupTable table, std::size_t index,
+              std::uint8_t& value) const noexcept {
+        if (image_ == nullptr || index >= tableLength(table)) return false;
+        const auto offset = static_cast<std::size_t>(tableAddress(table)) + index;
+        if (offset >= imageSize_) return false;
+        value = image_[offset]; return true;
+    }
+    // The two MOVC lookups in the common 0x1EDD path; caller supplies the
+    // 7-bit index after the firmware's preceding rotate/complement operations.
+    bool lookupNonlinearScale(std::uint8_t index, std::uint8_t& value) const noexcept {
+        std::uint8_t intermediate = 0;
+        return read(MASSFirmwareLookupTable::nonlinearScale1288, index, intermediate) &&
+               read(MASSFirmwareLookupTable::quantizeMap1308, intermediate, value);
+    }
+private:
+    const std::uint8_t* image_ = nullptr;
+    std::size_t imageSize_ = 0;
+};
+
 struct MASSResourceSelection {
     MASSResourceBank bank = MASSResourceBank::bank0;
     std::uint8_t pointerIndex = 0;
