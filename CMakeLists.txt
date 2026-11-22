@@ -23,6 +23,7 @@ juce_add_binary_data(TechnoXAssets
         TECHNOX.MID
         data/technox_ins.json
         technox_IC51_nm27c010_v105.bin
+        technox_IC4_mx27c1000_v105.bin
 )
 
 juce_add_plugin(QuasimidiTechnoX
@@ -97,6 +98,7 @@ if (BUILD_TESTING)
     target_compile_options(technox_8032_machine_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_8032_machine_tests
         COMMAND technox_8032_machine_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
     )
 endif()
 
