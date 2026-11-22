@@ -306,6 +306,7 @@ public:
                     const auto bitCycles = std::max<std::uint64_t>(
                         1u, midiByteMachineCycles() / 10u);
                     aciaTxReadyCycle_ = elapsedMachineCycles_ + bitCycles;
+                    refreshAciaInterrupt();
                 }
                 break;
             case 0xb000: lcdInstruction_ = value; break;
