@@ -48,7 +48,30 @@ This establishes the chain:
 
 `Part parameter -> 0x5C3D P3 mask + IC51 pointer-table index -> 16-bit descriptor address -> per-Part 12-byte XDATA selection record -> 0x1494 / 0x15AE descriptor scan -> command-stream pointer -> 0x189D`.
 
-## 2. Command-stream interpreter
+## 2. Firmware lookup tables used by command handlers
+
+The descrambled IC4 image contains compact lookup tables reached by MOVC:
+
+| ROM address | Entries | Call sites | Observed use |
+|---|---:|---|---|
+| 0x11E0 | 8 | 0x23DF | First modulation-scale table in helper 0x23C7 |
+| 0x11E8 | 8 | 0x23EF | Second modulation-scale table in helper 0x23C7 |
+| 0x11F0 | 12 | 0x1CD4 | First 12-entry interpolation table in the 0x1C61 path |
+| 0x11FC | 12 | 0x1D27 | Alternate interpolation table selected by E7 |
+| 0x1208 | 128 | 0x0D0E, 0x14CF | 7-bit selection/parameter remapping |
+| 0x1288 | 128 | 0x1F67 | Nonlinear scale curve in the common 0x1EDD path |
+| 0x1308 | 256 | 0x1F81 | Second-stage byte quantization map |
+
+In the common 0x1EDD branch, firmware derives a 7-bit index through 8051 rotate/complement operations at 0x1F63..0x1F6C, reads 0x1288, then uses that byte as the 0x1308 index at 0x1F7D..0x1F85. E0/E6/E7/F7 alter the surrounding arithmetic and can bypass or invert parts of this path. MASSFirmwareROMView exposes the numeric tables without assigning speculative musical names; lookupNonlinearScale models only the two MOVC lookups, not the surrounding ALU transformations.
+
+Related helpers:
+- 0x2381 constructs a pointer into a 0x30-byte record bank from the selected two-bit field in R5, base pointer RAM[0x38:0x39], and an offset derived from RAM[0x2F] + 0xF4; it then reads from the P3-selected external bus.
+- 0x1848 performs sign-aware rotate/multiply arithmetic using A, B/F0 and R2, with saturation returns 0x7F or 0x81 when the D2 condition is active. Its complete fixed-point interpretation remains under analysis.
+- 0x23C7 applies E6/E7-dependent modulation scaling. In mode 0x41 it uses the two 8-entry tables above; other modes may call 0x1890.
+
+CI checks table bounds and endpoint values against the real 128-KB descrambled IC4 image, verifies monotonicity of the 0x1208, 0x1288 and 0x1308 remapping curves, and evaluates all 128 composed 0x1288 -> 0x1308 lookups.
+
+## 3. Command-stream interpreter
 
 `0x189D` uses the descriptor pointer and the per-mode metadata table at `0x2868 + 0x80*mode`. The command interpreter is reached through the indirect dispatch at `0x19BD`.
 

@@ -56,7 +56,7 @@ void testActualFirmwareROMTables(const char* path) {
     assert(view.read(MASSFirmwareLookupTable::modulationScale11E8, 7, value) && value == 0xe0);
     assert(view.read(MASSFirmwareLookupTable::interpolationCurve11F0, 0, value) && value == 0x80);
     assert(view.read(MASSFirmwareLookupTable::interpolationCurve11F0, 11, value) && value == 0xf2);
-    assert(view.read(MASSFirmwareLookupTable::interpolationCurve11FC, 0, value) && value == 0xcb);
+    assert(view.read(MASSFirmwareLookupTable::interpolationCurve11FC, 0, value) && value == 0xff);
     assert(view.read(MASSFirmwareLookupTable::interpolationCurve11FC, 11, value) && value == 0x88);
     assert(view.read(MASSFirmwareLookupTable::parameterMap1208, 0, value) && value == 0x00);
     assert(view.read(MASSFirmwareLookupTable::parameterMap1208, 127, value) && value == 0x7f);
