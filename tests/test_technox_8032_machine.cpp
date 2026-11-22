@@ -441,6 +441,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
         std::fflush(stdout);
         assert(peripheralInit > 0);
+        std::fflush(stdout);
         assert(firmwareMachine.soundMemoryWriteCount() > 0u);
         assert(firmwareMachine.soundMemoryWriteTraceCount() ==
                firmwareMachine.soundMemoryWriteCount());
