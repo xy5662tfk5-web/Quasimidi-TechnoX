@@ -1,9 +1,8 @@
 #pragma once
 
-// Architectural foundation for the classic Intel MCS-51 / 8051 core.
-// Instruction execution is deliberately added in subsequent commits; this
-// file defines CPU state and the memory/peripheral boundary without claiming
-// that the original IC4 firmware can already run.
+// Architectural foundation and initial instruction subset for the classic
+// Intel MCS-51 / 8051 core. Unsupported instructions are reported explicitly;
+// this is not yet a complete 8051 emulator.
 
 #include <array>
 #include <cstdint>
@@ -90,6 +89,8 @@ public:
     virtual void writeExternal(std::uint16_t address, std::uint8_t value) noexcept = 0;
 };
 
+enum class MCS51StepResult : std::uint8_t { executed, unsupportedOpcode };
+
 class MCS51Core {
 public:
     static constexpr std::uint16_t kAddressSpaceSize = 0x10000;
@@ -102,6 +103,70 @@ public:
 
     const MCS51Registers& registers() const noexcept { return registers_; }
     MCS51Registers& registersForTesting() noexcept { return registers_; }
+
+    MCS51StepResult step(MCS51Bus& bus) noexcept {
+        const auto opcode = fetch8(bus);
+        std::uint8_t value = 0;
+        unsigned cycles = 1;
+
+        if (opcode == 0x00) { // NOP
+        } else if (opcode == 0x02) { // LJMP addr16
+            const auto high = fetch8(bus);
+            const auto low = fetch8(bus);
+            registers_.pc = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(high) << 8u) | low);
+            cycles = 2;
+        } else if (opcode == 0x80) { // SJMP rel
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode == 0x74) { // MOV A,#data
+            registers_.a = fetch8(bus);
+        } else if (opcode >= 0x78 && opcode <= 0x7f) { // MOV Rn,#data
+            writeRegister(bus, opcode & 7u, fetch8(bus));
+        } else if (opcode == 0x75) { // MOV direct,#data
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, fetch8(bus));
+            cycles = 2;
+        } else if (opcode == 0xe5) { // MOV A,direct
+            registers_.a = bus.readInternal(fetch8(bus));
+        } else if (opcode == 0xf5) { // MOV direct,A
+            bus.writeInternal(fetch8(bus), registers_.a);
+        } else if (opcode == 0x85) { // MOV direct,direct (source byte first)
+            const auto source = fetch8(bus);
+            const auto destination = fetch8(bus);
+            bus.writeInternal(destination, bus.readInternal(source));
+            cycles = 2;
+        } else if (opcode >= 0xe8 && opcode <= 0xef) { // MOV A,Rn
+            registers_.a = readRegister(bus, opcode & 7u);
+        } else if (opcode >= 0xf8 && opcode <= 0xff) { // MOV Rn,A
+            writeRegister(bus, opcode & 7u, registers_.a);
+        } else if (opcode == 0x04) { // INC A
+            ++registers_.a;
+        } else if (opcode >= 0x08 && opcode <= 0x0f) { // INC Rn
+            writeRegister(bus, opcode & 7u,
+                          static_cast<std::uint8_t>(readRegister(bus, opcode & 7u) + 1u));
+        } else if (opcode == 0x14) { // DEC A
+            --registers_.a;
+        } else if (opcode == 0x24) { // ADD A,#data
+            add(fetch8(bus), false);
+        } else if (opcode == 0x34) { // ADDC A,#data
+            add(fetch8(bus), registers_.psw.carry);
+        } else if (opcode == 0x94) { // SUBB A,#data
+            subtract(fetch8(bus));
+        } else if (opcode == 0xe4) { // CLR A
+            registers_.a = 0;
+        } else if (opcode == 0xf4) { // CPL A
+            registers_.a = static_cast<std::uint8_t>(~registers_.a);
+        } else {
+            registers_.pc = static_cast<std::uint16_t>(registers_.pc - 1u);
+            return MCS51StepResult::unsupportedOpcode;
+        }
+
+        updateParity();
+        totalCycles_ += cycles;
+        return MCS51StepResult::executed;
+    }
     bool halted() const noexcept { return halted_; }
     std::uint64_t totalCycles() const noexcept { return totalCycles_; }
 
@@ -121,6 +186,58 @@ public:
     }
 
 private:
+    std::uint8_t fetch8(MCS51Bus& bus) noexcept {
+        const auto value = bus.readCode(registers_.pc);
+        registers_.pc = static_cast<std::uint16_t>(registers_.pc + 1u);
+        return value;
+    }
+
+    std::uint8_t readRegister(MCS51Bus& bus, std::uint8_t index) const noexcept {
+        return bus.readInternal(static_cast<std::uint8_t>(
+            registers_.psw.registerBankBase() + (index & 7u)));
+    }
+
+    void writeRegister(MCS51Bus& bus, std::uint8_t index, std::uint8_t value) noexcept {
+        bus.writeInternal(static_cast<std::uint8_t>(
+            registers_.psw.registerBankBase() + (index & 7u)), value);
+    }
+
+    void add(std::uint8_t operand, bool carryIn) noexcept {
+        const auto a = registers_.a;
+        const unsigned carry = carryIn ? 1u : 0u;
+        const unsigned sum = static_cast<unsigned>(a) + operand + carry;
+        const auto result = static_cast<std::uint8_t>(sum);
+        registers_.psw.carry = sum > 0xffu;
+        registers_.psw.auxiliaryCarry =
+            ((a & 0x0fu) + (operand & 0x0fu) + carry) > 0x0fu;
+        registers_.psw.overflow =
+            ((~(a ^ operand) & (a ^ result) & 0x80u) != 0);
+        registers_.a = result;
+    }
+
+    void subtract(std::uint8_t operand) noexcept {
+        const auto a = registers_.a;
+        const unsigned borrow = registers_.psw.carry ? 1u : 0u;
+        const unsigned subtrahend = static_cast<unsigned>(operand) + borrow;
+        const auto result = static_cast<std::uint8_t>(
+            static_cast<unsigned>(a) - subtrahend);
+        registers_.psw.carry = static_cast<unsigned>(a) < subtrahend;
+        registers_.psw.auxiliaryCarry =
+            static_cast<unsigned>(a & 0x0fu) <
+            static_cast<unsigned>(operand & 0x0fu) + borrow;
+        registers_.psw.overflow =
+            (((a ^ operand) & (a ^ result) & 0x80u) != 0);
+        registers_.a = result;
+    }
+
+    void updateParity() noexcept {
+        std::uint8_t bits = registers_.a;
+        bits ^= static_cast<std::uint8_t>(bits >> 4u);
+        bits ^= static_cast<std::uint8_t>(bits >> 2u);
+        bits ^= static_cast<std::uint8_t>(bits >> 1u);
+        registers_.psw.parity = (bits & 1u) != 0;
+    }
+
     MCS51Registers registers_{};
     bool halted_ = false;
     std::uint64_t totalCycles_ = 0;
