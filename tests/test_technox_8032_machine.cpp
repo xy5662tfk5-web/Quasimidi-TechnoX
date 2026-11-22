@@ -212,6 +212,11 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
         assert(firmwareMachine.readCode(0x0002) == 0x32);
         firmwareMachine.reset();
+        // Seed the firmware's startup-cleared XDATA range and one byte just
+        // beyond its documented 0000-34FF initialization loop.
+        firmwareMachine.writeExternal(0x0000, 0xa5);
+        firmwareMachine.writeExternal(0x34ff, 0xa5);
+        firmwareMachine.writeExternal(0x3500, 0xa5);
         assert(firmwareMachine.step() == technox::MCS51StepResult::executed);
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
         const auto executed = firmwareMachine.runInstructions(50000);
@@ -220,6 +225,9 @@ int main(int argc, char** argv) {
                     firmwareMachine.cpu().registers().sp,
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
         assert(executed == 50000);
+        assert(firmwareMachine.readExternal(0x0000) == 0x00);
+        assert(firmwareMachine.readExternal(0x34ff) == 0x00);
+        assert(firmwareMachine.readExternal(0x3500) == 0xa5);
         assert(firmwareMachine.cpu().totalCycles() != 0);
     }
     return 0;
