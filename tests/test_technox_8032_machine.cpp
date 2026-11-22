@@ -568,6 +568,19 @@ int main(int argc, char** argv) {
         // not yet evidence that a voice command reached the external engine.
         assert(injectedResponseMachine.readExternal(0x304c) == 0x90u);
         assert(injectedResponseMachine.readExternal(0x2b9d) == 0x3cu);
+        std::printf("MIDI voice-gate XDATA: 7D95=%02X 3702=%02X 3704=%02X 370A=%02X 370B=%02X 3039=%02X 303A=%02X 304B=%02X 3050=%02X 3051=%02X 2FB3=%02X 2FB4=%02X\\n",
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x7d95)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3702)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3704)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x370a)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x370b)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3039)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x303a)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x304b)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3050)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3051)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fb3)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fb4)));
         const auto portWrites = injectedResponseMachine.portWriteCount();
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
