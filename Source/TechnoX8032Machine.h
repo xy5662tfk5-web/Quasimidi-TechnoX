@@ -709,6 +709,7 @@ public:
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
     std::uint64_t aciaReceiveReadCount() const noexcept { return aciaReceiveReadCount_; }
     std::uint64_t aciaValidReceiveReadCount() const noexcept { return aciaValidReceiveReadCount_; }
+    std::size_t scheduledAciaPendingCount() const noexcept { return scheduledAciaCount_; }
     std::uint8_t lastAciaReceiveRead() const noexcept { return lastAciaReceiveRead_; }
     std::uint8_t lastValidAciaReceiveRead() const noexcept { return lastValidAciaReceiveRead_; }
     const SoundCommandPacket& soundCommandPacketAt(std::size_t index) const noexcept {
