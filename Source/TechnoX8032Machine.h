@@ -49,6 +49,15 @@ public:
         std::uint8_t mode = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct IC51BusProbeEvent {
+        std::uint16_t address = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint8_t p3 = 0xff;
+        std::uint8_t valueOnCurrentMap = 0xff;
+        bool selected = false;
+        std::uint8_t bank = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct XdataWatchEvent {
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
@@ -221,6 +230,7 @@ public:
         soundMemoryReadCount_ = 0;
         soundMemoryWriteCount_ = 0;
         soundMemoryWriteTraceCount_ = 0;
+        ic51BusProbeTraceCount_ = 0;
         soundBusModeWriteCount_ = 0;
         p35TransitionCount_ = 0;
         lastSoundMemoryWriteAddress_ = 0;
@@ -392,7 +402,23 @@ public:
     }
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
-        if (isIC51Selected()) {
+        const auto instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        const bool ic51Selected = isIC51Selected();
+        if (instructionPC >= 0xaf3cu && instructionPC <= 0xaf63u) {
+            auto& probe = ic51BusProbeTrace_[
+                ic51BusProbeTraceCount_ % ic51BusProbeTrace_.size()];
+            probe.address = address;
+            probe.instructionPC = instructionPC;
+            probe.p3 = portPins_[3];
+            probe.selected = ic51Selected;
+            probe.bank = static_cast<std::uint8_t>((portPins_[3] & 0x20u) != 0 ? 1u : 0u);
+            probe.valueOnCurrentMap = ic51Selected
+                ? ic51Rom_[static_cast<std::size_t>(probe.bank) * 0x10000u + address]
+                : (isXdataRam(address) ? xdata_[address] : 0xffu);
+            probe.machineCycle = elapsedMachineCycles_;
+            ++ic51BusProbeTraceCount_;
+        }
+        if (ic51Selected) {
             const auto bank = (portPins_[3] & 0x20u) != 0 ? 1u : 0u;
             ++ic51ReadCount_;
             ++ic51ReadsByBank_[bank];
@@ -688,6 +714,10 @@ public:
     const SoundMemoryWriteEvent& soundMemoryWriteTraceAt(std::size_t index) const noexcept {
         return soundMemoryWriteTrace_[index % soundMemoryWriteTrace_.size()];
     }
+    std::size_t ic51BusProbeTraceCount() const noexcept { return ic51BusProbeTraceCount_; }
+    const IC51BusProbeEvent& ic51BusProbeTraceAt(std::size_t index) const noexcept {
+        return ic51BusProbeTrace_[index % ic51BusProbeTrace_.size()];
+    }
     std::uint64_t soundBusModeWriteCount() const noexcept { return soundBusModeWriteCount_; }
     std::uint64_t p35TransitionCount() const noexcept { return p35TransitionCount_; }
     std::uint16_t lastSoundMemoryWriteAddress() const noexcept { return lastSoundMemoryWriteAddress_; }
@@ -818,6 +848,8 @@ private:
     std::size_t soundCommandPacketCount_ = 0;
     std::array<SoundMemoryWriteEvent, 8192> soundMemoryWriteTrace_{};
     std::size_t soundMemoryWriteTraceCount_ = 0;
+    std::array<IC51BusProbeEvent, 256> ic51BusProbeTrace_{};
+    std::size_t ic51BusProbeTraceCount_ = 0;
     std::array<PortWriteEvent, 256> portWriteTrace_{};
     std::size_t portWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
