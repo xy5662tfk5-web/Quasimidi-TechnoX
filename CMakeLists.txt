@@ -80,6 +80,7 @@ if (BUILD_TESTING)
         tests/test_mcs51_core.cpp
     )
     target_compile_features(technox_mcs51_core_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_mcs51_core_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_mcs51_core_tests
         COMMAND technox_mcs51_core_tests
     )
