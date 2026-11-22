@@ -37,6 +37,12 @@ public:
         std::uint8_t value = 0xff;
         std::uint64_t machineCycle = 0;
     };
+    struct XdataWatchEvent {
+        std::uint16_t address = 0;
+        std::uint8_t value = 0xff;
+        bool write = false;
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -122,6 +128,10 @@ public:
     std::uint8_t ic51RomByteForTesting(std::size_t bank, std::uint16_t address) const noexcept {
         return bank < 2u ? ic51Rom_[bank * 0x10000u + address] : 0xffu;
     }
+    std::size_t xdataWatchTraceCount() const noexcept { return xdataWatchTraceCount_; }
+    const XdataWatchEvent& xdataWatchTraceAt(std::size_t index) const noexcept {
+        return xdataWatchTrace_[index % xdataWatchTrace_.size()];
+    }
 
     void reset() noexcept {
         cpu_.reset();
@@ -143,6 +153,8 @@ public:
         watchedCallCounts_.fill(0);
         ic51ReadTrace_.fill(IC51ReadEvent{});
         ic51ReadTraceCount_ = 0;
+        xdataWatchTrace_.fill(XdataWatchEvent{});
+        xdataWatchTraceCount_ = 0;
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -361,7 +373,16 @@ public:
                 const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
                 ++soundMemoryReadsByMode_[mode];
             }
-            return xdata_[address];
+            const auto value = xdata_[address];
+            if (address >= 0x7bd4u && address <= 0x7bd7u) {
+                auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.machineCycle = elapsedMachineCycles_;
+                ++xdataWatchTraceCount_;
+            }
+            return value;
         }
 
         switch (address) {
@@ -390,6 +411,14 @@ public:
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
+            if (address >= 0x7bd4u && address <= 0x7bd7u) {
+                auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = true;
+                event.machineCycle = elapsedMachineCycles_;
+                ++xdataWatchTraceCount_;
+            }
             if (address >= 0xc000u) {
                 ++soundMemoryWriteCount_;
                 const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
@@ -611,6 +640,8 @@ private:
     std::uint16_t lastIC51ReadAddress_ = 0;
     std::array<IC51ReadEvent, 512> ic51ReadTrace_{};
     std::size_t ic51ReadTraceCount_ = 0;
+    std::array<XdataWatchEvent, 512> xdataWatchTrace_{};
+    std::size_t xdataWatchTraceCount_ = 0;
     std::array<std::uint8_t, 0x100> internal_{};
     std::array<std::uint8_t, 0x80> upperIram_{};
     std::array<std::uint8_t, 0x10000> xdata_{};
