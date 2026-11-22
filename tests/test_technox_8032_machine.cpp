@@ -581,6 +581,24 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3051)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fb3)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fb4)));
+        std::printf("Part-0 MIDI route XDATA: 2900=%02X 2901=%02X 2902=%02X 2903=%02X 2904=%02X 2905=%02X 2906=%02X 2B98=%02X 2B99=%02X 2FD7=%02X 2FA2=%02X 7C17=%02X 7C1C=%02X 7C26=%02X 7BD5=%02X 3700=%02X 3703=%02X\\n",
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2900)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2901)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2902)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2903)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2904)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2905)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2906)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2b98)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2b99)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fd7)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fa2)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x7c17)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x7c1c)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x7c26)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x7bd5)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3700)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0x3703)));
         const auto portWrites = injectedResponseMachine.portWriteCount();
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
