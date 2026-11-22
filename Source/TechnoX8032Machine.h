@@ -780,7 +780,10 @@ private:
         // IC4 B385 applies the 0x07/0x06 resource masks to P3.5/P3.4/P3.1.
         // P3.4 and P3.1 remain high for IC51 access; P3.5 selects the bank:
         // high selects the first 64-KiB bank, low selects the second.
-        return ic51RomLoaded_ && (portPins_[3] & 0x12u) == 0x12u;
+        // External bus mode 2 is the sound-RAM write/read window used by AF05;
+        // in that mode the IC51 ROM must not shadow the C000-FFFF RAM window.
+        return ic51RomLoaded_ && (portPins_[3] & 0x12u) == 0x12u &&
+               (internal_[0x8e] & 0x03u) != 0x02u;
     }
 
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
