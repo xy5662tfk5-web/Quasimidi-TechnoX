@@ -72,6 +72,10 @@ public:
         soundDeviceDataLoaded_ = false;
         soundDeviceReady_ = false;
         cpuFaulted_ = false;
+        scheduledAciaHead_ = 0;
+        scheduledAciaTail_ = 0;
+        scheduledAciaCount_ = 0;
+        nextAciaReceiveCycle_ = 0;
         internal_[0x81] = 0x07; // SP reset value
     }
 
@@ -235,8 +239,11 @@ public:
     }
 
     void advanceMachineCycles(unsigned cycles) noexcept override {
-        elapsedMachineCycles_ += cycles;
-        timers_.advanceMachineCycles(*this, cycles);
+        for (unsigned cycle = 0; cycle < cycles; ++cycle) {
+            ++elapsedMachineCycles_;
+            deliverScheduledAciaBytes();
+            timers_.advanceMachineCycles(*this, 1);
+        }
     }
 
     void setPortPins(std::uint8_t portAddress, std::uint8_t value) noexcept {
@@ -251,6 +258,30 @@ public:
             aciaReceive_ = value;
         aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ | 0x01u); // RDRF
         refreshAciaInterrupt();
+    }
+
+    std::uint64_t midiByteMachineCycles() const noexcept {
+        const auto numerator = static_cast<std::uint64_t>(machineCyclesPerSecond()) * 10u;
+        return std::max<std::uint64_t>(1u, (numerator + 15625u) / 31250u);
+    }
+
+    bool scheduleAciaMidiBytes(const std::uint8_t* bytes, std::size_t size,
+                               std::uint64_t firstArrivalCycle) noexcept {
+        if (size == 0)
+            return true;
+        if (bytes == nullptr || size > scheduledAciaBytes_.size() - scheduledAciaCount_)
+            return false;
+
+        auto arrival = std::max({firstArrivalCycle, nextAciaReceiveCycle_, elapsedMachineCycles_});
+        const auto spacing = midiByteMachineCycles();
+        for (std::size_t i = 0; i < size; ++i) {
+            scheduledAciaBytes_[scheduledAciaTail_] = {arrival, bytes[i]};
+            scheduledAciaTail_ = (scheduledAciaTail_ + 1u) % scheduledAciaBytes_.size();
+            ++scheduledAciaCount_;
+            arrival += spacing;
+        }
+        nextAciaReceiveCycle_ = arrival;
+        return true;
     }
 
     bool takeAciaTransmitByte(std::uint8_t& value) noexcept {
@@ -288,6 +319,22 @@ private:
         return address <= 0x38ffu || address >= 0xc000u;
     }
 
+    struct ScheduledAciaByte {
+        std::uint64_t arrivalCycle = 0;
+        std::uint8_t value = 0;
+    };
+
+    void deliverScheduledAciaBytes() noexcept {
+        while (scheduledAciaCount_ != 0) {
+            const auto& next = scheduledAciaBytes_[scheduledAciaHead_];
+            if (next.arrivalCycle > elapsedMachineCycles_)
+                break;
+            injectAciaReceiveByte(next.value);
+            scheduledAciaHead_ = (scheduledAciaHead_ + 1u) % scheduledAciaBytes_.size();
+            --scheduledAciaCount_;
+        }
+    }
+
     void refreshAciaInterrupt() noexcept {
         // ACIA IRQ is wired to the 8032 INT1 input in the published MAME map.
         const bool irqActive = (aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0;
@@ -312,6 +359,11 @@ private:
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
     std::uint8_t aciaTransmit_ = 0;
+    std::array<ScheduledAciaByte, 4096> scheduledAciaBytes_{};
+    std::size_t scheduledAciaHead_ = 0;
+    std::size_t scheduledAciaTail_ = 0;
+    std::size_t scheduledAciaCount_ = 0;
+    std::uint64_t nextAciaReceiveCycle_ = 0;
     bool aciaTransmitPending_ = false;
     std::uint8_t lcdStatus_ = 0;
     std::uint8_t lcdData_ = 0;
