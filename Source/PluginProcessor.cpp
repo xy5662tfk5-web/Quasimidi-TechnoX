@@ -197,10 +197,10 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     const int numSamples = buffer.getNumSamples();
     const double hostSampleRate = getSampleRate();
     if (firmwareMachine != nullptr && !firmwareMachine->cpuFaulted() && hostSampleRate > 0.0) {
-        // MAME clocks the 8032 at 12 MHz; the classic 12T core executes
-        // one machine cycle per microsecond. Keep fractional cycles per block.
+        // The MAME skeleton currently assumes 12 MHz but marks the actual
+        // oscillator unknown; use the machine's configurable 12T cycle rate.
         firmwareCycleTarget += static_cast<double>(numSamples) *
-            1000000.0 / hostSampleRate;
+            static_cast<double>(firmwareMachine->machineCyclesPerSecond()) / hostSampleRate;
         const auto targetCycles = static_cast<std::uint64_t>(firmwareCycleTarget);
         const auto currentCycles = firmwareMachine->elapsedMachineCycles();
         if (targetCycles > currentCycles)
