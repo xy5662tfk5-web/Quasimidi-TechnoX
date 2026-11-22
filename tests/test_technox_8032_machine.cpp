@@ -457,6 +457,8 @@ int main(int argc, char** argv) {
         if (!realIC51.empty())
             assert(injectedResponseMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         injectedResponseMachine.reset();
+        // Experimental fixture only: writable 7xxx window plus a controlled
+        // 7BD5 status response. This proves the firmware path, not real hardware semantics.
         injectedResponseMachine.enableTestExternalRamWindow7000(0x00);
         injectedResponseMachine.setTestExternalReadOverride(0x7bd5, 0x00);
         injectedResponseMachine.writeExternal(0x0000, 0xa5);
@@ -708,6 +710,10 @@ int main(int argc, char** argv) {
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
+        assert(injectedResponseMachine.watchedCallCount(0x5671) > 0u);
+        assert(injectedResponseMachine.watchedCallCount(0x4256) > 0u);
+        assert(injectedResponseMachine.watchedCallCount(0x1494) > 0u);
+        assert(commandCount > commandCountBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
         const auto firstNewCommand = commandCount > commandCountBeforeMidi + 32u
