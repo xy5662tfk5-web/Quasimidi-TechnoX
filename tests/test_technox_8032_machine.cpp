@@ -236,9 +236,11 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.cpu().registers().pc == 0x326a);
 
         const auto peripheralInit = firmwareMachine.runUntilProgramCounter(0x32b0, 50000);
-        std::printf("IC4 peripheral-init handoff: instructions=%zu PC=%04X\\n",
-                    peripheralInit, static_cast<unsigned>(firmwareMachine.cpu().registers().pc));
-        assert(peripheralInit != 0);
+        std::printf("IC4 peripheral-init trace: instructions=%zu PC=%04X opcode=%02X SP=%02X cycles=%llu\\n",
+                    peripheralInit, static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
+                    static_cast<unsigned>(firmwareMachine.readCode(firmwareMachine.cpu().registers().pc)),
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().sp),
+                    static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
         assert(firmwareMachine.cpu().registers().pc == 0x32b0);
         assert(firmwareMachine.cpu().totalCycles() != 0);
     }
