@@ -29,6 +29,37 @@ public:
         return oscillatorHz_ / 12u; // classic 12T 8032 core
     }
 
+    // IC4 routine AEDD applies this affine map to R0 before the
+    // external sound-memory MOVX write in AF05 (ROM table at 0xADDD).
+    static constexpr std::uint8_t mapSoundMemoryLowAddress(
+        std::uint8_t logical) noexcept {
+        std::uint8_t physical = 0x04u;
+        if ((logical & 0x01u) != 0) physical ^= 0x21u;
+        if ((logical & 0x02u) != 0) physical ^= 0x12u;
+        if ((logical & 0x04u) != 0) physical ^= 0x80u;
+        if ((logical & 0x08u) != 0) physical ^= 0x20u;
+        if ((logical & 0x10u) != 0) physical ^= 0x40u;
+        if ((logical & 0x20u) != 0) physical ^= 0x08u;
+        if ((logical & 0x40u) != 0) physical ^= 0x04u;
+        if ((logical & 0x80u) != 0) physical ^= 0x10u;
+        return physical;
+    }
+
+    static constexpr std::uint8_t unmapSoundMemoryLowAddress(
+        std::uint8_t physical) noexcept {
+        const auto value = static_cast<std::uint8_t>(physical ^ 0x04u);
+        std::uint8_t logical = 0;
+        if ((value & 0x01u) != 0) logical ^= 0x09u;
+        if ((value & 0x02u) != 0) logical ^= 0x82u;
+        if ((value & 0x04u) != 0) logical ^= 0x40u;
+        if ((value & 0x08u) != 0) logical ^= 0x20u;
+        if ((value & 0x10u) != 0) logical ^= 0x80u;
+        if ((value & 0x20u) != 0) logical ^= 0x08u;
+        if ((value & 0x40u) != 0) logical ^= 0x10u;
+        if ((value & 0x80u) != 0) logical ^= 0x04u;
+        return logical;
+    }
+
     static constexpr std::size_t kIC4RomSize = 0x20000;
     static constexpr std::size_t kCodeSpaceSize = 0x10000;
 
