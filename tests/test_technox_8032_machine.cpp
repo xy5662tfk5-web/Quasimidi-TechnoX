@@ -907,6 +907,23 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x304d)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x304e)));
         std::fflush(stdout);
+        const auto soundReadTraceCount = injectedResponseMachine.soundMemoryReadTraceCount();
+        std::printf("Sound-memory reads after MIDI: total=%llu traced=%zu\\n",
+                    static_cast<unsigned long long>(injectedResponseMachine.soundMemoryReadCount()),
+                    soundReadTraceCount);
+        const auto firstSoundRead = soundReadTraceCount > 48u
+            ? soundReadTraceCount - 48u : 0u;
+        for (std::size_t i = firstSoundRead; i < soundReadTraceCount; ++i) {
+            const auto& event = injectedResponseMachine.soundMemoryReadTraceAt(i);
+            std::printf("  XREAD[%zu] addr=%04X value=%02X mode=%u pc=%04X ret=%04X cycle=%llu\\n",
+                        i, static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.mode),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
+        std::fflush(stdout);
         assert(!injectedResponseMachine.cpuFaulted());
         // The byte scheduler delivered the stimulus; full MIDI-to-voice
         // dispatch is not asserted until the SoundHost host/DSP path is modeled.

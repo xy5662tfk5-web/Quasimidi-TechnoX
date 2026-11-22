@@ -84,6 +84,14 @@ public:
         std::uint8_t mode = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct SoundMemoryReadEvent {
+        std::uint16_t address = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
+        std::uint8_t value = 0xff;
+        std::uint8_t mode = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct IC51BusProbeEvent {
         std::uint16_t address = 0;
         std::uint16_t instructionPC = 0;
@@ -279,6 +287,7 @@ public:
         scheduledAciaCount_ = 0;
         nextAciaReceiveCycle_ = 0;
         soundMemoryReadCount_ = 0;
+        soundMemoryReadTraceCount_ = 0;
         soundMemoryWriteCount_ = 0;
         soundMemoryWriteTraceCount_ = 0;
         ic51BusProbeTraceCount_ = 0;
@@ -514,6 +523,19 @@ public:
                 ++soundMemoryReadCount_;
                 const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
                 ++soundMemoryReadsByMode_[mode];
+                auto& event = soundMemoryReadTrace_[
+                    soundMemoryReadTraceCount_ % soundMemoryReadTrace_.size()];
+                event.address = address;
+                event.instructionPC = instructionPC;
+                const auto stackPointer = cpu_.registers().sp;
+                const auto returnHigh = readIndirect(stackPointer);
+                const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+                event.returnPC = static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
+                event.value = xdata_[address];
+                event.mode = static_cast<std::uint8_t>(mode);
+                event.machineCycle = elapsedMachineCycles_;
+                ++soundMemoryReadTraceCount_;
             }
             const auto value = xdata_[address];
             if (address >= 0x7bd4u && address <= 0x7bd7u) {
@@ -863,6 +885,10 @@ public:
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
     std::uint64_t soundMemoryReadCount() const noexcept { return soundMemoryReadCount_; }
+    std::size_t soundMemoryReadTraceCount() const noexcept { return soundMemoryReadTraceCount_; }
+    const SoundMemoryReadEvent& soundMemoryReadTraceAt(std::size_t index) const noexcept {
+        return soundMemoryReadTrace_[index % soundMemoryReadTrace_.size()];
+    }
     std::uint64_t soundMemoryWriteCount() const noexcept { return soundMemoryWriteCount_; }
     std::size_t soundMemoryWriteTraceCount() const noexcept { return soundMemoryWriteTraceCount_; }
     const SoundMemoryWriteEvent& soundMemoryWriteTraceAt(std::size_t index) const noexcept {
@@ -1028,6 +1054,8 @@ private:
     bool soundHostBurstLowPending_ = false;
     std::uint8_t soundHostBurstLowByte_ = 0;
     std::uint16_t soundHostBurstLowInstructionPC_ = 0;
+    std::array<SoundMemoryReadEvent, 8192> soundMemoryReadTrace_{};
+    std::size_t soundMemoryReadTraceCount_ = 0;
     std::array<SoundMemoryWriteEvent, 8192> soundMemoryWriteTrace_{};
     std::size_t soundMemoryWriteTraceCount_ = 0;
     std::array<IC51BusProbeEvent, 256> ic51BusProbeTrace_{};
