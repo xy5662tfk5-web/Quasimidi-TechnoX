@@ -399,6 +399,55 @@ int main() {
         assert(decodeCpu.step(decodeBus) == MCS51StepResult::executed);
     }
 
+    // Exhaustive 8-bit arithmetic flag verification for ADD, ADDC and SUBB.
+    // This checks result, CY, AC and signed overflow across every operand pair.
+    TestBus arithmeticSweepBus;
+    MCS51Core arithmeticSweepCpu;
+    for (unsigned a = 0; a < 256; ++a) {
+        for (unsigned b = 0; b < 256; ++b) {
+            arithmeticSweepCpu.reset();
+            arithmeticSweepCpu.registersForTesting().a = static_cast<std::uint8_t>(a);
+            arithmeticSweepBus.code[0] = 0x24; // ADD A,#data
+            arithmeticSweepBus.code[1] = static_cast<std::uint8_t>(b);
+            assert(arithmeticSweepCpu.step(arithmeticSweepBus) == MCS51StepResult::executed);
+            const unsigned sum = a + b;
+            const auto addResult = static_cast<std::uint8_t>(sum);
+            const bool addOverflow = ((~(a ^ b) & (a ^ addResult) & 0x80u) != 0);
+            assert(arithmeticSweepCpu.registers().a == addResult);
+            assert(arithmeticSweepCpu.registers().psw.carry == (sum > 0xffu));
+            assert(arithmeticSweepCpu.registers().psw.auxiliaryCarry == (((a & 0x0fu) + (b & 0x0fu)) > 0x0fu));
+            assert(arithmeticSweepCpu.registers().psw.overflow == addOverflow);
+
+            for (unsigned carryIn = 0; carryIn < 2; ++carryIn) {
+                arithmeticSweepCpu.reset();
+                arithmeticSweepCpu.registersForTesting().a = static_cast<std::uint8_t>(a);
+                arithmeticSweepCpu.registersForTesting().psw.carry = carryIn != 0;
+                arithmeticSweepBus.code[0] = 0x34; // ADDC A,#data
+                assert(arithmeticSweepCpu.step(arithmeticSweepBus) == MCS51StepResult::executed);
+                const unsigned addcSum = a + b + carryIn;
+                const auto addcResult = static_cast<std::uint8_t>(addcSum);
+                const bool addcOverflow = ((~(a ^ b) & (a ^ addcResult) & 0x80u) != 0);
+                assert(arithmeticSweepCpu.registers().a == addcResult);
+                assert(arithmeticSweepCpu.registers().psw.carry == (addcSum > 0xffu));
+                assert(arithmeticSweepCpu.registers().psw.auxiliaryCarry == (((a & 0x0fu) + (b & 0x0fu) + carryIn) > 0x0fu));
+                assert(arithmeticSweepCpu.registers().psw.overflow == addcOverflow);
+
+                arithmeticSweepCpu.reset();
+                arithmeticSweepCpu.registersForTesting().a = static_cast<std::uint8_t>(a);
+                arithmeticSweepCpu.registersForTesting().psw.carry = carryIn != 0;
+                arithmeticSweepBus.code[0] = 0x94; // SUBB A,#data
+                assert(arithmeticSweepCpu.step(arithmeticSweepBus) == MCS51StepResult::executed);
+                const unsigned subtrahend = b + carryIn;
+                const auto subResult = static_cast<std::uint8_t>(a - subtrahend);
+                const bool subOverflow = (((a ^ b) & (a ^ subResult) & 0x80u) != 0);
+                assert(arithmeticSweepCpu.registers().a == subResult);
+                assert(arithmeticSweepCpu.registers().psw.carry == (a < subtrahend));
+                assert(arithmeticSweepCpu.registers().psw.auxiliaryCarry == ((a & 0x0fu) < ((b & 0x0fu) + carryIn)));
+                assert(arithmeticSweepCpu.registers().psw.overflow == subOverflow);
+            }
+        }
+    }
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
