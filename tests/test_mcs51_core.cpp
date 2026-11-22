@@ -389,6 +389,16 @@ int main() {
     assert(carryOpsCpu.step(carryOpsBus) == MCS51StepResult::executed);
     assert(!carryOpsCpu.registers().psw.carry);
 
+    // Exhaustive legal-opcode decode smoke test: every classic 8051 opcode
+    // must be recognized; 0xA5 is the sole reserved opcode.
+    for (unsigned opcode = 0; opcode < 256; ++opcode) {
+        if (opcode == 0xa5u) continue;
+        TestBus decodeBus;
+        decodeBus.code[0] = static_cast<std::uint8_t>(opcode);
+        MCS51Core decodeCpu;
+        assert(decodeCpu.step(decodeBus) == MCS51StepResult::executed);
+    }
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
