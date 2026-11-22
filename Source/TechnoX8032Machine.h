@@ -57,6 +57,7 @@ public:
         elapsedMachineCycles_ = 0;
         soundDeviceResetReleased_ = true;
         soundDeviceBootRequested_ = false;
+        soundDeviceDataLoaded_ = false;
         soundDeviceReady_ = false;
         internal_[0x81] = 0x07; // SP reset value
     }
@@ -111,10 +112,11 @@ public:
                 if (wasReleased && !nowReleased) {
                     soundDeviceResetReleased_ = false;
                     soundDeviceBootRequested_ = false;
+                    soundDeviceDataLoaded_ = false;
                     soundDeviceReady_ = false;
                 } else if (!wasReleased && nowReleased) {
                     soundDeviceResetReleased_ = true;
-                    soundDeviceReady_ = soundDeviceBootRequested_;
+                    soundDeviceReady_ = soundDeviceBootRequested_ && soundDeviceDataLoaded_;
                 }
             }
         } else {
@@ -165,6 +167,9 @@ public:
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
+            if (address >= 0xc000u && address != 0xff10u &&
+                !soundDeviceResetReleased_ && soundDeviceBootRequested_)
+                soundDeviceDataLoaded_ = true;
             return;
         }
 
@@ -222,6 +227,7 @@ public:
     }
 
     bool soundDeviceBootRequested() const noexcept { return soundDeviceBootRequested_; }
+    bool soundDeviceDataLoaded() const noexcept { return soundDeviceDataLoaded_; }
     bool soundDeviceReady() const noexcept { return soundDeviceReady_; }
 
     static constexpr std::uint8_t descrambledOffset(std::uint8_t offset) noexcept {
@@ -274,6 +280,7 @@ private:
     std::uint64_t elapsedMachineCycles_ = 0;
     bool soundDeviceResetReleased_ = true;
     bool soundDeviceBootRequested_ = false;
+    bool soundDeviceDataLoaded_ = false;
     bool soundDeviceReady_ = false;
     bool romLoaded_ = false;
 };
