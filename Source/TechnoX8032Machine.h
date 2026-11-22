@@ -39,6 +39,14 @@ public:
         std::uint8_t value = 0xff;
         std::uint64_t machineCycle = 0;
     };
+    struct SoundMemoryWriteEvent {
+        std::uint16_t address = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
+        std::uint8_t value = 0;
+        std::uint8_t mode = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct XdataWatchEvent {
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
@@ -210,6 +218,7 @@ public:
         nextAciaReceiveCycle_ = 0;
         soundMemoryReadCount_ = 0;
         soundMemoryWriteCount_ = 0;
+        soundMemoryWriteTraceCount_ = 0;
         soundBusModeWriteCount_ = 0;
         p35TransitionCount_ = 0;
         lastSoundMemoryWriteAddress_ = 0;
@@ -493,6 +502,19 @@ public:
                 ++soundMemoryWritesByMode_[mode];
                 lastSoundMemoryWriteAddress_ = address;
                 lastSoundMemoryWriteValue_ = value;
+                auto& event = soundMemoryWriteTrace_[
+                    soundMemoryWriteTraceCount_ % soundMemoryWriteTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.mode = static_cast<std::uint8_t>(mode);
+                event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                const auto stackPointer = cpu_.registers().sp;
+                const auto returnHigh = readIndirect(stackPointer);
+                const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+                event.returnPC = static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
+                event.machineCycle = elapsedMachineCycles_;
+                ++soundMemoryWriteTraceCount_;
             }
             return;
         }
@@ -654,6 +676,10 @@ public:
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
     std::uint64_t soundMemoryReadCount() const noexcept { return soundMemoryReadCount_; }
     std::uint64_t soundMemoryWriteCount() const noexcept { return soundMemoryWriteCount_; }
+    std::size_t soundMemoryWriteTraceCount() const noexcept { return soundMemoryWriteTraceCount_; }
+    const SoundMemoryWriteEvent& soundMemoryWriteTraceAt(std::size_t index) const noexcept {
+        return soundMemoryWriteTrace_[index % soundMemoryWriteTrace_.size()];
+    }
     std::uint64_t soundBusModeWriteCount() const noexcept { return soundBusModeWriteCount_; }
     std::uint64_t p35TransitionCount() const noexcept { return p35TransitionCount_; }
     std::uint16_t lastSoundMemoryWriteAddress() const noexcept { return lastSoundMemoryWriteAddress_; }
@@ -782,6 +808,8 @@ private:
     std::array<std::uint8_t, 4> commandPort_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
+    std::array<SoundMemoryWriteEvent, 8192> soundMemoryWriteTrace_{};
+    std::size_t soundMemoryWriteTraceCount_ = 0;
     std::array<PortWriteEvent, 256> portWriteTrace_{};
     std::size_t portWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
