@@ -257,6 +257,30 @@ public:
             registers_.a ^= bus.readInternal(readRegister(bus, opcode & 1u));
         } else if (opcode >= 0x68 && opcode <= 0x6f) { // XRL A,Rn
             registers_.a ^= readRegister(bus, opcode & 7u);
+        } else if (opcode == 0x12) { // LCALL addr16
+            const auto high = fetch8(bus);
+            const auto low = fetch8(bus);
+            push(bus, static_cast<std::uint8_t>(registers_.pc & 0xffu));
+            push(bus, static_cast<std::uint8_t>(registers_.pc >> 8u));
+            registers_.pc = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(high) << 8u) | low);
+            cycles = 2;
+        } else if (opcode == 0x22 || opcode == 0x32) { // RET / RETI
+            const auto high = pop(bus);
+            const auto low = pop(bus);
+            registers_.pc = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(high) << 8u) | low);
+            cycles = 2;
+        } else if (opcode == 0xc0) { // PUSH direct
+            push(bus, bus.readInternal(fetch8(bus)));
+            cycles = 2;
+        } else if (opcode == 0xd0) { // POP direct
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, pop(bus));
+            cycles = 2;
+        } else if (opcode == 0x73) { // JMP @A+DPTR
+            registers_.pc = static_cast<std::uint16_t>(registers_.dptr + registers_.a);
+            cycles = 2;
         } else if (opcode == 0x03) { // RR A
             registers_.a = static_cast<std::uint8_t>((registers_.a >> 1u) | (registers_.a << 7u));
         } else if (opcode == 0x13) { // RRC A
@@ -320,6 +344,19 @@ private:
     void writeRegister(MCS51Bus& bus, std::uint8_t index, std::uint8_t value) noexcept {
         bus.writeInternal(static_cast<std::uint8_t>(
             registers_.psw.registerBankBase() + (index & 7u)), value);
+    }
+
+    void push(MCS51Bus& bus, std::uint8_t value) noexcept {
+        registers_.sp = static_cast<std::uint8_t>(registers_.sp + 1u);
+        bus.writeInternal(registers_.sp, value);
+        bus.writeInternal(0x81u, registers_.sp);
+    }
+
+    std::uint8_t pop(MCS51Bus& bus) noexcept {
+        const auto value = bus.readInternal(registers_.sp);
+        registers_.sp = static_cast<std::uint8_t>(registers_.sp - 1u);
+        bus.writeInternal(0x81u, registers_.sp);
+        return value;
     }
 
     void add(std::uint8_t operand, bool carryIn) noexcept {
