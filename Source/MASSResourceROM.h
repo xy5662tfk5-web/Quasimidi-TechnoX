@@ -218,7 +218,7 @@ public:
 };
 
 enum class MASSResourceCommandKind : std::uint8_t {
-    singleByte,
+    conditionalRecord,
     pitchParameter,
     multiParameter,
     emptyMultiParameter,
@@ -233,6 +233,7 @@ struct MASSResourceCommand {
     std::uint8_t opcode = 0;
     MASSResourceCommandKind kind = MASSResourceCommandKind::singleByte;
     std::uint8_t length = 0;
+    bool routesToHardware = false;
     std::array<std::uint8_t, 8> bytes{};
 };
 
@@ -254,10 +255,14 @@ public:
     // Decodes a stream from the memory bank selected by the descriptor's
     // P3 flags. The bank is supplied separately; no assumption is made that
     // the stream resides in the IC51 pointer-table bank.
+    // firmwareFlag0ASet is the live firmware flag 0x0A which changes how
+    // opcode group 0x00 is interpreted. With it clear, byte +3 bit 3 can
+    // select the longer path through handler 0x224C.
     static bool decode(const std::uint8_t* bankData,
                        std::size_t bankSize,
                        std::uint16_t streamPointer,
-                       MASSDecodedResourceStream& result) {
+                       MASSDecodedResourceStream& result,
+                       bool firmwareFlag0ASet = false) {
         if (bankData == nullptr || static_cast<std::size_t>(streamPointer) >= bankSize)
             return false;
 
@@ -285,7 +290,22 @@ public:
             command.length = 1;
 
             if (group == 0x00) {
-                command.kind = MASSResourceCommandKind::singleByte;
+                // Handler 0x1C2B: normally checks byte +3 bit 3. If clear,
+                // the record consumes four stream bytes; if set, execution
+                // continues at byte +3 in handler 0x224C and consumes seven.
+                // Firmware flag 0x0A instead selects the four-byte 0x1BEF path.
+                command.kind = MASSResourceCommandKind::conditionalRecord;
+                command.length = 4;
+                if (!firmwareFlag0ASet) {
+                    if (cursor + 3 >= bankSize) {
+                        decoded.truncated = true;
+                        break;
+                    }
+                    if ((bankData[cursor + 3] & 0x08) != 0) {
+                        command.length = 7;
+                        command.routesToHardware = true;
+                    }
+                }
             } else if (group == 0x08) {
                 command.kind = MASSResourceCommandKind::pitchParameter;
                 command.length = 7;
@@ -295,8 +315,10 @@ public:
                     break;
                 }
                 if (bankData[cursor + 1] == 0) {
+                    // The zero subcase advances the stream pointer by seven
+                    // and writes a 0x38 filler record; it is not eight bytes.
                     command.kind = MASSResourceCommandKind::emptyMultiParameter;
-                    command.length = 8;
+                    command.length = 7;
                 } else {
                     command.kind = MASSResourceCommandKind::multiParameter;
                     command.length = 7;
@@ -308,8 +330,11 @@ public:
                 command.kind = MASSResourceCommandKind::threePayloadCommand;
                 command.length = 4;
             } else if (group == 0x38) {
+                // The interpreter catches 0x38 before the jump table and
+                // writes a filler slot, then advances the stream by one.
                 command.kind = MASSResourceCommandKind::marker;
             } else {
+                // Groups 0x28 and 0x30 share handler 0x2374: one-byte advance.
                 command.kind = MASSResourceCommandKind::singleByteAdvance;
             }
 

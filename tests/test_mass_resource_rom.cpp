@@ -128,28 +128,55 @@ void testCommandStreamDecoder() {
     bank[0x1304] = 0x33;
     bank[0x1305] = 0x44;
     bank[0x1306] = 0x55;
-    bank[0x1307] = 0x66;
-    bank[0x1308] = 0xff;
+    bank[0x1307] = 0xff;
     assert(MASSCommandStreamDecoder::decode(
         bank.data(), bank.size(), 0x1300, decoded));
     assert(decoded.terminated && decoded.slotsConsumed == 1);
     assert(decoded.commands[0].kind == MASSResourceCommandKind::emptyMultiParameter);
-    assert(decoded.commands[0].length == 8);
+    assert(decoded.commands[0].length == 7 && decoded.commands[0].bytes[6] == 0x55);
 
-    bank[0x1400] = 0x3b;
-    bank[0x1401] = 0x42;
-    bank[0x1402] = 0xff;
+    // Group 0x00 has two paths: byte +3 bit 3 chooses a seven-byte
+    // hardware-routed path unless firmware flag 0x0A is set.
+    bank[0x1400] = 0x00;
+    bank[0x1401] = 0x11;
+    bank[0x1402] = 0x22;
+    bank[0x1403] = 0x08;
+    bank[0x1404] = 0x31;
+    bank[0x1405] = 0x42;
+    bank[0x1406] = 0x53;
+    bank[0x1407] = 0xff;
     assert(MASSCommandStreamDecoder::decode(
         bank.data(), bank.size(), 0x1400, decoded));
-    assert(decoded.terminated && decoded.slotsConsumed == 2);
-    assert(decoded.commands[0].kind == MASSResourceCommandKind::marker);
-    assert(decoded.commands[1].kind == MASSResourceCommandKind::singleByte);
+    assert(decoded.terminated && decoded.slotsConsumed == 1);
+    assert(decoded.commands[0].kind == MASSResourceCommandKind::conditionalRecord);
+    assert(decoded.commands[0].length == 7 && decoded.commands[0].routesToHardware);
 
-    for (std::size_t i = 0; i < MASSCommandStreamDecoder::kMaximumSlots; ++i)
-        bank[0x1500 + i] = 0x00;
-    bank[0x1510] = 0xff;
+    bank[0x1450] = 0x00;
+    bank[0x1451] = 0x11;
+    bank[0x1452] = 0x22;
+    bank[0x1453] = 0x08;
+    bank[0x1454] = 0xff;
+    assert(MASSCommandStreamDecoder::decode(
+        bank.data(), bank.size(), 0x1450, decoded, true));
+    assert(decoded.terminated && decoded.slotsConsumed == 1);
+    assert(decoded.commands[0].length == 4 && !decoded.commands[0].routesToHardware);
+
+    bank[0x1500] = 0x3b; // 0x38 filler/slot marker, not the end-of-stream byte
+    bank[0x1501] = 0x28; // group 0x28 advances by one byte
+    bank[0x1502] = 0x30; // group 0x30 advances by one byte
+    bank[0x1503] = 0xff;
     assert(MASSCommandStreamDecoder::decode(
         bank.data(), bank.size(), 0x1500, decoded));
+    assert(decoded.terminated && decoded.slotsConsumed == 3);
+    assert(decoded.commands[0].kind == MASSResourceCommandKind::marker);
+    assert(decoded.commands[1].kind == MASSResourceCommandKind::singleByteAdvance);
+    assert(decoded.commands[2].kind == MASSResourceCommandKind::singleByteAdvance);
+
+    for (std::size_t i = 0; i < MASSCommandStreamDecoder::kMaximumSlots; ++i)
+        bank[0x1600 + i] = 0x28;
+    bank[0x1610] = 0xff;
+    assert(MASSCommandStreamDecoder::decode(
+        bank.data(), bank.size(), 0x1600, decoded));
     assert(!decoded.terminated && decoded.slotLimitReached);
     assert(decoded.slotsConsumed == MASSCommandStreamDecoder::kMaximumSlots);
 
