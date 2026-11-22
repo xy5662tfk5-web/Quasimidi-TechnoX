@@ -768,8 +768,14 @@ int main(int argc, char** argv) {
                         static_cast<std::uint16_t>(base + offset))));
             std::printf("\\n");
         }
-        const auto firstNewCommand = commandCount > commandCountBeforeMidi + 32u
-            ? commandCount - 32u : commandCountBeforeMidi;
+        // Preserve the complete MIDI-triggered command burst in CI logs.
+        // The machine trace is a 1024-packet ring, so skip only entries that
+        // have genuinely been overwritten; do not hide the first 521 packets.
+        const auto firstRetainedCommand = commandCount > 1024u
+            ? commandCount - 1024u : 0u;
+        const auto firstNewCommand = std::max(commandCountBeforeMidi, firstRetainedCommand);
+        std::printf("Retained MIDI command packet range: [%zu, %zu)\\n",
+                    firstNewCommand, commandCount);
         for (auto commandIndex = firstNewCommand; commandIndex < commandCount; ++commandIndex) {
             const auto& packet = injectedResponseMachine.soundCommandPacketAt(commandIndex);
             std::printf("  MIDI-CMD[%zu] cycle=%llu %02X %02X %02X %02X\\n",
