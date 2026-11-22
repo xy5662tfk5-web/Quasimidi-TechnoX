@@ -127,7 +127,7 @@ def main():
     resources = extract(args.rom.read_bytes(), args.flag_0a_set)
     with args.output.open("w", encoding="utf-8") as out:
         for item in resources:
-            out.write(json.dumps(item, separators=(",", ":")) + "\\n")
+            out.write(json.dumps(item, separators=(",", ":")) + "\n")
     kinds = Counter(c["kind"] for r in resources for c in r["stream"]["commands"])
     endings = Counter(r["stream"]["end_state"] for r in resources)
     print(f"Extracted {len(resources)} programs to {args.output}")
