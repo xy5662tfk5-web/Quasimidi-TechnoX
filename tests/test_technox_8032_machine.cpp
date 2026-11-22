@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
     assert(machine.readExternal(0x3900) == 0xff);
     assert(machine.readExternal(0x7c00) == 0xff);
 
-    // Four-byte hardware command window is captured for later protocol analysis.
+    // Undocumented four-register external window is captured for later protocol analysis.
     machine.writeExternal(0x8000, 0x11);
     machine.writeExternal(0x8001, 0x22);
     machine.writeExternal(0x8002, 0x33);
@@ -564,9 +564,9 @@ int main(int argc, char** argv) {
         const auto bootTransactions = firmwareMachine.soundCommandPacketCount();
         const auto hostWrites = firmwareMachine.soundHostWriteCount();
         assert(bootBurstWords == bootTransactions);
-        std::printf("SoundHost boot: hostWrites=%zu completeTransactions=%zu burstWords=%zu\\n",
+        std::printf("External window boot: writes=%zu completeTransactions=%zu pairedWords=%zu\\n",
                     hostWrites, bootTransactions, bootBurstWords);
-        std::printf("SoundHost standalone register-3 writes (outside complete transactions):\\n");
+        std::printf("Standalone register-3 writes (outside complete transactions):\\n");
         for (std::size_t i = 0; i < hostWrites; ++i) {
             const auto& write = firmwareMachine.soundHostWriteAt(i);
             if (write.registerIndex == 3u && write.instructionPC != 0x0dc5u)
@@ -600,7 +600,7 @@ int main(int argc, char** argv) {
             assert(packet.returnPC == expectedCaller);
         }
         const auto hostReads = firmwareMachine.soundHostReadCount();
-        std::printf("SoundHost host reads (current loopback model, %zu):\\n", hostReads);
+        std::printf("External-window reads (current test model, %zu):\\n", hostReads);
         for (std::size_t i = 0; i < hostReads; ++i) {
             const auto& read = firmwareMachine.soundHostReadAt(i);
             std::printf("  read[%03zu] reg=%u value=%02X pc=%04X cycle=%llu\\n",
