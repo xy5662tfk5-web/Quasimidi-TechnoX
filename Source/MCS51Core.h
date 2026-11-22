@@ -585,7 +585,7 @@ private:
                     continue;
                 if (((interruptPriority & source.priorityMask) != 0) != (priority != 0))
                     continue;
-                const auto flags = source.flagAddress == 0x88u ? tcon : scon;
+                const auto flags = bus.readInternal(source.flagAddress);
                 if ((flags & source.flagMask) == 0)
                     continue;
 
