@@ -62,13 +62,27 @@ jobs:
           from analyze_technox_rom import descramble_ic4
           from disassemble_technox_8051 import decode
           code = descramble_ic4(Path("technox_IC4_mx27c1000_v105.bin").read_bytes())[:0x10000]
-          for start, end in ((0x0440, 0x0460), (0x2840, 0x28A0), (0x2FC0, 0x3060), (0x32C0, 0x3340), (0xA6D0, 0xA7A0)):
+          for start, end in ((0x0440, 0x0460), (0x2840, 0x28A0), (0x2FC0, 0x3060), (0x32C0, 0x3340), (0xA6D0, 0xA7A0), (0x9A00, 0xA050)):
               print(f"\\n=== IC4 0x{start:04X}-0x{end:04X} ===")
               pc = start
               while pc < end:
                   size, mnemonic, raw, _ = decode(code, pc)
                   print(f"{pc:04X}: {' '.join(f'{b:02X}' for b in raw):<8} {mnemonic}")
                   pc += size
+          from disassemble_technox_8051 import disassemble
+          reachable, _, _ = disassemble(code, [0xEB32, 0x000B, 0x0013, 0x001B], 50000)
+          print("\\n=== REACHABLE XDATA POINTER REFERENCES ===")
+          for target in (0x2B8F, 0x2B9D, 0x304C, 0x304D, 0x304E):
+              sites = [pc for pc, insn in sorted(reachable.items())
+                       if code[pc] == 0x90 and
+                       ((code[pc + 1] << 8) | code[pc + 2]) == target]
+              print(f"XDATA 0x{target:04X}: " + (", ".join(f"0x{x:04X}" for x in sites) or "no reachable immediate DPTR setup"))
+              ordered = sorted(reachable)
+              for site in sites:
+                  index = ordered.index(site)
+                  for nearby in ordered[max(0, index - 2):index + 9]:
+                      item = reachable[nearby]
+                      print(f"  {nearby:04X}: {item.raw:<8} {item.text}")
           PY
       - name: Upload indirect command-handler disassembly
         uses: actions/upload-artifact@v4
