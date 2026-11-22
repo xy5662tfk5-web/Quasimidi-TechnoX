@@ -455,7 +455,7 @@ public:
             cycles = 2;
         } else if (opcode == 0xf2 || opcode == 0xf3) { // MOVX @Ri,A
             const auto low = readRegister(bus, opcode & 1u);
-            const auto high = readDirect(bus, 0xa0u); // P2 output latch
+            const auto high = bus.readPortLatch(0xa0u); // P2 output latch
             const auto address = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(high) << 8u) | low);
             bus.writeExternal(address, registers_.a);
