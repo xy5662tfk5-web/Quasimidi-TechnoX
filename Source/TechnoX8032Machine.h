@@ -635,6 +635,10 @@ public:
             testExternalRam7000Enabled_ = true;
         }
     }
+    std::uint8_t testExternalRamByteForTesting(std::uint16_t address) const noexcept {
+        return address >= 0x7000u && address <= 0x7fffu
+            ? testExternalRam7000_[address - 0x7000u] : 0xffu;
+    }
     void setTestExternalReadOverride(std::uint16_t address, std::uint8_t value) noexcept {
         testExternalReadOverrideAddress_ = address;
         testExternalReadOverrideValue_ = value;
