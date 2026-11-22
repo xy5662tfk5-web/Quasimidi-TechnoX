@@ -83,7 +83,7 @@ public:
                 break;
             ++executed;
         }
-        return cpu_.registers().pc == target ? executed : 0;
+        return executed;
     }
 
     std::uint8_t readCode(std::uint16_t address) const noexcept override {
