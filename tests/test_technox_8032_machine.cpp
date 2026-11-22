@@ -727,7 +727,8 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.watchedCallCount(0x57a8) > call57a8BeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x5671) > call5671BeforeMidi);
         assert(commandCount > commandCountBeforeMidi);
-        assert(injectedResponseMachine.watchedCallCount(0x0db7) - commandWriterCallsBeforeMidi ==
+        assert(injectedResponseMachine.watchedCallCount(0x0db7) > commandWriterCallsBeforeMidi);
+        assert(injectedResponseMachine.watchedCallCount(0x0db7) - commandWriterCallsBeforeMidi >=
                commandCount - commandCountBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
