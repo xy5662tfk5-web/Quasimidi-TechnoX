@@ -725,7 +725,10 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
         assert(injectedResponseMachine.watchedCallCount(0x57a8) > call57a8BeforeMidi);
-        assert(injectedResponseMachine.watchedCallCount(0x5671) > call5671BeforeMidi);
+        assert(injectedResponseMachine.watchedCallCount(0x5671) - call5671BeforeMidi == 2u);
+        assert(injectedResponseMachine.watchedCallCount(0x4256) - call4256BeforeMidi == 2u);
+        assert(injectedResponseMachine.watchedCallCount(0x1494) - call1494BeforeMidi == 2u);
+        assert(injectedResponseMachine.watchedCallCount(0xac00) - callAC00BeforeMidi == 2u);
         assert(commandCount > commandCountBeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x0db7) > commandWriterCallsBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
