@@ -127,6 +127,32 @@ This is a real firmware note-state/release mechanism, but the selector's complet
 
 **Not established:** the identity of the receiving IC, the meaning of every command ID, the contents/codec of the external resource memory, or the original M.A.S.S. oscillator/sample playback algorithm. The current plug-in still uses its generic test synthesis backend; it must not be presented as original TechnoX sound.
 
+## 7. IC51 sample-ROM directory and four resource groups
+
+MAME's `src/mame/skeleton/qmquasar.cpp` declares IC51 as the sample ROM region. The TechnoX v1.05 image is `0x20000` bytes (128 KB), CRC32 `d669570e`, SHA1 `0645a1b022ed25a836152933e6df32da4448f49a`.
+
+The image divides naturally into two 64KB banks:
+
+- bank 0: file offsets `0x00000..0x0FFFF`
+- bank 1: file offsets `0x10000..0x1FFFF`
+
+The first `0x200` bytes of each bank form a 256-entry pointer table. Each entry is a little-endian 16-bit address relative to that 64KB bank. This byte order matches the firmware: `0xB3BC` reads the first byte into R6, the second into R7; `0x418E` stores R6/R7 at descriptor `+5/+6`; `0x1494` places byte `+5` in DPL and byte `+6` in DPH.
+
+Combining the pointer-table lookup with the normal `0x418E` path gives four 128-entry resource groups:
+
+| Part parameter | P3 mask | ROM bank | Pointer index |
+|---:|---:|---:|---|
+| 0 | `0x07` | 0 | `R3 + 0x00` |
+| 1 | `0x07` | 0 | `R3 + 0x80` |
+| 2 | `0x06` | 1 | `R3 + 0x00` |
+| 3 | `0x06` | 1 | `R3 + 0x80` |
+
+The two P3 masks differ only in bit 0, which controls P3.5. Since IC51 is a 128KB EPROM, P3.5 is a strong candidate for its A16 bank-select line; P3.4 and P3.1 remain asserted low in both masks and are likely enable/control lines. This pin-to-EPROM mapping is a hardware hypothesis until confirmed by PCB continuity or a schematic.
+
+A scan of the 512 pointer entries found no duplicate pointer values within either bank. In this dump, 224 bank-0 streams and 163 bank-1 streams begin with a non-`0xFF` command byte; 32 and 93 respectively begin with `0xFF` and are empty/unused from the interpreter's perspective. The known 16-slot parser can walk the entries without crossing their 64KB bank boundaries.
+
+This establishes that IC51 is not merely one flat PCM byte stream: it contains a pointer directory and structured M.A.S.S. command streams. It does **not** prove that no waveform payloads exist elsewhere in IC51, nor does it identify the sample codec. The C++ decoder `MASSResourceROM` now models this pointer table, the four-group Part-parameter mapping, and the raw command-stream record boundaries; it deliberately leaves command semantics and audio decoding unresolved.
+
 ## Next reverse-engineering target
 
-Inspect the raw IC51 image and compare it against the 256-entry pointer-table model and the command-stream parser. The immediate goal is to locate resource records and determine whether IC51 contains the pointer/descriptor data or only a separate data bank.
+Decode the payload fields of the `0x1C61`, `0x1EDD`, `0x224C`, and `0x2301` records across the four resource groups. Then correlate the resulting 24-bit parameters and external command IDs with the sound engine's sample, pitch, envelope, and modulation behavior.

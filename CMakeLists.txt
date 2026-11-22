@@ -51,6 +51,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSVoiceManager.h
     Source/MASSModulationMatrix.h
     Source/MASSAudioEngine.h
+    Source/MASSResourceROM.h
     Source/BasicMASSVoiceBackend.h
 )
 
@@ -80,6 +81,17 @@ if (BUILD_TESTING)
     target_compile_features(technox_firmware_transaction_tests PRIVATE cxx_std_17)
     add_test(NAME technox_firmware_transaction_tests
         COMMAND technox_firmware_transaction_tests
+    )
+endif()
+
+# Dependency-free IC51 pointer-table and command-stream decoder tests.
+if (BUILD_TESTING)
+    add_executable(technox_mass_resource_rom_tests
+        tests/test_mass_resource_rom.cpp
+    )
+    target_compile_features(technox_mass_resource_rom_tests PRIVATE cxx_std_17)
+    add_test(NAME technox_mass_resource_rom_tests
+        COMMAND technox_mass_resource_rom_tests
     )
 endif()
 
