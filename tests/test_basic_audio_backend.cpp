@@ -327,6 +327,35 @@ int main() {
                                        pressureLeft[static_cast<std::size_t>(i)]);
     assert(pressureDifference > 0.01);
 
+    // Verified manual panorama positions 1..15 range from hard-left to hard-right.
+    auto measurePanEnergy = [](int panorama, double& leftEnergy, double& rightEnergy) {
+        BasicMASSVoiceBackend panBackend;
+        MASSAudioEngine panEngine(&panBackend);
+        constexpr int panSamples = 2048;
+        panEngine.prepare(48000.0, panSamples);
+        assert(panEngine.setPartParameter(12, PartParameter::level, 127));
+        assert(panEngine.setPartParameter(12, PartParameter::cutoffFrequency, 127));
+        assert(panEngine.setPartParameter(12, PartParameter::resonance, 0));
+        assert(panEngine.setPartParameter(12, PartParameter::egAttack, 0));
+        assert(panEngine.setPartParameter(12, PartParameter::egDecay, 0));
+        assert(panEngine.setPartParameter(12, PartParameter::egRelease, 0));
+        assert(panEngine.setPartParameter(12, PartParameter::panorama, panorama));
+        panEngine.noteOn(12, 1, 69, 127);
+        std::array<float, panSamples> left{}, right{};
+        float* channels[] = {left.data(), right.data()};
+        panEngine.render(channels, 2, panSamples);
+        leftEnergy = rightEnergy = 0.0;
+        for (int i = 0; i < panSamples; ++i) {
+            leftEnergy += std::abs(left[static_cast<std::size_t>(i)]);
+            rightEnergy += std::abs(right[static_cast<std::size_t>(i)]);
+        }
+    };
+    double hardLeftL = 0.0, hardLeftR = 0.0, hardRightL = 0.0, hardRightR = 0.0;
+    measurePanEnergy(1, hardLeftL, hardLeftR);
+    measurePanEnergy(15, hardRightL, hardRightR);
+    assert(hardLeftL > 0.01 && hardLeftR == 0.0);
+    assert(hardRightR > 0.01 && hardRightL == 0.0);
+
     // Backend hand-off: a recovered DSP can replace the prototype without
     // rebuilding MIDI/Part routing, and receives the active host format.
     CountingBackend prototypeBackend;

@@ -120,8 +120,17 @@ public:
                 const float modulatedLevel = juceSafeClamp(level + levelModulation, 0.0f, 1.0f);
                 const float voiceSample = filtered * state.envelope * velocity *
                     modulatedLevel * expression * 0.18f;
-                const float leftGain = panModulation > 0.0f ? 1.0f - panModulation : 1.0f;
-                const float rightGain = panModulation < 0.0f ? 1.0f + panModulation : 1.0f;
+                // The manual defines raw values 1..15 as seven steps left,
+                // center and seven steps right. Value 0 (Off) and the special
+                // Random/Key/Velocity modes are not synthesized in this basic
+                // prototype; keep them centered rather than inventing behavior.
+                const int rawPanorama = parts.get(part, PartParameter::panorama);
+                const float staticPanorama = rawPanorama >= 1 && rawPanorama <= 15
+                    ? static_cast<float>(rawPanorama - 8) / 7.0f : 0.0f;
+                const float totalPanorama = juceSafeClamp(
+                    staticPanorama + panModulation, -1.0f, 1.0f);
+                const float leftGain = totalPanorama > 0.0f ? 1.0f - totalPanorama : 1.0f;
+                const float rightGain = totalPanorama < 0.0f ? 1.0f + totalPanorama : 1.0f;
                 mixedLeft += voiceSample * leftGain;
                 mixedRight += voiceSample * rightGain;
 
