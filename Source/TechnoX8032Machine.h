@@ -17,6 +17,18 @@ namespace technox {
 
 class TechnoX8032Machine final : public MCS51Bus {
 public:
+    // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
+    // the actual oscillator as unknown. Keep the rate injectable.
+    static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
+    explicit TechnoX8032Machine(
+        std::uint32_t oscillatorHz = kAssumedOscillatorHz) noexcept
+        : oscillatorHz_(oscillatorHz) {}
+
+    std::uint32_t oscillatorHz() const noexcept { return oscillatorHz_; }
+    std::uint32_t machineCyclesPerSecond() const noexcept {
+        return oscillatorHz_ / 12u; // classic 12T 8032 core
+    }
+
     static constexpr std::size_t kIC4RomSize = 0x20000;
     static constexpr std::size_t kCodeSpaceSize = 0x10000;
 
@@ -285,6 +297,7 @@ private:
             portPins_[3] = static_cast<std::uint8_t>(portPins_[3] | 0x08u);
     }
 
+    std::uint32_t oscillatorHz_ = kAssumedOscillatorHz;
     MCS51Core cpu_{};
     MCS51TimerUnit timers_{};
     std::array<std::uint8_t, kIC4RomSize> rom_{};
