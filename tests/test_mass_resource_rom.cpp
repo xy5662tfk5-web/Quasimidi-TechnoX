@@ -21,6 +21,36 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testMASS1C61SecondaryTableAddress() {
+    const auto normal = MASS1C61SecondaryTableAddressBuilder::resolve(
+        0x4000, 0x30, 0x20, 0x00);
+    assert(normal.normalizedIndex == 0x50 && normal.bankOffset == 0);
+    assert(normal.address == 0x4050);
+
+    const auto upper = MASS1C61SecondaryTableAddressBuilder::resolve(
+        0x4000, 0x30, 0x20, 0x10);
+    assert(upper.normalizedIndex == 0x50 && upper.bankOffset == 0x180);
+    assert(upper.address == 0x41d0);
+
+    const auto negativeWrapped = MASS1C61SecondaryTableAddressBuilder::resolve(
+        0x4000, 0x80, 0x05, 0x00);
+    assert(negativeWrapped.normalizedIndex == 0x79 && negativeWrapped.address == 0x4079);
+
+    const auto positiveWrapped = MASS1C61SecondaryTableAddressBuilder::resolve(
+        0x4000, 0xc0, 0x00, 0x00);
+    assert(positiveWrapped.normalizedIndex == 0x08 && positiveWrapped.address == 0x4008);
+
+    std::vector<std::uint8_t> image(0x20000, 0xff);
+    image[0x4050] = 0x12;
+    image[0x40d0] = 0x34;
+    image[0x4150] = 0x56;
+    MASSFirmwareROMView view;
+    assert(view.attach(image.data(), image.size()));
+    MASS1C61SecondaryTableBytes bytes{};
+    assert(MASS1C61SecondaryTableReader::read(view, normal, bytes));
+    assert((bytes.bytes == std::array<std::uint8_t, 3>{{0x12, 0x34, 0x56}}));
+}
+
 void testMASS1C61InterpolationLookup() {
     std::vector<std::uint8_t> romBytes(0x20000, 0xff);
     const std::array<std::uint8_t, 12> positive{{
@@ -814,6 +844,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASS1C61SecondaryTableAddress();
     testMASS1C61InterpolationLookup();
     testMASS1C61InterpolationArithmetic();
     testMASS1EDDLookupIndexBuilder();

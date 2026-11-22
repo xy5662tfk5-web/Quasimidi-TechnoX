@@ -66,6 +66,13 @@ public:
         if (offset >= imageSize_) return false;
         value = image_[offset]; return true;
     }
+    bool readCodeByte(std::uint16_t address, std::uint8_t& value) const noexcept {
+        if (image_ == nullptr || static_cast<std::size_t>(address) >= imageSize_)
+            return false;
+        value = image_[address];
+        return true;
+    }
+
     // The two MOVC lookups in the common 0x1EDD path; caller supplies the
     // 7-bit index after the firmware's preceding rotate/complement operations.
     bool lookupNonlinearScale(std::uint8_t index, std::uint8_t& value) const noexcept {
@@ -76,6 +83,59 @@ public:
 private:
     const std::uint8_t* image_ = nullptr;
     std::size_t imageSize_ = 0;
+};
+
+struct MASS1C61SecondaryTableAddress {
+    std::uint16_t address = 0;
+    std::uint8_t normalizedIndex = 0;
+    std::uint16_t bankOffset = 0;
+};
+
+// Models the 0x1D2F..0x1D98 address selection before three MOVC reads.
+// R3+RAM[0x2F] is wrapped into 0..0x7F by repeated +/-0x0C steps.
+// R4.4 selects the secondary area by adding 0x180 to the base pointer.
+class MASS1C61SecondaryTableAddressBuilder {
+public:
+    static MASS1C61SecondaryTableAddress resolve(std::uint16_t basePointer,
+                                                  std::uint8_t r3,
+                                                  std::uint8_t ram2F,
+                                                  std::uint8_t r4) noexcept {
+        auto index = static_cast<std::uint8_t>(r3 + ram2F);
+        while ((index & 0x80u) != 0) {
+            if ((index & 0x40u) != 0)
+                index = static_cast<std::uint8_t>(index + 0x0cu);
+            else
+                index = static_cast<std::uint8_t>(index - 0x0cu);
+        }
+        const std::uint16_t bankOffset = (r4 & 0x10u) != 0 ? 0x0180u : 0u;
+        return {
+            static_cast<std::uint16_t>(basePointer + bankOffset + index),
+            index,
+            bankOffset
+        };
+    }
+};
+
+struct MASS1C61SecondaryTableBytes {
+    std::array<std::uint8_t, 3> bytes{};
+};
+
+class MASS1C61SecondaryTableReader {
+public:
+    // The firmware reads MOVC at DPTR, DPTR+0x80, then DPTR+0x100.
+    static bool read(const MASSFirmwareROMView& rom,
+                     const MASS1C61SecondaryTableAddress& address,
+                     MASS1C61SecondaryTableBytes& result) noexcept {
+        MASS1C61SecondaryTableBytes decoded{};
+        if (!rom.readCodeByte(address.address, decoded.bytes[0]) ||
+            !rom.readCodeByte(static_cast<std::uint16_t>(address.address + 0x80u),
+                              decoded.bytes[1]) ||
+            !rom.readCodeByte(static_cast<std::uint16_t>(address.address + 0x100u),
+                              decoded.bytes[2]))
+            return false;
+        result = decoded;
+        return true;
+    }
 };
 
 struct MASS1C61InterpolationLookupResult {
