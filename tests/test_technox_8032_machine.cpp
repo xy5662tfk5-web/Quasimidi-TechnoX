@@ -732,8 +732,8 @@ int main(int argc, char** argv) {
                commandCount - commandCountBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
-        std::printf("Experimental 7C00-7FFF RAM image (16 bytes per row):\\n");
-        for (std::uint32_t base = 0x7c00u; base < 0x8000u; base += 16u) {
+        std::printf("Experimental 7B00-7FFF RAM image (16 bytes per row):\\n");
+        for (std::uint32_t base = 0x7b00u; base < 0x8000u; base += 16u) {
             std::printf("  %04X:", base);
             for (std::uint32_t offset = 0; offset < 16u; ++offset)
                 std::printf(" %02X", static_cast<unsigned>(
