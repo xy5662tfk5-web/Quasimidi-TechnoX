@@ -79,6 +79,40 @@ int main(int argc, char** argv) {
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
 
+    // INT0 level mode follows the active-low P3.2 input.
+    machine.reset();
+    machine.writeInternal(0x88, 0x00); // IT0 level-triggered
+    machine.setPortPins(0xb0, 0xfb); // INT0 low
+    machine.advanceMachineCycles(1);
+    assert((machine.readInternal(0x88) & 0x02u) != 0); // IE0
+    machine.setPortPins(0xb0, 0xff); // INT0 released
+    machine.advanceMachineCycles(1);
+    assert((machine.readInternal(0x88) & 0x02u) == 0);
+
+    // INT0 edge mode latches only the falling edge until firmware clears IE0.
+    machine.reset();
+    machine.writeInternal(0x88, 0x01); // IT0 edge-triggered
+    machine.setPortPins(0xb0, 0xfb);
+    machine.advanceMachineCycles(1);
+    assert((machine.readInternal(0x88) & 0x02u) != 0);
+    machine.writeInternal(0x88, 0x01); // emulate interrupt-entry auto-clear
+    machine.advanceMachineCycles(1); // pin remains low; no second falling edge
+    assert((machine.readInternal(0x88) & 0x02u) == 0);
+
+    // ACIA's active-low IRQ drives INT1; edge mode does not retrigger while held.
+    machine.reset();
+    machine.writeInternal(0x88, 0x04); // IT1 edge-triggered
+    machine.writeExternal(0xa000, 0x80);
+    machine.injectAciaReceiveByte(0x31);
+    assert((machine.readInternal(0x88) & 0x08u) != 0);
+    machine.writeInternal(0x88, 0x04); // emulate INT1 auto-clear
+    machine.advanceMachineCycles(1);
+    assert((machine.readInternal(0x88) & 0x08u) == 0);
+    assert(machine.readExternal(0xa003) == 0x31); // release ACIA IRQ
+    machine.advanceMachineCycles(1);
+    machine.injectAciaReceiveByte(0x32);
+    assert((machine.readInternal(0x88) & 0x08u) != 0); // next falling edge
+
     // Timer 0 mode 1: 16-bit overflow raises TF0.
     machine.reset();
     machine.writeInternal(0x89, 0x01); // TMOD: Timer 0 mode 1
