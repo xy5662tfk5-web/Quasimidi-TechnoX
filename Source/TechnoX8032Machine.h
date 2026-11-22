@@ -1,8 +1,9 @@
 #pragma once
 
 // First-pass Intel 8032 machine bus for the Quasimidi TechnoX v1.05 firmware.
-// Confirmed ROM transform and MAME address decoding are modeled explicitly;
-// undocumented command-port behavior remains observable/open-bus, not guessed.
+// The IC4 transform and known MAME I/O windows are reproduced. The C000-FFFF
+// read/write backing store follows the firmware self-test; physical RAM identity
+// is not claimed. Undocumented command-port reads remain open bus, not guessed.
 
 #include "MCS51Core.h"
 
@@ -199,6 +200,8 @@ private:
     }
 
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
+        // 0000-38FF is MAME's mapped RAM. C000-FFFF is a provisional
+        // storage-like model required by IC4's full 16-KiB write/read test.
         return address <= 0x38ffu || address >= 0xc000u;
     }
 
