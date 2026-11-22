@@ -83,6 +83,23 @@ int main(int argc, char** argv) {
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
 
+    // External sound-device boot handshake: reset low, request FF10,
+    // download data into C000+, then release reset and expose ready=AC.
+    machine.reset();
+    machine.writeInternal(0xb0, 0xfb); // P3.2 active-low reset
+    machine.writeExternal(0xff10, 0xff);
+    assert(machine.soundDeviceBootRequested());
+    assert(!machine.soundDeviceReady());
+    assert(!machine.soundDeviceDataLoaded());
+    machine.writeExternal(0xc000, 0x55);
+    assert(machine.soundDeviceDataLoaded());
+    assert(machine.readExternal(0xff10) == 0xff);
+    machine.writeInternal(0xb0, 0xff); // release sound-device reset
+    assert(machine.soundDeviceReady());
+    assert(machine.readExternal(0xff10) == 0xac);
+    machine.writeInternal(0xb0, 0xfb); // reset clears ready state
+    assert(!machine.soundDeviceReady());
+
     // INT0 level mode follows the active-low P3.2 input.
     machine.reset();
     machine.writeInternal(0x88, 0x00); // IT0 level-triggered
