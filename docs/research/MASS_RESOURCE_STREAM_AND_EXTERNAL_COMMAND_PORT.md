@@ -103,7 +103,7 @@ The stream handlers use this port in several ways:
 
 - `0x1C61` updates an interpolated 24-bit parameter through `0x09B9`.
 - `0x224C` emits a command with a three-byte payload.
-- `0x2301` emits a command whose first byte is `RAM[0x2B] | 0x0F`, with payload `[RAM[0x02], 0x02, R4]`. It then exits the stream interpreter via `0x19CD`; the decoder must stop after this four-byte record.
+- `0x2301` writes the three stream payload bytes to the final slot at `0xF9..0xFB`. For the hardware packet it sets `R5 = RAM[0x2B] | 0x0F`, `R2 = direct[0x07]`, `R3 = direct[0x02]`, and `R4 = payload[3] & 0x07`; `0x0DB7` therefore writes `[RAM[0x2B] | 0x0F, direct[0x07], direct[0x02], payload[3] & 0x07]` to `0x8000..0x8003`. It then exits the stream interpreter via `0x19CD`; bytes after the four-byte record are not parsed.
 - `0x1EDD` can emit a sequence of up to three packets: command `RAM[0x2B]-2` with buffered data, command `RAM[0x2B]` with `[R5,R6,R7]`, and command `RAM[0x2B]-1` with `[R2,R3,R4]`.
 
 ### Handshake

@@ -106,6 +106,27 @@ void testResourceSelectionRecordParser() {
         nullptr, page.size(), 0, parsed));
 }
 
+void testTerminalHardwarePacketBuilder() {
+    MASSResourceCommand command{};
+    command.opcode = 0x2a;
+    command.kind = MASSResourceCommandKind::threePayloadCommand;
+    command.length = 4;
+    command.bytes = {{0x2a, 0x11, 0x22, 0xfd}};
+
+    MASSHardwareCommandPacket packet{};
+    assert(MASSResourceHardwareCommandBuilder::buildTerminalPacket(
+        command, 0x20, 0x91, 0x72, packet));
+    assert((packet.bytes == std::array<std::uint8_t, 4>{{0x2f, 0x91, 0x72, 0x05}}));
+
+    command.opcode = 0x18;
+    assert(!MASSResourceHardwareCommandBuilder::buildTerminalPacket(
+        command, 0x20, 0x91, 0x72, packet));
+    command.opcode = 0x2a;
+    command.length = 3;
+    assert(!MASSResourceHardwareCommandBuilder::buildTerminalPacket(
+        command, 0x20, 0x91, 0x72, packet));
+}
+
 void testDescriptorParser() {
     std::vector<std::uint8_t> bank(0x10000, 0xff);
     constexpr std::uint16_t base = 0x0200;
@@ -341,6 +362,7 @@ void testActualIC51(const char* path) {
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testResourceSelectionRecordParser();
+    testTerminalHardwarePacketBuilder();
     testDescriptorParser();
     testCommandStreamDecoder();
     if (argc > 1)

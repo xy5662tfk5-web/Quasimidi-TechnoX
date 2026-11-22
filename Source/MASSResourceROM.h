@@ -330,6 +330,37 @@ struct MASSResourceCommand {
     std::array<std::uint8_t, 8> bytes{};
 };
 
+struct MASSHardwareCommandPacket {
+    // 0x0DB7 writes R5, R2, R3, R4 to XDATA 0x8000..0x8003.
+    std::array<std::uint8_t, 4> bytes{};
+};
+
+class MASSResourceHardwareCommandBuilder {
+public:
+    // Terminal opcode group 0x20 / handler 0x2301. The first two payload
+    // bytes are retained in the final slot, but the port packet takes its
+    // middle bytes from direct RAM addresses 0x07 and 0x02 after helpers.
+    static bool buildTerminalPacket(const MASSResourceCommand& command,
+                                    std::uint8_t ram2B,
+                                    std::uint8_t direct07,
+                                    std::uint8_t direct02,
+                                    MASSHardwareCommandPacket& result) noexcept {
+        if (command.kind != MASSResourceCommandKind::threePayloadCommand ||
+            command.length != 4 || (command.opcode & 0x38) != 0x20)
+            return false;
+
+        MASSHardwareCommandPacket packet{};
+        packet.bytes = {
+            static_cast<std::uint8_t>(ram2B | 0x0f),
+            direct07,
+            direct02,
+            static_cast<std::uint8_t>(command.bytes[3] & 0x07)
+        };
+        result = packet;
+        return true;
+    }
+};
+
 struct MASSDecodedResourceStream {
     std::uint16_t streamPointer = 0;
     std::size_t endOffset = 0;
