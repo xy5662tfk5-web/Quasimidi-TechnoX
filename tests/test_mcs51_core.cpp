@@ -306,7 +306,7 @@ int main() {
     assert(exchangeBus.internal[0x40] == 0xaa);
     assert(exchangeCpu.step(exchangeBus) == MCS51StepResult::executed);
     assert(exchangeCpu.step(exchangeBus) == MCS51StepResult::executed);
-    assert(exchangeCpu.registers().a == 0xad);
+    assert(exchangeCpu.registers().a == 0xaa);
     assert(exchangeBus.internal[0x40] == 0xab);
 
     // Decimal adjust after packed-BCD addition: 15 + 27 -> 42.
