@@ -475,6 +475,17 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.ic51ReadsByBank(0) == 13651u); // 4-byte header + payload
         assert(firmwareMachine.ic51ReadsByBank(1) == 64u);    // descriptor-table reads
         assert(firmwareMachine.xdataByteForTesting(0xf5b2) == 0xd2u); // final uploaded byte
+        // Optional raw snapshot of the firmware-loaded external sound-memory window.
+        // This is the physical XDATA image after the IC51 block transfer and address permutation.
+        if (argc > 4) {
+            std::ofstream dump(argv[4], std::ios::binary);
+            assert(dump.good());
+            for (std::uint32_t address = 0xc000u; address <= 0xffffu; ++address)
+                dump.put(static_cast<char>(firmwareMachine.xdataByteForTesting(
+                    static_cast<std::uint16_t>(address))));
+            dump.flush();
+            assert(dump.good());
+        }
         assert(firmwareMachine.soundMemoryWriteTraceCount() ==
                firmwareMachine.soundMemoryWriteCount());
         const auto soundWrites = firmwareMachine.soundMemoryWriteTraceCount();

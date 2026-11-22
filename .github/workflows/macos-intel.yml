@@ -25,7 +25,7 @@ jobs:
       - name: Extract timed factory Performance SysEx stream
         run: python3 tools/parse_technox_mid.py TECHNOX.MID --serial-stream-output /tmp/technox_factory_ram_bank.txsb
       - name: Compile and test TechnoX 8032 machine bus (C++17)
-        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_technox_8032_machine.cpp -o /tmp/test_technox_8032_machine && /tmp/test_technox_8032_machine technox_IC4_mx27c1000_v105.bin technox_IC51_nm27c010_v105.bin /tmp/technox_factory_ram_bank.txsb
+        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_technox_8032_machine.cpp -o /tmp/test_technox_8032_machine && /tmp/test_technox_8032_machine technox_IC4_mx27c1000_v105.bin technox_IC51_nm27c010_v105.bin /tmp/technox_factory_ram_bank.txsb /tmp/technox_external_sound_memory.bin
       - name: Compile and test MIDI control router (C++17)
         if: hashFiles('tests/test_midi_controller.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_midi_controller.cpp -o /tmp/test_midi_controller && /tmp/test_midi_controller
@@ -84,6 +84,13 @@ jobs:
                       item = reachable[nearby]
                       print(f"  {nearby:04X}: {item.raw:<8} {item.text}")
           PY
+      - name: Upload firmware-loaded external sound memory snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-external-sound-memory
+          path: /tmp/technox_external_sound_memory.bin
+          if-no-files-found: error
+          compression-level: 0
       - name: Upload indirect command-handler disassembly
         uses: actions/upload-artifact@v4
         with:
