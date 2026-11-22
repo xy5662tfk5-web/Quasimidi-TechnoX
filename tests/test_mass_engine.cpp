@@ -33,6 +33,19 @@ int main() {
     assert(!engine.setExpression(15, 128));
     assert(engine.setAftertouch(15, 100) && engine.getAftertouch(15) == 100);
     assert(!engine.setAftertouch(15, 128));
+    assert(engine.setFreeController(15, 72) && engine.getFreeController(15) == 72);
+    assert(!engine.setFreeController(16, 72));
+    assert(!engine.setFreeController(15, 128));
+    assert(engine.setCommonModulationDepth(0, 0, 0));
+    assert(engine.setCommonModulationDepth(3, 7, 127));
+    assert(engine.getCommonModulationDepth(0, 0) == 0);
+    assert(engine.getCommonModulationDepth(3, 7) == 127);
+    assert(engine.getCommonModulationDepth(4, 0) == -1);
+    assert(engine.getCommonModulationDepth(0, 8) == -1);
+    assert(!engine.setCommonModulationDepth(0, 0, 128));
+    engine.clearCommonModulationDepths();
+    assert(engine.getCommonModulationDepth(0, 0) == -1);
+    assert(engine.getCommonModulationDepth(3, 7) == -1);
     assert(engine.setRpn(12, 0, 12) && engine.getRpn(12, 0) == 12);
     assert(engine.setRpn(12, 1, 64) && engine.getRpn(12, 1) == 64);
     assert(engine.setRpnLsb(12, 0, 75) && engine.getRpnLsb(12, 0) == 75);
@@ -43,6 +56,7 @@ int main() {
     assert(!engine.portamento(12) && !engine.softPedal(12) && engine.getModWheel(12) == 0);
     assert(engine.getPitchBend(12) == 0 && engine.getExpression(12) == 127);
     assert(engine.getAftertouch(12) == 0);
+    assert(engine.getFreeController(12) == 0);
     assert(engine.getRpn(12, 0) == -1 && engine.getRpn(12, 1) == -1);
     assert(engine.getRpnLsb(12, 0) == -1);
 
@@ -89,6 +103,10 @@ int main() {
     assert(!matrix.setRoute(16, ModSource::modWheel, ModDestination::cutoff, 0.5f));
     assert(matrix.setRoute(0, ModSource::modWheel, ModDestination::cutoff, 0.5f));
     assert(std::abs(matrix.contribution(ModDestination::cutoff, 0.8f, 0, 0, 0)-0.4f) < 0.0001f);
+    assert(matrix.setRoute(1, ModSource::pitchBend, ModDestination::pitch, 0.5f));
+    assert(std::abs(matrix.contribution(ModDestination::pitch, 0, 0, 0, 0, -1.0f, 0.0f) + 0.5f) < 0.0001f);
+    assert(matrix.setRoute(2, ModSource::freeController, ModDestination::level, -0.25f));
+    assert(std::abs(matrix.contribution(ModDestination::level, 0, 0, 0, 0, 0.0f, 1.0f) + 0.25f) < 0.0001f);
     matrix.clearRoute(0);
     assert(matrix.contribution(ModDestination::cutoff, 1, 0, 0, 0) == 0.0f);
     // The production processor uses the audible prototype backend; the engine's

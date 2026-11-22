@@ -5,8 +5,8 @@
 
 namespace technox {
 
-enum class ModSource : std::uint8_t { modWheel, velocity, keyTrack, aftertouch };
-enum class ModDestination : std::uint8_t { pitch, cutoff, level, panorama };
+enum class ModSource : std::uint8_t { modWheel, velocity, keyTrack, aftertouch, pitchBend, freeController };
+enum class ModDestination : std::uint8_t { pitch, cutoff, level, panorama, lfo, fx2Control, arpGate };
 
 struct ModRoute {
     ModSource source = ModSource::modWheel;
@@ -33,7 +33,8 @@ public:
     }
 
     float contribution(ModDestination destination,
-                       float modWheel, float velocity, float keyTrack, float aftertouch) const noexcept {
+                       float modWheel, float velocity, float keyTrack, float aftertouch,
+                       float pitchBend = 0.0f, float freeController = 0.0f) const noexcept {
         float sum = 0.0f;
         for (const auto& route : routes_) {
             if (!route.enabled || route.destination != destination) continue;
@@ -43,6 +44,8 @@ public:
                 case ModSource::velocity: source = velocity; break;
                 case ModSource::keyTrack: source = keyTrack; break;
                 case ModSource::aftertouch: source = aftertouch; break;
+                case ModSource::pitchBend: source = pitchBend; break;
+                case ModSource::freeController: source = freeController; break;
             }
             sum += source * route.amount;
         }

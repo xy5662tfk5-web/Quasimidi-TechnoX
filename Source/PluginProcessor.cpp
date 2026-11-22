@@ -107,6 +107,7 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
     if (performanceIndex < 0 || performanceIndex >= 50)
         return;
     massEngine.clearPerformanceImage();
+    massEngine.clearCommonModulationDepths();
     const auto* selectedPerformance = performanceBank.at(static_cast<std::size_t>(performanceIndex));
     bool performanceImageValid = selectedPerformance != nullptr &&
         selectedPerformance->nameBlock.completeMessage.size() == 17 &&
@@ -120,6 +121,15 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
         for (int byte = 0; byte < 65; ++byte)
             performanceImageValid = massEngine.setPerformanceCommonByte(byte, commonFrame[8 + static_cast<std::size_t>(byte)])
                 && performanceImageValid;
+        // Manual Common image bytes 0x09..0x28 store four rows of eight
+        // modulation depths. Preserve their raw seven-bit values; DSP scaling
+        // is still under reverse engineering.
+        for (int source = 0; source < 4; ++source)
+            for (int destination = 0; destination < 8; ++destination) {
+                const int offset = 0x09 + source * 8 + destination;
+                massEngine.setCommonModulationDepth(
+                    source, destination, commonFrame[8 + static_cast<std::size_t>(offset)]);
+            }
         for (int part = 0; part < 4; ++part) {
             const auto& frame = selectedPerformance->parts[static_cast<std::size_t>(part)].completeMessage;
             if (frame.size() != 33) { performanceImageValid = false; continue; }
@@ -240,6 +250,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isController()) {
             const int controller = message.getControllerNumber();
             const int value = message.getControllerValue();
+            const int freeControllerNumber = massEngine.performanceImage().isLoaded()
+                ? massEngine.performanceImage().commonByte(0x04) : -1;
             if (controller == 80)
                 setCommonControlRaw(performanceIndex, technox::MASSCommonControl::fx1Type, value);
             else if (controller == 81)
@@ -277,6 +289,10 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                     massEngine.setSoftPedal(enginePart, value >= 64);
                 else if (controller == 121)
                     massEngine.resetPartControllers(enginePart);
+                // Free Controller is an independently selected CC number and
+                // may intentionally overlap a conventional controller.
+                if (controller == freeControllerNumber && freeControllerNumber >= 0 && controller <= 97)
+                    massEngine.setFreeController(enginePart, value);
                 if (drumChange.has_value())
                     massEngine.setDrumParameter(enginePart, drumChange->keyNumber,
                                                 drumChange->parameterIndex, drumChange->rawValue);

@@ -49,8 +49,12 @@ enum class MASSCommonControl : std::size_t { performanceMode = 0, fx1Type, fx2Ty
 class MASSCommonControlStore {
 public:
     static constexpr std::size_t kControlCount = 5;
+    static constexpr std::size_t kModulationSourceCount = 4;
+    static constexpr std::size_t kModulationDestinationCount = 8;
     MASSCommonControlStore() {
         for (auto& value : values_) value.store(-1, std::memory_order_relaxed);
+        for (auto& source : modulationDepths_)
+            for (auto& depth : source) depth.store(-1, std::memory_order_relaxed);
     }
     bool set(MASSCommonControl control, int value) noexcept {
         const auto index = static_cast<std::size_t>(control);
@@ -67,8 +71,30 @@ public:
         const auto index = static_cast<std::size_t>(control);
         if (index < kControlCount) values_[index].store(-1, std::memory_order_release);
     }
+    bool setModulationDepth(int sourceIndex, int destinationIndex, int rawValue) noexcept {
+        if (sourceIndex < 0 || sourceIndex >= static_cast<int>(kModulationSourceCount) ||
+            destinationIndex < 0 || destinationIndex >= static_cast<int>(kModulationDestinationCount) ||
+            rawValue < 0 || rawValue > 127)
+            return false;
+        modulationDepths_[static_cast<std::size_t>(sourceIndex)][static_cast<std::size_t>(destinationIndex)]
+            .store(rawValue, std::memory_order_release);
+        return true;
+    }
+    int modulationDepth(int sourceIndex, int destinationIndex) const noexcept {
+        if (sourceIndex < 0 || sourceIndex >= static_cast<int>(kModulationSourceCount) ||
+            destinationIndex < 0 || destinationIndex >= static_cast<int>(kModulationDestinationCount))
+            return -1;
+        return modulationDepths_[static_cast<std::size_t>(sourceIndex)][static_cast<std::size_t>(destinationIndex)]
+            .load(std::memory_order_acquire);
+    }
+    void clearModulationDepths() noexcept {
+        for (auto& source : modulationDepths_)
+            for (auto& depth : source) depth.store(-1, std::memory_order_release);
+    }
 private:
     std::array<std::atomic<int>, kControlCount> values_{};
+    std::array<std::array<std::atomic<int>, kModulationDestinationCount>, kModulationSourceCount>
+        modulationDepths_{};
 };
 
 // Lossless 169-byte Performance image recovered from IC4 routine 0xB475:
@@ -185,6 +211,7 @@ public:
             pitchBend_[i].store(0, std::memory_order_relaxed);
             expression_[i].store(127, std::memory_order_relaxed);
             aftertouch_[i].store(0, std::memory_order_relaxed);
+            freeController_[i].store(0, std::memory_order_relaxed);
         }
     }
     bool setModWheel(int partIndex, int value) noexcept {
@@ -219,6 +246,14 @@ public:
     int aftertouch(int partIndex) const noexcept {
         return valid(partIndex) ? aftertouch_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 0;
     }
+    bool setFreeController(int partIndex, int value) noexcept {
+        if (!valid(partIndex) || value < 0 || value > 127) return false;
+        freeController_[static_cast<std::size_t>(partIndex)].store(value, std::memory_order_release);
+        return true;
+    }
+    int freeController(int partIndex) const noexcept {
+        return valid(partIndex) ? freeController_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 0;
+    }
     void reset(int partIndex) noexcept {
         if (!valid(partIndex)) return;
         const auto i = static_cast<std::size_t>(partIndex);
@@ -226,6 +261,7 @@ public:
         pitchBend_[i].store(0, std::memory_order_release);
         expression_[i].store(127, std::memory_order_release);
         aftertouch_[i].store(0, std::memory_order_release);
+        freeController_[i].store(0, std::memory_order_release);
     }
 private:
     static bool valid(int partIndex) noexcept { return partIndex >= 0 && partIndex < static_cast<int>(kPartCount); }
@@ -233,6 +269,7 @@ private:
     std::array<std::atomic<int>, kPartCount> pitchBend_{};
     std::array<std::atomic<int>, kPartCount> expression_{};
     std::array<std::atomic<int>, kPartCount> aftertouch_{};
+    std::array<std::atomic<int>, kPartCount> freeController_{};
 };
 
 class MASSPartRuntimeControlStore {
@@ -463,6 +500,13 @@ public:
     bool setCommonControl(MASSCommonControl control, int value) noexcept { return commonControls_.set(control, value); }
     int getCommonControl(MASSCommonControl control) const noexcept { return commonControls_.get(control); }
     void clearCommonControl(MASSCommonControl control) noexcept { commonControls_.clear(control); }
+    void clearCommonModulationDepths() noexcept { commonControls_.clearModulationDepths(); }
+    bool setCommonModulationDepth(int sourceIndex, int destinationIndex, int rawValue) noexcept {
+        return commonControls_.setModulationDepth(sourceIndex, destinationIndex, rawValue);
+    }
+    int getCommonModulationDepth(int sourceIndex, int destinationIndex) const noexcept {
+        return commonControls_.modulationDepth(sourceIndex, destinationIndex);
+    }
 
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         return partParameters_.set(partIndex, parameter, rawValue);
@@ -478,6 +522,12 @@ public:
     int getExpression(int partIndex) const noexcept { return modulationSources_.expression(partIndex); }
     bool setAftertouch(int partIndex, int value) noexcept { return modulationSources_.setAftertouch(partIndex, value); }
     int getAftertouch(int partIndex) const noexcept { return modulationSources_.aftertouch(partIndex); }
+    bool setFreeController(int partIndex, int value) noexcept {
+        return modulationSources_.setFreeController(partIndex, value);
+    }
+    int getFreeController(int partIndex) const noexcept {
+        return modulationSources_.freeController(partIndex);
+    }
     bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
     bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
     bool setSustainPedal(int partIndex, bool enabled) noexcept {

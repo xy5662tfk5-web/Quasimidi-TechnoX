@@ -327,6 +327,36 @@ int main() {
                                        pressureLeft[static_cast<std::size_t>(i)]);
     assert(pressureDifference > 0.01);
 
+    // Pitch Bend and the performance-selected Free Controller are independent
+    // modulation sources; when explicitly routed, both affect the test voice.
+    BasicMASSVoiceBackend noFreeBackend, freeBackend;
+    MASSAudioEngine noFreeEngine(&noFreeBackend), freeEngine(&freeBackend);
+    noFreeEngine.prepare(48000.0, modulationSamples);
+    freeEngine.prepare(48000.0, modulationSamples);
+    for (MASSAudioEngine* candidate : {&noFreeEngine, &freeEngine}) {
+        assert(candidate->setPartParameter(12, PartParameter::level, 127));
+        assert(candidate->setPartParameter(12, PartParameter::cutoffFrequency, 100));
+        assert(candidate->setPartParameter(12, PartParameter::resonance, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egAttack, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egDecay, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egRelease, 0));
+    }
+    assert(freeEngine.setFreeController(12, 127));
+    assert(freeEngine.modulationMatrix().setRoute(
+        0, ModSource::freeController, ModDestination::pitch, 0.35f));
+    noFreeEngine.noteOn(12, 1, 69, 110);
+    freeEngine.noteOn(12, 1, 69, 110);
+    std::array<float, modulationSamples> noFreeLeft{}, noFreeRight{}, freeLeft{}, freeRight{};
+    float* noFreeChannels[] = {noFreeLeft.data(), noFreeRight.data()};
+    float* freeChannels[] = {freeLeft.data(), freeRight.data()};
+    noFreeEngine.render(noFreeChannels, 2, modulationSamples);
+    freeEngine.render(freeChannels, 2, modulationSamples);
+    double freeDifference = 0.0;
+    for (int i = 0; i < modulationSamples; ++i)
+        freeDifference += std::abs(noFreeLeft[static_cast<std::size_t>(i)] -
+                                   freeLeft[static_cast<std::size_t>(i)]);
+    assert(freeDifference > 0.01);
+
     // Verified manual panorama positions 1..15 range from hard-left to hard-right.
     auto measurePanEnergy = [](int panorama, double& leftEnergy, double& rightEnergy) {
         BasicMASSVoiceBackend panBackend;

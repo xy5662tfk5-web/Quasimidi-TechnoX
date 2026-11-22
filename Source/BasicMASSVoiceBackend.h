@@ -76,16 +76,23 @@ public:
                 const float expression = static_cast<float>(sources.expression(part)) / 127.0f;
                 const float modWheel = static_cast<float>(sources.modWheel(part)) / 127.0f;
                 const float aftertouch = static_cast<float>(sources.aftertouch(part)) / 127.0f;
+                const float pitchBendSource = juceSafeClamp(
+                    static_cast<float>(sources.pitchBend(part)) / 8192.0f, -1.0f, 1.0f);
+                const float freeController = static_cast<float>(sources.freeController(part)) / 127.0f;
                 const float velocity = static_cast<float>(slot.velocity) / 127.0f;
                 const float keyTrack = juceSafeClamp((static_cast<float>(slot.note) - 60.0f) / 60.0f, -1.0f, 1.0f);
                 const float pitchModulation = matrix.contribution(
-                    ModDestination::pitch, modWheel, velocity, keyTrack, aftertouch);
+                    ModDestination::pitch, modWheel, velocity, keyTrack, aftertouch,
+                    pitchBendSource, freeController);
                 const float cutoffModulation = matrix.contribution(
-                    ModDestination::cutoff, modWheel, velocity, keyTrack, aftertouch);
+                    ModDestination::cutoff, modWheel, velocity, keyTrack, aftertouch,
+                    pitchBendSource, freeController);
                 const float levelModulation = matrix.contribution(
-                    ModDestination::level, modWheel, velocity, keyTrack, aftertouch);
+                    ModDestination::level, modWheel, velocity, keyTrack, aftertouch,
+                    pitchBendSource, freeController);
                 const float panModulation = juceSafeClamp(matrix.contribution(
-                    ModDestination::panorama, modWheel, velocity, keyTrack, aftertouch), -1.0f, 1.0f);
+                    ModDestination::panorama, modWheel, velocity, keyTrack, aftertouch,
+                    pitchBendSource, freeController), -1.0f, 1.0f);
                 const float attack = timeSeconds(rawAttack, 0.002f, 1.5f);
                 const float decay = timeSeconds(rawDecay, 0.01f, 2.0f);
                 const float release = timeSeconds(rawRelease, 0.01f, 3.0f);
