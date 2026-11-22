@@ -3,8 +3,11 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <fstream>
+#include <iterator>
+#include <vector>
 
-int main() {
+int main(int argc, char** argv) {
     using technox::TechnoX8032Machine;
 
     TechnoX8032Machine machine;
@@ -81,5 +84,25 @@ int main() {
     assert(machine.readExternal(0xb003) == 0x41);
     machine.advanceMachineCycles(17);
     assert(machine.elapsedMachineCycles() == 17);
+
+    // Optional real-ROM smoke test: verify the descrambled reset vector and
+    // execute the original IC4 startup path in the 8032 bus model.
+    if (argc > 1) {
+        std::ifstream romFile(argv[1], std::ios::binary);
+        assert(romFile.good());
+        const std::vector<std::uint8_t> realRom(
+            std::istreambuf_iterator<char>(romFile), std::istreambuf_iterator<char>());
+        assert(realRom.size() == TechnoX8032Machine::kIC4RomSize);
+        TechnoX8032Machine firmwareMachine;
+        assert(firmwareMachine.loadIC4Rom(realRom.data(), realRom.size()));
+        assert(firmwareMachine.readCode(0x0000) == 0x02); // LJMP reset vector
+        assert(firmwareMachine.readCode(0x0001) == 0xeb);
+        assert(firmwareMachine.readCode(0x0002) == 0x32);
+        firmwareMachine.reset();
+        assert(firmwareMachine.step() == technox::MCS51StepResult::executed);
+        assert(firmwareMachine.cpu().registers().pc == 0xeb32);
+        assert(firmwareMachine.runInstructions(512) == 512);
+        assert(firmwareMachine.cpu().totalCycles() != 0);
+    }
     return 0;
 }
