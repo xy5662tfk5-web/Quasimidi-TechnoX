@@ -217,6 +217,49 @@ int main() {
     assert(sfrCpu.step(sfrBus) == MCS51StepResult::executed);
     assert(sfrCpu.registers().a == 0x7b);
 
+    // CODE/XDATA access and arithmetic unit instructions.
+    TestBus memoryBus;
+    memoryBus.code[0] = 0x90; memoryBus.code[1] = 0x12; memoryBus.code[2] = 0x34; // MOV DPTR,#1234
+    memoryBus.code[3] = 0x74; memoryBus.code[4] = 0x02; // MOV A,#02
+    memoryBus.code[5] = 0x93; // MOVC A,@A+DPTR -> CODE[1236]
+    memoryBus.code[0x1236] = 0x66;
+    memoryBus.code[6] = 0xe0; // MOVX A,@DPTR
+    memoryBus.code[7] = 0xf0; // MOVX @DPTR,A
+    memoryBus.external[0x1234] = 0x5a;
+    MCS51Core memoryCpu;
+    for (int i = 0; i < 4; ++i)
+        assert(memoryCpu.step(memoryBus) == MCS51StepResult::executed);
+    assert(memoryCpu.registers().dptr == 0x1234);
+    assert(memoryCpu.registers().a == 0x66);
+    assert(memoryCpu.step(memoryBus) == MCS51StepResult::executed);
+    assert(memoryCpu.registers().a == 0x5a);
+    assert(memoryCpu.step(memoryBus) == MCS51StepResult::executed);
+    assert(memoryBus.external[0x1234] == 0x5a);
+
+    TestBus mathBus;
+    mathBus.code[0] = 0x75; mathBus.code[1] = 0xe0; mathBus.code[2] = 0x10; // ACC=16
+    mathBus.code[3] = 0x75; mathBus.code[4] = 0xf0; mathBus.code[5] = 0x03; // B=3
+    mathBus.code[6] = 0xa4; // MUL AB -> 48
+    mathBus.code[7] = 0x84; // DIV AB -> quotient 16, remainder 0
+    MCS51Core mathCpu;
+    for (int i = 0; i < 4; ++i)
+        assert(mathCpu.step(mathBus) == MCS51StepResult::executed);
+    assert(mathCpu.registers().a == 16);
+    assert(mathCpu.registers().b == 0);
+    assert(!mathCpu.registers().psw.carry);
+    assert(!mathCpu.registers().psw.overflow);
+
+    TestBus divideZeroBus;
+    divideZeroBus.code[0] = 0x75; divideZeroBus.code[1] = 0xe0; divideZeroBus.code[2] = 0x25;
+    divideZeroBus.code[3] = 0x75; divideZeroBus.code[4] = 0xf0; divideZeroBus.code[5] = 0x00;
+    divideZeroBus.code[6] = 0x84;
+    MCS51Core divideZeroCpu;
+    for (int i = 0; i < 3; ++i)
+        assert(divideZeroCpu.step(divideZeroBus) == MCS51StepResult::executed);
+    assert(divideZeroCpu.registers().a == 0x25);
+    assert(divideZeroCpu.registers().psw.overflow);
+    assert(!divideZeroCpu.registers().psw.carry);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
