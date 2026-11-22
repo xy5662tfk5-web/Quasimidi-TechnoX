@@ -568,6 +568,17 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        std::printf("IC4 P1/P3 trace (newest first):\\n");
+        std::size_t serialPortEvents = 0;
+        for (std::size_t portAge = 0; portAge < 256u && portAge < portWrites && serialPortEvents < 64u; ++portAge) {
+            const auto& event = injectedResponseMachine.portWriteAt(portWrites - 1u - portAge);
+            if (event.port != 1u && event.port != 3u) continue;
+            ++serialPortEvents;
+            std::printf("  P%u=%02X cycle=%llu\\n",
+                        static_cast<unsigned>(event.port),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto& midiCpu = injectedResponseMachine.cpu();
         std::printf("Recent IC4 instructions (newest first):\\n");
         for (std::size_t traceAge = 0; traceAge < 24u &&
