@@ -47,6 +47,12 @@ public:
         std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct SAM9407HostReadEvent {
+        std::uint8_t registerIndex = 0;
+        std::uint8_t value = 0xff;
+        std::uint16_t instructionPC = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct SAM9407HostWriteEvent {
         std::uint8_t registerIndex = 0;
         std::uint8_t value = 0;
@@ -229,6 +235,8 @@ public:
         commandPort_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
+        sam9407HostReadCount_ = 0;
+        sam9407HostReadTrace_.fill(SAM9407HostReadEvent{});
         sam9407HostWriteCount_ = 0;
         sam9407HostWriteTrace_.fill(SAM9407HostWriteEvent{});
         sam9407TransactionActive_ = false;
@@ -490,8 +498,18 @@ public:
             ++ic51ReadTraceCount_;
             return value;
         }
-        if (address >= 0x8000u && address <= 0x8003u)
-            return commandPort_[address - 0x8000u];
+        if (address >= 0x8000u && address <= 0x8003u) {
+            const auto index = static_cast<std::size_t>(address - 0x8000u);
+            const auto value = commandPort_[index];
+            auto& event = sam9407HostReadTrace_[
+                sam9407HostReadCount_ % sam9407HostReadTrace_.size()];
+            event.registerIndex = static_cast<std::uint8_t>(index);
+            event.value = value;
+            event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+            event.machineCycle = elapsedMachineCycles_;
+            ++sam9407HostReadCount_;
+            return value;
+        }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
             return soundDeviceResponse_; // status port outside RAM mode
         if (isXdataRam(address)) {
@@ -803,6 +821,10 @@ public:
         return commandPort_;
     }
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
+    std::size_t sam9407HostReadCount() const noexcept { return sam9407HostReadCount_; }
+    const SAM9407HostReadEvent& sam9407HostReadAt(std::size_t index) const noexcept {
+        return sam9407HostReadTrace_[index % sam9407HostReadTrace_.size()];
+    }
     std::size_t sam9407HostWriteCount() const noexcept { return sam9407HostWriteCount_; }
     const SAM9407HostWriteEvent& sam9407HostWriteAt(std::size_t index) const noexcept {
         return sam9407HostWriteTrace_[index % sam9407HostWriteTrace_.size()];
@@ -981,6 +1003,8 @@ private:
     std::array<std::uint8_t, 4> commandPort_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
+    std::array<SAM9407HostReadEvent, 2048> sam9407HostReadTrace_{};
+    std::size_t sam9407HostReadCount_ = 0;
     std::array<SAM9407HostWriteEvent, 4096> sam9407HostWriteTrace_{};
     std::size_t sam9407HostWriteCount_ = 0;
     bool sam9407TransactionActive_ = false;
