@@ -21,6 +21,22 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testMASS1848Arithmetic() {
+    const auto positive = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d, false, false);
+    assert(positive.value == 0x96 && !positive.carryOut && !positive.saturated);
+
+    const auto e7Set = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d, true, false);
+    assert(e7Set.value == 0xee && !e7Set.carryOut && !e7Set.saturated);
+
+    const auto unclampedCarry = MASS1848Arithmetic::execute(0xff, 0xff, 0x7f, false, false);
+    assert(unclampedCarry.value == 0x7e && unclampedCarry.carryOut);
+    const auto clampHigh = MASS1848Arithmetic::execute(0xff, 0xff, 0x7f, false, true);
+    assert(clampHigh.value == 0x81 && clampHigh.carryOut && clampHigh.saturated);
+
+    const auto clampLow = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d, false, true);
+    assert(clampLow.value == 0x7f && !clampLow.carryOut && clampLow.saturated);
+}
+
 void testFirmwareROMTableView() {
     std::vector<std::uint8_t> synthetic(0x20000, 0xff);
     synthetic[0x1288] = 0x12;
@@ -529,6 +545,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASS1848Arithmetic();
     testFirmwareROMTableView();
     if (argc > 2)
         testActualFirmwareROMTables(argv[2]);

@@ -78,6 +78,82 @@ private:
     std::size_t imageSize_ = 0;
 };
 
+struct MASS1848Result {
+    std::uint8_t value = 0;
+    bool carryOut = false;
+    bool saturated = false;
+};
+
+// Instruction-level model of IC4 subroutine 0x1848. Inputs are A, B/F0 and
+// R2 at entry; E7 selects the paired two's-complement input transforms and
+// D2 enables the final 0x7F/0x81 saturation result.
+class MASS1848Arithmetic {
+public:
+    static MASS1848Result execute(std::uint8_t accumulator,
+                                  std::uint8_t bRegister,
+                                  std::uint8_t r2,
+                                  bool flagE7,
+                                  bool flagD2) noexcept {
+        bool tempBit3 = false;
+
+        if (flagE7) {
+            tempBit3 = true;
+            accumulator = negate(accumulator);
+        }
+        swap(accumulator, bRegister);
+        if (flagE7) {
+            tempBit3 = !tempBit3;
+            accumulator = negate(accumulator);
+        }
+
+        accumulator = static_cast<std::uint8_t>(rotateLeft(accumulator) | 0x01);
+        multiplyAndExchange(accumulator, bRegister);
+        if (tempBit3)
+            accumulator = negate(accumulator);
+
+        bRegister = r2;
+        tempBit3 = false;
+        if (flagE7) {
+            tempBit3 = true;
+            accumulator = negate(accumulator);
+        }
+        swap(accumulator, bRegister);
+        if (flagE7) {
+            tempBit3 = !tempBit3;
+            accumulator = negate(accumulator);
+        }
+
+        accumulator = static_cast<std::uint8_t>(rotateLeft(accumulator) | 0x01);
+        multiplyAndExchange(accumulator, bRegister);
+        if (tempBit3)
+            accumulator = negate(accumulator);
+
+        const auto sum = static_cast<unsigned>(accumulator) + r2;
+        const bool carry = sum > 0xffu;
+        const auto raw = static_cast<std::uint8_t>(sum & 0xffu);
+        if (flagD2)
+            return {static_cast<std::uint8_t>(carry ? 0x81 : 0x7f), carry, true};
+        return {raw, carry, false};
+    }
+
+private:
+    static constexpr std::uint8_t negate(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>(0u - value);
+    }
+    static constexpr std::uint8_t rotateLeft(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>((value << 1) | (value >> 7));
+    }
+    static void swap(std::uint8_t& a, std::uint8_t& b) noexcept {
+        const auto temp = a; a = b; b = temp;
+    }
+    static void multiplyAndExchange(std::uint8_t& a, std::uint8_t& b) noexcept {
+        const auto product = static_cast<std::uint16_t>(a) * b;
+        a = static_cast<std::uint8_t>(product & 0xffu); // MUL AB: low byte in A
+        b = static_cast<std::uint8_t>(product >> 8);   // high byte in B
+        swap(a, b);                                    // XCH A,F0
+    }
+};
+
 struct MASSResourceSelection {
     MASSResourceBank bank = MASSResourceBank::bank0;
     std::uint8_t pointerIndex = 0;

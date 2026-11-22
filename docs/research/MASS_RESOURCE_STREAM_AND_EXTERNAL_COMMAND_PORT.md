@@ -71,7 +71,18 @@ Related helpers:
 
 CI checks table bounds and endpoint values against the real 128-KB descrambled IC4 image, verifies monotonicity of the 0x1208, 0x1288 and 0x1308 remapping curves, and evaluates all 128 composed 0x1288 -> 0x1308 lookups.
 
-## 3. Command-stream interpreter
+## 3. Fixed-point helper 0x1848
+
+Subroutine 0x1848 is now represented at instruction level in MASS1848Arithmetic. Its entry arguments are the accumulator A, B/F0 and R2, plus the live E7 and D2 flags. The routine:
+
+1. Applies E7-controlled two's-complement transforms around the first A/B swap.
+2. Rotates the active A operand left, forces bit 0 to one, multiplies A*B, then swaps the 8051 MUL result so A receives the high byte.
+3. Loads R2 into B/F0, applies the second E7-controlled transform, performs the same rotate/force-bit/multiply/high-byte extraction, and adds R2.
+4. If D2 is clear, returns the low eight-bit sum. If D2 is set, it saturates to 0x7F when the final addition has no carry or 0x81 when carry is set.
+
+The E7 branch changes the operands before both multiplications; it is not a final sign-bit toggle. The C++ model retains the byte-level operations and carries rather than substituting a floating-point approximation. Tests cover E7 on/off, positive and carry-producing sums, and both saturation endpoints.
+
+## 4. Command-stream interpreter
 
 `0x189D` uses the descriptor pointer and the per-mode metadata table at `0x2868 + 0x80*mode`. The command interpreter is reached through the indirect dispatch at `0x19BD`.
 
