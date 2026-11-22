@@ -153,37 +153,37 @@ public:
         } else if (opcode == 0x34) { // ADDC A,#data
             add(fetch8(bus), registers_.psw.carry);
         } else if (opcode == 0x25) { // ADD A,direct
-            add(bus.readInternal(fetch8(bus)), false);
+            add(readDirect(bus, fetch8(bus)), false);
         } else if (opcode == 0x26 || opcode == 0x27) { // ADD A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
             add(readDirect(bus, address), false);
         } else if (opcode >= 0x28 && opcode <= 0x2f) { // ADD A,Rn
             add(readRegister(bus, opcode & 7u), false);
         } else if (opcode == 0x35) { // ADDC A,direct
-            add(bus.readInternal(fetch8(bus)), registers_.psw.carry);
+            add(readDirect(bus, fetch8(bus)), registers_.psw.carry);
         } else if (opcode == 0x36 || opcode == 0x37) { // ADDC A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
-            add(bus.readInternal(address), registers_.psw.carry);
+            add(readDirect(bus, address), registers_.psw.carry);
         } else if (opcode >= 0x38 && opcode <= 0x3f) { // ADDC A,Rn
             add(readRegister(bus, opcode & 7u), registers_.psw.carry);
         } else if (opcode == 0x95) { // SUBB A,direct
-            subtract(bus.readInternal(fetch8(bus)));
+            subtract(readDirect(bus, fetch8(bus)));
         } else if (opcode == 0x96 || opcode == 0x97) { // SUBB A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
-            subtract(bus.readInternal(address));
+            subtract(readDirect(bus, address));
         } else if (opcode >= 0x98 && opcode <= 0x9f) { // SUBB A,Rn
             subtract(readRegister(bus, opcode & 7u));
         } else if (opcode == 0x94) { // SUBB A,#data
             subtract(fetch8(bus));
         } else if (opcode == 0x05) { // INC direct
             const auto address = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) + 1u));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) + 1u));
         } else if (opcode == 0x06 || opcode == 0x07) { // INC @Ri
             const auto address = readRegister(bus, opcode & 1u);
             bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) + 1u));
         } else if (opcode == 0x15) { // DEC direct
             const auto address = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) - 1u));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) - 1u));
         } else if (opcode == 0x16 || opcode == 0x17) { // DEC @Ri
             const auto address = readRegister(bus, opcode & 1u);
             bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) - 1u));
@@ -208,51 +208,51 @@ public:
             bus.writeInternal(readRegister(bus, opcode & 1u), value);
         } else if (opcode == 0x42) { // ORL direct,A
             const auto address = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) | registers_.a));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) | registers_.a));
             cycles = 2;
         } else if (opcode == 0x43) { // ORL direct,#data
             const auto address = fetch8(bus);
             const auto immediate = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) | immediate));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) | immediate));
             cycles = 2;
         } else if (opcode == 0x44) { // ORL A,#data
             registers_.a |= fetch8(bus);
         } else if (opcode == 0x45) { // ORL A,direct
-            registers_.a |= bus.readInternal(fetch8(bus));
+            registers_.a |= readDirect(bus, fetch8(bus));
         } else if (opcode == 0x46 || opcode == 0x47) { // ORL A,@Ri
             registers_.a |= bus.readInternal(readRegister(bus, opcode & 1u));
         } else if (opcode >= 0x48 && opcode <= 0x4f) { // ORL A,Rn
             registers_.a |= readRegister(bus, opcode & 7u);
         } else if (opcode == 0x52) { // ANL direct,A
             const auto address = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) & registers_.a));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) & registers_.a));
             cycles = 2;
         } else if (opcode == 0x53) { // ANL direct,#data
             const auto address = fetch8(bus);
             const auto immediate = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) & immediate));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) & immediate));
             cycles = 2;
         } else if (opcode == 0x54) { // ANL A,#data
             registers_.a &= fetch8(bus);
         } else if (opcode == 0x55) { // ANL A,direct
-            registers_.a &= bus.readInternal(fetch8(bus));
+            registers_.a &= readDirect(bus, fetch8(bus));
         } else if (opcode == 0x56 || opcode == 0x57) { // ANL A,@Ri
             registers_.a &= bus.readInternal(readRegister(bus, opcode & 1u));
         } else if (opcode >= 0x58 && opcode <= 0x5f) { // ANL A,Rn
             registers_.a &= readRegister(bus, opcode & 7u);
         } else if (opcode == 0x62) { // XRL direct,A
             const auto address = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) ^ registers_.a));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) ^ registers_.a));
             cycles = 2;
         } else if (opcode == 0x63) { // XRL direct,#data
             const auto address = fetch8(bus);
             const auto immediate = fetch8(bus);
-            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) ^ immediate));
+            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) ^ immediate));
             cycles = 2;
         } else if (opcode == 0x64) { // XRL A,#data
             registers_.a ^= fetch8(bus);
         } else if (opcode == 0x65) { // XRL A,direct
-            registers_.a ^= bus.readInternal(fetch8(bus));
+            registers_.a ^= readDirect(bus, fetch8(bus));
         } else if (opcode == 0x66 || opcode == 0x67) { // XRL A,@Ri
             registers_.a ^= bus.readInternal(readRegister(bus, opcode & 1u));
         } else if (opcode >= 0x68 && opcode <= 0x6f) { // XRL A,Rn
