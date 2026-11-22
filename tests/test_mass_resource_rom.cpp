@@ -52,6 +52,37 @@ void testMASS1C61InterpolationLookup() {
     assert(result.tableRemainder == 9 && result.coefficient == 0x98);
 }
 
+void testMASS1C61InterpolationArithmetic() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    const std::array<std::uint8_t, 12> positive{{
+        0x80, 0x88, 0x90, 0x98, 0xa1, 0xab,
+        0xb5, 0xc0, 0xcb, 0xd7, 0xe4, 0xf2
+    }};
+    const std::array<std::uint8_t, 12> negative{{
+        0xff, 0xf2, 0xe4, 0xd7, 0xcb, 0xc0,
+        0xb5, 0xab, 0xa1, 0x98, 0x90, 0x88
+    }};
+    std::copy(positive.begin(), positive.end(), romBytes.begin() + 0x11f0);
+    std::copy(negative.begin(), negative.end(), romBytes.begin() + 0x11fc);
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASS1C61InterpolationLookupResult lookup{};
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x01, false, lookup));
+    const auto positiveResult =
+        MASS1C61InterpolationArithmetic::apply(lookup, 0x12, 0x34, 0x01);
+    assert(positiveResult.value24 == 0x014752);
+    assert(positiveResult.r2 == 0x52 && positiveResult.r3 == 0x47 &&
+           positiveResult.r4 == 0x01);
+
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x01, true, lookup));
+    const auto negativeResult =
+        MASS1C61InterpolationArithmetic::apply(lookup, 0x12, 0x34, 0x01);
+    assert(negativeResult.value24 == 0x102bb0);
+    assert(negativeResult.r2 == 0xb0 && negativeResult.r3 == 0x2b &&
+           negativeResult.r4 == 0x10);
+}
+
 void testMASS1EDDLookupIndexBuilder() {
     std::vector<std::uint8_t> romBytes(0x20000, 0xff);
     for (std::size_t i = 0; i < 128; ++i)
@@ -764,6 +795,7 @@ void testActualIC51(const char* path) {
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testMASS1C61InterpolationLookup();
+    testMASS1C61InterpolationArithmetic();
     testMASS1EDDLookupIndexBuilder();
     testMASS1EDDPostLookup();
     testMASS1EDDParameterPipeline();

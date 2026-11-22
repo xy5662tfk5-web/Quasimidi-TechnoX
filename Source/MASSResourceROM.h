@@ -114,6 +114,72 @@ public:
     }
 };
 
+struct MASS1C61Interpolation24Result {
+    std::uint8_t r2 = 0;
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+    std::uint32_t value24 = 0;
+};
+
+// Executes the byte-level multiply and RLC/RRC loops after the 0x1C61
+// interpolation table lookup. R2:R3:R4 is little-endian; the multiply keeps
+// the upper 24 bits of value24*coefficient. Shifts preserve 8051 carry flow.
+class MASS1C61InterpolationArithmetic {
+public:
+    static MASS1C61Interpolation24Result apply(
+        const MASS1C61InterpolationLookupResult& lookup,
+        std::uint8_t r2,
+        std::uint8_t r3,
+        std::uint8_t r4) noexcept {
+        const auto input = (static_cast<std::uint32_t>(r4 & 0x07u) << 16) |
+                           (static_cast<std::uint32_t>(r3) << 8) | r2;
+        const auto product = static_cast<std::uint64_t>(input) * lookup.coefficient;
+        auto value = static_cast<std::uint32_t>((product >> 8) & 0x00ffffffu);
+
+        const auto shiftCount = static_cast<unsigned>(
+            lookup.shiftCount + (lookup.negativeBranch ? 0u : 1u));
+        unsigned carry = 0;
+
+        for (unsigned i = 0; i < shiftCount; ++i) {
+            auto low = static_cast<std::uint8_t>(value & 0xffu);
+            auto middle = static_cast<std::uint8_t>((value >> 8) & 0xffu);
+            auto high = static_cast<std::uint8_t>((value >> 16) & 0xffu);
+
+            if (!lookup.negativeBranch) {
+                auto next = static_cast<unsigned>(low >> 7);
+                low = static_cast<std::uint8_t>((low << 1) | carry);
+                carry = next;
+                next = static_cast<unsigned>(middle >> 7);
+                middle = static_cast<std::uint8_t>((middle << 1) | carry);
+                carry = next;
+                next = static_cast<unsigned>(high >> 7);
+                high = static_cast<std::uint8_t>((high << 1) | carry);
+                carry = next;
+            } else {
+                auto next = static_cast<unsigned>(high & 1u);
+                high = static_cast<std::uint8_t>((high >> 1) | (carry << 7));
+                carry = next;
+                next = static_cast<unsigned>(middle & 1u);
+                middle = static_cast<std::uint8_t>((middle >> 1) | (carry << 7));
+                carry = next;
+                next = static_cast<unsigned>(low & 1u);
+                low = static_cast<std::uint8_t>((low >> 1) | (carry << 7));
+                carry = next;
+            }
+
+            value = (static_cast<std::uint32_t>(high) << 16) |
+                    (static_cast<std::uint32_t>(middle) << 8) | low;
+        }
+
+        return {
+            static_cast<std::uint8_t>(value & 0xffu),
+            static_cast<std::uint8_t>((value >> 8) & 0xffu),
+            static_cast<std::uint8_t>((value >> 16) & 0xffu),
+            value
+        };
+    }
+};
+
 struct MASS1EDDLookupResult {
     bool lookupPerformed = false;
     bool bSignBranch = false;
