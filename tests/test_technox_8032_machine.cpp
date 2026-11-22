@@ -724,12 +724,24 @@ int main(int argc, char** argv) {
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
+        bool sawControlBlockInitD4 = false;
+        bool sawControlBlockInitD5 = false;
+        bool sawControlBlockInitD6 = false;
+        bool sawControlBlockInitD7 = false;
         bool sawVelocityRegisterWrite = false;
         bool sawVelocityRegisterRead = false;
         bool sawLayerCountRead = false;
         const auto midiExternalTraceCount = injectedResponseMachine.externalWindowTraceCount();
         for (std::size_t age = 0; age < midiExternalTraceCount; ++age) {
             const auto& event = injectedResponseMachine.externalWindowTraceAt(age);
+            if (event.address == 0x7bd4u && event.write && event.value == 0x7fu)
+                sawControlBlockInitD4 = true;
+            if (event.address == 0x7bd5u && event.write && event.value == 0x00u)
+                sawControlBlockInitD5 = true;
+            if (event.address == 0x7bd6u && event.write && event.value == 0x00u)
+                sawControlBlockInitD6 = true;
+            if (event.address == 0x7bd7u && event.write && event.value == 0x00u)
+                sawControlBlockInitD7 = true;
             if (event.address == 0x7bd4u && event.write && event.value == 0x40u)
                 sawVelocityRegisterWrite = true;
             if (event.address == 0x7bd4u && !event.write && event.value == 0x40u)
@@ -737,6 +749,10 @@ int main(int argc, char** argv) {
             if (event.address == 0x7bd5u && !event.write && event.value == 0x01u)
                 sawLayerCountRead = true;
         }
+        assert(sawControlBlockInitD4);
+        assert(sawControlBlockInitD5);
+        assert(sawControlBlockInitD6);
+        assert(sawControlBlockInitD7);
         assert(sawVelocityRegisterWrite);
         assert(sawVelocityRegisterRead);
         assert(sawLayerCountRead);
