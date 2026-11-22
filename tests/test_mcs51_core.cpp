@@ -200,6 +200,23 @@ int main() {
     assert(bitCpu.step(bitBus) == MCS51StepResult::executed);
     assert(bitCpu.registers().a == 0x5a);
 
+    // Direct SFR reads/writes are reflected in the CPU's architectural registers.
+    TestBus sfrBus;
+    sfrBus.code[0] = 0x75; sfrBus.code[1] = 0xe0; sfrBus.code[2] = 0x7b; // MOV ACC,#7B
+    sfrBus.code[3] = 0x75; sfrBus.code[4] = 0x82; sfrBus.code[5] = 0x34; // MOV DPL,#34
+    sfrBus.code[6] = 0x75; sfrBus.code[7] = 0x83; sfrBus.code[8] = 0x12; // MOV DPH,#12
+    sfrBus.code[9] = 0x75; sfrBus.code[10] = 0xd0; sfrBus.code[11] = 0x08; // PSW bank 1
+    sfrBus.code[12] = 0x79; sfrBus.code[13] = 0xa6; // MOV R1,#A6 (bank 1)
+    sfrBus.code[14] = 0xe5; sfrBus.code[15] = 0xe0; // MOV A,ACC
+    MCS51Core sfrCpu;
+    for (int i = 0; i < 6; ++i)
+        assert(sfrCpu.step(sfrBus) == MCS51StepResult::executed);
+    assert(sfrCpu.registers().a == 0x7b);
+    assert(sfrCpu.registers().dptr == 0x1234);
+    assert(sfrBus.internal[0x09] == 0xa6);
+    assert(sfrCpu.step(sfrBus) == MCS51StepResult::executed);
+    assert(sfrCpu.registers().a == 0x7b);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
