@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
     assert(machine.soundMemoryWritesByMode(2) == 0x4000u);
     assert(machine.soundMemoryReadsByMode(2) == 0x4000u);
     // The same FF10 address is a sound-device status/data port in other bus modes.
-    machine.writeInternal(0x8e, 0x00);
+    machine.writeInternal(0x8e, 0x01);
     machine.writeExternal(0xff10, 0x5a);
     assert(machine.lastSoundDeviceWrite() == 0x5a);
     assert(machine.readExternal(0xff10) == 0xff);
