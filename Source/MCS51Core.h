@@ -118,15 +118,33 @@ public:
         totalCycles_ = 0;
         interruptDepth_ = 0;
         interruptPriorityStack_ = {};
+        recentInstructionCount_ = 0;
+        recentInstructionPC_.fill(0);
+        recentInstructionOpcode_.fill(0);
     }
 
     const MCS51Registers& registers() const noexcept { return registers_; }
     MCS51Registers& registersForTesting() noexcept { return registers_; }
+    std::size_t recentInstructionCount() const noexcept { return recentInstructionCount_; }
+    std::uint16_t recentInstructionPC(std::size_t age) const noexcept {
+        if (age >= recentInstructionCount_) return 0;
+        const auto index = (recentInstructionCount_ - 1u - age) % recentInstructionPC_.size();
+        return recentInstructionPC_[index];
+    }
+    std::uint8_t recentInstructionOpcode(std::size_t age) const noexcept {
+        if (age >= recentInstructionCount_) return 0;
+        const auto index = (recentInstructionCount_ - 1u - age) % recentInstructionOpcode_.size();
+        return recentInstructionOpcode_[index];
+    }
 
     MCS51StepResult step(MCS51Bus& bus) noexcept {
         if (servicePendingInterrupt(bus))
             return MCS51StepResult::executed;
+        const auto instructionPC = registers_.pc;
         const auto opcode = fetch8(bus);
+        const auto traceIndex = recentInstructionCount_++ % recentInstructionPC_.size();
+        recentInstructionPC_[traceIndex] = instructionPC;
+        recentInstructionOpcode_[traceIndex] = opcode;
         unsigned cycles = 1;
 
         if (opcode == 0x00) { // NOP
@@ -736,6 +754,9 @@ private:
     std::uint64_t totalCycles_ = 0;
     std::array<std::uint8_t, 2> interruptPriorityStack_{};
     std::uint8_t interruptDepth_ = 0;
+    std::array<std::uint16_t, 64> recentInstructionPC_{};
+    std::array<std::uint8_t, 64> recentInstructionOpcode_{};
+    std::size_t recentInstructionCount_ = 0;
 };
 
 } // namespace technox
