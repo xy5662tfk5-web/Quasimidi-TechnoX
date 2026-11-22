@@ -513,7 +513,7 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
             programAndNote.data(), programAndNote.size(), midiStartCycle));
         const auto midiInstructions = injectedResponseMachine.runForMachineCycles(2000000);
-        const auto midiDrainInstructions = injectedResponseMachine.runForMachineCycles(100000u);
+        const auto midiDrainInstructions = injectedResponseMachine.runForMachineCycles(5000000u);
         std::printf("IC4 MIDI Note On diagnostic: instructions=%zu drain=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X ACIAreads=%llu lastRX=%02X RAM49=%02X RAM47=%02X RAM59=%02X RAM5E=%02X X2B8B=%02X X2B8C=%02X X2B8D=%02X X2B8F=%02X X30E4=%02X R53=%02X R56=%02X R29=%02X R2A=%02X R5D=%02X R5E=%02X X2B90=%02X X2B9D=%02X X2B9E=%02X X2B9F=%02X X30E6=%02X X30E8=%02X X304C=%02X X304D=%02X X304E=%02X\\n",
                     midiInstructions, midiDrainInstructions,
                     static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
