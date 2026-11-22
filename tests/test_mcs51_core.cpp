@@ -569,6 +569,27 @@ int main() {
     assert(upperStackCpu.registers().pc == 0x1237);
     assert(upperStackCpu.registers().sp == 0x7f);
 
+    // Read-modify-write operations use the port output latch, while JB reads pins.
+    TestBus portRmwBus;
+    portRmwBus.internal[0x90] = 0xf0; // P1 pin state
+    portRmwBus.portLatches[1] = 0x0f; // P1 output latch
+    portRmwBus.code[0] = 0x53; // ANL P1,#0xF0
+    portRmwBus.code[1] = 0x90;
+    portRmwBus.code[2] = 0xf0;
+    MCS51Core portRmwCpu;
+    assert(portRmwCpu.step(portRmwBus) == MCS51StepResult::executed);
+    assert(portRmwBus.portLatches[1] == 0x00); // latch 0F & F0, not pin F0 & F0
+
+    TestBus portPinBranchBus;
+    portPinBranchBus.internal[0x90] = 0x10; // P1.4 pin high
+    portPinBranchBus.portLatches[1] = 0x00; // output latch low
+    portPinBranchBus.code[0] = 0x20; // JB P1.4,+2
+    portPinBranchBus.code[1] = 0x94;
+    portPinBranchBus.code[2] = 0x02;
+    MCS51Core portPinBranchCpu;
+    assert(portPinBranchCpu.step(portPinBranchBus) == MCS51StepResult::executed);
+    assert(portPinBranchCpu.registers().pc == 0x0005); // branch follows pin, not latch
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
