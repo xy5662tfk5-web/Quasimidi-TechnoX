@@ -126,6 +126,42 @@ int main() {
         if (voice.active && voice.part == 12 && voice.note == 63)
             disabledHoldReleased = voice.releasing && !voice.sustained;
     assert(disabledHoldReleased);
+    // Track Mode 0 mutes the Part; Poly permits overlapping notes; Mono and
+    // Lead retain one active voice per Part by reusing its newest voice slot.
+    BasicMASSVoiceBackend modeBackend;
+    MASSAudioEngine modeEngine(&modeBackend);
+    modeEngine.prepare(48000.0, 128);
+    assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 0));
+    modeEngine.noteOn(12, 1, 60, 100);
+    assert(modeEngine.voiceManager().activeVoiceCount() == 0);
+    assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 1));
+    modeEngine.noteOn(12, 1, 60, 100);
+    modeEngine.noteOn(12, 1, 64, 100);
+    assert(modeEngine.voiceManager().activeVoiceCount() == 2);
+    assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 2));
+    modeEngine.noteOn(12, 1, 67, 100);
+    assert(modeEngine.voiceManager().activeVoiceCount() == 1);
+    bool monoRetainedNewest = false;
+    for (const auto& voice : modeEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12)
+            monoRetainedNewest = voice.note == 67 && !voice.releasing;
+    assert(monoRetainedNewest);
+    modeEngine.noteOff(1, 64); // Previous poly note was replaced; it must not release the new mono note.
+    assert(modeEngine.voiceManager().activeVoiceCount() == 1);
+    modeEngine.noteOff(1, 67);
+    assert(modeEngine.voiceManager().voices()[0].releasing);
+    assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 3));
+    modeEngine.noteOn(12, 1, 69, 100);
+    modeEngine.noteOn(12, 1, 72, 100);
+    assert(modeEngine.voiceManager().activeVoiceCount() == 1);
+    bool leadRetainedNewest = false;
+    for (const auto& voice : modeEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12)
+            leadRetainedNewest = voice.note == 72 && !voice.releasing;
+    assert(leadRetainedNewest);
+    assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 0));
+    assert(modeEngine.voiceManager().activeVoiceCount() == 0);
+
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
     engine.noteOff(1, 48);

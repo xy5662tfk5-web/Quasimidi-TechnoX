@@ -18,6 +18,8 @@ public:
         for (auto& part : values_)
             for (auto& value : part)
                 value.store(0, std::memory_order_relaxed);
+        for (auto& part : values_)
+            part[static_cast<std::size_t>(PartParameter::trackMode)].store(1, std::memory_order_relaxed);
         // Neutral defaults for parameters with signed display offsets.
         for (auto& part : values_) {
             part[static_cast<std::size_t>(PartParameter::transpose)].store(24, std::memory_order_relaxed);
@@ -442,11 +444,36 @@ public:
             noteOff(channel, note);
             return;
         }
-        const int target = voices_.allocationTarget();
+        if (part >= MASSPartParameterStore::kPartCount) return;
+        const int trackMode = partParameters_.get(static_cast<int>(part), PartParameter::trackMode);
+        if (trackMode == 0) return; // Mute
+
+        int preferredVoice = -1;
+        if (trackMode == 2 || trackMode == 3) { // Mono / Lead: one active voice per Part
+            const auto& slots = voices_.voices();
+            std::uint64_t newestAge = 0;
+            for (std::size_t i = 0; i < slots.size(); ++i) {
+                if (slots[i].active && slots[i].part == part && slots[i].age >= newestAge) {
+                    newestAge = slots[i].age;
+                    preferredVoice = static_cast<int>(i);
+                }
+            }
+            // Collapse any older Poly voices for this Part before reusing the newest slot.
+            for (std::size_t i = 0; i < slots.size(); ++i) {
+                if (slots[i].active && slots[i].part == part && static_cast<int>(i) != preferredVoice) {
+                    backend_->resetVoice(static_cast<int>(i), slots[i]);
+                    voices_.finishRelease(i);
+                }
+            }
+            if (preferredVoice >= 0)
+                backend_->resetVoice(preferredVoice, voices_.voices()[static_cast<std::size_t>(preferredVoice)]);
+        }
+
+        const int target = preferredVoice >= 0 ? preferredVoice : voices_.allocationTarget();
         if (target >= 0 && voices_.voices()[static_cast<std::size_t>(target)].active &&
             !voices_.voices()[static_cast<std::size_t>(target)].releasing)
             backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
-        const int voiceIndex = voices_.noteOn(part, channel, note, velocity);
+        const int voiceIndex = voices_.noteOn(part, channel, note, velocity, preferredVoice);
         if (voiceIndex >= 0)
             backend_->noteOn(voiceIndex, voices_.voices()[static_cast<std::size_t>(voiceIndex)]);
     }
@@ -518,6 +545,16 @@ public:
 
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         if (!partParameters_.set(partIndex, parameter, rawValue)) return false;
+        if (parameter == PartParameter::trackMode && rawValue == 0 &&
+            partIndex >= 0 && partIndex < static_cast<int>(MASSPartParameterStore::kPartCount)) {
+            const auto& slots = voices_.voices();
+            for (std::size_t i = 0; i < slots.size(); ++i) {
+                if (slots[i].active && slots[i].part == static_cast<std::uint8_t>(partIndex)) {
+                    backend_->resetVoice(static_cast<int>(i), slots[i]);
+                    voices_.finishRelease(i);
+                }
+            }
+        }
         if (parameter == PartParameter::holdPedal && partIndex >= 0 &&
             partIndex < static_cast<int>(MASSPartParameterStore::kPartCount)) {
             const bool pedalDown = sustainControllerDown_[static_cast<std::size_t>(partIndex)]

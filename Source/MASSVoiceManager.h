@@ -45,14 +45,19 @@ public:
         return selected;
     }
 
-    int noteOn(std::uint8_t part, std::uint8_t channel, std::uint8_t note, std::uint8_t velocity) noexcept {
+    int noteOn(std::uint8_t part, std::uint8_t channel, std::uint8_t note, std::uint8_t velocity,
+               int preferredVoiceIndex = -1) noexcept {
         if (velocity == 0) {
             noteOff(channel, note);
             return -1;
         }
-        int selected = -1;
-        for (std::size_t i = 0; i < voices_.size(); ++i) {
-            if (!voices_[i].active) { selected = static_cast<int>(i); break; }
+        int selected = preferredVoiceIndex >= 0 &&
+            preferredVoiceIndex < static_cast<int>(voices_.size())
+                ? preferredVoiceIndex : -1;
+        if (selected < 0) {
+            for (std::size_t i = 0; i < voices_.size(); ++i) {
+                if (!voices_[i].active) { selected = static_cast<int>(i); break; }
+            }
         }
         if (selected < 0) {
             // Prefer stealing the oldest releasing voice, otherwise the oldest voice.
