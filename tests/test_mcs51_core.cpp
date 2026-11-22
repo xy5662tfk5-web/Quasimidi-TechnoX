@@ -515,6 +515,20 @@ int main() {
     assert(nestedInterruptCpu.registers().pc == 0x4567);
     assert(nestedInterruptCpu.registers().sp == 0x07);
 
+    // Intel 8032 adds Timer 2 at vector 0x002B; TF2/EXF2 remain software-cleared.
+    TestBus timer2InterruptBus;
+    timer2InterruptBus.internal[0xa8] = 0xa0; // EA + ET2
+    timer2InterruptBus.internal[0xb8] = 0x20; // PT2 high priority
+    timer2InterruptBus.internal[0xc8] = 0xc0; // TF2 + EXF2
+    timer2InterruptBus.code[0x002b] = 0x32; // RETI
+    MCS51Core timer2InterruptCpu;
+    timer2InterruptCpu.registersForTesting().pc = 0x2345;
+    assert(timer2InterruptCpu.step(timer2InterruptBus) == MCS51StepResult::executed);
+    assert(timer2InterruptCpu.registers().pc == 0x002b);
+    assert(timer2InterruptBus.internal[0xc8] == 0xc0); // firmware must clear Timer 2 flags
+    assert(timer2InterruptCpu.step(timer2InterruptBus) == MCS51StepResult::executed);
+    assert(timer2InterruptCpu.registers().pc == 0x2345);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
