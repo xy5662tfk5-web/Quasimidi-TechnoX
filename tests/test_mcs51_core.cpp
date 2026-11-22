@@ -110,6 +110,44 @@ int main() {
     assert(flagsCpu.registers().psw.auxiliaryCarry);
     assert(!flagsCpu.registers().psw.overflow);
 
+    // Logical instruction families and accumulator rotates.
+    TestBus logicBus;
+    logicBus.code[0] = 0x74; logicBus.code[1] = 0xf0; // MOV A,#F0
+    logicBus.code[2] = 0x54; logicBus.code[3] = 0x3c; // ANL A,#3C -> 30
+    logicBus.code[4] = 0x44; logicBus.code[5] = 0x05; // ORL A,#05 -> 35
+    logicBus.code[6] = 0x64; logicBus.code[7] = 0x0f; // XRL A,#0F -> 3A
+    logicBus.code[8] = 0x23;                       // RL A -> 74
+    logicBus.code[9] = 0x03;                       // RR A -> 3A
+    logicBus.code[10] = 0xc4;                      // SWAP A -> A3
+    MCS51Core logicCpu;
+    for (int i = 0; i < 7; ++i)
+        assert(logicCpu.step(logicBus) == MCS51StepResult::executed);
+    assert(logicCpu.registers().a == 0xa3);
+
+    TestBus directLogicBus;
+    directLogicBus.internal[0x30] = 0x55;
+    directLogicBus.code[0] = 0x75; directLogicBus.code[1] = 0x30; directLogicBus.code[2] = 0x0f;
+    directLogicBus.code[3] = 0x43; directLogicBus.code[4] = 0x30; directLogicBus.code[5] = 0x80;
+    directLogicBus.code[6] = 0x53; directLogicBus.code[7] = 0x30; directLogicBus.code[8] = 0xf0;
+    MCS51Core directLogicCpu;
+    assert(directLogicCpu.step(directLogicBus) == MCS51StepResult::executed);
+    assert(directLogicCpu.step(directLogicBus) == MCS51StepResult::executed);
+    assert(directLogicCpu.step(directLogicBus) == MCS51StepResult::executed);
+    assert(directLogicBus.internal[0x30] == 0x80);
+
+    TestBus rotateCarryBus;
+    rotateCarryBus.code[0] = 0x74; rotateCarryBus.code[1] = 0x80;
+    rotateCarryBus.code[2] = 0x33; // RLC A: 80 -> 00, carry=1
+    rotateCarryBus.code[3] = 0x13; // RRC A: 00 with carry -> 80, carry=0
+    MCS51Core rotateCarryCpu;
+    assert(rotateCarryCpu.step(rotateCarryBus) == MCS51StepResult::executed);
+    assert(rotateCarryCpu.step(rotateCarryBus) == MCS51StepResult::executed);
+    assert(rotateCarryCpu.registers().a == 0x00);
+    assert(rotateCarryCpu.registers().psw.carry);
+    assert(rotateCarryCpu.step(rotateCarryBus) == MCS51StepResult::executed);
+    assert(rotateCarryCpu.registers().a == 0x80);
+    assert(!rotateCarryCpu.registers().psw.carry);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
