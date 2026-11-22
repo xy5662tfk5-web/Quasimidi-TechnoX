@@ -599,6 +599,56 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.returnPC));
         }
 
+        // Experimental real-IC51 MIDI path: keep the actual resource ROM and
+        // bulk-loaded sound RAM, while providing only the known synthetic
+        // 7BD5 external status byte needed by the current bus fixture.
+        firmwareMachine.enableTestExternalRamWindow7000(0x00u);
+        firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
+        const std::array<std::uint8_t, 5> realRomProgramAndNote{{
+            0xc0u, 0x05u, 0x90u, 0x3cu, 0x64u
+        }};
+        const auto realMidiStart = firmwareMachine.elapsedMachineCycles();
+        const auto realPacketBaseline = firmwareMachine.soundCommandPacketCount();
+        const auto realBurstBaseline = firmwareMachine.sam9407BurstWordCount();
+        const auto realWriterBaseline = firmwareMachine.watchedCallCount(0x0db7u);
+        const auto realIC51Baseline = firmwareMachine.ic51ReadCount();
+        assert(firmwareMachine.scheduleAciaMidiBytes(
+            realRomProgramAndNote.data(), realRomProgramAndNote.size(), realMidiStart));
+        const auto realMidiInstructions = firmwareMachine.runForMachineCycles(2000000u);
+        const auto realMidiDrain = firmwareMachine.runForMachineCycles(5000000u);
+        std::printf("Real IC51 MIDI probe: instructions=%zu drain=%zu PC=%04X "
+                    "newPackets=%zu newBurstWords=%zu new0DB7=%llu newIC51=%llu "
+                    "validACIA=%llu lastRX=%02X\\n",
+                    realMidiInstructions, realMidiDrain,
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
+                    firmwareMachine.soundCommandPacketCount() - realPacketBaseline,
+                    firmwareMachine.sam9407BurstWordCount() - realBurstBaseline,
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0x0db7u) - realWriterBaseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.ic51ReadCount() - realIC51Baseline),
+                    static_cast<unsigned long long>(firmwareMachine.aciaValidReceiveReadCount()),
+                    static_cast<unsigned>(firmwareMachine.lastValidAciaReceiveRead()));
+        assert(!firmwareMachine.cpuFaulted());
+        const auto realPackets = firmwareMachine.soundCommandPacketCount();
+        const auto realBursts = firmwareMachine.sam9407BurstWordCount();
+        for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(i);
+            const auto& word = firmwareMachine.sam9407BurstWordAt(i);
+            std::printf("  real-host[%zu] %02X %02X %02X %02X -> %04X pc=%04X ret=%04X\\n",
+                        i - realPacketBaseline,
+                        static_cast<unsigned>(packet.bytes[0]),
+                        static_cast<unsigned>(packet.bytes[1]),
+                        static_cast<unsigned>(packet.bytes[2]),
+                        static_cast<unsigned>(packet.bytes[3]),
+                        static_cast<unsigned>(word.value),
+                        static_cast<unsigned>(packet.instructionPC),
+                        static_cast<unsigned>(packet.returnPC));
+        }
+        if (realBursts > realBurstBaseline)
+            std::printf("  real burst tail=%04X\\n",
+                        static_cast<unsigned>(firmwareMachine.sam9407BurstWordAt(realBursts - 1u).value));
+
         // Controlled test stimulus only: inject the expected AC signature so
         // the CPU can pass the otherwise-unmodeled external-device wait.
         TechnoX8032Machine injectedResponseMachine;
