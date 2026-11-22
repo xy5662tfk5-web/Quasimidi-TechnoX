@@ -296,6 +296,12 @@ public:
     }
 
     static bool read(const MASSFirmwareROMView& rom,
+                     const MASS1C61SecondaryTableAddress& address,
+                     MASS1C61SecondaryTableBytes& result) noexcept {
+        return read(rom, address.address, result);
+    }
+
+    static bool read(const MASSFirmwareROMView& rom,
                      const MASS1C61SecondaryTableFetchAddress& address,
                      MASS1C61SecondaryTableBytes& result) noexcept {
         return read(rom, address.address, result);

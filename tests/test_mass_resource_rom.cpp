@@ -74,32 +74,30 @@ void testMASS1C61SecondaryTableAddress() {
         0x40f0, 0x20);
     assert(withCarry.address == 0x4110 && withCarry.pageCarry);
 
-    // The reader consumes the adjusted DPTR, then reads the three MOVC lanes.
-    std::vector<std::uint8_t> image(0x20000, 0xff);
-    image[0x4110] = 0x11;
-    image[0x4190] = 0x22;
-    image[0x4210] = 0x33;
-    MASSFirmwareROMView view;
-    assert(view.attach(image.data(), image.size()));
-    MASS1C61SecondaryTableBytes triplet{};
-    MASS1C61SecondaryTableFetchAddress resolved{};
-    assert(MASS1C61SecondaryTableReader::read(
-        view, upper, 0x40, triplet, &resolved));
-    assert(resolved.address == 0x4210 && resolved.pageCarry);
-    assert((triplet.bytes == std::array<std::uint8_t, 3>{{0x33, 0xff, 0xff}}));
-
+    // One synthetic code ROM backs both the base-DPTR and adjusted-DPTR reads.
     std::vector<std::uint8_t> image(0x20000, 0xff);
     image[0x4050] = 0x12;
     image[0x40d0] = 0x34;
     image[0x4150] = 0x56;
+    image[0x4210] = 0x33;
+    image[0x4290] = 0x44;
+    image[0x4310] = 0x55;
     MASSFirmwareROMView view;
     assert(view.attach(image.data(), image.size()));
+
     MASS1C61SecondaryTableBytes bytes{};
     assert(MASS1C61SecondaryTableReader::read(view, normal, bytes));
     assert((bytes.bytes == std::array<std::uint8_t, 3>{{0x12, 0x34, 0x56}}));
     const auto fields = MASS1C61PackedLookupDecoder::decode(bytes);
     assert(fields.r5 == 0x12 && fields.r6 == 0x34 && fields.r7 == 0x56);
     assert(fields.r3 == 0x82 && fields.r4 == 0xce);
+
+    MASS1C61SecondaryTableBytes triplet{};
+    MASS1C61SecondaryTableFetchAddress resolved{};
+    assert(MASS1C61SecondaryTableReader::read(
+        view, upper, 0x40, triplet, &resolved));
+    assert(resolved.address == 0x4210 && resolved.pageCarry);
+    assert((triplet.bytes == std::array<std::uint8_t, 3>{{0x33, 0x44, 0x55}}));
 }
 
 void testMASS1C61InterpolationLookup() {
