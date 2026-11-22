@@ -21,6 +21,35 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testMASS1EDDLookupIndexBuilder() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    for (std::size_t i = 0; i < 128; ++i)
+        romBytes[0x1288 + i] = static_cast<std::uint8_t>(i);
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASS1EDDLookupResult result{};
+    // B=RL(0x21)=0x42, ordinary path: (~high(MUL))>>1 = 0x6C.
+    assert(MASS1EDDLookupIndexBuilder::build(view, 0x12, 0x35, 0x21, result));
+    assert(result.lookupPerformed && !result.bSignBranch);
+    assert(result.productHighByte == 0x26 && result.tableIndex == 0x6c);
+    assert(result.curveValue == 0x6c);
+
+    // Opcode.6 selects complemented RAM[0x30] when opcode.0 is clear.
+    assert(MASS1EDDLookupIndexBuilder::build(view, 0x52, 0x81, 0x41, result));
+    assert(result.lookupPerformed && result.bSignBranch);
+    assert(result.productHighByte == 0x7f && result.tableIndex == 0x7f);
+
+    // Sign branch with a non-saturating high byte returns B directly.
+    assert(MASS1EDDLookupIndexBuilder::build(view, 0x02, 0x12, 0x40, result));
+    assert(result.bSignBranch && result.productHighByte == 0x12);
+    assert(result.tableIndex == 0x12);
+
+    // R4=0 is an early alternate path and must not access 0x1288.
+    assert(MASS1EDDLookupIndexBuilder::build(view, 0x12, 0x35, 0x00, result));
+    assert(!result.lookupPerformed);
+}
+
 void testMASS2381AddressBuilder() {
     const auto low = MASS2381AddressBuilder::resolve(0x1200, 0x03, 0x20);
     assert(low.selector == 3 && low.offset == 0x0a && low.address == 0x129a);
@@ -597,6 +626,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASS1EDDLookupIndexBuilder();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
     testMASS1848Arithmetic();

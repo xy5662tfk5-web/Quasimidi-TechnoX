@@ -78,6 +78,77 @@ private:
     std::size_t imageSize_ = 0;
 };
 
+struct MASS1EDDLookupResult {
+    bool lookupPerformed = false;
+    bool bSignBranch = false;
+    std::uint8_t productHighByte = 0;
+    std::uint8_t tableIndex = 0;
+    std::uint8_t curveValue = 0;
+};
+
+// Reconstructs IC4 0x1EDD arithmetic from 0x1F4A through the first MOVC at
+// 0x1F6C. This is the exact first-stage table index only; later 0x1308 gating
+// also depends on RAM[0x3F], RAM[0x40], and opcode bits.
+class MASS1EDDLookupIndexBuilder {
+public:
+    static bool build(const MASSFirmwareROMView& rom,
+                      std::uint8_t opcode,
+                      std::uint8_t ram30,
+                      std::uint8_t r4,
+                      MASS1EDDLookupResult& result) noexcept {
+        MASS1EDDLookupResult decoded{};
+        if (r4 == 0) {
+            result = decoded; // firmware substitutes R4=0xFF and skips this lookup
+            return true;
+        }
+
+        const auto b = rotateLeft(r4); // MOV F0, RL R4
+        const bool bSignBranch = (b & 0x80u) != 0;
+
+        // JB ACC.0 or JNB ACC.6: use RAM[0x30] directly except when
+        // opcode bit0 is clear and opcode bit6 is set.
+        const auto source = ((opcode & 0x01u) != 0 || (opcode & 0x40u) == 0)
+            ? ram30 : static_cast<std::uint8_t>(~ram30);
+        auto a = rotateLeft(source);
+
+        // The ordinary B.7-clear path complements A before MUL AB.
+        if (!bSignBranch)
+            a = static_cast<std::uint8_t>(~a);
+
+        const auto product = static_cast<std::uint16_t>(a) * b;
+        const auto high = static_cast<std::uint8_t>(product >> 8);
+        std::uint8_t index = 0;
+
+        if (bSignBranch) {
+            // MUL AB, JB B.7: high product sign bit saturates to A=FF;
+            // otherwise RL B followed by CLR C/RRC returns the high byte.
+            index = (high & 0x80u) != 0 ? 0x7fu : high;
+        } else {
+            // MOV A,B; RL A; CPL A; CLR C; RRC A == (~high) >> 1.
+            index = static_cast<std::uint8_t>(
+                static_cast<std::uint8_t>(~high) >> 1);
+        }
+
+        std::uint8_t curve = 0;
+        if (!rom.read(MASSFirmwareLookupTable::nonlinearScale1288,
+                      index, curve))
+            return false;
+
+        decoded.lookupPerformed = true;
+        decoded.bSignBranch = bSignBranch;
+        decoded.productHighByte = high;
+        decoded.tableIndex = index;
+        decoded.curveValue = curve;
+        result = decoded;
+        return true;
+    }
+
+private:
+    static constexpr std::uint8_t rotateLeft(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>((value << 1) | (value >> 7));
+    }
+};
+
 struct MASS2381AddressResult {
     std::uint16_t address = 0;
     std::uint8_t selector = 0;
