@@ -78,6 +78,38 @@ int main() {
     assert(exec.registers().pc == 7);
     assert(exec.totalCycles() == 6);
 
+    // Indirect addressing, register arithmetic and conditional branch coverage.
+    TestBus addressingBus;
+    addressingBus.code[0] = 0x79; addressingBus.code[1] = 0x40; // MOV R1,#40
+    addressingBus.code[2] = 0x77; addressingBus.code[3] = 0x10; // MOV @R1,#10
+    addressingBus.code[4] = 0xe7;                               // MOV A,@R1
+    addressingBus.code[5] = 0x29;                               // ADD A,R1
+    addressingBus.code[6] = 0x94; addressingBus.code[7] = 0x10; // SUBB A,#10
+    addressingBus.code[8] = 0x70; addressingBus.code[9] = 0x02; // JNZ +2
+    addressingBus.code[10] = 0x74; addressingBus.code[11] = 0xff;
+    addressingBus.code[12] = 0x74; addressingBus.code[13] = 0x55;
+    MCS51Core addressingCpu;
+    for (int i = 0; i < 7; ++i)
+        assert(addressingCpu.step(addressingBus) == MCS51StepResult::executed);
+    assert(addressingBus.internal[0x40] == 0x10);
+    assert(addressingCpu.registers().a == 0x40);
+    assert(addressingCpu.step(addressingBus) == MCS51StepResult::executed);
+    assert(addressingCpu.registers().pc == 12);
+    assert(addressingCpu.step(addressingBus) == MCS51StepResult::executed);
+    assert(addressingCpu.registers().a == 0x55);
+
+    // Carry, auxiliary carry and overflow are independently derived by ADD.
+    TestBus flagsBus;
+    flagsBus.code[0] = 0x74; flagsBus.code[1] = 0xff; // MOV A,#FF
+    flagsBus.code[2] = 0x24; flagsBus.code[3] = 0x01; // ADD A,#01
+    MCS51Core flagsCpu;
+    assert(flagsCpu.step(flagsBus) == MCS51StepResult::executed);
+    assert(flagsCpu.step(flagsBus) == MCS51StepResult::executed);
+    assert(flagsCpu.registers().a == 0x00);
+    assert(flagsCpu.registers().psw.carry);
+    assert(flagsCpu.registers().psw.auxiliaryCarry);
+    assert(!flagsCpu.registers().psw.overflow);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
