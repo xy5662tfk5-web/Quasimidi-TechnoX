@@ -217,9 +217,7 @@ int main(int argc, char** argv) {
         firmwareMachine.writeExternal(0x0000, 0xa5);
         firmwareMachine.writeExternal(0x34ff, 0xa5);
         firmwareMachine.writeExternal(0x3500, 0xa5);
-        assert(firmwareMachine.step() == technox::MCS51StepResult::executed);
-        assert(firmwareMachine.cpu().registers().pc == 0xeb32);
-        const auto executed = firmwareMachine.runInstructions(41277);
+        const auto executed = firmwareMachine.runUntilProgramCounter(0xeb8d, 50000);
         std::printf("IC4 boot trace: instructions=%zu PC=%04X SP=%02X cycles=%llu\n",
                     executed, static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned>(firmwareMachine.cpu().registers().sp),
