@@ -20,6 +20,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test lossless MIDI/SysEx parser
         run: python3 -m unittest discover -s tests -v
+      - name: Compile and test MCS-51 CPU core (C++17)
+        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_mcs51_core.cpp -o /tmp/test_mcs51_core && /tmp/test_mcs51_core
       - name: Compile and test MIDI control router (C++17)
         if: hashFiles('tests/test_midi_controller.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_midi_controller.cpp -o /tmp/test_midi_controller && /tmp/test_midi_controller
