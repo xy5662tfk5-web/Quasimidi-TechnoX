@@ -405,9 +405,9 @@ int main(int argc, char** argv) {
         assert(executed == 41278);
         assert(firmwareMachine.cpu().registers().pc == 0xeb8d);
         assert(firmwareMachine.cpu().registers().sp == 0xb5);
-        assert(firmwareMachine.readExternal(0x0000) == 0x00);
-        assert(firmwareMachine.readExternal(0x34ff) == 0x00);
-        assert(firmwareMachine.readExternal(0x3500) == 0xa5);
+        assert(firmwareMachine.xdataByteForTesting(0x0000) == 0x00);
+        assert(firmwareMachine.xdataByteForTesting(0x34ff) == 0x00);
+        assert(firmwareMachine.xdataByteForTesting(0x3500) == 0xa5);
 
         const auto resourceInit = firmwareMachine.runUntilProgramCounter(0x326a, 50000);
         std::printf("IC4 resource-table handoff: instructions=%zu PC=%04X\\n",
