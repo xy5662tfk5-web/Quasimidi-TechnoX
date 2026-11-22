@@ -911,6 +911,14 @@ void testActualIC51(const char* path) {
         {{{159, 46, 51}, {165, 38, 53}}}, // bank 0: flag clear, then set
         {{{124, 55, 77}, {135, 60, 61}}}  // bank 1: flag clear, then set
     }};
+    // Counts of real IC51 group-0x10 commands with nonzero byte +1,
+    // bucketed by (opcode & 0x41): 0x00, 0x01, 0x40, 0x41.
+    // These prove that all three 0x23C7 paths occur in factory resources.
+    const std::array<std::array<std::size_t, 4>, 2> expectedModulationBranches{{
+        {{55, 48, 72, 83}}, // flag 0x0A clear
+        {{75, 42, 66, 82}}  // flag 0x0A set
+    }};
+    std::array<std::array<std::size_t, 4>, 2> modulationBranchCounts{};
 
     for (const auto bank : {MASSResourceBank::bank0, MASSResourceBank::bank1}) {
         std::set<std::uint16_t> pointers;
@@ -934,6 +942,21 @@ void testActualIC51(const char* path) {
                     bankData, MASSResourceROM::kBankSize,
                     descriptor.commandStreamPointer, decoded, flagIndex != 0));
                 assert(!decoded.truncated);
+                for (const auto& command : decoded.commands) {
+                    if (command.kind != MASSResourceCommandKind::multiParameter ||
+                        command.bytes[1] == 0)
+                        continue;
+                    const auto mask = static_cast<std::uint8_t>(command.opcode & 0x41u);
+                    std::size_t bucket = 0;
+                    switch (mask) {
+                        case 0x00: bucket = 0; break;
+                        case 0x01: bucket = 1; break;
+                        case 0x40: bucket = 2; break;
+                        case 0x41: bucket = 3; break;
+                        default: assert(false && "unexpected 0x23C7 mask");
+                    }
+                    ++modulationBranchCounts[flagIndex][bucket];
+                }
                 if (decoded.endedByControlCommand) {
                     ++endStates[flagIndex][0];
                     if (!flagIndex) {
@@ -952,6 +975,7 @@ void testActualIC51(const char* path) {
         assert(pointers.size() == MASSResourceROM::kPointerCount);
         assert(endStates == expectedEndStates[bankNumber]);
     }
+    assert(modulationBranchCounts == expectedModulationBranches);
 }
 }
 
