@@ -187,7 +187,8 @@ public:
             return xdata_[address];
 
         switch (address) {
-            case 0xa002: return aciaStatus_;
+            case 0xa002: return (aciaControl_ & 0x03u) == 0x03u
+                ? static_cast<std::uint8_t>(aciaStatus_ & ~0x02u) : aciaStatus_;
             case 0xa003: {
                 const auto value = aciaReceive_;
                 aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ & ~0x21u); // clear RDRF/OVRN
@@ -223,8 +224,11 @@ public:
         switch (address) {
             case 0xa000:
                 aciaControl_ = value;
-                if ((value & 0x03u) == 0x03u)
-                    aciaStatus_ = 0x02;
+                if ((value & 0x03u) == 0x03u) {
+                    aciaStatus_ = 0x02; // master reset; TDRE is masked on status reads
+                    aciaReceive_ = 0;
+                    aciaTransmitPending_ = false;
+                }
                 refreshAciaInterrupt();
                 break;
             case 0xa001:
@@ -252,6 +256,10 @@ public:
     }
 
     void injectAciaReceiveByte(std::uint8_t value) noexcept {
+        // The firmware selects the ACIA's divide-by-64 mode (CR1:CR0=10),
+        // which matches the 31.25 kbaud MIDI stream on the inferred 2 MHz clock.
+        if ((aciaControl_ & 0x03u) != 0x02u)
+            return;
         if ((aciaStatus_ & 0x01u) != 0)
             aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ | 0x20u); // overrun
         else
@@ -337,7 +345,8 @@ private:
 
     void refreshAciaInterrupt() noexcept {
         // ACIA IRQ is wired to the 8032 INT1 input in the published MAME map.
-        const bool irqActive = (aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0;
+        const bool irqActive = (aciaControl_ & 0x03u) != 0x03u &&
+            (aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0;
         if (irqActive)
             portPins_[3] = static_cast<std::uint8_t>(portPins_[3] & ~0x08u); // INT1 active low
         else
