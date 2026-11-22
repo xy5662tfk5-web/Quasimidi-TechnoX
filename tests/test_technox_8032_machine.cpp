@@ -588,6 +588,18 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        const auto portReads = injectedResponseMachine.portReadCount();
+        std::printf("IC4 GPIO input samples (newest first):\\n");
+        std::size_t gpioReadEvents = 0;
+        for (std::size_t readAge = 0; readAge < portReads && gpioReadEvents < 64u; ++readAge) {
+            const auto& event = injectedResponseMachine.portReadAt(portReads - 1u - readAge);
+            if (event.port != 1u && event.port != 3u) continue;
+            ++gpioReadEvents;
+            std::printf("  P%u=%02X cycle=%llu\\n",
+                        static_cast<unsigned>(event.port),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto& midiCpu = injectedResponseMachine.cpu();
         std::printf("Recent IC4 instructions (newest first):\\n");
         for (std::size_t traceAge = 0; traceAge < 24u &&
