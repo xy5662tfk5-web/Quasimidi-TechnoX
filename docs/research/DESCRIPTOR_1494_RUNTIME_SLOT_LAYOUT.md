@@ -88,3 +88,32 @@ Not confirmed:
 3. Correlate `RAM[0x28]` modes and slot offsets with the four event IDs 12–15.
 4. Trace the values returned by `0x189D` and the status byte at `0xFD`.
 5. Only after the slot structure is identified should the host-side firmware transaction model be promoted from protocol reconstruction to an audio command interface.
+
+## 7. A second 16 × 128-byte table is read by 0x189D
+
+The disassembly of `0x189D` reveals a second mode-indexed region, distinct from the `0x2068` slot region:
+
+```
+metadata_base = 0x2868 + 0x80 * RAM[0x28]
+```
+
+It reads four bytes from this region at offsets:
+
+- `+0x00` → direct RAM `0x41`
+- `+0x10` → direct RAM `0x43`
+- `+0x20` → register `R3`
+- `+0x40` → register `R4`
+
+It then switches DPTR to the 16-bit pointer in `RAM[0x36:0x37]`, conditionally toggles internal flags B5/B4/B1, and reads a variable record into direct RAM `0x38–0x3A`. The exact number/meaning of fields depends on the branch and subsequent continuation; the observed reads do not justify naming these bytes as audio parameters.
+
+The arithmetic gives a second set of 16 possible 128-byte records spanning `0x2868–0x3067`. This is adjacent to, but does not overlap, the first mode-indexed region `0x2068–0x2867`.
+
+**Important:** both regions are addressed by the same mode byte, but their roles are not yet identified. The strongest safe description is a pair of parallel mode-indexed 16 × 128-byte structures: one selected during descriptor construction and one consulted by the downstream record-staging routine.
+
+## 8. Updated next analysis
+
+1. Enumerate all writes to `0x2068–0x2867` and `0x2868–0x3067`, including indirect page/R0/R1 accesses.
+2. Determine whether the paired structures are initialized together or populated by different subsystems.
+3. Trace the `RAM[0x36:0x37]` pointer source and the bytes copied to `RAM[0x38–0x3A]`.
+4. Compare modes and pointers used by the Note On callers with the four event IDs 12–15.
+5. Keep the interpretation as structured resource/transaction state until hardware or audio-capture evidence identifies its role.
