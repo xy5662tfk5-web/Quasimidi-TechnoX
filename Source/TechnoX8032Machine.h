@@ -25,7 +25,7 @@ constexpr std::uint16_t externalAudioRegisterAddress(ExternalAudioRegister reg) 
     return static_cast<std::uint16_t>(0x8000u + static_cast<std::uint8_t>(reg));
 }
 
-static_assert(soundHostAddress(ExternalAudioRegister::register3) == 0x8003u,
+static_assert(externalAudioRegisterAddress(ExternalAudioRegister::register3) == 0x8003u,
               "Observed external register window ends at offset 3");
 
 class TechnoX8032Machine final : public MCS51Bus {
@@ -496,7 +496,7 @@ public:
             std::uint8_t value = commandPort_[index];
             if (index == static_cast<std::size_t>(ExternalAudioRegister::register2))
                 value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] & 0xffu);
-            else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataHigh))
+            else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3))
                 value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] >> 8u);
             auto& event = soundHostReadTrace_[
                 soundHostReadCount_ % soundHostReadTrace_.size()];
@@ -638,10 +638,10 @@ public:
                 // IC4 writes this register before the following register accesses.
                 // Preserve the observed ordering without assigning semantics.
                 soundHostCommandLatch_ = value;
-            } else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataLow)) {
+            } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register2)) {
                 auto& word = soundHostWords_[soundHostCommandLatch_];
                 word = static_cast<std::uint16_t>((word & 0xff00u) | value);
-            } else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataHigh)) {
+            } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3)) {
                 auto& word = soundHostWords_[soundHostCommandLatch_];
                 word = static_cast<std::uint16_t>((word & 0x00ffu) |
                     (static_cast<std::uint16_t>(value) << 8u));
@@ -657,18 +657,18 @@ public:
 
             // Only a contiguous 0,1,2,3 sequence is captured as a complete
             // four-register transaction. Other writes remain individual events.
-            if (index == static_cast<std::size_t>(soundHostRegister::Mpu401Data)) {
+            if (index == static_cast<std::size_t>(ExternalAudioRegister::register0)) {
                 soundHostTransactionBytes_[0] = value;
                 soundHostExpectedRegister_ = 1;
                 soundHostTransactionActive_ = true;
             } else if (soundHostTransactionActive_ && index == soundHostExpectedRegister_) {
                 soundHostTransactionBytes_[index] = value;
                 ++soundHostExpectedRegister_;
-                if (index == static_cast<std::size_t>(soundHostRegister::BurstDataLow)) {
+                if (index == static_cast<std::size_t>(ExternalAudioRegister::register2)) {
                     soundHostBurstLowByte_ = value;
                     soundHostBurstLowInstructionPC_ = instructionPC;
                     soundHostBurstLowPending_ = true;
-                } else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataHigh)) {
+                } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3)) {
                     if (soundHostBurstLowPending_) {
                         auto& word = soundHostBurstWordTrace_[
                             soundHostBurstWordCount_ % soundHostBurstWordTrace_.size()];
@@ -703,9 +703,9 @@ public:
                 soundHostExpectedRegister_ = 0;
                 soundHostBurstLowPending_ = false;
             }
-            if (index != static_cast<std::size_t>(soundHostRegister::BurstDataHigh))
+            if (index != static_cast<std::size_t>(ExternalAudioRegister::register3))
                 soundHostBurstLowPending_ = index == static_cast<std::size_t>(
-                    soundHostRegister::BurstDataLow);
+                    ExternalAudioRegister::register2);
             return;
         }
 
