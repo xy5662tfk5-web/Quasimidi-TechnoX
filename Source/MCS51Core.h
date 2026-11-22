@@ -412,7 +412,7 @@ private:
         const auto address = bitAddressToByte(bitAddress);
         const auto mask = static_cast<std::uint8_t>(1u << bitAddressToBit(bitAddress));
         const auto current = readDirect(bus, address);
-        bus.writeInternal(address, value ? static_cast<std::uint8_t>(current | mask)
+        writeDirect(bus, address, value ? static_cast<std::uint8_t>(current | mask)
                                          : static_cast<std::uint8_t>(current & static_cast<std::uint8_t>(~mask)));
     }
 
