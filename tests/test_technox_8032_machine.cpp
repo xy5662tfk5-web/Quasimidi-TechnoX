@@ -794,8 +794,9 @@ int main(int argc, char** argv) {
                     firstNewCommand, commandCount);
         for (auto commandIndex = firstNewCommand; commandIndex < commandCount; ++commandIndex) {
             const auto& packet = injectedResponseMachine.soundCommandPacketAt(commandIndex);
-            std::printf("  MIDI-CMD[%zu] cycle=%llu %02X %02X %02X %02X\\n",
+            std::printf("  MIDI-CMD[%zu] pc=%04X cycle=%llu %02X %02X %02X %02X\\n",
                         commandIndex,
+                        static_cast<unsigned>(packet.instructionPC),
                         static_cast<unsigned long long>(packet.machineCycle),
                         static_cast<unsigned>(packet.bytes[0]),
                         static_cast<unsigned>(packet.bytes[1]),
