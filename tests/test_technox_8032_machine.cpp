@@ -460,7 +460,6 @@ int main(int argc, char** argv) {
         // Experimental fixture only: writable 7xxx window plus a controlled
         // 7BD5 status response. This proves the firmware path, not real hardware semantics.
         injectedResponseMachine.enableTestExternalRamWindow7000(0x00);
-        injectedResponseMachine.setTestExternalReadOverride(0x7bd5, 0x01);
         injectedResponseMachine.writeExternal(0x0000, 0xa5);
         injectedResponseMachine.writeExternal(0x34ff, 0xa5);
         injectedResponseMachine.writeExternal(0x3500, 0xa5);
@@ -730,6 +729,16 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.watchedCallCount(0x0db7) > commandWriterCallsBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
+        std::printf("7BD0-7BD7 external-window trace (newest first):\\n");
+        const auto externalTraceCount = injectedResponseMachine.externalWindowTraceCount();
+        for (std::size_t age = 0; age < externalTraceCount && age < 64u; ++age) {
+            const auto& event = injectedResponseMachine.externalWindowTraceAt(externalTraceCount - 1u - age);
+            std::printf("  %c %04X=%02X cycle=%llu\\n",
+                        event.write ? 'W' : 'R',
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         std::printf("Experimental 7B00-7FFF RAM image (16 bytes per row):\\n");
         for (std::uint32_t base = 0x7b00u; base < 0x8000u; base += 16u) {
             std::printf("  %04X:", base);
