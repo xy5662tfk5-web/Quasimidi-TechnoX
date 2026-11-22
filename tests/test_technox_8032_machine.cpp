@@ -245,6 +245,20 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.readCode(0x0000) == 0x02); // LJMP reset vector
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
         assert(firmwareMachine.readCode(0x0002) == 0x32);
+
+        // AEDD maps every logical low-byte address through the 256-byte
+        // firmware table at ADDD before each external sound-memory write.
+        std::array<bool, 256> mappedAddressSeen{};
+        assert(firmwareMachine.readCode(0xaddd) == 0x04);
+        assert(firmwareMachine.readCode(0xadde) == 0x25);
+        assert(firmwareMachine.readCode(0xaddf) == 0x16);
+        assert(firmwareMachine.readCode(0xade0) == 0x37);
+        for (unsigned i = 0; i < 256; ++i) {
+            const auto mapped = firmwareMachine.readCode(
+                static_cast<std::uint16_t>(0xadddu + i));
+            assert(!mappedAddressSeen[mapped]);
+            mappedAddressSeen[mapped] = true;
+        }
         firmwareMachine.reset();
         // The reset vector is a two-machine-cycle LJMP to EB32. A budget of
         // one cycle must finish that instruction rather than split it.
