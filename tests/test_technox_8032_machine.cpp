@@ -732,10 +732,11 @@ int main(int argc, char** argv) {
         assert(commandCount > commandCountBeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x0db7) > commandWriterCallsBeforeMidi);
 
-        // The captured firmware burst has two distinct 256-write sweeps from
-        // the LCALL at 0x0E67 (return 0x0E6A), followed by two 16-write
-        // sequences from the LCALL at 0x0E1A (return 0x0E1D). Keep these
-        // caller/shape relationships under regression without assigning
+        // The captured firmware burst has two 256-write sweeps from
+        // the LCALL at 0x0E67 (return 0x0E6A), followed by one 32-iteration
+        // pass through 0x0DF7. Its 0x0E1A packet writes appear as two groups
+        // of 16, separated by a 0x0DE4 control-port write at the midpoint.
+        // Keep caller/shape relationships under regression without assigning
         // undocumented hardware meanings to the payload bytes.
         assert(commandCountBeforeMidi == 548u);
         assert(commandCount - commandCountBeforeMidi == 553u);
