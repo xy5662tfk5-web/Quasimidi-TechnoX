@@ -275,10 +275,10 @@ public:
         auto arrival = std::max({firstArrivalCycle, nextAciaReceiveCycle_, elapsedMachineCycles_});
         const auto spacing = midiByteMachineCycles();
         for (std::size_t i = 0; i < size; ++i) {
+            arrival += spacing; // RDRF is asserted when the full 10-bit frame arrives
             scheduledAciaBytes_[scheduledAciaTail_] = {arrival, bytes[i]};
             scheduledAciaTail_ = (scheduledAciaTail_ + 1u) % scheduledAciaBytes_.size();
             ++scheduledAciaCount_;
-            arrival += spacing;
         }
         nextAciaReceiveCycle_ = arrival;
         return true;
