@@ -219,8 +219,11 @@ public:
         if (address == 0xff10u)
             return soundDeviceResponse_; // unknown until the external device is modeled
         if (isXdataRam(address)) {
-            if (address >= 0xc000u)
+            if (address >= 0xc000u) {
                 ++soundMemoryReadCount_;
+                const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
+                ++soundMemoryReadsByMode_[mode];
+            }
             return xdata_[address];
         }
 
@@ -248,6 +251,8 @@ public:
             xdata_[address] = value;
             if (address >= 0xc000u) {
                 ++soundMemoryWriteCount_;
+                const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
+                ++soundMemoryWritesByMode_[mode];
                 lastSoundMemoryWriteAddress_ = address;
                 lastSoundMemoryWriteValue_ = value;
             }
@@ -348,6 +353,13 @@ public:
     std::uint64_t p35TransitionCount() const noexcept { return p35TransitionCount_; }
     std::uint16_t lastSoundMemoryWriteAddress() const noexcept { return lastSoundMemoryWriteAddress_; }
     std::uint8_t lastSoundMemoryWriteValue() const noexcept { return lastSoundMemoryWriteValue_; }
+    std::uint8_t externalSoundBusMode() const noexcept { return internal_[0x8e]; }
+    std::uint64_t soundMemoryReadsByMode(std::size_t mode) const noexcept {
+        return mode < soundMemoryReadsByMode_.size() ? soundMemoryReadsByMode_[mode] : 0;
+    }
+    std::uint64_t soundMemoryWritesByMode(std::size_t mode) const noexcept {
+        return mode < soundMemoryWritesByMode_.size() ? soundMemoryWritesByMode_[mode] : 0;
+    }
     void setSoundDeviceResponseForTesting(std::uint8_t value) noexcept {
         soundDeviceResponse_ = value;
     }
@@ -432,6 +444,8 @@ private:
     std::uint64_t p35TransitionCount_ = 0;
     std::uint16_t lastSoundMemoryWriteAddress_ = 0;
     std::uint8_t lastSoundMemoryWriteValue_ = 0;
+    std::array<std::uint64_t, 4> soundMemoryReadsByMode_{};
+    std::array<std::uint64_t, 4> soundMemoryWritesByMode_{};
     bool cpuFaulted_ = false;
     bool romLoaded_ = false;
 };
