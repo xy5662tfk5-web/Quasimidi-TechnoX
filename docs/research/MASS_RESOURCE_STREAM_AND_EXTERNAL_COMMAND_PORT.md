@@ -1,0 +1,132 @@
+# M.A.S.S. Resource-Stream Interpreter and External Command Interface
+
+## Scope
+
+This note records firmware behavior established from the descrambled IC4 v1.05 image and the targeted disassembly of indirect command handlers. It identifies the resource-pointer path, command-stream bytecode, pitch-related arithmetic, and the external four-byte command port.
+
+It does **not** identify the external sound-device IC, decode the full resource memory, or reconstruct the M.A.S.S. sample/oscillator algorithm. The addresses below are firmware/XDATA addresses, not asserted physical chip pins unless stated.
+
+## 1. Resource pointer construction
+
+### Normal Part path: `0x418E`
+
+For the normal branch (Part index other than the special index 9), `0x418E` receives:
+
+- `R7`: runtime Part index
+- `R5`: Part parameter, saved in `RAM[0x6F]` and clamped to `0..3`
+- `R3`: resource sub-index, saved in `RAM[0x70]`
+
+The routine performs two related lookups:
+
+1. It reads `0x5C3D + RAM[0x6F]` from code ROM. The first four bytes are `07 07 06 06`. This value is written to descriptor byte `+9` at `0x2909 + 12*PartIndex`.
+2. It forms a 256-entry pointer-table index:
+   `index = RAM[0x70] + 0x80 * (RAM[0x6F] & 1)`.
+   The code extracts parameter bit 0 into bit 7, then adds `RAM[0x70]`.
+
+### Bank selection and pointer read: `0xB3BC`
+
+`0xB3BC` receives the pointer-table index in `R7` and the bank mask in `R5`:
+
+- `R5` is loaded from descriptor byte `+9`.
+- `B385` tests bits 0, 1, and 2 of A (=R5), clearing P3.5, P3.4, and P3.1 respectively. These are active-low external control lines from the DS5002FP.
+- With those lines asserted, `B3BC` reads two bytes from XDATA address `2*index` and `2*index+1`.
+- The low byte returns in `R6`, the high byte in `R7`.
+- `B395` restores P3.5, P3.4, and P3.1 high after the read.
+
+Thus the normal path uses a 256-entry, two-byte pointer table in a bank-selected XDATA window. The mask values for Part parameters 0..3 are `07, 07, 06, 06`. The special Part-index-9 branch follows a different path and is not covered by this formula.
+
+### Descriptor hand-off
+
+`0x418E` writes the returned pointer to descriptor bytes `+5/+6`:
+
+- `+5`: pointer low byte (`R6`)
+- `+6`: pointer high byte (`R7`)
+
+`0x1494` reads the 13-byte descriptor. It loads byte `+5` into `RAM[0x37]` and byte `+6` into `RAM[0x36]`, forming the 16-bit stream pointer `RAM[0x36]:RAM[0x37]`. Descriptor byte `+10` bits 0..2 are copied into internal flags 0..2; the firmware's external-memory helpers use these flags when controlling the same P3 lines during subsequent accesses.
+
+This establishes the chain:
+
+`Part parameter -> 0x5C3D bank mask + pointer-table index -> banked XDATA pointer -> descriptor +5/+6 -> 0x1494 -> 0x189D`.
+
+## 2. Command-stream interpreter
+
+`0x189D` uses the descriptor pointer and the per-mode metadata table at `0x2868 + 0x80*mode`. The command interpreter is reached through the indirect dispatch at `0x19BD`.
+
+### Stream control bytes
+
+- `0xFF` is the stream terminator.
+- If `(byte & 0x38) == 0x38`, the byte follows the marker path: the stream pointer advances and the current output-window index advances. It is not dispatched through the handler table.
+- Other bytes are dispatched using `(byte & 0x38) >> 1` into the table at `0x1BC3`.
+
+The dispatch table contains eight four-byte entries (an `LJMP` plus padding):
+
+| Masked group | Handler | Observed behavior |
+|---|---:|---|
+| `0x00` | `0x1C2B` | One-byte advance; its bit-3 conditional is not taken for this dispatch group |
+| `0x08` | `0x1C61` | Seven-byte parameter record; fixed-point scaling and interpolation |
+| `0x10` | `0x1EDD` | Seven-byte active record; if its second byte is zero, skips the remaining record bytes |
+| `0x18` | `0x224C` | Four-byte command record |
+| `0x20` | `0x2301` | Command byte plus three payload bytes |
+| `0x28..0x37` | `0x2374` | One-byte advance |
+
+The interpreter initializes a 16-iteration counter (`RAM[0x2C] = 0x10`). It derives the current high-XDATA window as:
+
+`RAM[0x2E] = 0x80 + 8 * (RAM[0x2B] & 0x0F)`
+
+After each slot, it increments `RAM[0x2E]` by 8 and `RAM[0x2B]` by 1. This selects 16 high-XDATA windows spaced by `0x0800` (page values `0x80, 0x88, ... 0xF8`). Their exact physical ownership—Part, command slot, or another hardware resource—remains unproven.
+
+## 3. Pitch and parameter arithmetic
+
+Handler `0x1C61` uses the 12-entry table at `0x11F0`:
+
+`80 88 90 98 A1 AB B5 C0 CB D7 E4 F2`
+
+These are Q7-like approximations of the equal-tempered semitone ratios. The reverse table at `0x11FC` is:
+
+`FF F2 E4 D7 CB C0 B5 AB A1 98 90 88`
+
+The handler divides a pitch-related quantity by 12, selects the semitone coefficient, and uses 24-bit arithmetic to scale the parameter. It then updates the per-window state and calls `0x09B9`, which interpolates the 24-bit value and sends an update through the four-byte port.
+
+Handler `0x1EDD` also performs 24-bit arithmetic and uses nonlinear lookup tables at `0x1288` and `0x1308`. Their exact parameter semantics are not yet identified.
+
+## 4. External four-byte command port
+
+### Packet format
+
+`0x0DB7` writes four bytes to the current XDATA page at offsets 0..3 in this order:
+
+`[R5, R2, R3, R4]`
+
+Callers select page `0x80`, so this is the port at `0x8000..0x8003`. The first byte is the command; the remaining three are its payload.
+
+The stream handlers use this port in several ways:
+
+- `0x1C61` updates an interpolated 24-bit parameter through `0x09B9`.
+- `0x224C` emits a command with a three-byte payload.
+- `0x2301` emits a command whose first byte is `RAM[0x2B] | 0x0F`, with payload `[RAM[0x02], 0x02, R4]`.
+- `0x1EDD` can emit a sequence of up to three packets: command `RAM[0x2B]-2` with buffered data, command `RAM[0x2B]` with `[R5,R6,R7]`, and command `RAM[0x2B]-1` with `[R2,R3,R4]`.
+
+### Handshake
+
+`0x0DCE` synchronizes internal flag `0x0C` with `E7`. On a state change it writes either `0x40` or `0xC0` to port offset 3 (`0x8003)), then reads offset 2 (`0x8002`). This is a toggle/acknowledgement pattern; no busy-wait loop proving a conventional ready flag was found.
+
+The MAME skeleton currently leaves `0x8000..0x8003` as no-op, and the physical target of this port remains unidentified. The firmware behavior strongly establishes a command interface, but not the chip model.
+
+## 5. Note-state path connected to the command engine
+
+- `0xAC00` computes a per-Part note-map byte address from Part index and note number, sets the note bit in XDATA page `0x35`, and clears the same bit in page `0x36`.
+- `0xAC88` uses the per-Part byte at `0x2FA2 + PartIndex` to select a bit operation on the same page pair.
+- `0xAD8C` scans the 16-byte page-`0x36` map for set bits, clears them, reconstructs note numbers, and calls `0x4256` with velocity zero (Note Off).
+- `0x3ECE` initializes `0x2FA2 + index` to zero. The only explicit writer found so far is this zeroing path; a nonzero writer, if any, remains unresolved.
+
+This is a real firmware note-state/release mechanism, but the selector's complete lifecycle is not yet known.
+
+## 6. What this proves—and what it does not
+
+**Established:** TechnoX firmware resolves per-Part resource pointers through bank-selected external XDATA, interprets a structured command stream, performs pitch-related fixed-point arithmetic, and sends three-byte parameter payloads through a four-byte external command port.
+
+**Not established:** the identity of the receiving IC, the meaning of every command ID, the contents/codec of the external resource memory, or the original M.A.S.S. oscillator/sample playback algorithm. The current plug-in still uses its generic test synthesis backend; it must not be presented as original TechnoX sound.
+
+## Next reverse-engineering target
+
+Inspect the raw IC51 image and compare it against the 256-entry pointer-table model and the command-stream parser. The immediate goal is to locate resource records and determine whether IC51 contains the pointer/descriptor data or only a separate data bank.

@@ -64,6 +64,13 @@ jobs:
           path: build/technox_ic4_descrambled.bin
           if-no-files-found: error
           compression-level: 0
+      - name: Upload raw IC51 research image
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-ic51-raw-research
+          path: technox_IC51_nm27c010_v105.bin
+          if-no-files-found: error
+          compression-level: 0
       - name: Analyze opaque Part SysEx bytes
         run: python3 tools/analyze_technox_parts.py TECHNOX.MID --output technox_part_byte_report.json
       - name: Upload Part byte report
