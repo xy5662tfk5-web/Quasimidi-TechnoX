@@ -14,13 +14,7 @@ record_size         = 0x18 (24 bytes)
 Startup code at `0x35C7–0x35D7` calls this initializer for indices 0 through 15. The table therefore occupies:
 
 - index 0: `0x7C15–0x7C2C`
-- index 11: `0x7D05–0x7D1C`
-- index 12: `0x7D1D–0x7D34`
-- index 13: `0x7D35–0x7D4C`
-- index 14: `0x7D4D–0x7D64`
-- index 15: `0x7D65–0x7D7C`
-
-Correction: the address ranges above follow the formula; the four Performance payload blocks are copied to `0x7D35–0x7D94`, which correspond to record indices **13–15 plus the preceding index 12**:
+- index 11: `0x7D1D–0x7D34`
 - index 12: `0x7D35–0x7D4C`
 - index 13: `0x7D4D–0x7D64`
 - index 14: `0x7D65–0x7D7C`
