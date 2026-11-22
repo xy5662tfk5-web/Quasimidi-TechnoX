@@ -411,7 +411,7 @@ public:
             probe.instructionPC = instructionPC;
             probe.p3 = portPins_[3];
             probe.selected = ic51Selected;
-            probe.bank = static_cast<std::uint8_t>((portPins_[3] & 0x20u) != 0 ? 1u : 0u);
+            probe.bank = static_cast<std::uint8_t>((portPins_[3] & 0x20u) != 0 ? 0u : 1u);
             probe.valueOnCurrentMap = ic51Selected
                 ? ic51Rom_[static_cast<std::size_t>(probe.bank) * 0x10000u + address]
                 : (isXdataRam(address) ? xdata_[address] : 0xffu);
@@ -419,7 +419,7 @@ public:
             ++ic51BusProbeTraceCount_;
         }
         if (ic51Selected) {
-            const auto bank = (portPins_[3] & 0x20u) != 0 ? 1u : 0u;
+            const auto bank = (portPins_[3] & 0x20u) != 0 ? 0u : 1u;
             ++ic51ReadCount_;
             ++ic51ReadsByBank_[bank];
             lastIC51ReadAddress_ = address;
@@ -774,9 +774,10 @@ private:
     }
 
     bool isIC51Selected() const noexcept {
-        // IC4 B385 selects IC51 by pulling P3.4 and P3.1 low.
-        // P3.5 is the bank line: low selects bank 0, high selects bank 1.
-        return ic51RomLoaded_ && (portPins_[3] & 0x12u) == 0;
+        // IC4 B385 applies the 0x07/0x06 resource masks to P3.5/P3.4/P3.1.
+        // P3.4 and P3.1 remain high for IC51 access; P3.5 selects the bank:
+        // high selects the first 64-KiB bank, low selects the second.
+        return ic51RomLoaded_ && (portPins_[3] & 0x12u) == 0x12u;
     }
 
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
