@@ -379,8 +379,8 @@ private:
     }
 
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
-        // 0000-38FF is MAME's mapped RAM. C000-FFFF is a provisional
-        // storage-like model required by IC4's full 16-KiB write/read test.
+        // 0000-38FF is the mapped work RAM. IC4 routine B34D explicitly
+        // writes and reads the complete 16-KiB C000-FFFF sound-memory window.
         return address <= 0x38ffu || address >= 0xc000u;
     }
 
