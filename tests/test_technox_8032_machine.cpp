@@ -608,6 +608,28 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x7bd5)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3700)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3703)));
+        std::printf("IC51 raw route bytes: bank0[7BD4..7BD7]=%02X %02X %02X %02X bank1[7BD4..7BD7]=%02X %02X %02X %02X\\n",
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd4)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd5)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd6)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd7)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(1, 0x7bd4)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(1, 0x7bd5)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(1, 0x7bd6)),
+                    static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(1, 0x7bd7)));
+        const auto ic51TraceCount = injectedResponseMachine.ic51ReadTraceCount();
+        std::printf("IC51 reads near 7BD5 (newest first):\\n");
+        std::size_t routeReads = 0;
+        for (std::size_t age = 0; age < ic51TraceCount && routeReads < 24u; ++age) {
+            const auto& event = injectedResponseMachine.ic51ReadTraceAt(ic51TraceCount - 1u - age);
+            if (event.address < 0x7bd0u || event.address > 0x7be0u) continue;
+            ++routeReads;
+            std::printf("  bank=%u address=%04X value=%02X cycle=%llu\\n",
+                        static_cast<unsigned>(event.bank),
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto portWrites = injectedResponseMachine.portWriteCount();
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
