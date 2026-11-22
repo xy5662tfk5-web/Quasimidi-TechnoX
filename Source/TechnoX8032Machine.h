@@ -209,10 +209,14 @@ private:
     void refreshAciaInterrupt() noexcept {
         // ACIA IRQ is wired to the 8032 INT1 input in the published MAME map.
         auto tcon = internal_[0x88];
-        if ((aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0)
+        const bool irqActive = (aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0;
+        if (irqActive) {
             tcon = static_cast<std::uint8_t>(tcon | 0x08u); // IE1
-        else
+            portPins_[3] = static_cast<std::uint8_t>(portPins_[3] & ~0x08u); // INT1 active low
+        } else {
             tcon = static_cast<std::uint8_t>(tcon & ~0x08u);
+            portPins_[3] = static_cast<std::uint8_t>(portPins_[3] | 0x08u);
+        }
         internal_[0x88] = tcon;
     }
 
