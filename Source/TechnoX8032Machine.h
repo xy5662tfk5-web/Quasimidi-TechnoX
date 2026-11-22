@@ -6,6 +6,7 @@
 // is not claimed. Undocumented command-port reads remain open bus, not guessed.
 
 #include "MCS51Core.h"
+#include "MCS51Timers.h"
 
 #include <algorithm>
 #include <array>
@@ -38,6 +39,7 @@ public:
 
     void reset() noexcept {
         cpu_.reset();
+        timers_.reset();
         internal_.fill(0);
         upperIram_.fill(0);
         xdata_.fill(0);
@@ -156,8 +158,7 @@ public:
 
     void advanceMachineCycles(unsigned cycles) noexcept override {
         elapsedMachineCycles_ += cycles;
-        // Timer 0/1/2 counting and pin-driven counter modes are intentionally
-        // separate follow-up work; this hook preserves exact CPU cycle timing.
+        timers_.advanceMachineCycles(*this, cycles);
     }
 
     void setPortPins(std::uint8_t portAddress, std::uint8_t value) noexcept {
@@ -216,6 +217,7 @@ private:
     }
 
     MCS51Core cpu_{};
+    MCS51TimerUnit timers_{};
     std::array<std::uint8_t, kIC4RomSize> rom_{};
     std::array<std::uint8_t, kCodeSpaceSize> code_{};
     std::array<std::uint8_t, 0x100> internal_{};
