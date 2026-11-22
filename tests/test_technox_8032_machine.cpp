@@ -455,35 +455,10 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.xdataByteForTesting(0xf5b2) == 0xd2u); // final uploaded byte
         assert(firmwareMachine.soundMemoryWriteTraceCount() ==
                firmwareMachine.soundMemoryWriteCount());
-        std::printf("IC4 external sound-memory writes (first 12):\\n");
         const auto soundWrites = firmwareMachine.soundMemoryWriteTraceCount();
-        for (std::size_t i = 0; i < 12u && i < soundWrites; ++i) {
-            const auto& event = firmwareMachine.soundMemoryWriteTraceAt(i);
-            std::printf("  %04X=%02X pc=%04X ret=%04X mode=%u cycle=%llu\\n",
-                        static_cast<unsigned>(event.address),
-                        static_cast<unsigned>(event.value),
-                        static_cast<unsigned>(event.instructionPC),
-                        static_cast<unsigned>(event.returnPC),
-                        static_cast<unsigned>(event.mode),
-                        static_cast<unsigned long long>(event.machineCycle));
-        }
-        struct CallerCount { std::uint16_t pc = 0; std::size_t count = 0; };
-        std::array<CallerCount, 64> writeCallers{};
-        std::size_t writeCallerKinds = 0;
-        for (std::size_t i = 0; i < soundWrites; ++i) {
-            const auto caller = firmwareMachine.soundMemoryWriteTraceAt(i).returnPC;
-            std::size_t slot = 0;
-            while (slot < writeCallerKinds && writeCallers[slot].pc != caller) ++slot;
-            if (slot == writeCallerKinds && writeCallerKinds < writeCallers.size()) {
-                writeCallers[slot].pc = caller;
-                ++writeCallerKinds;
-            }
-            if (slot < writeCallerKinds) ++writeCallers[slot].count;
-        }
-        std::printf("Sound-memory write caller groups (%zu):\\n", writeCallerKinds);
-        for (std::size_t i = 0; i < writeCallerKinds; ++i)
-            std::printf("  return=%04X writes=%zu\\n",
-                        static_cast<unsigned>(writeCallers[i].pc), writeCallers[i].count);
+        const auto& finalSoundWrite = firmwareMachine.soundMemoryWriteTraceAt(soundWrites - 1u);
+        assert(finalSoundWrite.instructionPC == 0xaf10u);
+        assert(finalSoundWrite.returnPC == 0xaf68u);
         std::printf("IC4 external sound-memory writes (last 12):\\n");
         const auto firstRecentWrite = soundWrites > 12u ? soundWrites - 12u : 0u;
         for (std::size_t i = firstRecentWrite; i < soundWrites; ++i) {
