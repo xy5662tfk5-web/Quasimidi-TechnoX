@@ -31,6 +31,12 @@ public:
         std::uint8_t value = 0xff;
         std::uint64_t machineCycle = 0;
     };
+    struct IC51ReadEvent {
+        std::uint16_t address = 0;
+        std::uint8_t bank = 0;
+        std::uint8_t value = 0xff;
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -109,6 +115,13 @@ public:
         return bank < ic51ReadsByBank_.size() ? ic51ReadsByBank_[bank] : 0;
     }
     std::uint16_t lastIC51ReadAddress() const noexcept { return lastIC51ReadAddress_; }
+    std::size_t ic51ReadTraceCount() const noexcept { return ic51ReadTraceCount_; }
+    const IC51ReadEvent& ic51ReadTraceAt(std::size_t index) const noexcept {
+        return ic51ReadTrace_[index % ic51ReadTrace_.size()];
+    }
+    std::uint8_t ic51RomByteForTesting(std::size_t bank, std::uint16_t address) const noexcept {
+        return bank < 2u ? ic51Rom_[bank * 0x10000u + address] : 0xffu;
+    }
 
     void reset() noexcept {
         cpu_.reset();
@@ -128,6 +141,8 @@ public:
         portReadTrace_.fill(PortReadEvent{});
         portReadCount_ = 0;
         watchedCallCounts_.fill(0);
+        ic51ReadTrace_.fill(IC51ReadEvent{});
+        ic51ReadTraceCount_ = 0;
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -327,7 +342,14 @@ public:
             ++ic51ReadCount_;
             ++ic51ReadsByBank_[bank];
             lastIC51ReadAddress_ = address;
-            return ic51Rom_[bank * 0x10000u + address];
+            const auto value = ic51Rom_[bank * 0x10000u + address];
+            auto& event = ic51ReadTrace_[ic51ReadTraceCount_ % ic51ReadTrace_.size()];
+            event.address = address;
+            event.bank = static_cast<std::uint8_t>(bank);
+            event.value = value;
+            event.machineCycle = elapsedMachineCycles_;
+            ++ic51ReadTraceCount_;
+            return value;
         }
         if (address >= 0x8000u && address <= 0x8003u)
             return commandPort_[address - 0x8000u];
@@ -587,6 +609,8 @@ private:
     std::uint64_t ic51ReadCount_ = 0;
     std::array<std::uint64_t, 2> ic51ReadsByBank_{};
     std::uint16_t lastIC51ReadAddress_ = 0;
+    std::array<IC51ReadEvent, 512> ic51ReadTrace_{};
+    std::size_t ic51ReadTraceCount_ = 0;
     std::array<std::uint8_t, 0x100> internal_{};
     std::array<std::uint8_t, 0x80> upperIram_{};
     std::array<std::uint8_t, 0x10000> xdata_{};
