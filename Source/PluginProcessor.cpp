@@ -257,6 +257,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                     massEngine.setModWheel(enginePart, value);
                 else if (controller == 11)
                     massEngine.setExpression(enginePart, value);
+                else if (controller == 64)
+                    massEngine.setSustainPedal(enginePart, value >= 64);
                 else if (controller == 65)
                     massEngine.setPortamento(enginePart, value >= 64);
                 else if (controller == 67)

@@ -13,6 +13,8 @@ struct VoiceSlot {
     std::uint8_t note = 0;
     std::uint8_t velocity = 0;
     std::uint64_t age = 0;
+    bool keyDown = true;
+    bool sustained = false;
 };
 
 class VoiceManager {
@@ -72,15 +74,30 @@ public:
     }
 
     void noteOff(std::uint8_t channel, std::uint8_t note) noexcept {
-        for (auto& voice : voices_)
-            if (voice.active && voice.channel == channel && voice.note == note)
-                voice.releasing = true;
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (voices_[i].active && voices_[i].channel == channel && voices_[i].note == note)
+                releaseVoice(i);
     }
 
     void allNotesOff(int channel = 0) noexcept {
-        for (auto& voice : voices_)
-            if (voice.active && (channel == 0 || voice.channel == channel))
-                voice.releasing = true;
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (voices_[i].active && (channel == 0 || voices_[i].channel == channel))
+                releaseVoice(i);
+    }
+
+    void holdForSustain(std::size_t voiceIndex) noexcept {
+        if (voiceIndex >= voices_.size() || !voices_[voiceIndex].active) return;
+        auto& voice = voices_[voiceIndex];
+        voice.keyDown = false;
+        voice.sustained = true;
+    }
+
+    void releaseVoice(std::size_t voiceIndex) noexcept {
+        if (voiceIndex >= voices_.size() || !voices_[voiceIndex].active) return;
+        auto& voice = voices_[voiceIndex];
+        voice.keyDown = false;
+        voice.sustained = false;
+        voice.releasing = true;
     }
 
     void finishRelease(std::size_t voiceIndex) noexcept {

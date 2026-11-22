@@ -232,6 +232,7 @@ public:
             portamento_[i].store(0, std::memory_order_relaxed);
             softPedal_[i].store(0, std::memory_order_relaxed);
             for (auto& rpn : rpnValues_[i]) rpn.store(-1, std::memory_order_relaxed);
+            sustainPedal_[i].store(false, std::memory_order_relaxed);
         }
     }
     bool setPortamento(int partIndex, bool enabled) noexcept {
@@ -243,6 +244,15 @@ public:
         if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return false;
         softPedal_[static_cast<std::size_t>(partIndex)].store(enabled ? 1 : 0, std::memory_order_release);
         return true;
+    }
+    bool setSustainPedal(int partIndex, bool enabled) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return false;
+        sustainPedal_[static_cast<std::size_t>(partIndex)].store(enabled ? 1 : 0, std::memory_order_release);
+        return true;
+    }
+    bool sustainPedal(int partIndex) const noexcept {
+        return partIndex >= 0 && partIndex < static_cast<int>(kPartCount) &&
+            sustainPedal_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) != 0;
     }
     bool portamento(int partIndex) const noexcept {
         return partIndex >= 0 && partIndex < static_cast<int>(kPartCount) &&
@@ -269,6 +279,7 @@ public:
     void reset(int partIndex) noexcept {
         setPortamento(partIndex, false);
         setSoftPedal(partIndex, false);
+        setSustainPedal(partIndex, false);
         if (partIndex >= 0 && partIndex < static_cast<int>(kPartCount))
             for (auto& rpn : rpnValues_[static_cast<std::size_t>(partIndex)])
                 rpn.store(-1, std::memory_order_release);
@@ -276,6 +287,7 @@ public:
 private:
     std::array<std::atomic<int>, kPartCount> portamento_{};
     std::array<std::atomic<int>, kPartCount> softPedal_{};
+    std::array<std::atomic<int>, kPartCount> sustainPedal_{};
     std::array<std::array<std::atomic<int>, 3>, kPartCount> rpnValues_{};
 };
 
@@ -365,23 +377,35 @@ public:
     }
 
     void noteOff(std::uint8_t channel, std::uint8_t note) noexcept {
-        // Notify the backend only on the transition into Release. Repeated
-        // Note Off messages must not restart/extend an already running release.
-        const auto& before = voices_.voices();
-        for (std::size_t i = 0; i < before.size(); ++i)
-            if (before[i].active && !before[i].releasing &&
-                before[i].channel == channel && before[i].note == note)
-                backend_->noteOff(static_cast<int>(i), before[i]);
-        voices_.noteOff(channel, note);
+        // A key release is held while its Part's sustain pedal is down.
+        // Once pedal-up arrives, the backend receives exactly one Note Off.
+        const auto& slots = voices_.voices();
+        for (std::size_t i = 0; i < slots.size(); ++i) {
+            const auto& voice = slots[i];
+            if (!voice.active || voice.releasing || voice.channel != channel || voice.note != note)
+                continue;
+            if (runtimeControls_.sustainPedal(voice.part)) {
+                voices_.holdForSustain(i);
+            } else {
+                backend_->noteOff(static_cast<int>(i), voice);
+                voices_.releaseVoice(i);
+            }
+        }
     }
 
     void allNotesOff(int channel = 0) noexcept {
-        const auto& before = voices_.voices();
-        for (std::size_t i = 0; i < before.size(); ++i)
-            if (before[i].active && !before[i].releasing &&
-                (channel == 0 || before[i].channel == channel))
-                backend_->noteOff(static_cast<int>(i), before[i]);
-        voices_.allNotesOff(channel);
+        const auto& slots = voices_.voices();
+        for (std::size_t i = 0; i < slots.size(); ++i) {
+            const auto& voice = slots[i];
+            if (!voice.active || voice.releasing || (channel != 0 && voice.channel != channel))
+                continue;
+            if (runtimeControls_.sustainPedal(voice.part)) {
+                voices_.holdForSustain(i);
+            } else {
+                backend_->noteOff(static_cast<int>(i), voice);
+                voices_.releaseVoice(i);
+            }
+        }
     }
 
     void allSoundsOff(int channel = 0) noexcept {
@@ -424,11 +448,32 @@ public:
     int getExpression(int partIndex) const noexcept { return modulationSources_.expression(partIndex); }
     bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
     bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
+    bool setSustainPedal(int partIndex, bool enabled) noexcept {
+        const bool wasEnabled = runtimeControls_.sustainPedal(partIndex);
+        if (!runtimeControls_.setSustainPedal(partIndex, enabled)) return false;
+        if (wasEnabled && !enabled) {
+            const auto& slots = voices_.voices();
+            for (std::size_t i = 0; i < slots.size(); ++i) {
+                const auto& voice = slots[i];
+                if (!voice.active || voice.releasing || voice.part != partIndex ||
+                    !voice.sustained || voice.keyDown)
+                    continue;
+                backend_->noteOff(static_cast<int>(i), voice);
+                voices_.releaseVoice(i);
+            }
+        }
+        return true;
+    }
     bool portamento(int partIndex) const noexcept { return runtimeControls_.portamento(partIndex); }
     bool softPedal(int partIndex) const noexcept { return runtimeControls_.softPedal(partIndex); }
+    bool sustainPedal(int partIndex) const noexcept { return runtimeControls_.sustainPedal(partIndex); }
     bool setRpn(int partIndex, int parameterIndex, int value) noexcept { return runtimeControls_.setRpn(partIndex, parameterIndex, value); }
     int getRpn(int partIndex, int parameterIndex) const noexcept { return runtimeControls_.rpn(partIndex, parameterIndex); }
-    void resetPartControllers(int partIndex) noexcept { runtimeControls_.reset(partIndex); modulationSources_.reset(partIndex); }
+    void resetPartControllers(int partIndex) noexcept {
+        setSustainPedal(partIndex, false);
+        runtimeControls_.reset(partIndex);
+        modulationSources_.reset(partIndex);
+    }
 
     void render(float* const* channels, int channelCount, int sampleCount) noexcept {
         backend_->render(channels, channelCount, sampleCount, voices_, modulation_, partParameters_,

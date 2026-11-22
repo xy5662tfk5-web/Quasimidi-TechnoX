@@ -40,6 +40,35 @@ int main() {
     assert(!engine.portamento(12) && !engine.softPedal(12) && engine.getModWheel(12) == 0);
     assert(engine.getPitchBend(12) == 0 && engine.getExpression(12) == 127);
     assert(engine.getRpn(12, 0) == -1 && engine.getRpn(12, 1) == -1);
+
+    // Sustain is independent per Part even when Parts share the same MIDI channel.
+    BasicMASSVoiceBackend sustainBackend;
+    MASSAudioEngine sustainEngine(&sustainBackend);
+    sustainEngine.prepare(48000.0, 128);
+    assert(sustainEngine.setSustainPedal(12, true));
+    assert(sustainEngine.sustainPedal(12));
+    assert(!sustainEngine.sustainPedal(13));
+    sustainEngine.noteOn(12, 1, 60, 100);
+    sustainEngine.noteOn(13, 1, 60, 100);
+    sustainEngine.noteOff(1, 60);
+    bool part12Held = false;
+    bool part13Released = false;
+    for (const auto& voice : sustainEngine.voiceManager().voices()) {
+        if (!voice.active || voice.note != 60) continue;
+        if (voice.part == 12)
+            part12Held = voice.sustained && !voice.keyDown && !voice.releasing;
+        if (voice.part == 13)
+            part13Released = voice.releasing && !voice.sustained;
+    }
+    assert(part12Held && part13Released);
+    assert(sustainEngine.setSustainPedal(12, false));
+    bool part12Released = false;
+    for (const auto& voice : sustainEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 60)
+            part12Released = voice.releasing && !voice.sustained;
+    assert(part12Released);
+    sustainEngine.resetPartControllers(12);
+    assert(!sustainEngine.sustainPedal(12));
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
     engine.noteOff(1, 48);
