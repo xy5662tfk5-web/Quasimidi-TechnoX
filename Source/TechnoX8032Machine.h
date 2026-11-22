@@ -47,6 +47,12 @@ public:
         std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct SAM9407HostWriteEvent {
+        std::uint8_t registerIndex = 0;
+        std::uint8_t value = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct SAM9407BurstWordEvent {
         std::uint16_t value = 0;
         std::uint8_t lowByte = 0;
@@ -223,6 +229,11 @@ public:
         commandPort_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
+        sam9407HostWriteCount_ = 0;
+        sam9407HostWriteTrace_.fill(SAM9407HostWriteEvent{});
+        sam9407TransactionActive_ = false;
+        sam9407ExpectedRegister_ = 0;
+        sam9407TransactionBytes_.fill(0);
         sam9407BurstWordCount_ = 0;
         sam9407BurstWordTrace_.fill(SAM9407BurstWordEvent{});
         sam9407BurstLowPending_ = false;
@@ -606,41 +617,69 @@ public:
 
         if (address >= 0x8000u && address <= 0x8003u) {
             const auto index = static_cast<std::size_t>(address - 0x8000u);
-            commandPort_[index] = value;
             const auto instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
-            if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow)) {
-                sam9407BurstLowByte_ = value;
-                sam9407BurstLowInstructionPC_ = instructionPC;
-                sam9407BurstLowPending_ = true;
-            } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh) &&
-                       sam9407BurstLowPending_) {
-                auto& word = sam9407BurstWordTrace_[
-                    sam9407BurstWordCount_ % sam9407BurstWordTrace_.size()];
-                word.lowByte = sam9407BurstLowByte_;
-                word.highByte = value;
-                word.value = static_cast<std::uint16_t>(
-                    static_cast<std::uint16_t>(sam9407BurstLowByte_) |
-                    (static_cast<std::uint16_t>(value) << 8u));
-                word.lowInstructionPC = sam9407BurstLowInstructionPC_;
-                word.highInstructionPC = instructionPC;
-                word.machineCycle = elapsedMachineCycles_;
-                ++sam9407BurstWordCount_;
+            commandPort_[index] = value;
+
+            auto& hostWrite = sam9407HostWriteTrace_[
+                sam9407HostWriteCount_ % sam9407HostWriteTrace_.size()];
+            hostWrite.registerIndex = static_cast<std::uint8_t>(index);
+            hostWrite.value = value;
+            hostWrite.instructionPC = instructionPC;
+            hostWrite.machineCycle = elapsedMachineCycles_;
+            ++sam9407HostWriteCount_;
+
+            // Only a contiguous 0,1,2,3 sequence is a complete four-register
+            // host transaction. The firmware also writes register 3 alone
+            // in its 0x0DCE control path; do not turn that into a fake packet.
+            if (index == static_cast<std::size_t>(SAM9407HostRegister::Mpu401Data)) {
+                sam9407TransactionBytes_[0] = value;
+                sam9407ExpectedRegister_ = 1;
+                sam9407TransactionActive_ = true;
+            } else if (sam9407TransactionActive_ && index == sam9407ExpectedRegister_) {
+                sam9407TransactionBytes_[index] = value;
+                ++sam9407ExpectedRegister_;
+                if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow)) {
+                    sam9407BurstLowByte_ = value;
+                    sam9407BurstLowInstructionPC_ = instructionPC;
+                    sam9407BurstLowPending_ = true;
+                } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh)) {
+                    if (sam9407BurstLowPending_) {
+                        auto& word = sam9407BurstWordTrace_[
+                            sam9407BurstWordCount_ % sam9407BurstWordTrace_.size()];
+                        word.lowByte = sam9407BurstLowByte_;
+                        word.highByte = value;
+                        word.value = static_cast<std::uint16_t>(
+                            static_cast<std::uint16_t>(sam9407BurstLowByte_) |
+                            (static_cast<std::uint16_t>(value) << 8u));
+                        word.lowInstructionPC = sam9407BurstLowInstructionPC_;
+                        word.highInstructionPC = instructionPC;
+                        word.machineCycle = elapsedMachineCycles_;
+                        ++sam9407BurstWordCount_;
+                    }
+                    sam9407BurstLowPending_ = false;
+
+                    auto& packet = soundCommandTrace_[
+                        soundCommandPacketCount_ % soundCommandTrace_.size()];
+                    packet.bytes = sam9407TransactionBytes_;
+                    packet.instructionPC = instructionPC;
+                    const auto stackPointer = cpu_.registers().sp;
+                    const auto returnHigh = readIndirect(stackPointer);
+                    const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+                    packet.returnPC = static_cast<std::uint16_t>(
+                        (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
+                    packet.machineCycle = elapsedMachineCycles_;
+                    ++soundCommandPacketCount_;
+                    sam9407TransactionActive_ = false;
+                    sam9407ExpectedRegister_ = 0;
+                }
+            } else {
+                sam9407TransactionActive_ = false;
+                sam9407ExpectedRegister_ = 0;
                 sam9407BurstLowPending_ = false;
             }
-            if (index == 3u) {
-                auto& packet = soundCommandTrace_[soundCommandPacketCount_ % soundCommandTrace_.size()];
-                packet.bytes = commandPort_;
-                // MOVX is a one-byte instruction; the core has already
-                // advanced PC when the bus callback is entered.
-                packet.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
-                const auto stackPointer = cpu_.registers().sp;
-                const auto returnHigh = readIndirect(stackPointer);
-                const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
-                packet.returnPC = static_cast<std::uint16_t>(
-                    (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
-                packet.machineCycle = elapsedMachineCycles_;
-                ++soundCommandPacketCount_;
-            }
+            if (index != static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh))
+                sam9407BurstLowPending_ = index == static_cast<std::size_t>(
+                    SAM9407HostRegister::BurstDataLow);
             return;
         }
 
@@ -764,6 +803,10 @@ public:
         return commandPort_;
     }
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
+    std::size_t sam9407HostWriteCount() const noexcept { return sam9407HostWriteCount_; }
+    const SAM9407HostWriteEvent& sam9407HostWriteAt(std::size_t index) const noexcept {
+        return sam9407HostWriteTrace_[index % sam9407HostWriteTrace_.size()];
+    }
     std::size_t sam9407BurstWordCount() const noexcept { return sam9407BurstWordCount_; }
     const SAM9407BurstWordEvent& sam9407BurstWordAt(std::size_t index) const noexcept {
         return sam9407BurstWordTrace_[index % sam9407BurstWordTrace_.size()];
@@ -938,6 +981,11 @@ private:
     std::array<std::uint8_t, 4> commandPort_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
+    std::array<SAM9407HostWriteEvent, 4096> sam9407HostWriteTrace_{};
+    std::size_t sam9407HostWriteCount_ = 0;
+    bool sam9407TransactionActive_ = false;
+    std::uint8_t sam9407ExpectedRegister_ = 0;
+    std::array<std::uint8_t, 4> sam9407TransactionBytes_{};
     std::array<SAM9407BurstWordEvent, 2048> sam9407BurstWordTrace_{};
     std::size_t sam9407BurstWordCount_ = 0;
     bool sam9407BurstLowPending_ = false;
