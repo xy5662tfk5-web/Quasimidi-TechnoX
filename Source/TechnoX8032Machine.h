@@ -105,8 +105,12 @@ public:
                                        std::size_t maximumInstructions) noexcept {
         std::size_t executed = 0;
         while (executed < maximumInstructions && cpu_.registers().pc != target) {
-            if (step() == MCS51StepResult::unsupportedOpcode)
+            const auto result = step();
+            if (result != MCS51StepResult::executed) {
+                if (result == MCS51StepResult::unsupportedOpcode)
+                    cpuFaulted_ = true;
                 break;
+            }
             ++executed;
         }
         return executed;
