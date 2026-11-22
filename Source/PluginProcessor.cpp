@@ -47,7 +47,8 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
                 reinterpret_cast<const std::uint8_t*>(firmwareData),
                 static_cast<std::size_t>(firmwareRomSize))) {
             firmwareMachine->reset();
-            if (firmwareMachine->runUntilProgramCounter(0x326a, 100000) == 0)
+            firmwareMachine->runUntilProgramCounter(0x326a, 100000);
+            if (firmwareMachine->cpu().registers().pc != 0x326a)
                 firmwareMachine.reset();
         } else {
             firmwareMachine.reset();
