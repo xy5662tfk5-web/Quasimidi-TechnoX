@@ -185,7 +185,8 @@ bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& l
 void QuasimidiTechnoXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     massEngine.prepare(sampleRate, samplesPerBlock);
-    firmwareCycleTarget = 0.0;
+    firmwareCycleTarget = firmwareMachine != nullptr
+        ? static_cast<double>(firmwareMachine->elapsedMachineCycles()) : 0.0;
 }
 void QuasimidiTechnoXAudioProcessor::releaseResources() {}
 
