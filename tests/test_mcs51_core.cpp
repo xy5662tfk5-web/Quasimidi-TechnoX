@@ -178,6 +178,28 @@ int main() {
     assert(pushPopCpu.registers().sp == 0x07);
     assert(pushPopBus.internal[0x81] == 0x07);
 
+    // Bit-addressable IRAM/SFR operations, carry transfer and bit branches.
+    TestBus bitBus;
+    bitBus.code[0] = 0xd2; bitBus.code[1] = 0x02; // SETB bit 2 -> IRAM 20.2
+    bitBus.code[2] = 0xa2; bitBus.code[3] = 0x02; // MOV C,bit 2
+    bitBus.code[4] = 0xc2; bitBus.code[5] = 0x02; // CLR bit 2
+    bitBus.code[6] = 0x20; bitBus.code[7] = 0x02; bitBus.code[8] = 0x02; // JB bit2,+2 not taken
+    bitBus.code[9] = 0x92; bitBus.code[10] = 0x03; // MOV bit3,C
+    bitBus.code[11] = 0x10; bitBus.code[12] = 0x03; bitBus.code[13] = 0x02; // JBC bit3,+2
+    bitBus.code[14] = 0x74; bitBus.code[15] = 0xff;
+    bitBus.code[16] = 0x74; bitBus.code[17] = 0x5a;
+    MCS51Core bitCpu;
+    for (int i = 0; i < 5; ++i)
+        assert(bitCpu.step(bitBus) == MCS51StepResult::executed);
+    assert(bitCpu.registers().psw.carry);
+    assert((bitBus.internal[0x20] & 0x04u) == 0);
+    assert((bitBus.internal[0x20] & 0x08u) != 0);
+    assert(bitCpu.step(bitBus) == MCS51StepResult::executed);
+    assert(bitCpu.registers().pc == 16);
+    assert((bitBus.internal[0x20] & 0x08u) == 0);
+    assert(bitCpu.step(bitBus) == MCS51StepResult::executed);
+    assert(bitCpu.registers().a == 0x5a);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
