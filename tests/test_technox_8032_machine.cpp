@@ -430,6 +430,19 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.ic51ReadsByBank(1) > 0u);
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
+        const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
+        std::printf("M.A.S.S. command packets after Note On: %zu\\n", commandCount);
+        const auto firstCommand = commandCount > 12u ? commandCount - 12u : 0u;
+        for (auto commandIndex = firstCommand; commandIndex < commandCount; ++commandIndex) {
+            const auto& packet = injectedResponseMachine.soundCommandPacketAt(commandIndex);
+            std::printf("  CMD[%zu] cycle=%llu %02X %02X %02X %02X\\n",
+                        commandIndex,
+                        static_cast<unsigned long long>(packet.machineCycle),
+                        static_cast<unsigned>(packet.bytes[0]),
+                        static_cast<unsigned>(packet.bytes[1]),
+                        static_cast<unsigned>(packet.bytes[2]),
+                        static_cast<unsigned>(packet.bytes[3]));
+        }
     }
     return 0;
 }
