@@ -1,12 +1,14 @@
 #include "../Source/TechnoX8032Machine.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
+#include <utility>
 #include <vector>
 
 int main(int argc, char** argv) {
