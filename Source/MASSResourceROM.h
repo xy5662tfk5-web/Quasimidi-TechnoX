@@ -386,6 +386,21 @@ struct MASSHardwareCommandPacket {
     std::array<std::uint8_t, 4> bytes{};
 };
 
+struct MASSResolvedMultiParameterRegisters {
+    std::uint8_t ram2B = 0;
+    std::uint8_t r2 = 0;
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+    std::uint8_t r5 = 0;
+    std::uint8_t r6 = 0;
+    std::uint8_t r7 = 0;
+};
+
+struct MASSHardwareCommandPacketSequence {
+    std::array<MASSHardwareCommandPacket, 3> packets{};
+    std::uint8_t count = 0;
+};
+
 class MASSResourceHardwareCommandBuilder {
 public:
     // Terminal opcode group 0x20 / handler 0x2301. The first two payload
@@ -408,6 +423,40 @@ public:
             static_cast<std::uint8_t>(command.bytes[3] & 0x07)
         };
         result = packet;
+        return true;
+    }
+
+    // Handler 0x1EDD / group 0x10 packet phase. Inputs are the post-transform
+    // register values at the point the firmware reaches its external writes.
+    // When emitBufferedUpdate is true, the first packet carries the three
+    // bytes already staged in the current slot. The next two packets always
+    // use [R5,R6,R7] and [R2,R3,R4], respectively.
+    static bool buildMultiParameterPackets(
+        const MASSResourceCommand& command,
+        const MASSResolvedMultiParameterRegisters& registers,
+        bool emitBufferedUpdate,
+        const std::array<std::uint8_t, 3>& bufferedData,
+        MASSHardwareCommandPacketSequence& result) noexcept {
+        if (command.kind != MASSResourceCommandKind::multiParameter ||
+            command.length != 7 || (command.opcode & 0x38) != 0x10 ||
+            command.bytes[1] == 0)
+            return false;
+
+        MASSHardwareCommandPacketSequence sequence{};
+        if (emitBufferedUpdate) {
+            sequence.packets[sequence.count++].bytes = {
+                static_cast<std::uint8_t>(registers.ram2B - 2),
+                bufferedData[0], bufferedData[1], bufferedData[2]
+            };
+        }
+        sequence.packets[sequence.count++].bytes = {
+            registers.ram2B, registers.r5, registers.r6, registers.r7
+        };
+        sequence.packets[sequence.count++].bytes = {
+            static_cast<std::uint8_t>(registers.ram2B - 1),
+            registers.r2, registers.r3, registers.r4
+        };
+        result = sequence;
         return true;
     }
 

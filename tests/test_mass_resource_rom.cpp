@@ -138,6 +138,47 @@ void testCommandRegisterFieldDecoders() {
     assert(!MASSResourceCommandFieldDecoder::decodeMultiParameter(command, multi));
 }
 
+void testMultiParameterPacketSequenceBuilder() {
+    MASSResourceCommand command{};
+    command.opcode = 0x15;
+    command.kind = MASSResourceCommandKind::multiParameter;
+    command.length = 7;
+    command.bytes = {{0x15, 0x01, 0x12, 0x23, 0x34, 0x45, 0x56}};
+
+    MASSResolvedMultiParameterRegisters registers{};
+    registers.ram2B = 0x40;
+    registers.r2 = 0x81;
+    registers.r3 = 0x92;
+    registers.r4 = 0x03;
+    registers.r5 = 0xa4;
+    registers.r6 = 0xb5;
+    registers.r7 = 0xc6;
+
+    MASSHardwareCommandPacketSequence sequence{};
+    const std::array<std::uint8_t, 3> buffered{{0xd7, 0xe8, 0xf9}};
+    assert(MASSResourceHardwareCommandBuilder::buildMultiParameterPackets(
+        command, registers, false, buffered, sequence));
+    assert(sequence.count == 2);
+    assert((sequence.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x40, 0xa4, 0xb5, 0xc6}}));
+    assert((sequence.packets[1].bytes ==
+            std::array<std::uint8_t, 4>{{0x3f, 0x81, 0x92, 0x03}}));
+
+    assert(MASSResourceHardwareCommandBuilder::buildMultiParameterPackets(
+        command, registers, true, buffered, sequence));
+    assert(sequence.count == 3);
+    assert((sequence.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x3e, 0xd7, 0xe8, 0xf9}}));
+    assert((sequence.packets[1].bytes ==
+            std::array<std::uint8_t, 4>{{0x40, 0xa4, 0xb5, 0xc6}}));
+    assert((sequence.packets[2].bytes ==
+            std::array<std::uint8_t, 4>{{0x3f, 0x81, 0x92, 0x03}}));
+
+    command.bytes[1] = 0;
+    assert(!MASSResourceHardwareCommandBuilder::buildMultiParameterPackets(
+        command, registers, false, buffered, sequence));
+}
+
 void testFourByteParameterPacketBuilder() {
     MASSResourceCommand command{};
     command.opcode = 0x1b;
@@ -414,6 +455,7 @@ int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testResourceSelectionRecordParser();
     testCommandRegisterFieldDecoders();
+    testMultiParameterPacketSequenceBuilder();
     testFourByteParameterPacketBuilder();
     testTerminalHardwarePacketBuilder();
     testDescriptorParser();
