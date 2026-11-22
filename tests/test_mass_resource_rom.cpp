@@ -290,9 +290,9 @@ void testActualIC51(const char* path) {
     assert(rom.readResourceDescriptorAddress(MASSResourceBank::bank1, 0, address));
     assert(address == 0x0f5b);
 
-    const std::array<std::array<std::size_t, 3>, 2> expectedEndStates{{
-        {{283, 101, 128}}, // flag 0x0A clear: control command, 0xFF, 16 slots
-        {{300, 98, 114}}   // flag 0x0A set
+    const std::array<std::array<std::array<std::size_t, 3>, 2>, 2> expectedEndStates{{
+        {{{159, 46, 51}, {165, 38, 53}}}, // bank 0: flag clear, then set
+        {{{124, 55, 77}, {135, 60, 61}}}  // bank 1: flag clear, then set
     }};
 
     for (const auto bank : {MASSResourceBank::bank0, MASSResourceBank::bank1}) {
@@ -333,7 +333,7 @@ void testActualIC51(const char* path) {
             }
         }
         assert(pointers.size() == MASSResourceROM::kPointerCount);
-        assert(endStates == expectedEndStates);
+        assert(endStates == expectedEndStates[bankNumber]);
     }
 }
 }
