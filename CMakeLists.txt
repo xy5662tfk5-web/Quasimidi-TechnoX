@@ -74,6 +74,17 @@ target_link_libraries(QuasimidiTechnoX PRIVATE
 )
 
 
+# MCS-51 CPU architectural foundation tests are dependency-free and do not instantiate JUCE.
+if (BUILD_TESTING)
+    add_executable(technox_mcs51_core_tests
+        tests/test_mcs51_core.cpp
+    )
+    target_compile_features(technox_mcs51_core_tests PRIVATE cxx_std_17)
+    add_test(NAME technox_mcs51_core_tests
+        COMMAND technox_mcs51_core_tests
+    )
+endif()
+
 # Firmware transaction decoder tests are dependency-free and do not instantiate JUCE.
 if (BUILD_TESTING)
     add_executable(technox_firmware_transaction_tests
