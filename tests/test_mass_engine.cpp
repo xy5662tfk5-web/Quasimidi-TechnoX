@@ -149,7 +149,11 @@ int main() {
     modeEngine.noteOff(1, 64); // Previous poly note was replaced; it must not release the new mono note.
     assert(modeEngine.voiceManager().activeVoiceCount() == 1);
     modeEngine.noteOff(1, 67);
-    assert(modeEngine.voiceManager().voices()[0].releasing);
+    bool monoVoiceReleased = false;
+    for (const auto& voice : modeEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 67)
+            monoVoiceReleased = voice.releasing;
+    assert(monoVoiceReleased);
     assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 3));
     modeEngine.noteOn(12, 1, 69, 100);
     modeEngine.noteOn(12, 1, 72, 100);
