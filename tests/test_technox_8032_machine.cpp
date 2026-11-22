@@ -296,7 +296,7 @@ int main(int argc, char** argv) {
         const auto peripheralInit = firmwareMachine.runUntilProgramCounter(0x32b0, 2000000);
         const bool reachedPeripheralHandoff = firmwareMachine.cpu().registers().pc == 0x32b0;
         const auto bank = firmwareMachine.cpu().registers().psw.registerBankBase();
-        std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X P3=%02X lastFF10write=%02X FF10read=%02X XWR=%llu XRD=%llu 8EWR=%llu P35=%llu lastMem=%04X:%02X cycles=%llu\\n",
+        std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X P3=%02X lastFF10write=%02X FF10read=%02X XWR=%llu XRD=%llu 8EWR=%llu P35=%llu mode8E=%02X mode2WR=%llu mode2RD=%llu lastMem=%04X:%02X cycles=%llu\\n",
                     static_cast<unsigned>(reachedPeripheralHandoff), peripheralInit,
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned>(firmwareMachine.readCode(firmwareMachine.cpu().registers().pc)),
@@ -314,6 +314,9 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(firmwareMachine.soundMemoryReadCount()),
                     static_cast<unsigned long long>(firmwareMachine.soundBusModeWriteCount()),
                     static_cast<unsigned long long>(firmwareMachine.p35TransitionCount()),
+                    static_cast<unsigned>(firmwareMachine.externalSoundBusMode()),
+                    static_cast<unsigned long long>(firmwareMachine.soundMemoryWritesByMode(2)),
+                    static_cast<unsigned long long>(firmwareMachine.soundMemoryReadsByMode(2)),
                     static_cast<unsigned>(firmwareMachine.lastSoundMemoryWriteAddress()),
                     static_cast<unsigned>(firmwareMachine.lastSoundMemoryWriteValue()),
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
@@ -322,6 +325,8 @@ int main(int argc, char** argv) {
         // Firmware routine B34D must write and read every byte of C000-FFFF.
         assert(firmwareMachine.soundMemoryWriteCount() >= 0x4000u);
         assert(firmwareMachine.soundMemoryReadCount() >= 0x4000u);
+        assert(firmwareMachine.soundMemoryWritesByMode(2) >= 0x4000u);
+        assert(firmwareMachine.soundMemoryReadsByMode(2) >= 0x4000u);
         assert(firmwareMachine.soundBusModeWriteCount() >= 2u);
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
