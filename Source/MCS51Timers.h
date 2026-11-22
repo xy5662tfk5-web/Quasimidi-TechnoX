@@ -24,6 +24,9 @@ public:
             const bool t1Falling = (previousP3_ & 0x20u) != 0 && (p3 & 0x20u) == 0;
             const bool int0High = (p3 & 0x04u) != 0;
             const bool int1High = (p3 & 0x08u) != 0;
+            const bool int0Falling = (previousP3_ & 0x04u) != 0 && !int0High;
+            const bool int1Falling = (previousP3_ & 0x08u) != 0 && !int1High;
+            updateExternalInterruptFlags(bus, int0High, int1High, int0Falling, int1Falling);
             const bool t2Falling = (previousP1_ & 0x01u) != 0 && (p1 & 0x01u) == 0;
             const bool t2exFalling = (previousP1_ & 0x02u) != 0 && (p1 & 0x02u) == 0;
 
@@ -36,6 +39,28 @@ public:
     }
 
 private:
+    static void updateExternalInterruptFlags(MCS51Bus& bus, bool int0High,
+                                             bool int1High, bool int0Falling,
+                                             bool int1Falling) noexcept {
+        auto tcon = bus.readInternal(0x88u);
+        if ((tcon & 0x01u) != 0) {
+            if (int0Falling) tcon = static_cast<std::uint8_t>(tcon | 0x02u);
+        } else if (int0High) {
+            tcon = static_cast<std::uint8_t>(tcon & ~0x02u);
+        } else {
+            tcon = static_cast<std::uint8_t>(tcon | 0x02u);
+        }
+
+        if ((tcon & 0x04u) != 0) {
+            if (int1Falling) tcon = static_cast<std::uint8_t>(tcon | 0x08u);
+        } else if (int1High) {
+            tcon = static_cast<std::uint8_t>(tcon & ~0x08u);
+        } else {
+            tcon = static_cast<std::uint8_t>(tcon | 0x08u);
+        }
+        bus.writeInternal(0x88u, tcon);
+    }
+
     static void setFlag(MCS51Bus& bus, std::uint8_t address,
                         std::uint8_t mask) noexcept {
         bus.writeInternal(address,
