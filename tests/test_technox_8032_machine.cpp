@@ -550,14 +550,38 @@ int main(int argc, char** argv) {
         assert(bootBurstWords == bootTransactions);
         std::printf("SAM9407 boot: hostWrites=%zu completeTransactions=%zu burstWords=%zu\\n",
                     hostWrites, bootTransactions, bootBurstWords);
-        std::printf("SAM9407 standalone register-3 writes (0x0DCE control path):\\n");
+        std::printf("SAM9407 standalone register-3 writes (outside complete transactions):\\n");
         for (std::size_t i = 0; i < hostWrites; ++i) {
             const auto& write = firmwareMachine.sam9407HostWriteAt(i);
-            if (write.registerIndex == 3u && write.instructionPC == 0x0de4u)
+            if (write.registerIndex == 3u && write.instructionPC != 0x0dc5u)
                 std::printf("  reg3=%02X pc=%04X cycle=%llu\\n",
                             static_cast<unsigned>(write.value),
                             static_cast<unsigned>(write.instructionPC),
                             static_cast<unsigned long long>(write.machineCycle));
+        }
+        assert(bootTransactions == 544u);
+        for (std::size_t i = 0; i < bootTransactions; ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(i);
+            const auto& word = firmwareMachine.sam9407BurstWordAt(i);
+            std::uint8_t expectedIndex = 0;
+            std::uint16_t expectedWord = 0;
+            std::uint16_t expectedCaller = 0x0e6au;
+            if (i < 512u) {
+                const auto offset = static_cast<unsigned>(i % 256u);
+                expectedIndex = static_cast<std::uint8_t>(offset == 0u ? 0u : 256u - offset);
+                expectedWord = i < 256u ? 0x0000u : 0x8000u;
+            } else {
+                const auto offset = static_cast<unsigned>((i - 512u) % 16u);
+                expectedIndex = static_cast<std::uint8_t>(0x0fu + offset * 0x10u);
+                expectedWord = i < 528u ? 0x0040u : 0x8040u;
+                expectedCaller = 0x0e1du;
+            }
+            assert(packet.bytes[0] == expectedIndex);
+            assert(packet.bytes[1] == 0x00u);
+            assert(packet.bytes[2] == static_cast<std::uint8_t>(expectedWord & 0xffu));
+            assert(packet.bytes[3] == static_cast<std::uint8_t>(expectedWord >> 8u));
+            assert(word.value == expectedWord);
+            assert(packet.returnPC == expectedCaller);
         }
         std::printf("SAM9407 host transactions after IC51 boot block (%zu):\\n",
                     bootTransactions);
