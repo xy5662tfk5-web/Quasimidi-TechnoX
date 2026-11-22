@@ -650,6 +650,17 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        std::printf("Unmapped 7xxx address histogram:\\n");
+        for (std::uint32_t address = 0x7000u; address <= 0x7fffu; ++address) {
+            const auto reads = injectedResponseMachine.unmappedReadCountAt7xxx(
+                static_cast<std::uint16_t>(address));
+            const auto writes = injectedResponseMachine.unmappedWriteCountAt7xxx(
+                static_cast<std::uint16_t>(address));
+            if (reads != 0 || writes != 0)
+                std::printf("  %04X reads=%llu writes=%llu\\n", address,
+                            static_cast<unsigned long long>(reads),
+                            static_cast<unsigned long long>(writes));
+        }
         const auto portWrites = injectedResponseMachine.portWriteCount();
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
