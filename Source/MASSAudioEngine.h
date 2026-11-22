@@ -243,6 +243,7 @@ public:
             portamento_[i].store(0, std::memory_order_relaxed);
             softPedal_[i].store(0, std::memory_order_relaxed);
             for (auto& rpn : rpnValues_[i]) rpn.store(-1, std::memory_order_relaxed);
+            for (auto& rpn : rpnLsbValues_[i]) rpn.store(-1, std::memory_order_relaxed);
             sustainPedal_[i].store(false, std::memory_order_relaxed);
         }
     }
@@ -287,6 +288,20 @@ public:
         return rpnValues_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(parameterIndex)]
             .load(std::memory_order_acquire);
     }
+    bool setRpnLsb(int partIndex, int parameterIndex, int value) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            parameterIndex < 0 || parameterIndex >= 3 || value < 0 || value > 127)
+            return false;
+        rpnLsbValues_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(parameterIndex)]
+            .store(value, std::memory_order_release);
+        return true;
+    }
+    int rpnLsb(int partIndex, int parameterIndex) const noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            parameterIndex < 0 || parameterIndex >= 3) return -1;
+        return rpnLsbValues_[static_cast<std::size_t>(partIndex)][static_cast<std::size_t>(parameterIndex)]
+            .load(std::memory_order_acquire);
+    }
     void reset(int partIndex) noexcept {
         setPortamento(partIndex, false);
         setSoftPedal(partIndex, false);
@@ -294,12 +309,16 @@ public:
         if (partIndex >= 0 && partIndex < static_cast<int>(kPartCount))
             for (auto& rpn : rpnValues_[static_cast<std::size_t>(partIndex)])
                 rpn.store(-1, std::memory_order_release);
+        if (partIndex >= 0 && partIndex < static_cast<int>(kPartCount))
+            for (auto& rpn : rpnLsbValues_[static_cast<std::size_t>(partIndex)])
+                rpn.store(-1, std::memory_order_release);
     }
 private:
     std::array<std::atomic<int>, kPartCount> portamento_{};
     std::array<std::atomic<int>, kPartCount> softPedal_{};
     std::array<std::atomic<int>, kPartCount> sustainPedal_{};
     std::array<std::array<std::atomic<int>, 3>, kPartCount> rpnValues_{};
+    std::array<std::array<std::atomic<int>, 3>, kPartCount> rpnLsbValues_{};
 };
 
 // Backend contract only. A real implementation must be based on verified
@@ -482,6 +501,12 @@ public:
     bool sustainPedal(int partIndex) const noexcept { return runtimeControls_.sustainPedal(partIndex); }
     bool setRpn(int partIndex, int parameterIndex, int value) noexcept { return runtimeControls_.setRpn(partIndex, parameterIndex, value); }
     int getRpn(int partIndex, int parameterIndex) const noexcept { return runtimeControls_.rpn(partIndex, parameterIndex); }
+    bool setRpnLsb(int partIndex, int parameterIndex, int value) noexcept {
+        return runtimeControls_.setRpnLsb(partIndex, parameterIndex, value);
+    }
+    int getRpnLsb(int partIndex, int parameterIndex) const noexcept {
+        return runtimeControls_.rpnLsb(partIndex, parameterIndex);
+    }
     void resetPartControllers(int partIndex) noexcept {
         setSustainPedal(partIndex, false);
         runtimeControls_.reset(partIndex);

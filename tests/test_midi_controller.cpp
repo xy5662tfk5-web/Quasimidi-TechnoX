@@ -32,6 +32,8 @@ int main() {
     assert(!router.handleControlChange(1, 6, 64));
     const auto rpn = router.decodeRpnDataEntry(1, 64);
     assert(rpn && rpn->parameterIndex == 1 && rpn->rawValue == 64);
+    const auto rpnLsb = router.decodeRpnDataEntryLsb(1, 37);
+    assert(rpnLsb && rpnLsb->parameterIndex == 1 && rpnLsb->rawValue == 37);
     assert(!router.decodeRpnDataEntry(17, 64));
     assert(!router.handleControlChange(1, 121, 0));
     assert(!router.decodeRpnDataEntry(1, 64));

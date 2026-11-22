@@ -251,6 +251,9 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             const auto rpnChange = controller == 6
                 ? midiControlRouter.decodeRpnDataEntry(message.getChannel(), value)
                 : std::optional<technox::MidiControlRouter::RpnParameterChange>{};
+            const auto rpnLsbChange = controller == 38
+                ? midiControlRouter.decodeRpnDataEntryLsb(message.getChannel(), value)
+                : std::optional<technox::MidiControlRouter::RpnParameterChange>{};
 
             for (int i = 0; i < targetCount; ++i) {
                 const int slot = targetSlots[static_cast<std::size_t>(i)];
@@ -274,6 +277,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                                                 drumChange->parameterIndex, drumChange->rawValue);
                 if (rpnChange.has_value())
                     massEngine.setRpn(enginePart, rpnChange->parameterIndex, rpnChange->rawValue);
+                if (rpnLsbChange.has_value())
+                    massEngine.setRpnLsb(enginePart, rpnLsbChange->parameterIndex, rpnLsbChange->rawValue);
             }
         } else if (message.isProgramChange() && !omniPerformance) {
             for (int i = 0; i < targetCount; ++i) {

@@ -67,11 +67,20 @@ public:
     }
 
     struct RpnParameterChange {
-        std::uint8_t parameterIndex; // 0 = pitch-bend range, 1 = fine tune, 2 = coarse tune
+        std::uint8_t parameterIndex; // 0 = pitch-bend sensitivity, 1 = fine tune, 2 = coarse tune
         std::uint8_t rawValue;
     };
 
     std::optional<RpnParameterChange> decodeRpnDataEntry(int channel, int value) const noexcept {
+        if (!validChannel(channel) || value < 0 || value > 127)
+            return std::nullopt;
+        const auto ch = static_cast<std::size_t>(channel - 1);
+        if (rpnMsb_[ch] != 0x00 || rpnLsb_[ch] > 0x02)
+            return std::nullopt;
+        return RpnParameterChange{rpnLsb_[ch], static_cast<std::uint8_t>(value)};
+    }
+
+    std::optional<RpnParameterChange> decodeRpnDataEntryLsb(int channel, int value) const noexcept {
         if (!validChannel(channel) || value < 0 || value > 127)
             return std::nullopt;
         const auto ch = static_cast<std::size_t>(channel - 1);

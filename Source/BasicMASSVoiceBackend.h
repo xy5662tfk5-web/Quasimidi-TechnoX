@@ -92,10 +92,13 @@ public:
                 updateEnvelope(state, attack, decay, release);
 
                 const int bendRaw = sources.pitchBend(part);
-                const int bendRange = runtimeControls.rpn(part, 0) >= 0
+                const int bendRangeSemitones = runtimeControls.rpn(part, 0) >= 0
                     ? runtimeControls.rpn(part, 0) : 2;
-                const double bendSemitones = (static_cast<double>(bendRaw) / 8192.0) *
-                    static_cast<double>(bendRange);
+                const int bendRangeCents = runtimeControls.rpnLsb(part, 0) >= 0
+                    ? runtimeControls.rpnLsb(part, 0) : 0;
+                const double bendRange = static_cast<double>(bendRangeSemitones) +
+                    static_cast<double>(bendRangeCents) / 100.0;
+                const double bendSemitones = (static_cast<double>(bendRaw) / 8192.0) * bendRange;
                 const double vibratoSemitones = static_cast<double>(modWheel) * 0.5 *
                     std::sin(state.lfoPhase);
                 const double frequency = 440.0 * std::pow(2.0,

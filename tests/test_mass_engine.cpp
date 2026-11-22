@@ -35,6 +35,7 @@ int main() {
     assert(!engine.setAftertouch(15, 128));
     assert(engine.setRpn(12, 0, 12) && engine.getRpn(12, 0) == 12);
     assert(engine.setRpn(12, 1, 64) && engine.getRpn(12, 1) == 64);
+    assert(engine.setRpnLsb(12, 0, 75) && engine.getRpnLsb(12, 0) == 75);
     assert(!engine.setRpn(12, 3, 1));
     assert(engine.setPortamento(12, true) && engine.portamento(12));
     assert(engine.setSoftPedal(12, true) && engine.softPedal(12));
@@ -43,6 +44,7 @@ int main() {
     assert(engine.getPitchBend(12) == 0 && engine.getExpression(12) == 127);
     assert(engine.getAftertouch(12) == 0);
     assert(engine.getRpn(12, 0) == -1 && engine.getRpn(12, 1) == -1);
+    assert(engine.getRpnLsb(12, 0) == -1);
 
     // Sustain is independent per Part even when Parts share the same MIDI channel.
     BasicMASSVoiceBackend sustainBackend;
