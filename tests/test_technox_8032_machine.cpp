@@ -298,15 +298,15 @@ int main(int argc, char** argv) {
             TechnoX8032Machine ic51Probe;
             assert(ic51Probe.loadIC51Rom(realIC51.data(), realIC51.size()));
             ic51Probe.reset();
-            ic51Probe.writeInternal(0xb0, 0xffu); // P3.4/P3.1 high, P3.5 high: bank 0
+            ic51Probe.writeInternal(0xb0, 0xcdu); // P3.5/P3.4/P3.1 low: bank 0
             assert(ic51Probe.readExternal(0x0000) == realIC51[0x0000]);
             assert(ic51Probe.readExternal(0x1234) == realIC51[0x1234]);
             assert(ic51Probe.ic51ReadsByBank(0) == 2u);
-            ic51Probe.writeInternal(0xb0, 0xdfu); // P3.5 low: bank 1
+            ic51Probe.writeInternal(0xb0, 0xedu); // P3.5 high: bank 1
             assert(ic51Probe.readExternal(0x0000) == realIC51[0x10000]);
             assert(ic51Probe.readExternal(0x1234) == realIC51[0x11234]);
             assert(ic51Probe.ic51ReadsByBank(1) == 2u);
-            ic51Probe.writeInternal(0xb0, 0xcdu); // P3.4/P3.1 low: deselect IC51
+            ic51Probe.writeInternal(0xb0, 0xffu); // deselect IC51
         }
 
         struct TimedSysExFrame {
