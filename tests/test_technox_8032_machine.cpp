@@ -526,11 +526,10 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.loadIC4Rom(
             realRom.data(),
             realRom.size()));
-        // Retain the real IC51 resource tables and streams. The synthetic
-        // XDATA window and AC response below isolate the external bus timing,
-        // not the actual program-resource command interpreter.
-        if (!realIC51.empty())
-            assert(injectedResponseMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
+        // Keep this second machine synthetic so its ACIA timing test is
+        // isolated from the asynchronous IC51/resource-loader startup path.
+        // Real IC51 descriptors and command streams are covered above and in
+        // test_mass_resource_rom.
         injectedResponseMachine.reset();
         // Experimental fixture only: writable 7xxx window plus a controlled
         // 7BD5 status response. This proves the firmware path, not real hardware semantics.
