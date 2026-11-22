@@ -252,6 +252,8 @@ public:
             lastIC51ReadAddress_ = address;
             return ic51Rom_[bank * 0x10000u + address];
         }
+        if (address >= 0x8000u && address <= 0x8003u)
+            return commandPort_[address - 0x8000u];
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
             return soundDeviceResponse_; // status port outside RAM mode
         if (isXdataRam(address)) {
