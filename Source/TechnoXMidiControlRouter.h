@@ -66,6 +66,16 @@ public:
         return validChannel(channel) ? modulationWheel_[static_cast<std::size_t>(channel - 1)] : 0;
     }
 
+    struct BankSelectChange {
+        std::uint8_t bankNumber;
+    };
+
+    std::optional<BankSelectChange> decodePartBankSelect(int controller, int value) const noexcept {
+        if (controller != 0 || value < 0 || value > 3)
+            return std::nullopt;
+        return BankSelectChange{static_cast<std::uint8_t>(value)};
+    }
+
     struct RpnParameterChange {
         std::uint8_t parameterIndex; // 0 = pitch-bend sensitivity, 1 = fine tune, 2 = coarse tune
         std::uint8_t rawValue;

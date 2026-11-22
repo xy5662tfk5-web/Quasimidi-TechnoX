@@ -261,6 +261,9 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             else if (controller == 83)
                 setCommonControlRaw(performanceIndex, technox::MASSCommonControl::arpSpeed, value);
 
+            const auto bankSelectChange = !omniPerformance
+                ? midiControlRouter.decodePartBankSelect(controller, value)
+                : std::optional<technox::MidiControlRouter::BankSelectChange>{};
             const auto partChange = midiControlRouter.handleControlChange(message.getChannel(), controller, value);
             const auto drumChange = controller == 6
                 ? midiControlRouter.decodeDrumNrpnDataEntry(message.getChannel(), value)
@@ -275,6 +278,9 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             for (int i = 0; i < targetCount; ++i) {
                 const int slot = targetSlots[static_cast<std::size_t>(i)];
                 const int enginePart = 12 + slot;
+                if (bankSelectChange.has_value())
+                    setPartParameterRaw(performanceIndex, slot, technox::PartParameter::bankNumber,
+                                         bankSelectChange->bankNumber);
                 if (partChange.has_value())
                     setPartParameterRaw(performanceIndex, slot, partChange->parameter, partChange->rawValue);
                 if (controller == 1)

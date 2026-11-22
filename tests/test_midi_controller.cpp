@@ -2,6 +2,14 @@
 #include <cassert>
 using namespace technox;
 int main() {
+    MidiControlRouter bankSelectRouter;
+    const auto bank0 = bankSelectRouter.decodePartBankSelect(0, 0);
+    const auto bank3 = bankSelectRouter.decodePartBankSelect(0, 3);
+    assert(bank0 && bank0->bankNumber == 0);
+    assert(bank3 && bank3->bankNumber == 3);
+    assert(!bankSelectRouter.decodePartBankSelect(0, 4));
+    assert(!bankSelectRouter.decodePartBankSelect(32, 1));
+    assert(!bankSelectRouter.decodePartBankSelect(1, 1));
     MidiControlRouter router;
     auto cc = router.handleControlChange(1, 7, 100);
     assert(cc && cc->parameter == PartParameter::level && cc->rawValue == 100);
