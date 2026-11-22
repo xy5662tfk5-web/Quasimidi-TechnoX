@@ -279,7 +279,7 @@ int main(int argc, char** argv) {
         const auto peripheralInit = firmwareMachine.runUntilProgramCounter(0x32b0, 2000000);
         const bool reachedPeripheralHandoff = firmwareMachine.cpu().registers().pc == 0x32b0;
         const auto bank = firmwareMachine.cpu().registers().psw.registerBankBase();
-        std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X cycles=%llu\\n",
+        std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X P3=%02X boot=%u data=%u ready=%u FF10=%02X cycles=%llu\\n",
                     static_cast<unsigned>(reachedPeripheralHandoff), peripheralInit,
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned>(firmwareMachine.readCode(firmwareMachine.cpu().registers().pc)),
@@ -290,6 +290,11 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(firmwareMachine.readInternal(static_cast<std::uint8_t>(bank + 5u))),
                     static_cast<unsigned>(firmwareMachine.readInternal(static_cast<std::uint8_t>(bank + 6u))),
                     static_cast<unsigned>(firmwareMachine.readInternal(static_cast<std::uint8_t>(bank + 7u))),
+                    static_cast<unsigned>(firmwareMachine.readInternal(0xb0)),
+                    static_cast<unsigned>(firmwareMachine.soundDeviceBootRequested()),
+                    static_cast<unsigned>(firmwareMachine.soundDeviceDataLoaded()),
+                    static_cast<unsigned>(firmwareMachine.soundDeviceReady()),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0xff10)),
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
         std::fflush(stdout);
         assert(peripheralInit > 0);
