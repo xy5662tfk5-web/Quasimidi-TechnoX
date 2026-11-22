@@ -363,8 +363,7 @@ void testMASS1EDDSlotCoefficientStage() {
         view, 0x01, 0x7f, 0x00, 0x00, 0x80, 0x40, result));
     assert(result.modulationApplied && result.coefficientB == 0x7f);
 
-    // 0x40 dispatches RAM[0x41] through the same entry. The selected
-    // parameter's high-bit path and the final OV/CY saturation are preserved.
+    // 0x40 dispatches RAM[0x41] through the same entry's ACC.7 sign branch.
     assert(MASS1EDDSlotCoefficientStage::apply(
         view, 0x40, 0x7f, 0x00, 0x00, 0x80, 0x40, result));
     assert(result.modulationApplied && result.coefficientB == 0x00);
@@ -378,6 +377,15 @@ void testMASS1EDDSlotCoefficientStage() {
     assert(MASS1EDDSlotCoefficientStage::apply(
         view, 0x40, 0x55, 0x00, 0x00, 0x00, 0x80, result));
     assert(!result.modulationApplied && result.coefficientB == 0x55);
+}
+
+void testMASS1890Arithmetic() {
+    // Entry 0x1890 joins the second half of 0x1848. These vectors cover
+    // both ACC.7 entry paths and the resulting multiply/accumulate byte.
+    assert(MASS1890Arithmetic::apply(0x40, 0x7f) == 0x7f);
+    assert(MASS1890Arithmetic::apply(0x80, 0x7f) == 0x00);
+    assert(MASS1890Arithmetic::apply(0xc0, 0x7f) == 0x40);
+    assert(MASS1890Arithmetic::apply(0x20, 0x40) == 0x4f);
 }
 
 void testMASS1848Arithmetic() {
@@ -957,6 +965,7 @@ int main(int argc, char** argv) {
     testMASS1EDDPostLookup();
     testMASS1EDDParameterPipeline();
     testMASS1EDDSlotCoefficientStage();
+    testMASS1890Arithmetic();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
     testMASS1848Arithmetic();
