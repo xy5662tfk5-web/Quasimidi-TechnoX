@@ -407,6 +407,9 @@ public:
             return value;
         }
 
+        if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu)
+            return testExternalRam7000_[address - 0x7000u];
+
         switch (address) {
             case 0xa002: return (aciaControl_ & 0x03u) == 0x03u
                 ? static_cast<std::uint8_t>(aciaStatus_ & ~0x02u) : aciaStatus_;
@@ -471,6 +474,11 @@ public:
                 packet.machineCycle = elapsedMachineCycles_;
                 ++soundCommandPacketCount_;
             }
+            return;
+        }
+
+        if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
+            testExternalRam7000_[address - 0x7000u] = value;
             return;
         }
 
@@ -611,6 +619,19 @@ public:
     }
     void setSoundDeviceResponseForTesting(std::uint8_t value) noexcept {
         soundDeviceResponse_ = value;
+    }
+    // Experimental fixture only: MAME leaves the 0x7000-0x7FFF external
+    // window unimplemented. This opt-in RAM overlay tests firmware control
+    // flow without changing the default open-bus hardware model.
+    void enableTestExternalRamWindow7000(std::uint8_t fillValue = 0x00) noexcept {
+        testExternalRam7000_.fill(fillValue);
+        testExternalRam7000Enabled_ = true;
+    }
+    void setTestExternalRamByte(std::uint16_t address, std::uint8_t value) noexcept {
+        if (address >= 0x7000u && address <= 0x7fffu) {
+            testExternalRam7000_[address - 0x7000u] = value;
+            testExternalRam7000Enabled_ = true;
+        }
     }
 
     static constexpr std::uint8_t descrambledOffset(std::uint8_t offset) noexcept {
