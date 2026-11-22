@@ -528,6 +528,8 @@ private:
     std::array<std::uint8_t, 4> commandPort_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
+    std::array<PortWriteEvent, 256> portWriteTrace_{};
+    std::size_t portWriteCount_ = 0;
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
