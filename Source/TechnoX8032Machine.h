@@ -21,6 +21,11 @@ public:
         std::array<std::uint8_t, 4> bytes{};
         std::uint64_t machineCycle = 0;
     };
+    struct PortWriteEvent {
+        std::uint8_t port = 0;
+        std::uint8_t value = 0xff;
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -111,6 +116,8 @@ public:
         commandPort_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
+        portWriteTrace_.fill(PortWriteEvent{});
+        portWriteCount_ = 0;
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -215,6 +222,11 @@ public:
             const auto previousPins = portPins_[index];
             portLatch_[index] = value;
             portPins_[index] = value;
+            auto& portEvent = portWriteTrace_[portWriteCount_ % portWriteTrace_.size()];
+            portEvent.port = static_cast<std::uint8_t>(port);
+            portEvent.value = value;
+            portEvent.machineCycle = elapsedMachineCycles_;
+            ++portWriteCount_;
             if (port == 3) {
                 if (((previousPins ^ value) & 0x20u) != 0)
                     ++p35TransitionCount_;
@@ -415,6 +427,10 @@ public:
     std::uint8_t lastAciaReceiveRead() const noexcept { return lastAciaReceiveRead_; }
     const SoundCommandPacket& soundCommandPacketAt(std::size_t index) const noexcept {
         return soundCommandTrace_[index % soundCommandTrace_.size()];
+    }
+    std::size_t portWriteCount() const noexcept { return portWriteCount_; }
+    const PortWriteEvent& portWriteAt(std::size_t index) const noexcept {
+        return portWriteTrace_[index % portWriteTrace_.size()];
     }
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
