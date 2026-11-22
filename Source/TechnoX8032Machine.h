@@ -75,6 +75,17 @@ public:
         return executed;
     }
 
+    std::size_t runUntilProgramCounter(std::uint16_t target,
+                                       std::size_t maximumInstructions) noexcept {
+        std::size_t executed = 0;
+        while (executed < maximumInstructions && cpu_.registers().pc != target) {
+            if (step() == MCS51StepResult::unsupportedOpcode)
+                break;
+            ++executed;
+        }
+        return cpu_.registers().pc == target ? executed : 0;
+    }
+
     std::uint8_t readCode(std::uint16_t address) const noexcept override {
         return code_[address];
     }
