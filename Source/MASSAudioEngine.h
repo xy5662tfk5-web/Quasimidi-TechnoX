@@ -465,38 +465,90 @@ public:
                     voices_.finishRelease(i);
                 }
             }
-            if (preferredVoice >= 0)
-                backend_->resetVoice(preferredVoice, voices_.voices()[static_cast<std::size_t>(preferredVoice)]);
         }
 
         const int target = preferredVoice >= 0 ? preferredVoice : voices_.allocationTarget();
+        const bool legatoReuse = preferredVoice >= 0 &&
+            !voices_.voices()[static_cast<std::size_t>(preferredVoice)].releasing;
         if (preferredVoice < 0 && target >= 0 &&
             voices_.voices()[static_cast<std::size_t>(target)].active &&
             !voices_.voices()[static_cast<std::size_t>(target)].releasing)
             backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
-        const int voiceIndex = voices_.noteOn(part, channel, note, velocity, preferredVoice);
-        if (voiceIndex >= 0)
+        const int voiceIndex = preferredVoice >= 0
+            ? (voices_.retargetVoice(static_cast<std::size_t>(preferredVoice), channel, note, velocity)
+                ? preferredVoice : -1)
+            : voices_.noteOn(part, channel, note, velocity);
+        if (voiceIndex >= 0 && !legatoReuse)
             backend_->noteOn(voiceIndex, voices_.voices()[static_cast<std::size_t>(voiceIndex)]);
+        if ((trackMode == 2 || trackMode == 3) && voiceIndex >= 0)
+            pushMonoKey(static_cast<int>(part), channel, note, velocity);
     }
 
     void noteOff(std::uint8_t channel, std::uint8_t note) noexcept {
-        // A key release is held while its Part's sustain pedal is down.
-        // Once pedal-up arrives, the backend receives exactly one Note Off.
+        // Mono/Lead use last-note priority. Releasing the current key restores
+        // the newest still-held key without restarting the voice envelope.
+        std::array<bool, MASSPartParameterStore::kPartCount> handledMonoParts{};
+        for (std::size_t part = 0; part < MASSPartParameterStore::kPartCount; ++part) {
+            const int mode = partParameters_.get(static_cast<int>(part), PartParameter::trackMode);
+            if (mode != 2 && mode != 3) continue;
+            auto& count = monoKeyCounts_[part];
+            int found = -1;
+            for (int i = static_cast<int>(count) - 1; i >= 0; --i) {
+                const auto& key = monoKeyStacks_[part][static_cast<std::size_t>(i)];
+                if (key.channel == channel && key.note == note && key.keyDown) {
+                    found = i;
+                    break;
+                }
+            }
+            if (found < 0) continue;
+            handledMonoParts[part] = true;
+            const bool isTop = static_cast<std::size_t>(found) == count - 1;
+            if (isTop && runtimeControls_.sustainPedal(static_cast<int>(part))) {
+                monoKeyStacks_[part][static_cast<std::size_t>(found)].keyDown = false;
+                monoKeyStacks_[part][static_cast<std::size_t>(found)].sustained = true;
+                const int voiceIndex = activeVoiceForPart(static_cast<int>(part));
+                if (voiceIndex >= 0 && voices_.voices()[static_cast<std::size_t>(voiceIndex)].note == note)
+                    voices_.holdForSustain(static_cast<std::size_t>(voiceIndex));
+                continue;
+            }
+
+            removeMonoKeyAt(part, static_cast<std::size_t>(found));
+            if (!isTop) continue;
+            while (count > 0 && !monoKeyStacks_[part][count - 1].keyDown &&
+                   !monoKeyStacks_[part][count - 1].sustained)
+                --count;
+
+            const int voiceIndex = activeVoiceForPart(static_cast<int>(part));
+            if (voiceIndex < 0) continue;
+            if (count > 0) {
+                const auto& previous = monoKeyStacks_[part][count - 1];
+                if (voices_.retargetVoice(static_cast<std::size_t>(voiceIndex),
+                                          previous.channel, previous.note, previous.velocity))
+                    continue;
+            }
+            releaseVoiceWithSustain(static_cast<std::size_t>(voiceIndex));
+        }
+
         const auto& slots = voices_.voices();
         for (std::size_t i = 0; i < slots.size(); ++i) {
             const auto& voice = slots[i];
-            if (!voice.active || voice.releasing || voice.channel != channel || voice.note != note)
+            if (!voice.active || voice.releasing || voice.channel != channel || voice.note != note ||
+                handledMonoParts[voice.part])
                 continue;
-            if (runtimeControls_.sustainPedal(voice.part)) {
-                voices_.holdForSustain(i);
-            } else {
-                backend_->noteOff(static_cast<int>(i), voice);
-                voices_.releaseVoice(i);
-            }
+            releaseVoiceWithSustain(i);
         }
     }
 
     void allNotesOff(int channel = 0) noexcept {
+        for (std::size_t part = 0; part < monoKeyCounts_.size(); ++part) {
+            auto& count = monoKeyCounts_[part];
+            for (std::size_t i = 0; i < count;) {
+                if (channel == 0 || monoKeyStacks_[part][i].channel == channel)
+                    removeMonoKeyAt(part, i);
+                else
+                    ++i;
+            }
+        }
         const auto& slots = voices_.voices();
         for (std::size_t i = 0; i < slots.size(); ++i) {
             const auto& voice = slots[i];
@@ -512,6 +564,15 @@ public:
     }
 
     void allSoundsOff(int channel = 0) noexcept {
+        for (std::size_t part = 0; part < monoKeyCounts_.size(); ++part) {
+            auto& count = monoKeyCounts_[part];
+            for (std::size_t i = 0; i < count;) {
+                if (channel == 0 || monoKeyStacks_[part][i].channel == channel)
+                    removeMonoKeyAt(part, i);
+                else
+                    ++i;
+            }
+        }
         const auto& slots = voices_.voices();
         for (std::size_t i = 0; i < slots.size(); ++i) {
             if (slots[i].active && (channel == 0 || slots[i].channel == channel)) {
@@ -546,6 +607,10 @@ public:
 
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         if (!partParameters_.set(partIndex, parameter, rawValue)) return false;
+        if (parameter == PartParameter::trackMode &&
+            partIndex >= 0 && partIndex < static_cast<int>(MASSPartParameterStore::kPartCount)) {
+            clearMonoKeys(partIndex);
+        }
         if (parameter == PartParameter::trackMode && rawValue == 0 &&
             partIndex >= 0 && partIndex < static_cast<int>(MASSPartParameterStore::kPartCount)) {
             const auto& slots = voices_.voices();
@@ -592,11 +657,27 @@ public:
         const bool wasEnabled = runtimeControls_.sustainPedal(partIndex);
         if (!runtimeControls_.setSustainPedal(partIndex, effectiveEnabled)) return false;
         if (wasEnabled && !effectiveEnabled) {
+            auto& monoCount = monoKeyCounts_[part];
+            for (std::size_t i = 0; i < monoCount;) {
+                if (!monoKeyStacks_[part][i].keyDown)
+                    removeMonoKeyAt(part, i);
+                else
+                    ++i;
+            }
+            const int monoVoice = activeVoiceForPart(partIndex);
+            if (monoVoice >= 0 && monoCount > 0) {
+                const auto& top = monoKeyStacks_[part][monoCount - 1];
+                voices_.retargetVoice(static_cast<std::size_t>(monoVoice),
+                                      top.channel, top.note, top.velocity);
+            } else if (monoVoice >= 0 && voices_.voices()[static_cast<std::size_t>(monoVoice)].sustained) {
+                backend_->noteOff(monoVoice, voices_.voices()[static_cast<std::size_t>(monoVoice)]);
+                voices_.releaseVoice(static_cast<std::size_t>(monoVoice));
+            }
             const auto& slots = voices_.voices();
             for (std::size_t i = 0; i < slots.size(); ++i) {
                 const auto& voice = slots[i];
                 if (!voice.active || voice.releasing || voice.part != partIndex ||
-                    !voice.sustained || voice.keyDown)
+                    !voice.sustained || voice.keyDown || static_cast<int>(i) == monoVoice)
                     continue;
                 backend_->noteOff(static_cast<int>(i), voice);
                 voices_.releaseVoice(i);
@@ -643,6 +724,67 @@ public:
     const MASSPartParameterStore& partParameters() const noexcept { return partParameters_; }
 
 private:
+    struct MonoKeyEntry {
+        std::uint8_t channel = 0;
+        std::uint8_t note = 0;
+        std::uint8_t velocity = 0;
+        bool keyDown = false;
+        bool sustained = false;
+    };
+
+    static constexpr std::size_t kMonoKeyCapacity = MASSPartParameterStore::kPartCount > VoiceManager::kVoiceCount
+        ? MASSPartParameterStore::kPartCount : VoiceManager::kVoiceCount;
+
+    void clearMonoKeys(int partIndex) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(MASSPartParameterStore::kPartCount)) return;
+        monoKeyCounts_[static_cast<std::size_t>(partIndex)] = 0;
+    }
+
+    void pushMonoKey(int partIndex, std::uint8_t channel, std::uint8_t note,
+                     std::uint8_t velocity) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(MASSPartParameterStore::kPartCount)) return;
+        auto& count = monoKeyCounts_[static_cast<std::size_t>(partIndex)];
+        auto& stack = monoKeyStacks_[static_cast<std::size_t>(partIndex)];
+        if (count >= stack.size()) {
+            for (std::size_t i = 1; i < count; ++i) stack[i - 1] = stack[i];
+            --count;
+        }
+        stack[count++] = {channel, note, velocity, true, false};
+    }
+
+    void removeMonoKeyAt(std::size_t part, std::size_t index) noexcept {
+        if (part >= monoKeyStacks_.size() || index >= monoKeyCounts_[part]) return;
+        auto& count = monoKeyCounts_[part];
+        for (std::size_t i = index + 1; i < count; ++i)
+            monoKeyStacks_[part][i - 1] = monoKeyStacks_[part][i];
+        --count;
+    }
+
+    int activeVoiceForPart(int partIndex) const noexcept {
+        int selected = -1;
+        std::uint64_t newest = 0;
+        const auto& slots = voices_.voices();
+        for (std::size_t i = 0; i < slots.size(); ++i)
+            if (slots[i].active && slots[i].part == static_cast<std::uint8_t>(partIndex) &&
+                (selected < 0 || slots[i].age >= newest)) {
+                selected = static_cast<int>(i);
+                newest = slots[i].age;
+            }
+        return selected;
+    }
+
+    void releaseVoiceWithSustain(std::size_t voiceIndex) noexcept {
+        if (voiceIndex >= voices_.voices().size()) return;
+        const auto& voice = voices_.voices()[voiceIndex];
+        if (!voice.active || voice.releasing) return;
+        if (runtimeControls_.sustainPedal(voice.part)) {
+            voices_.holdForSustain(voiceIndex);
+        } else {
+            backend_->noteOff(static_cast<int>(voiceIndex), voice);
+            voices_.releaseVoice(voiceIndex);
+        }
+    }
+
     NullMASSVoiceBackend nullBackend_;
     IMASSVoiceBackend* backend_;
     double preparedSampleRate_ = 44100.0;
@@ -657,6 +799,8 @@ private:
     MASSPerformanceImageStore performanceImage_;
     MASSDrumParameterStore drumParameters_;
     std::array<std::atomic<bool>, MASSPartParameterStore::kPartCount> sustainControllerDown_{};
+    std::array<std::array<MonoKeyEntry, kMonoKeyCapacity>, MASSPartParameterStore::kPartCount> monoKeyStacks_{};
+    std::array<std::size_t, MASSPartParameterStore::kPartCount> monoKeyCounts_{};
 };
 
 } // namespace technox

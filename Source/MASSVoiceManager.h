@@ -78,6 +78,21 @@ public:
         return selected;
     }
 
+    bool retargetVoice(std::size_t voiceIndex, std::uint8_t channel,
+                       std::uint8_t note, std::uint8_t velocity) noexcept {
+        if (voiceIndex >= voices_.size() || !voices_[voiceIndex].active || velocity == 0)
+            return false;
+        auto& voice = voices_[voiceIndex];
+        voice.channel = channel;
+        voice.note = note;
+        voice.velocity = velocity;
+        voice.age = ++age_;
+        voice.keyDown = true;
+        voice.sustained = false;
+        voice.releasing = false;
+        return true;
+    }
+
     void noteOff(std::uint8_t channel, std::uint8_t note) noexcept {
         for (std::size_t i = 0; i < voices_.size(); ++i)
             if (voices_[i].active && voices_[i].channel == channel && voices_[i].note == note)

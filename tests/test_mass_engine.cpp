@@ -163,6 +163,18 @@ int main() {
         if (voice.active && voice.part == 12)
             leadRetainedNewest = voice.note == 72 && !voice.releasing;
     assert(leadRetainedNewest);
+    modeEngine.noteOff(1, 72);
+    bool leadRestoredPrevious = false;
+    for (const auto& voice : modeEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12)
+            leadRestoredPrevious = voice.note == 69 && !voice.releasing;
+    assert(leadRestoredPrevious);
+    modeEngine.noteOff(1, 69);
+    bool leadFinalReleased = false;
+    for (const auto& voice : modeEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 69)
+            leadFinalReleased = voice.releasing;
+    assert(leadFinalReleased);
     assert(modeEngine.setPartParameter(12, PartParameter::trackMode, 0));
     assert(modeEngine.voiceManager().activeVoiceCount() == 0);
 
