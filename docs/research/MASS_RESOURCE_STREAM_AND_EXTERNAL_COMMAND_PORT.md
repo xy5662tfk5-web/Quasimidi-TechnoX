@@ -83,6 +83,8 @@ Subroutine 0x1848 is represented at instruction level in MASS1848Arithmetic. Its
 
 The E7 branch changes the operands before both multiplications; it is not a final sign-bit toggle. The C++ model retains the byte-level operations and carries rather than substituting a floating-point approximation. Tests cover E7 on/off, positive and carry-producing sums, and both saturation endpoints.
 
+The 0x1C61 handler can perform a 24-bit interpolation. XDATA 0x2067 bit7 selects the sign branch: the handler takes R4&7, optionally computes its 8-bit two's-complement negation, divides by 12, and uses the quotient as the number of later left/right shifts while the remainder selects a coefficient from 0x11F0 (nonnegative) or 0x11FC (negative). MASS1C61InterpolationLookup now models that division/table selection exactly. The subsequent three-byte multiply/accumulate and shifts remain a separate fixed-point stage.
+
 ## 4. Command-stream interpreter
 
 `0x189D` uses the descriptor pointer and the per-mode metadata table at `0x2868 + 0x80*mode`. The command interpreter is reached through the indirect dispatch at `0x19BD`.

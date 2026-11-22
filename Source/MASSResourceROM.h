@@ -78,6 +78,42 @@ private:
     std::size_t imageSize_ = 0;
 };
 
+struct MASS1C61InterpolationLookupResult {
+    std::uint8_t signedIndex = 0;
+    std::uint8_t shiftCount = 0;
+    std::uint8_t tableRemainder = 0;
+    std::uint8_t coefficient = 0;
+    bool negativeBranch = false;
+};
+
+// Reconstructs 0x1CC6..0x1CDE / 0x1D23..0x1D2A. The low three bits
+// of R4 are optionally negated as an 8-bit value, divided by 12, and the
+// remainder selects one of the two 12-entry ROM interpolation tables.
+class MASS1C61InterpolationLookup {
+public:
+    static bool resolve(const MASSFirmwareROMView& rom,
+                        std::uint8_t r4,
+                        bool negativeBranch,
+                        MASS1C61InterpolationLookupResult& result) noexcept {
+        auto index = static_cast<std::uint8_t>(r4 & 0x07u);
+        if (negativeBranch)
+            index = static_cast<std::uint8_t>(0u - index);
+
+        const auto quotient = static_cast<std::uint8_t>(index / 12u);
+        const auto remainder = static_cast<std::uint8_t>(index % 12u);
+        const auto table = negativeBranch
+            ? MASSFirmwareLookupTable::interpolationCurve11FC
+            : MASSFirmwareLookupTable::interpolationCurve11F0;
+
+        std::uint8_t coefficient = 0;
+        if (!rom.read(table, remainder, coefficient))
+            return false;
+
+        result = {index, quotient, remainder, coefficient, negativeBranch};
+        return true;
+    }
+};
+
 struct MASS1EDDLookupResult {
     bool lookupPerformed = false;
     bool bSignBranch = false;

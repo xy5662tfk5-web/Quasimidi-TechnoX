@@ -21,6 +21,37 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testMASS1C61InterpolationLookup() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    const std::array<std::uint8_t, 12> positive{{
+        0x80, 0x88, 0x90, 0x98, 0xa1, 0xab,
+        0xb5, 0xc0, 0xcb, 0xd7, 0xe4, 0xf2
+    }};
+    const std::array<std::uint8_t, 12> negative{{
+        0xff, 0xf2, 0xe4, 0xd7, 0xcb, 0xc0,
+        0xb5, 0xab, 0xa1, 0x98, 0x90, 0x88
+    }};
+    std::copy(positive.begin(), positive.end(), romBytes.begin() + 0x11f0);
+    std::copy(negative.begin(), negative.end(), romBytes.begin() + 0x11fc);
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASS1C61InterpolationLookupResult result{};
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x07, false, result));
+    assert(result.signedIndex == 0x07 && result.shiftCount == 0);
+    assert(result.tableRemainder == 7 && result.coefficient == 0xc0);
+    assert(!result.negativeBranch);
+
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x01, true, result));
+    assert(result.signedIndex == 0xff && result.shiftCount == 21);
+    assert(result.tableRemainder == 3 && result.coefficient == 0xd7);
+    assert(result.negativeBranch);
+
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x07, true, result));
+    assert(result.signedIndex == 0xf9 && result.shiftCount == 20);
+    assert(result.tableRemainder == 9 && result.coefficient == 0x98);
+}
+
 void testMASS1EDDLookupIndexBuilder() {
     std::vector<std::uint8_t> romBytes(0x20000, 0xff);
     for (std::size_t i = 0; i < 128; ++i)
@@ -732,6 +763,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASS1C61InterpolationLookup();
     testMASS1EDDLookupIndexBuilder();
     testMASS1EDDPostLookup();
     testMASS1EDDParameterPipeline();
