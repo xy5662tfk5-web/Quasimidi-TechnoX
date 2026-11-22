@@ -49,6 +49,9 @@ void testMASS1C61SecondaryTableAddress() {
     MASS1C61SecondaryTableBytes bytes{};
     assert(MASS1C61SecondaryTableReader::read(view, normal, bytes));
     assert((bytes.bytes == std::array<std::uint8_t, 3>{{0x12, 0x34, 0x56}}));
+    const auto fields = MASS1C61PackedLookupDecoder::decode(bytes);
+    assert(fields.r5 == 0x12 && fields.r6 == 0x34 && fields.r7 == 0x56);
+    assert(fields.r3 == 0x82 && fields.r4 == 0xce);
 }
 
 void testMASS1C61InterpolationLookup() {

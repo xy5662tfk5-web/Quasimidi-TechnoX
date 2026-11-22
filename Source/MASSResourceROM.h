@@ -120,6 +120,46 @@ struct MASS1C61SecondaryTableBytes {
     std::array<std::uint8_t, 3> bytes{};
 };
 
+struct MASS1C61PackedLookupFields {
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+    std::uint8_t r5 = 0;
+    std::uint8_t r6 = 0;
+    std::uint8_t r7 = 0;
+};
+
+// Reverses the SWAP/RL/ANL/ORL sequence at 0x1D9D..0x1DBD.
+class MASS1C61PackedLookupDecoder {
+public:
+    static MASS1C61PackedLookupFields decode(
+        const MASS1C61SecondaryTableBytes& table) noexcept {
+        const auto packed0 = table.bytes[0];
+        const auto packed1 = table.bytes[1];
+        const auto packed2 = table.bytes[2];
+
+        const auto a0 = rotateLeft(swapNibbles(packed0));
+        const auto r3Low = static_cast<std::uint8_t>(a0 & 0x1fu);
+
+        const auto a1 = rotateLeft(swapNibbles(packed1));
+        const auto r3 = static_cast<std::uint8_t>((a1 & 0xe0u) | r3Low);
+        auto r4 = static_cast<std::uint8_t>(a1 & 0x1fu);
+
+        const auto r7 = packed2;
+        const auto a2 = rotateLeft(swapNibbles(packed2));
+        r4 = static_cast<std::uint8_t>(a2 | r4);
+
+        return {r3, r4, packed0, packed1, r7};
+    }
+
+private:
+    static constexpr std::uint8_t swapNibbles(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>((value << 4) | (value >> 4));
+    }
+    static constexpr std::uint8_t rotateLeft(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>((value << 1) | (value >> 7));
+    }
+};
+
 class MASS1C61SecondaryTableReader {
 public:
     // The firmware reads MOVC at DPTR, DPTR+0x80, then DPTR+0x100.
