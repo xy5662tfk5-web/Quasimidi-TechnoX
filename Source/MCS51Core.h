@@ -93,7 +93,7 @@ enum class MCS51StepResult : std::uint8_t { executed, unsupportedOpcode };
 
 class MCS51Core {
 public:
-    static constexpr std::uint16_t kAddressSpaceSize = 0x10000;
+    static constexpr std::uint32_t kAddressSpaceSize = 0x10000u;
 
     void reset() noexcept {
         registers_ = MCS51Registers{};
@@ -106,7 +106,6 @@ public:
 
     MCS51StepResult step(MCS51Bus& bus) noexcept {
         const auto opcode = fetch8(bus);
-        std::uint8_t value = 0;
         unsigned cycles = 1;
 
         if (opcode == 0x00) { // NOP
@@ -177,7 +176,7 @@ public:
             cycles = 2;
         } else if (opcode >= 0xe8 && opcode <= 0xef) { // MOV A,Rn
             registers_.a = readRegister(bus, opcode & 7u);
-        } else if (opcode >= 0xf8 && opcode <= 0xff) { // MOV Rn,A
+        } else if (opcode >= 0xf8) { // MOV Rn,A
             writeRegister(bus, opcode & 7u, registers_.a);
         } else if (opcode == 0x04) { // INC A
             ++registers_.a;
