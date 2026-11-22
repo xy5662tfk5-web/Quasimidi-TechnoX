@@ -143,7 +143,6 @@ struct MASS1C61AccumulatorResult {
     std::uint8_t r4 = 0;
     bool zeroInputBypass = false;
     bool negativeInput = false;
-    bool negativeInput = false;
 };
 
 // Instruction-level model of 0x1DC8..0x1E04. The input CY from ADD A,R7 at
@@ -282,6 +281,18 @@ public:
             return false;
         result = decoded;
         return true;
+    }
+
+    static bool read(const MASSFirmwareROMView& rom,
+                     const MASS1C61SecondaryTableAddress& address,
+                     std::uint8_t originalR7,
+                     MASS1C61SecondaryTableBytes& result,
+                     MASS1C61SecondaryTableFetchAddress* resolved = nullptr) noexcept {
+        const auto fetch = MASS1C61SecondaryTableFetchAddressBuilder::addOriginalR7(
+            address.address, originalR7);
+        if (resolved != nullptr)
+            *resolved = fetch;
+        return read(rom, fetch.address, result);
     }
 
     static bool read(const MASSFirmwareROMView& rom,

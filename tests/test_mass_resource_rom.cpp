@@ -74,6 +74,20 @@ void testMASS1C61SecondaryTableAddress() {
         0x40f0, 0x20);
     assert(withCarry.address == 0x4110 && withCarry.pageCarry);
 
+    // The reader consumes the adjusted DPTR, then reads the three MOVC lanes.
+    std::vector<std::uint8_t> image(0x20000, 0xff);
+    image[0x4110] = 0x11;
+    image[0x4190] = 0x22;
+    image[0x4210] = 0x33;
+    MASSFirmwareROMView view;
+    assert(view.attach(image.data(), image.size()));
+    MASS1C61SecondaryTableBytes triplet{};
+    MASS1C61SecondaryTableFetchAddress resolved{};
+    assert(MASS1C61SecondaryTableReader::read(
+        view, upper, 0x40, triplet, &resolved));
+    assert(resolved.address == 0x4210 && resolved.pageCarry);
+    assert((triplet.bytes == std::array<std::uint8_t, 3>{{0x33, 0xff, 0xff}}));
+
     std::vector<std::uint8_t> image(0x20000, 0xff);
     image[0x4050] = 0x12;
     image[0x40d0] = 0x34;
