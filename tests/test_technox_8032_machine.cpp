@@ -508,6 +508,32 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.returnPC),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        const auto busProbeCount = firmwareMachine.ic51BusProbeTraceCount();
+        std::printf("IC51 bus probes around AF3C-AF63 (last 24): total=%zu\\n",
+                    busProbeCount);
+        const auto firstBusProbe = busProbeCount > 24u ? busProbeCount - 24u : 0u;
+        for (std::size_t i = firstBusProbe; i < busProbeCount; ++i) {
+            const auto& event = firmwareMachine.ic51BusProbeTraceAt(i);
+            std::printf("  pc=%04X DPTR=%04X P3=%02X selected=%u bank=%u value=%02X cycle=%llu\\n",
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.p3),
+                        static_cast<unsigned>(event.selected),
+                        static_cast<unsigned>(event.bank),
+                        static_cast<unsigned>(event.valueOnCurrentMap),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
+        std::printf("IC4 P3 writes during peripheral init (last 32):\\n");
+        const auto p3Writes = firmwareMachine.portWriteCount();
+        std::size_t shownP3Writes = 0;
+        for (std::size_t age = 0; age < p3Writes && shownP3Writes < 32u; ++age) {
+            const auto& event = firmwareMachine.portWriteAt(p3Writes - 1u - age);
+            if (event.port != 3u) continue;
+            ++shownP3Writes;
+            std::printf("  P3=%02X cycle=%llu\\n",
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
 
