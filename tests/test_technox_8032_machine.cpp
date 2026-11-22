@@ -91,22 +91,22 @@ int main(int argc, char** argv) {
     assert(machine.soundCommandPacketCount() == 1u);
     const auto& capturedCommand = machine.soundCommandPacketAt(0);
     assert(capturedCommand.bytes == command);
-    assert(machine.sam9407BurstWordCount() == 1u);
-    const auto& burstWord = machine.sam9407BurstWordAt(0);
+    assert(machine.unidentifiedSoundHostBurstWordCount() == 1u);
+    const auto& burstWord = machine.unidentifiedSoundHostBurstWordAt(0);
     assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
     assert(burstWord.value == 0x4433u);
     machine.writeExternal(0x8003u, 0x80u); // standalone 0x0DCE-style control write
     assert(machine.soundCommandPacketCount() == 1u);
-    assert(machine.sam9407BurstWordCount() == 1u);
-    assert(machine.sam9407HostWriteCount() == 5u);
-    assert(machine.sam9407HostWordForTesting(0x11u) == 0x8033u);
+    assert(machine.unidentifiedSoundHostBurstWordCount() == 1u);
+    assert(machine.unidentifiedSoundHostHostWriteCount() == 5u);
+    assert(machine.unidentifiedSoundHostHostWordForTesting(0x11u) == 0x8033u);
     machine.writeExternal(0x8000u, 0x20u);
     machine.writeExternal(0x8001u, 0x00u);
     machine.writeExternal(0x8002u, 0x78u);
     machine.writeExternal(0x8003u, 0x56u);
     assert(machine.soundCommandPacketCount() == 2u);
-    assert(machine.sam9407BurstWordCount() == 2u);
-    assert(machine.sam9407HostWordForTesting(0x20u) == 0x5678u);
+    assert(machine.unidentifiedSoundHostBurstWordCount() == 2u);
+    assert(machine.unidentifiedSoundHostHostWordForTesting(0x20u) == 0x5678u);
     machine.writeExternal(0x8000u, 0x11u);
     assert(machine.readExternal(0x8002u) == 0x33u);
     assert(machine.readExternal(0x8003u) == 0x80u);
@@ -543,32 +543,32 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.cpu().totalCycles() != 0);
 
         // Resume the real-IC51 loader with a controlled ready signature.
-        // This is explicitly a synthetic SAM9407 handshake, not a claim that
+        // This is explicitly a synthetic UnidentifiedSoundHost handshake, not a claim that
         // the unimplemented DSP returned AC on physical hardware.
         const auto loadedBlockWrites = firmwareMachine.soundMemoryWriteCount();
         firmwareMachine.enableTestExternalRamWindow7000(0x00u);
         firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
         firmwareMachine.setSoundDeviceResponseForTesting(0xacu);
         const auto resumedToMain = firmwareMachine.runUntilProgramCounter(0x32b0u, 2000000u);
-        std::printf("IC4 after synthetic SAM9407-ready response: instructions=%llu PC=%04X "
+        std::printf("IC4 after synthetic UnidentifiedSoundHost-ready response: instructions=%llu PC=%04X "
                     "IC51=%llu writes=%llu burstWords=%zu\\n",
                     static_cast<unsigned long long>(resumedToMain),
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()),
                     static_cast<unsigned long long>(firmwareMachine.soundMemoryWriteCount()),
-                    firmwareMachine.sam9407BurstWordCount());
+                    firmwareMachine.unidentifiedSoundHostBurstWordCount());
         assert(resumedToMain != 0u);
         assert(firmwareMachine.cpu().registers().pc == 0x32b0u);
         assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
-        const auto bootBurstWords = firmwareMachine.sam9407BurstWordCount();
+        const auto bootBurstWords = firmwareMachine.unidentifiedSoundHostBurstWordCount();
         const auto bootTransactions = firmwareMachine.soundCommandPacketCount();
-        const auto hostWrites = firmwareMachine.sam9407HostWriteCount();
+        const auto hostWrites = firmwareMachine.unidentifiedSoundHostHostWriteCount();
         assert(bootBurstWords == bootTransactions);
-        std::printf("SAM9407 boot: hostWrites=%zu completeTransactions=%zu burstWords=%zu\\n",
+        std::printf("UnidentifiedSoundHost boot: hostWrites=%zu completeTransactions=%zu burstWords=%zu\\n",
                     hostWrites, bootTransactions, bootBurstWords);
-        std::printf("SAM9407 standalone register-3 writes (outside complete transactions):\\n");
+        std::printf("UnidentifiedSoundHost standalone register-3 writes (outside complete transactions):\\n");
         for (std::size_t i = 0; i < hostWrites; ++i) {
-            const auto& write = firmwareMachine.sam9407HostWriteAt(i);
+            const auto& write = firmwareMachine.unidentifiedSoundHostHostWriteAt(i);
             if (write.registerIndex == 3u && write.instructionPC != 0x0dc5u)
                 std::printf("  reg3=%02X pc=%04X cycle=%llu\\n",
                             static_cast<unsigned>(write.value),
@@ -578,7 +578,7 @@ int main(int argc, char** argv) {
         assert(bootTransactions == 544u);
         for (std::size_t i = 0; i < bootTransactions; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
-            const auto& word = firmwareMachine.sam9407BurstWordAt(i);
+            const auto& word = firmwareMachine.unidentifiedSoundHostBurstWordAt(i);
             std::uint8_t expectedIndex = 0;
             std::uint16_t expectedWord = 0;
             std::uint16_t expectedCaller = 0x0e6au;
@@ -599,21 +599,21 @@ int main(int argc, char** argv) {
             assert(word.value == expectedWord);
             assert(packet.returnPC == expectedCaller);
         }
-        const auto hostReads = firmwareMachine.sam9407HostReadCount();
-        std::printf("SAM9407 host reads (current loopback model, %zu):\\n", hostReads);
+        const auto hostReads = firmwareMachine.unidentifiedSoundHostHostReadCount();
+        std::printf("UnidentifiedSoundHost host reads (current loopback model, %zu):\\n", hostReads);
         for (std::size_t i = 0; i < hostReads; ++i) {
-            const auto& read = firmwareMachine.sam9407HostReadAt(i);
+            const auto& read = firmwareMachine.unidentifiedSoundHostHostReadAt(i);
             std::printf("  read[%03zu] reg=%u value=%02X pc=%04X cycle=%llu\\n",
                         i, static_cast<unsigned>(read.registerIndex),
                         static_cast<unsigned>(read.value),
                         static_cast<unsigned>(read.instructionPC),
                         static_cast<unsigned long long>(read.machineCycle));
         }
-        std::printf("SAM9407 host transactions after IC51 boot block (%zu):\\n",
+        std::printf("UnidentifiedSoundHost host transactions after IC51 boot block (%zu):\\n",
                     bootTransactions);
         for (std::size_t i = 0; i < bootTransactions; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
-            const auto& word = firmwareMachine.sam9407BurstWordAt(i);
+            const auto& word = firmwareMachine.unidentifiedSoundHostBurstWordAt(i);
             std::printf("  %03zu: %02X %02X %02X %02X -> %04X pc=%04X ret=%04X\\n",
                         i,
                         static_cast<unsigned>(packet.bytes[0]),
@@ -660,7 +660,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(totalFactoryBytes),
                         static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                         firmwareMachine.soundCommandPacketCount(),
-                        firmwareMachine.sam9407BurstWordCount(),
+                        firmwareMachine.unidentifiedSoundHostBurstWordCount(),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()));
         }
         const std::array<std::uint8_t, 5> realRomProgramAndNote{{
@@ -668,8 +668,8 @@ int main(int argc, char** argv) {
         }};
         const auto realMidiStart = firmwareMachine.elapsedMachineCycles();
         const auto realPacketBaseline = firmwareMachine.soundCommandPacketCount();
-        const auto realBurstBaseline = firmwareMachine.sam9407BurstWordCount();
-        const auto realHostWriteBaseline = firmwareMachine.sam9407HostWriteCount();
+        const auto realBurstBaseline = firmwareMachine.unidentifiedSoundHostBurstWordCount();
+        const auto realHostWriteBaseline = firmwareMachine.unidentifiedSoundHostHostWriteCount();
         const auto realWriterBaseline = firmwareMachine.watchedCallCount(0x0db7u);
         const auto realAC00Baseline = firmwareMachine.watchedCallCount(0xac00u);
         const auto realAC88Baseline = firmwareMachine.watchedCallCount(0xac88u);
@@ -689,8 +689,8 @@ int main(int argc, char** argv) {
                     realMidiInstructions, realMidiDrain,
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     firmwareMachine.soundCommandPacketCount() - realPacketBaseline,
-                    firmwareMachine.sam9407BurstWordCount() - realBurstBaseline,
-                    firmwareMachine.sam9407HostWriteCount() - realHostWriteBaseline,
+                    firmwareMachine.unidentifiedSoundHostBurstWordCount() - realBurstBaseline,
+                    firmwareMachine.unidentifiedSoundHostHostWriteCount() - realHostWriteBaseline,
                     static_cast<unsigned long long>(
                         firmwareMachine.watchedCallCount(0x0db7u) - realWriterBaseline),
                     static_cast<unsigned long long>(
@@ -727,10 +727,10 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)));
         assert(!firmwareMachine.cpuFaulted());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
-        const auto realBursts = firmwareMachine.sam9407BurstWordCount();
+        const auto realBursts = firmwareMachine.unidentifiedSoundHostBurstWordCount();
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
-            const auto& word = firmwareMachine.sam9407BurstWordAt(i);
+            const auto& word = firmwareMachine.unidentifiedSoundHostBurstWordAt(i);
             std::printf("  real-host[%zu] %02X %02X %02X %02X -> %04X pc=%04X ret=%04X\\n",
                         i - realPacketBaseline,
                         static_cast<unsigned>(packet.bytes[0]),
@@ -743,7 +743,7 @@ int main(int argc, char** argv) {
         }
         if (realBursts > realBurstBaseline)
             std::printf("  real burst tail=%04X\\n",
-                        static_cast<unsigned>(firmwareMachine.sam9407BurstWordAt(realBursts - 1u).value));
+                        static_cast<unsigned>(firmwareMachine.unidentifiedSoundHostBurstWordAt(realBursts - 1u).value));
 
         // Controlled test stimulus only: inject the expected AC signature so
         // the CPU can pass the otherwise-unmodeled external-device wait.
@@ -877,7 +877,7 @@ int main(int argc, char** argv) {
         std::fflush(stdout);
         assert(!injectedResponseMachine.cpuFaulted());
         // The byte scheduler delivered the stimulus; full MIDI-to-voice
-        // dispatch is not asserted until the SAM9407 host/DSP path is modeled.
+        // dispatch is not asserted until the UnidentifiedSoundHost host/DSP path is modeled.
         assert(injectedResponseMachine.scheduledAciaPendingCount() == 0u);
         // The firmware consumed all MIDI bytes. The event work area may be
         // cleared by the downstream voice dispatcher, so retain the note check
@@ -1100,7 +1100,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.bytes[3]));
         }
         } else {
-            std::printf("MIDI bytes were received, but this fixture emitted no SAM9407 host transaction yet.\\n");
+            std::printf("MIDI bytes were received, but this fixture emitted no UnidentifiedSoundHost host transaction yet.\\n");
         }
     }
     return 0;
