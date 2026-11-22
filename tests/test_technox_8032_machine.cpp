@@ -559,6 +559,15 @@ int main(int argc, char** argv) {
         // not yet evidence that a voice command reached the external engine.
         assert(injectedResponseMachine.readExternal(0x304c) == 0x90u);
         assert(injectedResponseMachine.readExternal(0x2b9d) == 0x3cu);
+        const auto portWrites = injectedResponseMachine.portWriteCount();
+        std::printf("Recent IC4 port writes (newest first):\\n");
+        for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
+            const auto& event = injectedResponseMachine.portWriteAt(portWrites - 1u - portAge);
+            std::printf("  P%u=%02X cycle=%llu\\n",
+                        static_cast<unsigned>(event.port),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto& midiCpu = injectedResponseMachine.cpu();
         std::printf("Recent IC4 instructions (newest first):\\n");
         for (std::size_t traceAge = 0; traceAge < 24u &&
