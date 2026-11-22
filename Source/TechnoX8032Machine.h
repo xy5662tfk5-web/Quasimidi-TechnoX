@@ -747,6 +747,8 @@ private:
     bool soundDeviceResetReleased_ = true;
     std::uint8_t soundDeviceWrite_ = 0;
     std::uint8_t soundDeviceResponse_ = 0xff;
+    bool testExternalRam7000Enabled_ = false;
+    std::array<std::uint8_t, 0x1000> testExternalRam7000_{};
     std::uint64_t soundMemoryReadCount_ = 0;
     std::uint64_t soundMemoryWriteCount_ = 0;
     std::uint64_t soundBusModeWriteCount_ = 0;
