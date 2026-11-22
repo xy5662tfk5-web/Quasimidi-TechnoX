@@ -50,6 +50,38 @@ void testMASS1EDDLookupIndexBuilder() {
     assert(!result.lookupPerformed);
 }
 
+void testMASS1EDDPostLookup() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    romBytes[0x1308 + 0x55] = 0xa6;
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASS1EDDPostLookupResult result{};
+    // All three gates pass: RAM[3F].7=0, RAM[40].4=1, opcode.2=1.
+    assert(MASS1EDDPostLookup::apply(
+        view, 0x04, 0x00, 0x10, 0x33, 0x55, result));
+    assert(result.quantizeLookupUsed && result.r4 == 0xa6);
+    assert(result.coefficientB == 0x33 && !result.fallbackSignCorrection);
+
+    // Gate fails on RAM[3F].7: plain R3*curve high byte, R4 sentinel.
+    assert(MASS1EDDPostLookup::apply(
+        view, 0x02, 0x80, 0x10, 0x80, 0x80, result));
+    assert(!result.quantizeLookupUsed && result.r4 == 0xff);
+    assert(result.coefficientB == 0x40 && !result.fallbackSignCorrection);
+
+    // Opcode.6 set and opcode.0 clear activates complemented-R3 multiply,
+    // then adds the original R3 to the high product byte.
+    assert(MASS1EDDPostLookup::apply(
+        view, 0x40, 0x80, 0x00, 0x20, 0x40, result));
+    assert(result.r4 == 0xff && result.fallbackSignCorrection);
+    assert(result.coefficientB == 0x57);
+
+    // Common nonzero guard: a zero high product with nonzero R3 becomes 1.
+    assert(MASS1EDDPostLookup::apply(
+        view, 0x01, 0x80, 0x00, 0x01, 0x01, result));
+    assert(result.coefficientB == 1 && result.r4 == 0xff);
+}
+
 void testMASS2381AddressBuilder() {
     const auto low = MASS2381AddressBuilder::resolve(0x1200, 0x03, 0x20);
     assert(low.selector == 3 && low.offset == 0x0a && low.address == 0x129a);
@@ -627,6 +659,7 @@ void testActualIC51(const char* path) {
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testMASS1EDDLookupIndexBuilder();
+    testMASS1EDDPostLookup();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
     testMASS1848Arithmetic();

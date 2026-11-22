@@ -149,6 +149,67 @@ private:
     }
 };
 
+struct MASS1EDDPostLookupResult {
+    std::uint8_t r4 = 0xff;
+    std::uint8_t coefficientB = 0;
+    bool quantizeLookupUsed = false;
+    bool fallbackSignCorrection = false;
+};
+
+// Models IC4 0x1F6F..0x1F9F after the 0x1288 curve byte has been obtained.
+// This is separate from the index builder because the quantize gate depends
+// on RAM[0x3F], RAM[0x40] and opcode bits.
+class MASS1EDDPostLookup {
+public:
+    static bool apply(const MASSFirmwareROMView& rom,
+                      std::uint8_t opcode,
+                      std::uint8_t ram3F,
+                      std::uint8_t ram40,
+                      std::uint8_t r3,
+                      std::uint8_t curveValue,
+                      MASS1EDDPostLookupResult& result) noexcept {
+        MASS1EDDPostLookupResult decoded{};
+
+        const bool quantizeEnabled =
+            (ram3F & 0x80u) == 0 &&
+            (ram40 & 0x10u) != 0 &&
+            (opcode & 0x04u) != 0;
+
+        if (quantizeEnabled) {
+            std::uint8_t mapped = 0;
+            if (!rom.read(MASSFirmwareLookupTable::quantizeMap1308,
+                          curveValue, mapped))
+                return false;
+            decoded.r4 = mapped;
+            decoded.coefficientB = r3;
+            decoded.quantizeLookupUsed = true;
+            result = decoded;
+            return true;
+        }
+
+        decoded.r4 = 0xff;
+        const bool signCorrected =
+            (opcode & 0x01u) == 0 && (opcode & 0x40u) != 0;
+        decoded.fallbackSignCorrection = signCorrected;
+
+        const auto multiplicand = signCorrected
+            ? static_cast<std::uint8_t>(~r3) : r3;
+        const auto product = static_cast<std::uint16_t>(multiplicand) * curveValue;
+        const auto high = static_cast<std::uint8_t>(product >> 8);
+
+        decoded.coefficientB = signCorrected
+            ? static_cast<std::uint8_t>(r3 + high)
+            : high;
+
+        // Common 0x1F9F guard: do not leave B zero when R3 was nonzero.
+        if (decoded.coefficientB == 0 && r3 != 0)
+            decoded.coefficientB = 1;
+
+        result = decoded;
+        return true;
+    }
+};
+
 struct MASS2381AddressResult {
     std::uint16_t address = 0;
     std::uint8_t selector = 0;
