@@ -344,6 +344,51 @@ int main() {
     assert(parityBus.internal[0xd0] == parityCpu.registers().psw.pack());
     assert((parityBus.internal[0xd0] & 1u) == 1u);
 
+    // AJMP/ACALL use the 11-bit page-relative destination encoding.
+    TestBus pageJumpBus;
+    pageJumpBus.code[0] = 0xe1; pageJumpBus.code[1] = 0x34; // AJMP 0734
+    MCS51Core pageJumpCpu;
+    assert(pageJumpCpu.step(pageJumpBus) == MCS51StepResult::executed);
+    assert(pageJumpCpu.registers().pc == 0x0734);
+
+    TestBus pageCallBus;
+    pageCallBus.code[0] = 0x11; pageCallBus.code[1] = 0x56; // ACALL 0056
+    pageCallBus.code[0x56] = 0x22; // RET
+    MCS51Core pageCallCpu;
+    assert(pageCallCpu.step(pageCallBus) == MCS51StepResult::executed);
+    assert(pageCallCpu.registers().pc == 0x0056);
+    assert(pageCallCpu.registers().sp == 0x09);
+    assert(pageCallCpu.step(pageCallBus) == MCS51StepResult::executed);
+    assert(pageCallCpu.registers().pc == 0x0002);
+    assert(pageCallCpu.registers().sp == 0x07);
+
+    // Indexed MOVX uses P2 as the high address byte and Ri as the low byte.
+    TestBus indexedXdataBus;
+    indexedXdataBus.internal[0xa0] = 0x12; // P2 latch
+    indexedXdataBus.internal[0] = 0x34; // R0
+    indexedXdataBus.internal[1] = 0x35; // R1
+    indexedXdataBus.external[0x1234] = 0x6c;
+    indexedXdataBus.code[0] = 0xe2; // MOVX A,@R0
+    indexedXdataBus.code[1] = 0xf3; // MOVX @R1,A
+    MCS51Core indexedXdataCpu;
+    assert(indexedXdataCpu.step(indexedXdataBus) == MCS51StepResult::executed);
+    assert(indexedXdataCpu.registers().a == 0x6c);
+    assert(indexedXdataCpu.step(indexedXdataBus) == MCS51StepResult::executed);
+    assert(indexedXdataBus.external[0x1235] == 0x6c);
+
+    // Carry-only instructions modify CY without disturbing accumulator data.
+    TestBus carryOpsBus;
+    carryOpsBus.code[0] = 0xd3; // SETB C
+    carryOpsBus.code[1] = 0xb3; // CPL C
+    carryOpsBus.code[2] = 0xc3; // CLR C
+    MCS51Core carryOpsCpu;
+    assert(carryOpsCpu.step(carryOpsBus) == MCS51StepResult::executed);
+    assert(carryOpsCpu.registers().psw.carry);
+    assert(carryOpsCpu.step(carryOpsBus) == MCS51StepResult::executed);
+    assert(!carryOpsCpu.registers().psw.carry);
+    assert(carryOpsCpu.step(carryOpsBus) == MCS51StepResult::executed);
+    assert(!carryOpsCpu.registers().psw.carry);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
