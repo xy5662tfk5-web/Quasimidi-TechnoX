@@ -46,10 +46,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         if (firmwareMachine->loadIC4Rom(
                 reinterpret_cast<const std::uint8_t*>(firmwareData),
                 static_cast<std::size_t>(firmwareRomSize))) {
-            firmwareMachine->reset();
-            firmwareMachine->runUntilProgramCounter(0x326a, 100000);
-            if (firmwareMachine->cpu().registers().pc != 0x326a)
-                firmwareMachine.reset();
+            firmwareMachine->reset(); // CPU starts at the original reset vector
         } else {
             firmwareMachine.reset();
         }
@@ -188,6 +185,7 @@ bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& l
 void QuasimidiTechnoXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     massEngine.prepare(sampleRate, samplesPerBlock);
+    firmwareCycleRemainder = 0.0;
 }
 void QuasimidiTechnoXAudioProcessor::releaseResources() {}
 
@@ -196,8 +194,19 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
-    const int performanceIndex = getCurrentProgram();
     const int numSamples = buffer.getNumSamples();
+    const double hostSampleRate = getSampleRate();
+    if (firmwareMachine != nullptr && !firmwareMachine->cpuFaulted() && hostSampleRate > 0.0) {
+        // MAME clocks the 8032 at 12 MHz; the classic 12T core executes
+        // one machine cycle per microsecond. Keep fractional cycles per block.
+        const double exactCycles = static_cast<double>(numSamples) *
+            1000000.0 / hostSampleRate + firmwareCycleRemainder;
+        const auto cycleBudget = static_cast<std::uint64_t>(exactCycles);
+        firmwareCycleRemainder = exactCycles - static_cast<double>(cycleBudget);
+        if (cycleBudget != 0)
+            firmwareMachine->runForMachineCycles(cycleBudget);
+    }
+    const int performanceIndex = getCurrentProgram();
     const int channelCount = buffer.getNumChannels();
     int renderedSamples = 0;
 
