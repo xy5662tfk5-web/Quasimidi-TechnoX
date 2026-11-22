@@ -90,6 +90,11 @@ public:
     }
 
     bool ic51RomLoaded() const noexcept { return ic51RomLoaded_; }
+    std::uint64_t ic51ReadCount() const noexcept { return ic51ReadCount_; }
+    std::uint64_t ic51ReadsByBank(std::size_t bank) const noexcept {
+        return bank < ic51ReadsByBank_.size() ? ic51ReadsByBank_[bank] : 0;
+    }
+    std::uint16_t lastIC51ReadAddress() const noexcept { return lastIC51ReadAddress_; }
 
     void reset() noexcept {
         cpu_.reset();
@@ -127,6 +132,9 @@ public:
         lastSoundMemoryWriteValue_ = 0;
         soundMemoryReadsByMode_.fill(0);
         soundMemoryWritesByMode_.fill(0);
+        ic51ReadCount_ = 0;
+        ic51ReadsByBank_.fill(0);
+        lastIC51ReadAddress_ = 0;
         internal_[0x81] = 0x07; // SP reset value
     }
 
@@ -233,6 +241,9 @@ public:
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
         if (isIC51Selected()) {
             const auto bank = (portPins_[3] & 0x20u) != 0 ? 1u : 0u;
+            ++ic51ReadCount_;
+            ++ic51ReadsByBank_[bank];
+            lastIC51ReadAddress_ = address;
             return ic51Rom_[bank * 0x10000u + address];
         }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
@@ -465,6 +476,9 @@ private:
     std::array<std::uint8_t, kIC51RomSize> ic51Rom_{};
     std::array<std::uint8_t, kCodeSpaceSize> code_{};
     bool ic51RomLoaded_ = false;
+    std::uint64_t ic51ReadCount_ = 0;
+    std::array<std::uint64_t, 2> ic51ReadsByBank_{};
+    std::uint16_t lastIC51ReadAddress_ = 0;
     std::array<std::uint8_t, 0x100> internal_{};
     std::array<std::uint8_t, 0x80> upperIram_{};
     std::array<std::uint8_t, 0x10000> xdata_{};
