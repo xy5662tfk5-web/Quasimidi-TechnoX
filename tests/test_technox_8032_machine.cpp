@@ -67,10 +67,13 @@ int main(int argc, char** argv) {
     // ACIA register map, receive data and its INT1 request.
     machine.writeExternal(0xa000, 0x80); // receive interrupt enabled
     machine.injectAciaReceiveByte(0x6c);
-    assert((machine.readInternal(0x88) & 0x08u) != 0); // TCON.IE1
+    assert((machine.readInternal(0x88) & 0x08u) == 0); // pin sampled on machine cycle
+    machine.advanceMachineCycles(1);
+    assert((machine.readInternal(0x88) & 0x08u) != 0); // TCON.IE1 level request
     assert((machine.readExternal(0xa002) & 0x01u) != 0); // RDRF
     assert(machine.readExternal(0xa003) == 0x6c);
     assert((machine.readExternal(0xa002) & 0x01u) == 0);
+    machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) == 0);
 
     machine.writeExternal(0xa001, 0x7d);
@@ -104,13 +107,15 @@ int main(int argc, char** argv) {
     machine.writeInternal(0x88, 0x04); // IT1 edge-triggered
     machine.writeExternal(0xa000, 0x80);
     machine.injectAciaReceiveByte(0x31);
+    machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) != 0);
     machine.writeInternal(0x88, 0x04); // emulate INT1 auto-clear
     machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) == 0);
     assert(machine.readExternal(0xa003) == 0x31); // release ACIA IRQ
-    machine.advanceMachineCycles(1);
+    machine.advanceMachineCycles(1); // sample released/high pin
     machine.injectAciaReceiveByte(0x32);
+    machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) != 0); // next falling edge
 
     // Timer 0 mode 1: 16-bit overflow raises TF0.
