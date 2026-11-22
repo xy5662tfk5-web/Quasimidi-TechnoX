@@ -112,6 +112,32 @@ int main(int argc, char** argv) {
     assert(machine.readInternal(0xcc) == 0x34);
     assert((machine.readInternal(0xc8) & 0x80u) != 0); // TF2
 
+    // Timer 0 counter mode increments on a sampled falling edge at T0/P3.4.
+    machine.reset();
+    machine.writeInternal(0x89, 0x05); // Timer 0 mode 1, C/T0 counter input
+    machine.writeInternal(0x88, 0x10); // TR0
+    machine.setPortPins(0xb0, 0xef); // T0 transitions high -> low
+    machine.advanceMachineCycles(1);
+    assert(machine.readInternal(0x8a) == 0x01);
+
+    // Timer 2 capture mode latches TH2/TL2 on a T2EX/P1.1 falling edge.
+    machine.reset();
+    machine.writeInternal(0xcd, 0x12);
+    machine.writeInternal(0xcc, 0x34);
+    machine.writeInternal(0xc8, 0x09); // EXEN2 + CP/RL2, stopped
+    machine.setPortPins(0x90, 0xfd); // T2EX high -> low
+    machine.advanceMachineCycles(1);
+    assert(machine.readInternal(0xcb) == 0x12);
+    assert(machine.readInternal(0xca) == 0x34);
+    assert((machine.readInternal(0xc8) & 0x40u) != 0); // EXF2
+
+    // Timer 2 counter mode increments on a falling edge at T2/P1.0.
+    machine.reset();
+    machine.writeInternal(0xc8, 0x06); // TR2 + C/T2
+    machine.setPortPins(0x90, 0xfe); // T2 high -> low
+    machine.advanceMachineCycles(1);
+    assert(machine.readInternal(0xcc) == 0x01);
+
     // Timer 2 baud-rate mode reloads but suppresses TF2.
     machine.reset();
     machine.writeInternal(0xcb, 0x22);
