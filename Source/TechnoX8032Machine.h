@@ -114,6 +114,8 @@ public:
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
+        aciaReceiveReadCount_ = 0;
+        lastAciaReceiveRead_ = 0;
         aciaTransmit_ = 0;
         aciaTransmitPending_ = false;
         aciaTransmitterBusy_ = false;
@@ -270,6 +272,8 @@ public:
                 ? static_cast<std::uint8_t>(aciaStatus_ & ~0x02u) : aciaStatus_;
             case 0xa003: {
                 const auto value = aciaReceive_;
+                ++aciaReceiveReadCount_;
+                lastAciaReceiveRead_ = value;
                 aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ & ~0x21u); // clear RDRF/OVRN
                 refreshAciaInterrupt();
                 return value;
@@ -407,6 +411,8 @@ public:
         return commandPort_;
     }
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
+    std::uint64_t aciaReceiveReadCount() const noexcept { return aciaReceiveReadCount_; }
+    std::uint8_t lastAciaReceiveRead() const noexcept { return lastAciaReceiveRead_; }
     const SoundCommandPacket& soundCommandPacketAt(std::size_t index) const noexcept {
         return soundCommandTrace_[index % soundCommandTrace_.size()];
     }
@@ -509,6 +515,8 @@ private:
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
+    std::uint64_t aciaReceiveReadCount_ = 0;
+    std::uint8_t lastAciaReceiveRead_ = 0;
     std::uint8_t aciaTransmit_ = 0;
     std::array<ScheduledAciaByte, 4096> scheduledAciaBytes_{};
     std::size_t scheduledAciaHead_ = 0;
