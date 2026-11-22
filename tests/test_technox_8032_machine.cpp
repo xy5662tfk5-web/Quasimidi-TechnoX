@@ -463,6 +463,41 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.cpu().registers().pc == 0x32b0);
         assert(injectedResponseMachine.soundMemoryWriteCount() > 0u);
 
+        if (!factoryFrames.empty()) {
+            const auto factoryStartCycle = injectedResponseMachine.elapsedMachineCycles();
+            const auto cyclesPerSecond = injectedResponseMachine.machineCyclesPerSecond();
+            const auto byteCycles = injectedResponseMachine.midiByteMachineCycles();
+            const auto tickDenominator =
+                static_cast<std::uint64_t>(factoryDivision) * 1000000u;
+            std::uint64_t timelineNumerator = 0;
+            std::uint64_t totalFactoryBytes = 0;
+            for (const auto& frame : factoryFrames) {
+                timelineNumerator += static_cast<std::uint64_t>(frame.deltaTicks) *
+                    factoryTempo * cyclesPerSecond;
+                const auto eventCycle = factoryStartCycle +
+                    timelineNumerator / tickDenominator;
+                const auto firstArrivalBase = std::max(
+                    eventCycle, injectedResponseMachine.elapsedMachineCycles());
+                assert(injectedResponseMachine.scheduleAciaMidiBytes(
+                    frame.bytes.data(), frame.bytes.size(), eventCycle));
+                const auto lastByteArrival = firstArrivalBase +
+                    byteCycles * frame.bytes.size();
+                const auto cycleBudget = lastByteArrival -
+                    injectedResponseMachine.elapsedMachineCycles() + 1u;
+                injectedResponseMachine.runForMachineCycles(
+                    static_cast<std::size_t>(cycleBudget));
+                assert(!injectedResponseMachine.cpuFaulted());
+                totalFactoryBytes += frame.bytes.size();
+            }
+            injectedResponseMachine.runForMachineCycles(100000);
+            std::printf("Factory RAM Performance SysEx loaded: frames=%zu bytes=%llu tempo=%u division=%u commands=%zu IC51=%llu\\n",
+                        factoryFrames.size(),
+                        static_cast<unsigned long long>(totalFactoryBytes),
+                        factoryTempo, static_cast<unsigned>(factoryDivision),
+                        injectedResponseMachine.soundCommandPacketCount(),
+                        static_cast<unsigned long long>(injectedResponseMachine.ic51ReadCount()));
+        }
+
         // Exercise the real INT1/ACIA receive path with a MIDI Note On.
         const std::array<std::uint8_t, 3> noteOn{{0x90, 0x3c, 0x64}};
         const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
