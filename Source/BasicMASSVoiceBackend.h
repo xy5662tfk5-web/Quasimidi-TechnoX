@@ -123,10 +123,34 @@ public:
                     ? 0.0 : static_cast<double>(rawTranspose - 24);
                 const double fineTuneSemitones = rawTune < 0
                     ? 0.0 : static_cast<double>(rawTune - 64) / 100.0;
-                const double frequency = 440.0 * std::pow(2.0,
+                const double targetFrequency = 440.0 * std::pow(2.0,
                     (static_cast<double>(slot.note) - 69.0 + transposeSemitones + fineTuneSemitones +
                      bendSemitones + vibratoSemitones +
                      static_cast<double>(pitchModulation) * 12.0) / 12.0);
+                const int trackMode = parts.get(part, PartParameter::trackMode);
+                if (state.note != slot.note) {
+                    state.note = slot.note;
+                    state.gliding = trackMode == 3 && runtimeControls.portamento(part);
+                }
+                if (!state.frequencyInitialized) {
+                    state.currentFrequency = targetFrequency;
+                    state.frequencyInitialized = true;
+                } else if (state.gliding && runtimeControls.portamento(part) && trackMode == 3) {
+                    const int rawPortamento = parts.get(part, PartParameter::portamentoTime);
+                    const double normalizedTime = rawPortamento < 0
+                        ? 0.2 : static_cast<double>(rawPortamento) / 127.0;
+                    const double glideSeconds = 0.005 * std::pow(200.0, normalizedTime);
+                    const double coefficient = 1.0 - std::exp(-1.0 / (glideSeconds * sampleRate_));
+                    state.currentFrequency += (targetFrequency - state.currentFrequency) * coefficient;
+                    if (std::abs(targetFrequency - state.currentFrequency) < 0.05) {
+                        state.currentFrequency = targetFrequency;
+                        state.gliding = false;
+                    }
+                } else {
+                    state.currentFrequency = targetFrequency;
+                    state.gliding = false;
+                }
+                const double frequency = state.currentFrequency;
                 state.lfoPhase += twoPi * 5.0 / sampleRate_;
                 if (state.lfoPhase >= twoPi) state.lfoPhase -= twoPi;
                 const float oscillator = static_cast<float>(std::sin(state.phase));
@@ -179,12 +203,15 @@ private:
         bool gate = false;
         Stage stage = Stage::off;
         double phase = 0.0;
+        double currentFrequency = 0.0;
         double lfoPhase = 0.0;
         float envelope = 0.0f;
         float releaseStartEnvelope = 0.0f;
         float filterIc1 = 0.0f;
         float filterIc2 = 0.0f;
         std::uint8_t note = 0;
+        bool frequencyInitialized = false;
+        bool gliding = false;
     };
 
     static constexpr double twoPi = 6.28318530717958647692;

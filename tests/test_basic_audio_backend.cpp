@@ -473,6 +473,42 @@ int main() {
     assert(octaveDifference > 1.0);
     assert(fineTuneDifference > 0.01);
 
+    // Lead mode + Portamento CC65 glides from the previous pitch instead of
+    // jumping immediately to the next note. Portamento Time controls duration.
+    BasicMASSVoiceBackend glideBackend;
+    MASSAudioEngine glideEngine(&glideBackend);
+    constexpr int glideBlock = 8192;
+    glideEngine.prepare(48000.0, glideBlock);
+    assert(glideEngine.setPartParameter(12, PartParameter::level, 127));
+    assert(glideEngine.setPartParameter(12, PartParameter::cutoffFrequency, 127));
+    assert(glideEngine.setPartParameter(12, PartParameter::resonance, 0));
+    assert(glideEngine.setPartParameter(12, PartParameter::egAttack, 0));
+    assert(glideEngine.setPartParameter(12, PartParameter::egDecay, 0));
+    assert(glideEngine.setPartParameter(12, PartParameter::egRelease, 0));
+    assert(glideEngine.setPartParameter(12, PartParameter::trackMode, 3));
+    assert(glideEngine.setPartParameter(12, PartParameter::portamentoTime, 127));
+    assert(glideEngine.setPortamento(12, true));
+    glideEngine.noteOn(12, 1, 69, 127);
+    std::array<float, 1024> glideWarmupL{}, glideWarmupR{};
+    float* warmupChannels[] = {glideWarmupL.data(), glideWarmupR.data()};
+    glideEngine.render(warmupChannels, 2, 1024);
+    glideEngine.noteOn(12, 1, 81, 127);
+    std::array<float, glideBlock> glideLeft{}, glideRight{};
+    float* glideChannels[] = {glideLeft.data(), glideRight.data()};
+    glideEngine.render(glideChannels, 2, glideBlock);
+    auto zeroCrossings = [](const float* signal, int start, int count) {
+        int crossings = 0;
+        for (int i = start + 1; i < start + count; ++i)
+            if ((signal[i - 1] <= 0.0f && signal[i] > 0.0f) ||
+                (signal[i - 1] >= 0.0f && signal[i] < 0.0f))
+                ++crossings;
+        return crossings;
+    };
+    const int earlyGlideCrossings = zeroCrossings(glideLeft.data(), 0, 2048);
+    const int lateGlideCrossings = zeroCrossings(glideLeft.data(), 6144, 2048);
+    assert(earlyGlideCrossings > 0);
+    assert(lateGlideCrossings > earlyGlideCrossings);
+
     // Recovered firmware image layout: 8-byte name + 65 Common + four 24-byte Parts.
     CountingBackend imageBackend;
     MASSAudioEngine imageEngine(&imageBackend);
