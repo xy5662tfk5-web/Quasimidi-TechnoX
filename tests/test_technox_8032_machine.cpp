@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
     assert((machine.readInternal(0xc8) & 0x80u) == 0);
 
     // LCD stub and cycle accounting.
+    machine.reset();
     machine.writeExternal(0xb001, 0x41);
     assert(machine.readExternal(0xb003) == 0x41);
     machine.advanceMachineCycles(17);
