@@ -61,6 +61,12 @@ void testPointerTableAndPartMapping() {
 }
 
 void testResourceSelectionRecordParser() {
+    const auto part12Address = MASSResourceSelectionRecordParser::addressForRuntimePart(12);
+    assert(part12Address.page == 0x29 && part12Address.offset == 0x90);
+    assert(part12Address.linearAddress() == 0x2990);
+    const auto part15Address = MASSResourceSelectionRecordParser::addressForRuntimePart(15);
+    assert(part15Address.page == 0x29 && part15Address.offset == 0xb4);
+
     std::array<std::uint8_t, 20> page{};
     const std::array<std::uint8_t, 12> record = {
         0x92, 0x31, 0x15, 0x44, 0x55, 0x24, 0xd4, 0x77, 0x88, 0x05, 0x2a, 0x66
@@ -75,6 +81,25 @@ void testResourceSelectionRecordParser() {
     assert(parsed.p3ControlFlags() == 0x05);
     assert(parsed.lookupIndex0() == 0x15);
     assert(parsed.lookupIndex1() == 0x2a);
+
+    // MOVX @R0 increments only the low byte. A record beginning at 0xFA
+    // wraps from 0xFF to 0x00 while remaining on the P2-selected page.
+    std::array<std::uint8_t, 256> selectedPage{};
+    const std::array<std::uint8_t, 12> wrappedRecord = {
+        0x82, 0x31, 0x12, 0x44, 0x55, 0x24, 0xd4, 0x77, 0x88, 0x06, 0x2a, 0x66
+    };
+    for (std::size_t i = 0; i < wrappedRecord.size(); ++i)
+        selectedPage[static_cast<std::uint8_t>(0xfa + i)] = wrappedRecord[i];
+    MASSResourceSelectionRecord wrapped{};
+    const MASSXDataAddress wrappedAddress{0x29, 0xfa};
+    assert(MASSResourceSelectionRecordParser::parseSelectedPage(
+        selectedPage.data(), selectedPage.size(), wrappedAddress, wrapped));
+    assert(wrapped.xdataAddress.page == 0x29 && wrapped.xdataAddress.offset == 0xfa);
+    assert(wrapped.bytes[0] == 0x82 && wrapped.bytes[6] == 0xd4 &&
+           wrapped.bytes[9] == 0x06 && wrapped.bytes[11] == 0x66);
+    assert(!MASSResourceSelectionRecordParser::parseSelectedPage(
+        selectedPage.data(), selectedPage.size() - 1, wrappedAddress, wrapped));
+
     assert(!MASSResourceSelectionRecordParser::parse(
         page.data(), page.size(), 9, parsed));
     assert(!MASSResourceSelectionRecordParser::parse(
@@ -226,6 +251,7 @@ void testCommandStreamDecoder() {
     assert(!decoded.terminated && decoded.endedByControlCommand);
     assert(decoded.fillsRemainingSlots);
     assert(decoded.slotsConsumed == 1 && decoded.commands.size() == 1);
+    assert(decoded.outputSlotsWritten == 16 && decoded.fillerSlotsWritten == 15);
     assert(decoded.bytesConsumed == 4 && decoded.endOffset == 0x1704);
 
     bank[0x1710] = 0x20;
@@ -237,6 +263,7 @@ void testCommandStreamDecoder() {
         bank.data(), bank.size(), 0x1710, decoded, true));
     assert(!decoded.terminated && decoded.endedByControlCommand);
     assert(!decoded.fillsRemainingSlots && decoded.bytesConsumed == 4);
+    assert(decoded.outputSlotsWritten == 1 && decoded.fillerSlotsWritten == 0);
 
     bank[0xfffc] = 0x08;
     bank[0xfffd] = 0x01;
@@ -263,14 +290,50 @@ void testActualIC51(const char* path) {
     assert(rom.readResourceDescriptorAddress(MASSResourceBank::bank1, 0, address));
     assert(address == 0x0f5b);
 
+    const std::array<std::array<std::size_t, 3>, 2> expectedEndStates{{
+        {{283, 101, 128}}, // flag 0x0A clear: control command, 0xFF, 16 slots
+        {{300, 98, 114}}   // flag 0x0A set
+    }};
+
     for (const auto bank : {MASSResourceBank::bank0, MASSResourceBank::bank1}) {
         std::set<std::uint16_t> pointers;
+        const auto bankNumber = bank == MASSResourceBank::bank0 ? 0u : 1u;
+        const auto* bankData = image.data() + bankNumber * MASSResourceROM::kBankSize;
+        std::array<std::array<std::size_t, 3>, 2> endStates{};
+
         for (std::size_t i = 0; i < MASSResourceROM::kPointerCount; ++i) {
             assert(rom.readResourceDescriptorAddress(
                 bank, static_cast<std::uint8_t>(i), address));
             assert(pointers.insert(address).second);
+
+            MASSResourceDescriptor descriptor{};
+            assert(MASSResourceDescriptorParser::parse(
+                bankData, MASSResourceROM::kBankSize, address, descriptor));
+            assert(descriptor.commandStreamPointer < MASSResourceROM::kBankSize);
+
+            for (std::size_t flagIndex = 0; flagIndex < 2; ++flagIndex) {
+                MASSDecodedResourceStream decoded{};
+                assert(MASSCommandStreamDecoder::decode(
+                    bankData, MASSResourceROM::kBankSize,
+                    descriptor.commandStreamPointer, decoded, flagIndex != 0));
+                assert(!decoded.truncated);
+                if (decoded.endedByControlCommand) {
+                    ++endStates[flagIndex][0];
+                    if (!flagIndex) {
+                        assert(decoded.fillsRemainingSlots);
+                        assert(decoded.outputSlotsWritten == MASSCommandStreamDecoder::kMaximumSlots);
+                    }
+                } else if (decoded.terminated) {
+                    ++endStates[flagIndex][1];
+                } else if (decoded.slotLimitReached) {
+                    ++endStates[flagIndex][2];
+                } else {
+                    assert(false && "resource stream ended without a firmware terminal state");
+                }
+            }
         }
         assert(pointers.size() == MASSResourceROM::kPointerCount);
+        assert(endStates == expectedEndStates);
     }
 }
 }

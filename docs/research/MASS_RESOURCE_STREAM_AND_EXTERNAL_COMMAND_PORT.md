@@ -156,14 +156,14 @@ The two P3 masks differ only in bit 0, which controls P3.5. Since IC51 is a 128K
 
 ### External resource descriptor format
 
-The pointer-table entry does not point directly to a command stream. `0x1494` scans a descriptor beginning at `descriptorAddress + 8`:
+The pointer-table entry points to an eight-byte descriptor header, followed by descriptor tables; it does not point directly to the command stream. `0x1494` reads a separate 12-byte Part selection record from XDATA `0x2900 + 12*PartIndex` (P2 page plus R0 offset), obtains the descriptor address from bytes +5/+6, and `0x15AE` scans the descriptor beginning at `descriptorAddress + 8`:
 
 - The first eight descriptor bytes are retained as a fixed header; their full semantics are not yet mapped.
 - Table A contains group IDs `0..4`. Each group contains records of `selector + 2 data bytes`; selector `0x7F` ends the current group. A group ID `>= 5` ends Table A.
 - Table B contains records of `key + 2 data bytes` for keys `0..5`. A key `>= 6` ends Table B.
 - The next two bytes form the command-stream pointer in **little-endian** order. The code reads the first into `RAM[0x36]`, the second into `RAM[0x37]`, then loads DPL from `RAM[0x36]` and DPH from `RAM[0x37]`.
 
-The descriptor and command-stream reads use the same P3 control mask used for the IC51 pointer-table read: `0x418E` writes the `0x5C3D` mask into selection-record byte `+9`, and `0x1494` copies those bits into the P3 control flags. Thus the P3-selected external bus path is continuous from directory lookup into descriptor/stream reads. The additional P2/page mapping and exact physical device/window are still unresolved; this is not yet a byte-for-byte proof of the physical memory map.
+The same P3 mask from `0x5C3D` is stored at byte +9 of the XDATA selection record and reused for pointer-table, descriptor and command-stream reads. Scanning the actual IC51 image confirms that all 512 pointer targets parse as descriptors in their corresponding 64-KB pointer bank, and all 512 resulting stream pointers decode in that same bank without truncation. The exact external bus/device implementation remains a hardware-level question, but the firmware-selected IC51 memory window is now supported by the ROM-wide structural scan.
 
 ### XDATA staging buffer and hardware port
 
@@ -171,7 +171,7 @@ The descriptor and command-stream reads use the same P3 control mask used for th
 
 The four-byte hardware port at `0x8000..0x8003` is separate. The firmware temporarily selects P2 page `0x80` for hardware writes, then restores P2 to `RAM[0x2D]`. This distinguishes the decoded per-page staging records from the external sound-processor command interface.
 
-IC51 is therefore a structured resource directory, not a flat PCM stream. The C++ components now include `MASSResourceROM` for the big-endian IC51 directory, `MASSResourceSelectionRecordParser` for the 12-byte selection record (descriptor address and P3 flags), `MASSResourceDescriptorParser` for the external descriptor, and `MASSCommandStreamDecoder` for streams decoded from a caller-supplied memory bank. None of these components claims to decode PCM or reproduce the original M.A.S.S. synthesis.
+IC51 is therefore a structured resource directory, not a flat PCM stream. The C++ components now include `MASSResourceROM` for the big-endian IC51 directory, `MASSResourceSelectionRecordParser` for the 12-byte P2:R0 XDATA selection record (including R0 wraparound), `MASSResourceDescriptorParser` for descriptors stored in each selected 64-KB IC51 bank, and `MASSCommandStreamDecoder` for streams in the same bank. The regression test now parses all 512 real descriptors and decodes all 512 streams in both flag-0A scenarios; end-state counts are asserted. None of these components claims to decode PCM or reproduce the original M.A.S.S. synthesis.
 
 ## Next reverse-engineering target
 

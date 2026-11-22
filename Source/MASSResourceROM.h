@@ -102,11 +102,27 @@ private:
     bool loaded_ = false;
 };
 
-// Twelve-byte resource-selection record read through the currently selected
-// XDATA page by firmware routine 0x1494. It points to a separate descriptor;
-// the IC51 pointer-directory address is not assumed to be this record's
-// physical XDATA address.
+// Firmware XDATA addressing for MOVX @R0: P2 selects the page and R0 is
+// the eight-bit offset. Incrementing R0 wraps within the selected page.
+struct MASSXDataAddress {
+    std::uint8_t page = 0;
+    std::uint8_t offset = 0;
+
+    static constexpr MASSXDataAddress fromLinear(std::uint16_t address) noexcept {
+        return {static_cast<std::uint8_t>(address >> 8),
+                static_cast<std::uint8_t>(address & 0xff)};
+    }
+    constexpr std::uint16_t linearAddress() const noexcept {
+        return static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(page) << 8 | offset);
+    }
+};
+
+// Twelve-byte per-Part resource-selection record at XDATA 0x2900 + 12*Part.
+// 0x4256 stores its absolute address in 0x2B98/0x2B99; callers restore the
+// high byte to P2 and low byte to R0 before 0x1494 reads it.
 struct MASSResourceSelectionRecord {
+    MASSXDataAddress xdataAddress{};
     std::array<std::uint8_t, 12> bytes{};
 
     std::uint8_t selectionCode() const noexcept {
@@ -134,6 +150,31 @@ struct MASSResourceSelectionRecord {
 
 class MASSResourceSelectionRecordParser {
 public:
+    static MASSXDataAddress addressForRuntimePart(std::uint8_t runtimePartIndex) noexcept {
+        const auto address = static_cast<std::uint16_t>(
+            0x2900u + 12u * static_cast<unsigned>(runtimePartIndex));
+        return MASSXDataAddress::fromLinear(address);
+    }
+
+    // pageWindow is the 256-byte window already selected by P2. Reads wrap
+    // the R0 offset exactly as MOVX @R0 + INC R0 does on the 8051.
+    static bool parseSelectedPage(const std::uint8_t* pageWindow,
+                                  std::size_t pageSize,
+                                  MASSXDataAddress address,
+                                  MASSResourceSelectionRecord& result) noexcept {
+        if (pageWindow == nullptr || pageSize < 256)
+            return false;
+        MASSResourceSelectionRecord parsed{};
+        parsed.xdataAddress = address;
+        for (std::size_t i = 0; i < parsed.bytes.size(); ++i) {
+            const auto offset = static_cast<std::uint8_t>(
+                static_cast<unsigned>(address.offset) + static_cast<unsigned>(i));
+            parsed.bytes[i] = pageWindow[offset];
+        }
+        result = parsed;
+        return true;
+    }
+
     static bool parse(const std::uint8_t* bankData,
                       std::size_t bankSize,
                       std::size_t recordOffset,
@@ -142,6 +183,9 @@ public:
             bankSize - recordOffset < 12)
             return false;
         MASSResourceSelectionRecord parsed{};
+        if (recordOffset <= 0xffffu)
+            parsed.xdataAddress = MASSXDataAddress::fromLinear(
+                static_cast<std::uint16_t>(recordOffset));
         std::copy_n(bankData + recordOffset, parsed.bytes.size(), parsed.bytes.begin());
         result = parsed;
         return true;
@@ -178,8 +222,9 @@ struct MASSResourceDescriptor {
 
 class MASSResourceDescriptorParser {
 public:
-    // Parses the descriptor memory bank selected by the firmware's separate
-    // P3 flags (descriptor byte +10). This bank is not assumed to be IC51.
+    // Parses a descriptor from the 64-KB memory window selected by the
+    // Part's P3 mask (selection-record byte +9). The 512 descriptors in the
+    // supplied IC51 image are all structurally valid in their pointer bank.
     // At descriptor +8 the firmware scans:
     //   Table A: group IDs 0..4; selector + two data bytes; selector 0x7F
     //            terminates a group; group ID >=5 terminates Table A.
@@ -295,6 +340,10 @@ struct MASSDecodedResourceStream {
     bool fillsRemainingSlots = false; // group 0x20 emits 0x38 filler slots when flag 0x0A is clear
     bool truncated = false;
     bool slotLimitReached = false;
+    // Commands consumed differ from output slots written because terminal
+    // group 0x20 can fill the remaining slots with 0x38 records.
+    std::uint8_t outputSlotsWritten = 0;
+    std::uint8_t fillerSlotsWritten = 0;
     std::vector<MASSResourceCommand> commands;
 };
 
@@ -397,6 +446,7 @@ public:
             decoded.commands.push_back(command);
             cursor += command.length;
             ++decoded.slotsConsumed;
+            ++decoded.outputSlotsWritten;
 
             // Handler 0x2301 always leaves the interpreter via 0x19CD after
             // consuming this four-byte command. When flag 0x0A is clear it
@@ -408,6 +458,12 @@ public:
                 // with 0x38 when flag 0x0A is clear. When it is set, firmware
                 // jumps straight to the reserved final slot at offset 0xF8.
                 decoded.fillsRemainingSlots = !firmwareFlag0ASet;
+                if (decoded.fillsRemainingSlots) {
+                    decoded.fillerSlotsWritten = static_cast<std::uint8_t>(
+                        kMaximumSlots - decoded.outputSlotsWritten);
+                    decoded.outputSlotsWritten =
+                        static_cast<std::uint8_t>(kMaximumSlots);
+                }
                 break;
             }
         }
@@ -416,7 +472,8 @@ public:
         decoded.bytesConsumed = cursor - streamPointer;
         decoded.slotLimitReached =
             decoded.slotsConsumed == kMaximumSlots &&
-            !decoded.terminated && !decoded.truncated;
+            !decoded.terminated && !decoded.endedByControlCommand &&
+            !decoded.truncated;
         result = std::move(decoded);
         return true;
     }
