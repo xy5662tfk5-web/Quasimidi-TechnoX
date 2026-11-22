@@ -152,8 +152,63 @@ public:
             add(fetch8(bus), false);
         } else if (opcode == 0x34) { // ADDC A,#data
             add(fetch8(bus), registers_.psw.carry);
+        } else if (opcode == 0x25) { // ADD A,direct
+            add(bus.readInternal(fetch8(bus)), false);
+        } else if (opcode == 0x26 || opcode == 0x27) { // ADD A,@Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            add(bus.readInternal(address), false);
+        } else if (opcode >= 0x28 && opcode <= 0x2f) { // ADD A,Rn
+            add(readRegister(bus, opcode & 7u), false);
+        } else if (opcode == 0x35) { // ADDC A,direct
+            add(bus.readInternal(fetch8(bus)), registers_.psw.carry);
+        } else if (opcode == 0x36 || opcode == 0x37) { // ADDC A,@Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            add(bus.readInternal(address), registers_.psw.carry);
+        } else if (opcode >= 0x38 && opcode <= 0x3f) { // ADDC A,Rn
+            add(readRegister(bus, opcode & 7u), registers_.psw.carry);
+        } else if (opcode == 0x95) { // SUBB A,direct
+            subtract(bus.readInternal(fetch8(bus)));
+        } else if (opcode == 0x96 || opcode == 0x97) { // SUBB A,@Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            subtract(bus.readInternal(address));
+        } else if (opcode >= 0x98 && opcode <= 0x9f) { // SUBB A,Rn
+            subtract(readRegister(bus, opcode & 7u));
         } else if (opcode == 0x94) { // SUBB A,#data
             subtract(fetch8(bus));
+        } else if (opcode == 0x05) { // INC direct
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) + 1u));
+        } else if (opcode == 0x06 || opcode == 0x07) { // INC @Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) + 1u));
+        } else if (opcode == 0x15) { // DEC direct
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) - 1u));
+        } else if (opcode == 0x16 || opcode == 0x17) { // DEC @Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) - 1u));
+        } else if (opcode >= 0x18 && opcode <= 0x1f) { // DEC Rn
+            writeRegister(bus, opcode & 7u,
+                          static_cast<std::uint8_t>(readRegister(bus, opcode & 7u) - 1u));
+        } else if (opcode == 0x60 || opcode == 0x70 ||
+                   opcode == 0x40 || opcode == 0x50) { // JZ/JNZ/JC/JNC rel
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            const bool take = opcode == 0x60 ? registers_.a == 0 :
+                              opcode == 0x70 ? registers_.a != 0 :
+                              opcode == 0x40 ? registers_.psw.carry :
+                                               !registers_.psw.carry;
+            if (take) registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode == 0xe6 || opcode == 0xe7) { // MOV A,@Ri
+            registers_.a = bus.readInternal(readRegister(bus, opcode & 1u));
+        } else if (opcode == 0xf6 || opcode == 0xf7) { // MOV @Ri,A
+            bus.writeInternal(readRegister(bus, opcode & 1u), registers_.a);
+        } else if (opcode == 0x76 || opcode == 0x77) { // MOV @Ri,#data
+            const auto value = fetch8(bus);
+            bus.writeInternal(readRegister(bus, opcode & 1u), value);
+        } else if (opcode == 0xa3) { // INC DPTR
+            ++registers_.dptr;
+            cycles = 2;
         } else if (opcode == 0xe4) { // CLR A
             registers_.a = 0;
         } else if (opcode == 0xf4) { // CPL A
