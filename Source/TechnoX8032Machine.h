@@ -418,7 +418,9 @@ public:
             probe.machineCycle = elapsedMachineCycles_;
             ++ic51BusProbeTraceCount_;
         }
-        if (ic51Selected) {
+        const bool ramMode = (internal_[0x8e] & 0x03u) == 0x02u;
+        const bool peripheralAddress = isDedicatedPeripheralAddress(address);
+        if (ic51Selected && !peripheralAddress && !(ramMode && isXdataRam(address))) {
             const auto bank = (portPins_[3] & 0x20u) != 0 ? 1u : 0u;
             ++ic51ReadCount_;
             ++ic51ReadsByBank_[bank];
@@ -514,8 +516,10 @@ public:
     }
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
-        if (isIC51Selected())
-            return; // IC51 is a read-only source; do not write into the ROM window.
+        const bool ramMode = (internal_[0x8e] & 0x03u) == 0x02u;
+        if (isIC51Selected() && !isDedicatedPeripheralAddress(address) &&
+            !(ramMode && isXdataRam(address)))
+            return; // IC51 is read-only; dedicated I/O and RAM remain writable.
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
             soundDeviceWrite_ = value; // status-port traffic outside RAM mode
             return;
@@ -784,6 +788,13 @@ private:
         const bool directorySelect = (pins & 0x12u) == 0;
         const bool bulkBlockSelect = (pins & 0x32u) == 0x12u;
         return ic51RomLoaded_ && (directorySelect || bulkBlockSelect);
+    }
+
+    static constexpr bool isDedicatedPeripheralAddress(std::uint16_t address) noexcept {
+        return (address >= 0x8000u && address <= 0x8003u) ||
+               (address >= 0xa002u && address <= 0xa003u) ||
+               (address >= 0xb002u && address <= 0xb003u) ||
+               address == 0xff10u;
     }
 
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
