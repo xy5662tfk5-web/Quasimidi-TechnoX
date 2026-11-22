@@ -93,6 +93,9 @@ public:
     // must be supplied by a device model, not guessed by the CPU core.
     virtual std::uint8_t readExternal(std::uint16_t address) noexcept = 0;
     virtual void writeExternal(std::uint16_t address, std::uint8_t value) noexcept = 0;
+
+    // Advance timer/UART/peripheral models by classic 8051 machine cycles.
+    virtual void advanceMachineCycles(unsigned /*cycles*/) noexcept {}
 };
 
 enum class MCS51StepResult : std::uint8_t { executed, unsupportedOpcode };
@@ -507,6 +510,7 @@ public:
 
         updateParity();
         syncArchitecturalSfrs(bus);
+        bus.advanceMachineCycles(cycles);
         totalCycles_ += cycles;
         return MCS51StepResult::executed;
     }
