@@ -234,6 +234,7 @@ public:
         commandPort_.fill(0);
         soundHostCommandLatch_ = 0;
         soundHostWords_.fill(0);
+        for (auto& bytes : soundHostData_) bytes.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
         soundHostReadCount_ = 0;
@@ -502,11 +503,13 @@ public:
         }
         if (address >= 0x8000u && address <= 0x8003u) {
             const auto index = static_cast<std::size_t>(address - 0x8000u);
-            std::uint8_t value = commandPort_[index];
-            if (index == static_cast<std::size_t>(ExternalAudioRegister::register2))
-                value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] & 0xffu);
-            else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3))
-                value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] >> 8u);
+            // Firmware helper 0x0DCE selects an index via register 0, then
+            // reads response bytes from registers 1, 2 and 3 into R2, R3, R4.
+            // Keep all three response bytes per selected index; the old model
+            // incorrectly echoed only a 16-bit pair and lost register 1.
+            const std::uint8_t value = index == 0
+                ? commandPort_[index]
+                : soundHostData_[soundHostCommandLatch_][index - 1u];
             auto& event = soundHostReadTrace_[
                 soundHostReadCount_ % soundHostReadTrace_.size()];
             event.registerIndex = static_cast<std::uint8_t>(index);
@@ -660,13 +663,18 @@ public:
                 // IC4 writes this register before the following register accesses.
                 // Preserve the observed ordering without assigning semantics.
                 soundHostCommandLatch_ = value;
-            } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register2)) {
-                auto& word = soundHostWords_[soundHostCommandLatch_];
-                word = static_cast<std::uint16_t>((word & 0xff00u) | value);
-            } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3)) {
-                auto& word = soundHostWords_[soundHostCommandLatch_];
-                word = static_cast<std::uint16_t>((word & 0x00ffu) |
-                    (static_cast<std::uint16_t>(value) << 8u));
+            } else {
+                // Registers 1..3 are the three-byte payload at the selected
+                // device index, matching the firmware's R2/R3/R4 readback.
+                soundHostData_[soundHostCommandLatch_][index - 1u] = value;
+                if (index == static_cast<std::size_t>(ExternalAudioRegister::register2)) {
+                    auto& word = soundHostWords_[soundHostCommandLatch_];
+                    word = static_cast<std::uint16_t>((word & 0xff00u) | value);
+                } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3)) {
+                    auto& word = soundHostWords_[soundHostCommandLatch_];
+                    word = static_cast<std::uint16_t>((word & 0x00ffu) |
+                        (static_cast<std::uint16_t>(value) << 8u));
+                }
             }
 
             auto& hostWrite = soundHostWriteTrace_[
@@ -1040,6 +1048,7 @@ private:
     std::array<std::uint8_t, 4> commandPort_{};
     std::uint8_t soundHostCommandLatch_ = 0;
     std::array<std::uint16_t, 256> soundHostWords_{};
+    std::array<std::array<std::uint8_t, 3>, 256> soundHostData_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
     std::array<soundHostReadEvent, 2048> soundHostReadTrace_{};
