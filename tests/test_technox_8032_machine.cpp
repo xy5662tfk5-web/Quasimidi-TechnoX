@@ -30,6 +30,15 @@ int main(int argc, char** argv) {
     assert(machine.cpu().registers().pc == 0);
     assert(machine.cpu().registers().sp == 0x07);
 
+    // External hardware can independently drive GPIO input pins while the
+    // CPU-visible output latch remains unchanged (P1.3/P1.5 on IC4).
+    machine.writeInternal(0x90, 0xff);
+    machine.setExternalPortInputs(0x90, 0x28, 0x00);
+    assert(machine.readInternal(0x90) == 0xd7);
+    assert(machine.readPortLatch(0x90) == 0xff);
+    machine.reset();
+    assert(machine.readInternal(0x90) == 0xff);
+
     // Firmware-visible RAM ranges: lower XDATA and the 16 KiB startup-test window.
     machine.writeExternal(0x0000, 0x12);
     machine.writeExternal(0x38ff, 0x34);
