@@ -809,6 +809,7 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.watchedCallCount(0x4256) - call4256BeforeMidi == 2u);
         // The MIDI stimulus does not deterministically enter IC51 helper 0x1494.
         // Its source-read trace is asserted separately on the startup/resource path.
+        if (commandCount > commandCountBeforeMidi) {
         // AC00 is a dispatch-table entry, not a guaranteed call on every
         // synthetic MIDI stimulus; command-packet output below is the stronger
         // regression signal for this fixture.
@@ -872,6 +873,9 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.bytes[1]),
                         static_cast<unsigned>(packet.bytes[2]),
                         static_cast<unsigned>(packet.bytes[3]));
+        }
+        } else {
+            std::printf("MIDI bytes were received, but this fixture emitted no SAM9407 host transaction yet.\\n");
         }
     }
     return 0;
