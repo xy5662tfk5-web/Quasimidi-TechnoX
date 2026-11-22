@@ -664,6 +664,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x304c)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x304d)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x304e)));
+        std::fflush(stdout);
         assert(!injectedResponseMachine.cpuFaulted());
         assert(injectedResponseMachine.aciaReceiveReadCount() == aciaReadsBeforeMidi + programAndNote.size());
         assert(injectedResponseMachine.lastAciaReceiveRead() == programAndNote.back());
