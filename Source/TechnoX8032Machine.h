@@ -19,6 +19,7 @@ class TechnoX8032Machine final : public MCS51Bus {
 public:
     struct SoundCommandPacket {
         std::array<std::uint8_t, 4> bytes{};
+        std::uint16_t instructionPC = 0;
         std::uint64_t machineCycle = 0;
     };
     struct PortWriteEvent {
@@ -501,6 +502,9 @@ public:
             if (index == 3u) {
                 auto& packet = soundCommandTrace_[soundCommandPacketCount_ % soundCommandTrace_.size()];
                 packet.bytes = commandPort_;
+                // MOVX is a one-byte instruction; the core has already
+                // advanced PC when the bus callback is entered.
+                packet.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
                 packet.machineCycle = elapsedMachineCycles_;
                 ++soundCommandPacketCount_;
             }
