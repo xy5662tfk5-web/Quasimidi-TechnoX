@@ -105,6 +105,8 @@ public:
         aciaReceive_ = 0;
         aciaTransmit_ = 0;
         aciaTransmitPending_ = false;
+        aciaTransmitterBusy_ = false;
+        aciaTxReadyCycle_ = 0;
         lcdStatus_ = 0;
         lcdData_ = 0;
         lcdInstruction_ = 0;
@@ -123,6 +125,8 @@ public:
         p35TransitionCount_ = 0;
         lastSoundMemoryWriteAddress_ = 0;
         lastSoundMemoryWriteValue_ = 0;
+        soundMemoryReadsByMode_.fill(0);
+        soundMemoryWritesByMode_.fill(0);
         internal_[0x81] = 0x07; // SP reset value
     }
 
