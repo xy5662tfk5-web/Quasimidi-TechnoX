@@ -529,6 +529,14 @@ int main(int argc, char** argv) {
         assert(!injectedResponseMachine.cpuFaulted());
         assert(injectedResponseMachine.aciaReceiveReadCount() == aciaReadsBeforeMidi + programAndNote.size());
         assert(injectedResponseMachine.lastAciaReceiveRead() == programAndNote.back());
+        const auto& midiCpu = injectedResponseMachine.cpu();
+        std::printf("Recent IC4 instructions (newest first):\\n");
+        for (std::size_t traceAge = 0; traceAge < 24u &&
+             traceAge < midiCpu.recentInstructionCount(); ++traceAge) {
+            std::printf("  %04X: %02X\\n",
+                        static_cast<unsigned>(midiCpu.recentInstructionPC(traceAge)),
+                        static_cast<unsigned>(midiCpu.recentInstructionOpcode(traceAge)));
+        }
         assert(injectedResponseMachine.ic51ReadsByBank(0) > 0u);
         assert(injectedResponseMachine.ic51ReadsByBank(1) > 0u);
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
