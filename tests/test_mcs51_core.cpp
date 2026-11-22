@@ -590,6 +590,26 @@ int main() {
     assert(portPinBranchCpu.step(portPinBranchBus) == MCS51StepResult::executed);
     assert(portPinBranchCpu.registers().pc == 0x0005); // branch follows pin, not latch
 
+    TestBus portJbcBus;
+    portJbcBus.internal[0x90] = 0x00; // P1.4 pin low
+    portJbcBus.portLatches[1] = 0x10; // P1.4 latch high
+    portJbcBus.code[0] = 0x10; // JBC P1.4,+2
+    portJbcBus.code[1] = 0x94;
+    portJbcBus.code[2] = 0x02;
+    MCS51Core portJbcCpu;
+    assert(portJbcCpu.step(portJbcBus) == MCS51StepResult::executed);
+    assert(portJbcCpu.registers().pc == 0x0005); // JBC tests latch
+    assert(portJbcBus.portLatches[1] == 0x00); // and clears that latch bit
+
+    TestBus portCplBus;
+    portCplBus.internal[0x90] = 0x10; // P1.4 pin high
+    portCplBus.portLatches[1] = 0x00; // P1.4 latch low
+    portCplBus.code[0] = 0xb2; // CPL P1.4
+    portCplBus.code[1] = 0x94;
+    MCS51Core portCplCpu;
+    assert(portCplCpu.step(portCplBus) == MCS51StepResult::executed);
+    assert(portCplBus.portLatches[1] == 0x10); // CPL operates on latch
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
