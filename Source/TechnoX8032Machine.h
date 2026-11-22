@@ -17,6 +17,10 @@ namespace technox {
 
 class TechnoX8032Machine final : public MCS51Bus {
 public:
+    struct SoundCommandPacket {
+        std::array<std::uint8_t, 4> bytes{};
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -105,6 +109,8 @@ public:
         portLatch_.fill(0xff);
         portPins_.fill(0xff);
         commandPort_.fill(0);
+        soundCommandPacketCount_ = 0;
+        soundCommandTrace_.fill(SoundCommandPacket{});
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -292,7 +298,14 @@ public:
         }
 
         if (address >= 0x8000u && address <= 0x8003u) {
-            commandPort_[address - 0x8000u] = value;
+            const auto index = static_cast<std::size_t>(address - 0x8000u);
+            commandPort_[index] = value;
+            if (index == 3u) {
+                auto& packet = soundCommandTrace_[soundCommandPacketCount_ % soundCommandTrace_.size()];
+                packet.bytes = commandPort_;
+                packet.machineCycle = elapsedMachineCycles_;
+                ++soundCommandPacketCount_;
+            }
             return;
         }
 
@@ -391,6 +404,10 @@ public:
     const std::array<std::uint8_t, 4>& commandPortBytes() const noexcept {
         return commandPort_;
     }
+    std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
+    const SoundCommandPacket& soundCommandPacketAt(std::size_t index) const noexcept {
+        return soundCommandTrace_[index % soundCommandTrace_.size()];
+    }
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
     std::uint64_t soundMemoryReadCount() const noexcept { return soundMemoryReadCount_; }
@@ -485,6 +502,8 @@ private:
     std::array<std::uint8_t, 4> portLatch_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> portPins_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> commandPort_{};
+    std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
+    std::size_t soundCommandPacketCount_ = 0;
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
