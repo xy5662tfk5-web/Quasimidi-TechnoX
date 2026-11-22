@@ -526,8 +526,11 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.loadIC4Rom(
             realRom.data(),
             realRom.size()));
-        // Keep this fixture synthetic: real IC51 bulk loading is covered
-        // by firmwareMachine above; this instance isolates MIDI/ACIA behavior.
+        // Retain the real IC51 resource tables and streams. The synthetic
+        // XDATA window and AC response below isolate the external bus timing,
+        // not the actual program-resource command interpreter.
+        if (!realIC51.empty())
+            assert(injectedResponseMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         injectedResponseMachine.reset();
         // Experimental fixture only: writable 7xxx window plus a controlled
         // 7BD5 status response. This proves the firmware path, not real hardware semantics.
