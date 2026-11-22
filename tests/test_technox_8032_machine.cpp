@@ -554,6 +554,11 @@ int main(int argc, char** argv) {
         assert(!injectedResponseMachine.cpuFaulted());
         assert(injectedResponseMachine.aciaReceiveReadCount() == aciaReadsBeforeMidi + programAndNote.size());
         assert(injectedResponseMachine.lastAciaReceiveRead() == programAndNote.back());
+        // The firmware has parsed the channel-1 Program Change and Note On:
+        // status and note number are retained in its event work area. This is
+        // not yet evidence that a voice command reached the external engine.
+        assert(injectedResponseMachine.readExternal(0x304c) == 0x90u);
+        assert(injectedResponseMachine.readExternal(0x2b9d) == 0x3cu);
         const auto& midiCpu = injectedResponseMachine.cpu();
         std::printf("Recent IC4 instructions (newest first):\\n");
         for (std::size_t traceAge = 0; traceAge < 24u &&
