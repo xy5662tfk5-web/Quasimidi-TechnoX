@@ -235,13 +235,13 @@ public:
             subtract(fetch8(bus));
         } else if (opcode == 0x05) { // INC direct
             const auto address = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) + 1u));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) + 1u));
         } else if (opcode == 0x06 || opcode == 0x07) { // INC @Ri
             const auto address = readRegister(bus, opcode & 1u);
             bus.writeIndirect(address, static_cast<std::uint8_t>(bus.readIndirect(address) + 1u));
         } else if (opcode == 0x15) { // DEC direct
             const auto address = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) - 1u));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) - 1u));
         } else if (opcode == 0x16 || opcode == 0x17) { // DEC @Ri
             const auto address = readRegister(bus, opcode & 1u);
             bus.writeIndirect(address, static_cast<std::uint8_t>(bus.readIndirect(address) - 1u));
@@ -266,12 +266,12 @@ public:
             bus.writeIndirect(readRegister(bus, opcode & 1u), value);
         } else if (opcode == 0x42) { // ORL direct,A
             const auto address = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) | registers_.a));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) | registers_.a));
             cycles = 2;
         } else if (opcode == 0x43) { // ORL direct,#data
             const auto address = fetch8(bus);
             const auto immediate = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) | immediate));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) | immediate));
             cycles = 2;
         } else if (opcode == 0x44) { // ORL A,#data
             registers_.a |= fetch8(bus);
@@ -283,12 +283,12 @@ public:
             registers_.a |= readRegister(bus, opcode & 7u);
         } else if (opcode == 0x52) { // ANL direct,A
             const auto address = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) & registers_.a));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) & registers_.a));
             cycles = 2;
         } else if (opcode == 0x53) { // ANL direct,#data
             const auto address = fetch8(bus);
             const auto immediate = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) & immediate));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) & immediate));
             cycles = 2;
         } else if (opcode == 0x54) { // ANL A,#data
             registers_.a &= fetch8(bus);
@@ -300,12 +300,12 @@ public:
             registers_.a &= readRegister(bus, opcode & 7u);
         } else if (opcode == 0x62) { // XRL direct,A
             const auto address = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) ^ registers_.a));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) ^ registers_.a));
             cycles = 2;
         } else if (opcode == 0x63) { // XRL direct,#data
             const auto address = fetch8(bus);
             const auto immediate = fetch8(bus);
-            writeDirect(bus, address, static_cast<std::uint8_t>(readDirect(bus, address) ^ immediate));
+            writeDirect(bus, address, static_cast<std::uint8_t>(bus.readPortLatch(address) ^ immediate));
             cycles = 2;
         } else if (opcode == 0x64) { // XRL A,#data
             registers_.a ^= fetch8(bus);
@@ -318,7 +318,7 @@ public:
         } else if (opcode == 0x10 || opcode == 0x20 || opcode == 0x30) { // JBC/JB/JNB bit,rel
             const auto bitAddress = fetch8(bus);
             const auto rel = static_cast<std::int8_t>(fetch8(bus));
-            const bool bit = readBit(bus, bitAddress);
+            const bool bit = readBitForRmw(bus, bitAddress);
             const bool take = opcode == 0x10 ? bit : opcode == 0x20 ? bit : !bit;
             if (take) {
                 if (opcode == 0x10) writeBit(bus, bitAddress, false);
@@ -348,7 +348,7 @@ public:
             cycles = 2;
         } else if (opcode == 0xb2 || opcode == 0xc2 || opcode == 0xd2) { // CPL/CLR/SETB bit
             const auto bitAddress = fetch8(bus);
-            const bool value = opcode == 0xb2 ? !readBit(bus, bitAddress) : opcode == 0xd2;
+            const bool value = opcode == 0xb2 ? !readBitForRmw(bus, bitAddress) : opcode == 0xd2;
             writeBit(bus, bitAddress, value);
             cycles = 2;
         } else if (opcode == 0x12) { // LCALL addr16
@@ -401,7 +401,7 @@ public:
         } else if (opcode == 0xd5) { // DJNZ direct,rel
             const auto address = fetch8(bus);
             const auto rel = static_cast<std::int8_t>(fetch8(bus));
-            const auto value = static_cast<std::uint8_t>(readDirect(bus, address) - 1u);
+            const auto value = static_cast<std::uint8_t>(bus.readPortLatch(address) - 1u);
             writeDirect(bus, address, value);
             if (value != 0)
                 registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
@@ -415,7 +415,7 @@ public:
             cycles = 2;
         } else if (opcode == 0xc5) { // XCH A,direct
             const auto address = fetch8(bus);
-            const auto value = readDirect(bus, address);
+            const auto value = bus.readPortLatch(address);
             writeDirect(bus, address, registers_.a);
             registers_.a = value;
         } else if (opcode == 0xc6 || opcode == 0xc7) { // XCH A,@Ri
@@ -653,6 +653,12 @@ private:
             bus.writeInternal(address, value);
     }
 
+    bool readBitForRmw(MCS51Bus& bus, std::uint8_t bitAddress) const noexcept {
+        const auto address = bitAddressToByte(bitAddress);
+        return (bus.readPortLatch(address) &
+                static_cast<std::uint8_t>(1u << bitAddressToBit(bitAddress))) != 0;
+    }
+
     bool readBit(MCS51Bus& bus, std::uint8_t bitAddress) const noexcept {
         const auto address = bitAddressToByte(bitAddress);
         return (readDirect(bus, address) & static_cast<std::uint8_t>(1u << bitAddressToBit(bitAddress))) != 0;
@@ -661,7 +667,7 @@ private:
     void writeBit(MCS51Bus& bus, std::uint8_t bitAddress, bool value) noexcept {
         const auto address = bitAddressToByte(bitAddress);
         const auto mask = static_cast<std::uint8_t>(1u << bitAddressToBit(bitAddress));
-        const auto current = readDirect(bus, address);
+        const auto current = bus.readPortLatch(address);
         writeDirect(bus, address, value ? static_cast<std::uint8_t>(current | mask)
                                          : static_cast<std::uint8_t>(current & static_cast<std::uint8_t>(~mask)));
     }
