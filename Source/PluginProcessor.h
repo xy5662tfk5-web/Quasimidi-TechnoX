@@ -78,6 +78,7 @@ private:
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
+    double firmwareCycleRemainder = 0.0;
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
     void initialisePartStates();
