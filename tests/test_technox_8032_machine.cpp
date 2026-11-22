@@ -741,6 +741,20 @@ int main(int argc, char** argv) {
                         firmwareMachine.ic51ReadCount() - realIC51Baseline),
                     static_cast<unsigned long long>(firmwareMachine.aciaValidReceiveReadCount()),
                     static_cast<unsigned>(firmwareMachine.lastValidAciaReceiveRead()));
+        const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
+        std::printf("REAL-ROM sound-memory reads after MIDI: total=%llu traced=%zu\\n",
+                    static_cast<unsigned long long>(firmwareMachine.soundMemoryReadCount()),
+                    realSoundReads);
+        const auto realFirstRead = realSoundReads > 64u ? realSoundReads - 64u : 0u;
+        for (std::size_t i = realFirstRead; i < realSoundReads; ++i) {
+            const auto& event = firmwareMachine.soundMemoryReadTraceAt(i);
+            std::printf("  REAL-XREAD[%zu] %04X=%02X mode=%u pc=%04X ret=%04X cycle=%llu\\n",
+                        i, static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value), static_cast<unsigned>(event.mode),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const std::uint16_t midiWatchAddresses[] = {
             0x7d95u, 0x3702u, 0x3704u, 0x370au, 0x370bu, 0x3039u, 0x303au,
             0x304bu, 0x3050u, 0x3051u, 0x2fb3u, 0x2fb4u, 0x2b8bu, 0x2b8cu,
