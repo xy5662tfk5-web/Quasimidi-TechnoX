@@ -57,6 +57,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/BasicMASSVoiceBackend.h
     Source/MCS51Core.h
     Source/TechnoX8032Machine.h
+    Source/MCS51Timers.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC
