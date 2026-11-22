@@ -108,10 +108,10 @@ void testResourceSelectionRecordParser() {
 
 void testTerminalHardwarePacketBuilder() {
     MASSResourceCommand command{};
-    command.opcode = 0x2a;
+    command.opcode = 0x22; // (opcode & 0x38) == 0x20 terminal group
     command.kind = MASSResourceCommandKind::threePayloadCommand;
     command.length = 4;
-    command.bytes = {{0x2a, 0x11, 0x22, 0xfd}};
+    command.bytes = {{0x22, 0x11, 0x22, 0xfd}};
 
     MASSHardwareCommandPacket packet{};
     assert(MASSResourceHardwareCommandBuilder::buildTerminalPacket(
@@ -121,7 +121,7 @@ void testTerminalHardwarePacketBuilder() {
     command.opcode = 0x18;
     assert(!MASSResourceHardwareCommandBuilder::buildTerminalPacket(
         command, 0x20, 0x91, 0x72, packet));
-    command.opcode = 0x2a;
+    command.opcode = 0x22;
     command.length = 3;
     assert(!MASSResourceHardwareCommandBuilder::buildTerminalPacket(
         command, 0x20, 0x91, 0x72, packet));
