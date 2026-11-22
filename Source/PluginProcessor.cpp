@@ -39,6 +39,17 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
             "technox_IC51_nm27c010_v105_bin", resourceRomSize))
         resourceROM.load(reinterpret_cast<const std::uint8_t*>(resourceData),
                          static_cast<std::size_t>(resourceRomSize));
+    int firmwareRomSize = 0;
+    if (const auto* firmwareData = BinaryData::getNamedResource(
+            "technox_IC4_mx27c1000_v105_bin", firmwareRomSize)) {
+        firmwareMachine = std::make_unique<technox::TechnoX8032Machine>();
+        if (firmwareMachine->loadIC4Rom(
+                reinterpret_cast<const std::uint8_t*>(firmwareData),
+                static_cast<std::size_t>(firmwareRomSize)))
+            firmwareMachine->reset();
+        else
+            firmwareMachine.reset();
+    }
     initialisePartStates();
     initialiseCommonControlsFromBank();
     syncCurrentPerformanceToEngine();
