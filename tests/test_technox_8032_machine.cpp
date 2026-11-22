@@ -47,7 +47,6 @@ int main(int argc, char** argv) {
     }
     for (unsigned i = 0; i < 0x4000; ++i) {
         const auto address = static_cast<std::uint16_t>(0xc000u + i);
-        if (address == 0xff10u) continue; // mapped sound-device status/data port
         const auto expected = static_cast<std::uint8_t>((i * 37u) ^ 0xa5u);
         assert(machine.readExternal(address) == expected);
     }
