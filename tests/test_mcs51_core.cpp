@@ -10,6 +10,7 @@ public:
     std::uint8_t internal[256]{};
     std::uint8_t external[65536]{};
     std::uint8_t portLatches[4]{};
+    unsigned advancedMachineCycles = 0;
     std::uint8_t readCode(std::uint16_t a) const noexcept override { return code[a]; }
     std::uint8_t readInternal(std::uint8_t a) const noexcept override { return internal[a]; }
     void writeInternal(std::uint8_t a, std::uint8_t v) noexcept override {
@@ -25,6 +26,7 @@ public:
     }
     std::uint8_t readExternal(std::uint16_t a) noexcept override { return external[a]; }
     void writeExternal(std::uint16_t a, std::uint8_t v) noexcept override { external[a] = v; }
+    void advanceMachineCycles(unsigned cycles) noexcept override { advancedMachineCycles += cycles; }
 };
 }
 
@@ -459,6 +461,18 @@ int main() {
             }
         }
     }
+
+    // Peripheral bus receives exact 8051 machine-cycle advances.
+    TestBus cycleBus;
+    cycleBus.code[0] = 0x00; // NOP: 1 machine cycle
+    cycleBus.code[1] = 0x90; cycleBus.code[2] = 0x12; cycleBus.code[3] = 0x34; // MOV DPTR,#1234: 2
+    cycleBus.code[4] = 0x12; cycleBus.code[5] = 0x00; cycleBus.code[6] = 0x10; // LCALL: 2
+    MCS51Core cycleCpu;
+    assert(cycleCpu.step(cycleBus) == MCS51StepResult::executed);
+    assert(cycleCpu.step(cycleBus) == MCS51StepResult::executed);
+    assert(cycleCpu.step(cycleBus) == MCS51StepResult::executed);
+    assert(cycleCpu.totalCycles() == 5);
+    assert(cycleBus.advancedMachineCycles == 5);
 
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
