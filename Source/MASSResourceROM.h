@@ -116,6 +116,23 @@ public:
     }
 };
 
+struct MASS1C61SecondaryTableFetchAddress {
+    std::uint16_t address = 0;
+    bool pageCarry = false;
+};
+
+// At 0x1D95 the original R7 is added to DPL; carry increments DPH before
+// the first MOVC. This CY only affects the fetch address.
+class MASS1C61SecondaryTableFetchAddressBuilder {
+public:
+    static MASS1C61SecondaryTableFetchAddress addOriginalR7(
+        std::uint16_t baseAddress, std::uint8_t originalR7) noexcept {
+        const auto lowSum = static_cast<unsigned>(baseAddress & 0xffu) + originalR7;
+        const auto address = static_cast<std::uint16_t>(baseAddress + originalR7);
+        return {address, lowSum > 0xffu};
+    }
+};
+
 struct MASS1C61SecondaryTableBytes {
     std::array<std::uint8_t, 3> bytes{};
 };
@@ -126,12 +143,13 @@ struct MASS1C61AccumulatorResult {
     std::uint8_t r4 = 0;
     bool zeroInputBypass = false;
     bool negativeInput = false;
-    bool initialCarry = false;
+    bool negativeInput = false;
 };
 
-// Instruction-level model of 0x1DC8..0x1E04. initialCarry is the CY left
-// by ADD A,R7 at 0x1D95 before the first RLC A. The helper deliberately takes
-// it as input because it depends on the table-base/offset addition upstream.
+// Instruction-level model of 0x1DC8..0x1E04. The input CY from ADD A,R7 at
+// 0x1D95 only selects the MOVC page; RLC A consumes it, but that rotated A
+// is overwritten before the second MUL. The saved CY used by ADDC is the
+// old bit7 of the first MUL low byte, so no address carry enters this math.
 class MASS1C61AccumulatorTransform {
 public:
     static MASS1C61AccumulatorResult apply(
@@ -141,12 +159,11 @@ public:
         std::uint8_t r5,
         std::uint8_t r6,
         std::uint8_t r7,
-        bool initialCarry,
         std::uint8_t directRam05,
         std::uint8_t directRam06,
         std::uint8_t directRam07) noexcept {
         if (r2 == 0) {
-            return {directRam05, directRam06, directRam07, true, false, initialCarry};
+            return {directRam05, directRam06, directRam07, true, false};
         }
 
         const bool negative = (r2 & 0x80u) != 0;
@@ -157,11 +174,9 @@ public:
         const auto firstLow = static_cast<std::uint8_t>(firstProduct & 0xffu);
         const auto firstHigh = static_cast<std::uint8_t>(firstProduct >> 8);
 
-        // RLC A uses the incoming carry from the earlier table pointer ADD.
-        const auto rotateResult = static_cast<std::uint16_t>(
-            (static_cast<unsigned>(firstLow) << 1) | (initialCarry ? 1u : 0u));
+        // RLC A consumes the prior address carry, but A is overwritten by
+        // MOV A,R2 before the next MUL. Only the outgoing carry survives PSW.
         const auto carryFromRotate = (firstLow & 0x80u) != 0;
-        const auto rotatedLow = static_cast<std::uint8_t>(rotateResult & 0xffu);
 
         const auto secondProduct = static_cast<std::uint16_t>(magnitude) * r4;
         const auto secondLow = static_cast<std::uint8_t>(secondProduct & 0xffu);
@@ -177,7 +192,6 @@ public:
         const auto highSum = static_cast<unsigned>(secondHigh) +
                              (carryToHigh ? 1u : 0u);
         auto outR3 = static_cast<std::uint8_t>(highSum & 0xffu);
-        const bool carryOut16 = highSum > 0xffu;
         std::uint8_t outR4 = 0;
 
         if (negative) {
@@ -209,7 +223,7 @@ public:
         outR4 = static_cast<std::uint8_t>(addHigh & 0xffu);
         outR4 &= 0x07u;
 
-        return {outR2, outR3, outR4, false, negative, initialCarry};
+        return {outR2, outR3, outR4, false, negative};
     }
 };
 
@@ -257,17 +271,23 @@ class MASS1C61SecondaryTableReader {
 public:
     // The firmware reads MOVC at DPTR, DPTR+0x80, then DPTR+0x100.
     static bool read(const MASSFirmwareROMView& rom,
-                     const MASS1C61SecondaryTableAddress& address,
+                     std::uint16_t baseAddress,
                      MASS1C61SecondaryTableBytes& result) noexcept {
         MASS1C61SecondaryTableBytes decoded{};
-        if (!rom.readCodeByte(address.address, decoded.bytes[0]) ||
-            !rom.readCodeByte(static_cast<std::uint16_t>(address.address + 0x80u),
+        if (!rom.readCodeByte(baseAddress, decoded.bytes[0]) ||
+            !rom.readCodeByte(static_cast<std::uint16_t>(baseAddress + 0x80u),
                               decoded.bytes[1]) ||
-            !rom.readCodeByte(static_cast<std::uint16_t>(address.address + 0x100u),
+            !rom.readCodeByte(static_cast<std::uint16_t>(baseAddress + 0x100u),
                               decoded.bytes[2]))
             return false;
         result = decoded;
         return true;
+    }
+
+    static bool read(const MASSFirmwareROMView& rom,
+                     const MASS1C61SecondaryTableFetchAddress& address,
+                     MASS1C61SecondaryTableBytes& result) noexcept {
+        return read(rom, address.address, result);
     }
 };
 

@@ -24,26 +24,26 @@ void writePointerBE(std::vector<std::uint8_t>& image,
 void testMASS1C61AccumulatorTransform() {
     // Positive input, no incoming carry.
     auto result = MASS1C61AccumulatorTransform::apply(
-        0x12, 0x34, 0x02, 0x05, 0x06, 0x07, false, 0x11, 0x22, 0x03);
+        0x12, 0x34, 0x02, 0x05, 0x06, 0x07, 0x11, 0x22, 0x03);
     assert(!result.zeroInputBypass && !result.negativeInput);
-    assert(result.r2 == 0x7a && result.r3 == 0x06 && result.r4 == 0x07);
+    assert(result.r2 == 0x2d && result.r3 == 0x06 && result.r4 == 0x07);
 
-    // Same arithmetic with incoming CY from the 0x1D95 pointer addition.
+    // The initial address carry changes the MOVC page, not the final math:
+    // RLC A consumes it, but A is overwritten before the second MUL.
     result = MASS1C61AccumulatorTransform::apply(
-        0x12, 0x34, 0x02, 0x05, 0x06, 0x07, true, 0x11, 0x22, 0x03);
-    assert(result.r2 == 0x7b && result.r3 == 0x06 && result.r4 == 0x07);
-    assert(result.initialCarry);
+        0x12, 0x34, 0x02, 0x05, 0x06, 0x07, 0x11, 0x22, 0x03);
+    assert(result.r2 == 0x2d && result.r3 == 0x06 && result.r4 == 0x07);
 
     // Negative R2 takes the absolute-value path, computes the 16-bit
     // multiply-sum, negates it, sign extends, then adds R5:R6:R7.
     result = MASS1C61AccumulatorTransform::apply(
-        0x80, 0x20, 0x03, 0x01, 0x02, 0x03, false, 0x11, 0x22, 0x03);
+        0x80, 0x20, 0x03, 0x01, 0x02, 0x03, 0x11, 0x22, 0x03);
     assert(result.negativeInput);
-    assert(result.r2 == 0x81 && result.r3 == 0x00 && result.r4 == 0x03);
+    assert(result.r2 == 0x71 && result.r3 == 0x00 && result.r4 == 0x03);
 
     // R2==0 bypasses the multiplies and copies direct RAM[0x05..0x07].
     result = MASS1C61AccumulatorTransform::apply(
-        0x00, 0x20, 0x03, 0x01, 0x02, 0x03, true, 0x45, 0x56, 0x67);
+        0x00, 0x20, 0x03, 0x01, 0x02, 0x03, 0x45, 0x56, 0x67);
     assert(result.zeroInputBypass && result.r2 == 0x45 &&
            result.r3 == 0x56 && result.r4 == 0x67);
 }
@@ -66,6 +66,13 @@ void testMASS1C61SecondaryTableAddress() {
     const auto positiveWrapped = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0xc0, 0x00, 0x00);
     assert(positiveWrapped.normalizedIndex == 0x08 && positiveWrapped.address == 0x4008);
+
+    const auto noCarry = MASS1C61SecondaryTableFetchAddressBuilder::addOriginalR7(
+        0x4050, 0x10);
+    assert(noCarry.address == 0x4060 && !noCarry.pageCarry);
+    const auto withCarry = MASS1C61SecondaryTableFetchAddressBuilder::addOriginalR7(
+        0x40f0, 0x20);
+    assert(withCarry.address == 0x4110 && withCarry.pageCarry);
 
     std::vector<std::uint8_t> image(0x20000, 0xff);
     image[0x4050] = 0x12;
