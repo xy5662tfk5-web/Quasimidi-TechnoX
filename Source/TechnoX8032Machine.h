@@ -407,6 +407,8 @@ public:
             return value;
         }
 
+        if (testExternalReadOverrideEnabled_ && address == testExternalReadOverrideAddress_)
+            return testExternalReadOverrideValue_;
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu)
             return testExternalRam7000_[address - 0x7000u];
 
@@ -633,6 +635,11 @@ public:
             testExternalRam7000Enabled_ = true;
         }
     }
+    void setTestExternalReadOverride(std::uint16_t address, std::uint8_t value) noexcept {
+        testExternalReadOverrideAddress_ = address;
+        testExternalReadOverrideValue_ = value;
+        testExternalReadOverrideEnabled_ = true;
+    }
 
     static constexpr std::uint8_t descrambledOffset(std::uint8_t offset) noexcept {
         constexpr std::uint8_t order[8] = {1, 2, 3, 6, 5, 7, 1, 0};
@@ -749,6 +756,9 @@ private:
     std::uint8_t soundDeviceResponse_ = 0xff;
     bool testExternalRam7000Enabled_ = false;
     std::array<std::uint8_t, 0x1000> testExternalRam7000_{};
+    bool testExternalReadOverrideEnabled_ = false;
+    std::uint16_t testExternalReadOverrideAddress_ = 0;
+    std::uint8_t testExternalReadOverrideValue_ = 0xff;
     std::uint64_t soundMemoryReadCount_ = 0;
     std::uint64_t soundMemoryWriteCount_ = 0;
     std::uint64_t soundBusModeWriteCount_ = 0;
