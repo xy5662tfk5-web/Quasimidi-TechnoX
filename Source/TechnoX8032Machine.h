@@ -20,6 +20,7 @@ public:
     struct SoundCommandPacket {
         std::array<std::uint8_t, 4> bytes{};
         std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
     };
     struct PortWriteEvent {
@@ -505,6 +506,11 @@ public:
                 // MOVX is a one-byte instruction; the core has already
                 // advanced PC when the bus callback is entered.
                 packet.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                const auto stackPointer = cpu_.registers().sp;
+                const auto returnHigh = readIndirect(stackPointer);
+                const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+                packet.returnPC = static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
                 packet.machineCycle = elapsedMachineCycles_;
                 ++soundCommandPacketCount_;
             }
