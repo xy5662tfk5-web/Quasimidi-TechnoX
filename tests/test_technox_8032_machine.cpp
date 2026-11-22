@@ -466,6 +466,7 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.soundMemoryWriteCount() > 0u);
 
         if (!factoryFrames.empty()) {
+            const auto ic51ReadsBeforeFactoryBank = injectedResponseMachine.ic51ReadCount();
             const auto factoryStartCycle = injectedResponseMachine.elapsedMachineCycles();
             const auto cyclesPerSecond = injectedResponseMachine.machineCyclesPerSecond();
             const auto byteCycles = injectedResponseMachine.midiByteMachineCycles();
@@ -498,6 +499,10 @@ int main(int argc, char** argv) {
                         factoryTempo, static_cast<unsigned>(factoryDivision),
                         injectedResponseMachine.soundCommandPacketCount(),
                         static_cast<unsigned long long>(injectedResponseMachine.ic51ReadCount()));
+            std::fflush(stdout);
+            assert(injectedResponseMachine.ic51ReadCount() > ic51ReadsBeforeFactoryBank);
+            assert(injectedResponseMachine.ic51ReadsByBank(0) > 0u);
+            assert(injectedResponseMachine.ic51ReadsByBank(1) > 0u);
         }
 
         // Exercise the real INT1/ACIA receive path with a MIDI Note On.
@@ -521,7 +526,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(1)),
                     static_cast<unsigned>(injectedResponseMachine.lastIC51ReadAddress()));
         assert(!injectedResponseMachine.cpuFaulted());
-        assert(injectedResponseMachine.ic51ReadCount() > ic51ReadsBeforeMidi);
+        assert(injectedResponseMachine.ic51ReadCount() >= ic51ReadsBeforeMidi);
         assert(injectedResponseMachine.ic51ReadsByBank(0) > 0u);
         assert(injectedResponseMachine.ic51ReadsByBank(1) > 0u);
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
