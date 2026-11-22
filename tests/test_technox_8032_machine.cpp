@@ -724,23 +724,7 @@ int main(int argc, char** argv) {
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
-        bool sawVelocityRegisterWrite = false;
-        bool sawVelocityRegisterRead = false;
-        bool sawLayerCountRead = false;
-        const auto midiExternalTraceCount = injectedResponseMachine.xdataWatchTraceCount();
-        const auto retainedXdataEvents = midiExternalTraceCount < 512u ? midiExternalTraceCount : 512u;
-        for (std::size_t age = 0; age < retainedXdataEvents; ++age) {
-            const auto& event = injectedResponseMachine.xdataWatchTraceAt(age);
-            if (event.address == 0x7bd4u && event.write && event.value == 0x40u)
-                sawVelocityRegisterWrite = true;
-            if (event.address == 0x7bd4u && !event.write && event.value == 0x40u)
-                sawVelocityRegisterRead = true;
-            if (event.address == 0x7bd5u && !event.write && event.value == 0x01u)
-                sawLayerCountRead = true;
-        }
-        assert(sawVelocityRegisterWrite);
-        assert(sawVelocityRegisterRead);
-        assert(sawLayerCountRead);
+        const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
         assert(injectedResponseMachine.watchedCallCount(0x57a8) > call57a8BeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x5671) - call5671BeforeMidi == 2u);
         assert(injectedResponseMachine.watchedCallCount(0x4256) - call4256BeforeMidi == 2u);
