@@ -113,6 +113,8 @@ public:
         xdata_.fill(0);
         portLatch_.fill(0xff);
         portPins_.fill(0xff);
+        externalPortInputMask_.fill(0);
+        externalPortInputValue_.fill(0xff);
         commandPort_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
@@ -212,7 +214,20 @@ public:
 
     std::uint8_t readInternal(std::uint8_t address) const noexcept override {
         const int port = portIndex(address);
-        return port >= 0 ? portPins_[static_cast<std::size_t>(port)] : internal_[address];
+        if (port < 0) return internal_[address];
+        const auto index = static_cast<std::size_t>(port);
+        const auto mask = externalPortInputMask_[index];
+        return static_cast<std::uint8_t>((portPins_[index] & static_cast<std::uint8_t>(~mask)) |
+                                         (externalPortInputValue_[index] & mask));
+    }
+
+    void setExternalPortInputs(std::uint8_t portAddress, std::uint8_t mask,
+                               std::uint8_t value) noexcept {
+        const int port = portIndex(portAddress);
+        if (port < 0) return;
+        const auto index = static_cast<std::size_t>(port);
+        externalPortInputMask_[index] = mask;
+        externalPortInputValue_[index] = value;
     }
 
     void writeInternal(std::uint8_t address, std::uint8_t value) noexcept override {
@@ -525,6 +540,8 @@ private:
     std::array<std::uint8_t, 0x10000> xdata_{};
     std::array<std::uint8_t, 4> portLatch_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> portPins_{{0xff, 0xff, 0xff, 0xff}};
+    std::array<std::uint8_t, 4> externalPortInputMask_{};
+    std::array<std::uint8_t, 4> externalPortInputValue_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> commandPort_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
