@@ -524,6 +524,23 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
 
+        // Resume the real-IC51 loader with a controlled ready signature.
+        // This is explicitly a synthetic SAM9407 handshake, not a claim that
+        // the unimplemented DSP returned AC on physical hardware.
+        const auto loadedBlockWrites = firmwareMachine.soundMemoryWriteCount();
+        firmwareMachine.setSoundDeviceResponseForTesting(0xacu);
+        const auto resumedToMain = firmwareMachine.runUntilProgramCounter(0x32b0u, 2000000u);
+        std::printf("IC4 after synthetic SAM9407-ready response: instructions=%llu PC=%04X "
+                    "IC51=%llu writes=%llu burstWords=%zu\\n",
+                    static_cast<unsigned long long>(resumedToMain),
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
+                    static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()),
+                    static_cast<unsigned long long>(firmwareMachine.soundMemoryWriteCount()),
+                    firmwareMachine.sam9407BurstWordCount());
+        assert(resumedToMain != 0u);
+        assert(firmwareMachine.cpu().registers().pc == 0x32b0u);
+        assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
+
         // Controlled test stimulus only: inject the expected AC signature so
         // the CPU can pass the otherwise-unmodeled external-device wait.
         TechnoX8032Machine injectedResponseMachine;
