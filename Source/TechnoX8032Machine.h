@@ -233,6 +233,8 @@ public:
         externalPortInputMask_.fill(0);
         externalPortInputValue_.fill(0xff);
         commandPort_.fill(0);
+        sam9407HostCommandLatch_ = 0;
+        sam9407HostWords_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
         sam9407HostReadCount_ = 0;
@@ -500,7 +502,11 @@ public:
         }
         if (address >= 0x8000u && address <= 0x8003u) {
             const auto index = static_cast<std::size_t>(address - 0x8000u);
-            const auto value = commandPort_[index];
+            std::uint8_t value = commandPort_[index];
+            if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow))
+                value = static_cast<std::uint8_t>(sam9407HostWords_[sam9407HostCommandLatch_] & 0xffu);
+            else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh))
+                value = static_cast<std::uint8_t>(sam9407HostWords_[sam9407HostCommandLatch_] >> 8u);
             auto& event = sam9407HostReadTrace_[
                 sam9407HostReadCount_ % sam9407HostReadTrace_.size()];
             event.registerIndex = static_cast<std::uint8_t>(index);
@@ -637,6 +643,19 @@ public:
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             const auto instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
             commandPort_[index] = value;
+            if (index == static_cast<std::size_t>(SAM9407HostRegister::Mpu401Data)) {
+                // IC4 selects a byte-wide host command/index before accessing
+                // the SAM9407 16-bit burst window. Its internal meaning is
+                // still being decoded; preserve the observed indexed behavior.
+                sam9407HostCommandLatch_ = value;
+            } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow)) {
+                auto& word = sam9407HostWords_[sam9407HostCommandLatch_];
+                word = static_cast<std::uint16_t>((word & 0xff00u) | value);
+            } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh)) {
+                auto& word = sam9407HostWords_[sam9407HostCommandLatch_];
+                word = static_cast<std::uint16_t>((word & 0x00ffu) |
+                    (static_cast<std::uint16_t>(value) << 8u));
+            }
 
             auto& hostWrite = sam9407HostWriteTrace_[
                 sam9407HostWriteCount_ % sam9407HostWriteTrace_.size()];
@@ -821,6 +840,9 @@ public:
         return commandPort_;
     }
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
+    std::uint16_t sam9407HostWordForTesting(std::uint8_t index) const noexcept {
+        return sam9407HostWords_[index];
+    }
     std::size_t sam9407HostReadCount() const noexcept { return sam9407HostReadCount_; }
     const SAM9407HostReadEvent& sam9407HostReadAt(std::size_t index) const noexcept {
         return sam9407HostReadTrace_[index % sam9407HostReadTrace_.size()];
@@ -1001,6 +1023,8 @@ private:
     std::array<std::uint8_t, 4> externalPortInputMask_{};
     std::array<std::uint8_t, 4> externalPortInputValue_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> commandPort_{};
+    std::uint8_t sam9407HostCommandLatch_ = 0;
+    std::array<std::uint16_t, 256> sam9407HostWords_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
     std::array<SAM9407HostReadEvent, 2048> sam9407HostReadTrace_{};
