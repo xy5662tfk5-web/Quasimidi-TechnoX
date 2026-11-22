@@ -731,6 +731,38 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.watchedCallCount(0xac00) - callAC00BeforeMidi == 2u);
         assert(commandCount > commandCountBeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x0db7) > commandWriterCallsBeforeMidi);
+
+        // The captured firmware burst has two distinct 256-write sweeps from
+        // the LCALL at 0x0E67 (return 0x0E6A), followed by two 16-write
+        // sequences from the LCALL at 0x0E1A (return 0x0E1D). Keep these
+        // caller/shape relationships under regression without assigning
+        // undocumented hardware meanings to the payload bytes.
+        assert(commandCountBeforeMidi == 548u);
+        assert(commandCount - commandCountBeforeMidi == 553u);
+        const auto& sweepAFirst = injectedResponseMachine.soundCommandPacketAt(554u);
+        const auto& sweepALast = injectedResponseMachine.soundCommandPacketAt(809u);
+        const auto& sweepBFirst = injectedResponseMachine.soundCommandPacketAt(810u);
+        const auto& sweepBLast = injectedResponseMachine.soundCommandPacketAt(1065u);
+        assert(sweepAFirst.returnPC == 0x0e6au);
+        assert(sweepALast.returnPC == 0x0e6au);
+        assert(sweepBFirst.returnPC == 0x0e6au);
+        assert(sweepBLast.returnPC == 0x0e6au);
+        assert(sweepAFirst.bytes[0] == 0x00u && sweepAFirst.bytes[3] == 0x00u);
+        assert(sweepALast.bytes[0] == 0x01u && sweepALast.bytes[3] == 0x00u);
+        assert(sweepBFirst.bytes[0] == 0x00u && sweepBFirst.bytes[3] == 0x80u);
+        assert(sweepBLast.bytes[0] == 0x01u && sweepBLast.bytes[3] == 0x80u);
+        const auto& tableWriteFirst = injectedResponseMachine.soundCommandPacketAt(1067u);
+        const auto& tableWriteLast = injectedResponseMachine.soundCommandPacketAt(1082u);
+        const auto& tableWriteSecondFirst = injectedResponseMachine.soundCommandPacketAt(1084u);
+        const auto& tableWriteSecondLast = injectedResponseMachine.soundCommandPacketAt(1099u);
+        assert(tableWriteFirst.returnPC == 0x0e1du);
+        assert(tableWriteLast.returnPC == 0x0e1du);
+        assert(tableWriteSecondFirst.returnPC == 0x0e1du);
+        assert(tableWriteSecondLast.returnPC == 0x0e1du);
+        assert(tableWriteFirst.bytes[0] == 0x0fu && tableWriteFirst.bytes[2] == 0x40u);
+        assert(tableWriteLast.bytes[0] == 0xffu && tableWriteLast.bytes[2] == 0x40u);
+        assert(tableWriteSecondFirst.bytes[0] == 0x0fu && tableWriteSecondFirst.bytes[3] == 0x80u);
+        assert(tableWriteSecondLast.bytes[0] == 0xffu && tableWriteSecondLast.bytes[3] == 0x80u);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
         // Preserve the complete MIDI-triggered command burst in CI logs.
