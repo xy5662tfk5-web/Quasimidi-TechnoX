@@ -425,7 +425,11 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(1)),
                     static_cast<unsigned>(injectedResponseMachine.lastIC51ReadAddress()));
         assert(!injectedResponseMachine.cpuFaulted());
-        (void)ic51ReadsBeforeMidi;
+        assert(injectedResponseMachine.ic51ReadCount() > ic51ReadsBeforeMidi);
+        assert(injectedResponseMachine.ic51ReadsByBank(0) > 0u);
+        assert(injectedResponseMachine.ic51ReadsByBank(1) > 0u);
+        assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
+        assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
     }
     return 0;
 }
