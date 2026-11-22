@@ -227,12 +227,12 @@ int main() {
     memoryBus.code[7] = 0xf0; // MOVX @DPTR,A
     memoryBus.external[0x1234] = 0x5a;
     MCS51Core memoryCpu;
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 3; ++i)
         assert(memoryCpu.step(memoryBus) == MCS51StepResult::executed);
     assert(memoryCpu.registers().dptr == 0x1234);
-    assert(memoryCpu.registers().a == 0x66);
+    assert(memoryCpu.registers().a == 0x66); // MOVC reads CODE[DPTR+A]
     assert(memoryCpu.step(memoryBus) == MCS51StepResult::executed);
-    assert(memoryCpu.registers().a == 0x5a);
+    assert(memoryCpu.registers().a == 0x5a); // MOVX then reads XDATA[DPTR]
     assert(memoryCpu.step(memoryBus) == MCS51StepResult::executed);
     assert(memoryBus.external[0x1234] == 0x5a);
 
