@@ -105,22 +105,17 @@ int main(int argc, char** argv) {
     assert((machine.readExternal(0xa002) & 0x01u) != 0);
     assert(machine.readExternal(0xa003) == 0x64);
 
-    // External sound-device boot handshake: reset low, request FF10,
-    // download data into C000+, then release reset and expose ready=AC.
+    // External sound-device port: preserve observed bus writes, but do not
+    // synthesize the undocumented 0xAC ready response from unrelated RAM writes.
     machine.reset();
-    machine.writeInternal(0xb0, 0xfb); // P3.2 active-low reset
+    machine.writeInternal(0xb0, 0xfb); // observed active-low P3.2 reset transition
     machine.writeExternal(0xff10, 0xff);
-    assert(machine.soundDeviceBootRequested());
-    assert(!machine.soundDeviceReady());
-    assert(!machine.soundDeviceDataLoaded());
+    assert(machine.lastSoundDeviceWrite() == 0xff);
     machine.writeExternal(0xc000, 0x55);
-    assert(machine.soundDeviceDataLoaded());
+    machine.writeInternal(0xb0, 0xff); // release reset; response remains unknown
     assert(machine.readExternal(0xff10) == 0xff);
-    machine.writeInternal(0xb0, 0xff); // release sound-device reset
-    assert(machine.soundDeviceReady());
+    machine.setSoundDeviceResponseForTesting(0xac); // explicit peripheral test fixture
     assert(machine.readExternal(0xff10) == 0xac);
-    machine.writeInternal(0xb0, 0xfb); // reset clears ready state
-    assert(!machine.soundDeviceReady());
 
     // INT0 level mode follows the active-low P3.2 input.
     machine.reset();
