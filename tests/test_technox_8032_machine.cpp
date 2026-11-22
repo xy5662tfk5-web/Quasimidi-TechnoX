@@ -90,8 +90,9 @@ int main(int argc, char** argv) {
     if (argc > 1) {
         std::ifstream romFile(argv[1], std::ios::binary);
         assert(romFile.good());
-        const std::vector<std::uint8_t> realRom(
-            std::istreambuf_iterator<char>(romFile), std::istreambuf_iterator<char>());
+        const std::istreambuf_iterator<char> romBegin{romFile};
+        const std::istreambuf_iterator<char> romEnd{};
+        const std::vector<std::uint8_t> realRom(romBegin, romEnd);
         assert(realRom.size() == TechnoX8032Machine::kIC4RomSize);
         TechnoX8032Machine firmwareMachine;
         assert(firmwareMachine.loadIC4Rom(realRom.data(), realRom.size()));
