@@ -49,6 +49,12 @@ public:
         bool write = false;
         std::uint64_t machineCycle = 0;
     };
+    struct ExternalWindowEvent {
+        std::uint16_t address = 0;
+        std::uint8_t value = 0xff;
+        bool write = false;
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -177,6 +183,8 @@ public:
         unmappedBusTraceCount_ = 0;
         unmappedReadCounts7xxx_.fill(0);
         unmappedWriteCounts7xxx_.fill(0);
+        externalWindowTrace_.fill(ExternalWindowEvent{});
+        externalWindowTraceCount_ = 0;
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -407,10 +415,30 @@ public:
             return value;
         }
 
-        if (testExternalReadOverrideEnabled_ && address == testExternalReadOverrideAddress_)
-            return testExternalReadOverrideValue_;
-        if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu)
-            return testExternalRam7000_[address - 0x7000u];
+        if (testExternalReadOverrideEnabled_ && address == testExternalReadOverrideAddress_) {
+            const auto value = testExternalReadOverrideValue_;
+            if (address >= 0x7bd0u && address <= 0x7bd7u) {
+                auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.machineCycle = elapsedMachineCycles_;
+                ++externalWindowTraceCount_;
+            }
+            return value;
+        }
+        if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
+            const auto value = testExternalRam7000_[address - 0x7000u];
+            if (address >= 0x7bd0u && address <= 0x7bd7u) {
+                auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.machineCycle = elapsedMachineCycles_;
+                ++externalWindowTraceCount_;
+            }
+            return value;
+        }
 
         switch (address) {
             case 0xa002: return (aciaControl_ & 0x03u) == 0x03u
@@ -481,6 +509,14 @@ public:
 
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
             testExternalRam7000_[address - 0x7000u] = value;
+            if (address >= 0x7bd0u && address <= 0x7bd7u) {
+                auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = true;
+                event.machineCycle = elapsedMachineCycles_;
+                ++externalWindowTraceCount_;
+            }
             return;
         }
 
@@ -644,6 +680,10 @@ public:
         testExternalReadOverrideValue_ = value;
         testExternalReadOverrideEnabled_ = true;
     }
+    std::size_t externalWindowTraceCount() const noexcept { return externalWindowTraceCount_; }
+    const ExternalWindowEvent& externalWindowTraceAt(std::size_t index) const noexcept {
+        return externalWindowTrace_[index % externalWindowTrace_.size()];
+    }
 
     static constexpr std::uint8_t descrambledOffset(std::uint8_t offset) noexcept {
         constexpr std::uint8_t order[8] = {1, 2, 3, 6, 5, 7, 1, 0};
@@ -760,6 +800,8 @@ private:
     std::uint8_t soundDeviceResponse_ = 0xff;
     bool testExternalRam7000Enabled_ = false;
     std::array<std::uint8_t, 0x1000> testExternalRam7000_{};
+    std::array<ExternalWindowEvent, 1024> externalWindowTrace_{};
+    std::size_t externalWindowTraceCount_ = 0;
     bool testExternalReadOverrideEnabled_ = false;
     std::uint16_t testExternalReadOverrideAddress_ = 0;
     std::uint8_t testExternalReadOverrideValue_ = 0xff;
