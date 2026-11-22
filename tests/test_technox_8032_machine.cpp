@@ -604,7 +604,6 @@ int main(int argc, char** argv) {
         const auto callAC00BeforeMidi = injectedResponseMachine.watchedCallCount(0xac00);
         const auto callAC88BeforeMidi = injectedResponseMachine.watchedCallCount(0xac88);
         const auto commandWriterCallsBeforeMidi = injectedResponseMachine.watchedCallCount(0x0db7);
-        const auto validAciaReadsBeforeMidi = injectedResponseMachine.aciaValidReceiveReadCount();
         const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
             programAndNote.data(), programAndNote.size(), midiStartCycle));
