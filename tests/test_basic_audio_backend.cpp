@@ -437,6 +437,42 @@ int main() {
                                  std::abs(performanceRight[static_cast<std::size_t>(i)]);
     assert(fullPerformanceEnergy > 0.01);
 
+    // Part transpose (0..48, center 24) and tuning (0..127, center 64)
+    // must alter oscillator frequency, not just remain editor metadata.
+    constexpr int pitchSamples = 4096;
+    auto renderPitch = [](int transposeRaw, int tuneRaw,
+                          std::array<float, pitchSamples>& left,
+                          std::array<float, pitchSamples>& right) {
+        BasicMASSVoiceBackend pitchBackend;
+        MASSAudioEngine pitchEngine(&pitchBackend);
+        pitchEngine.prepare(48000.0, pitchSamples);
+        assert(pitchEngine.setPartParameter(12, PartParameter::level, 127));
+        assert(pitchEngine.setPartParameter(12, PartParameter::cutoffFrequency, 127));
+        assert(pitchEngine.setPartParameter(12, PartParameter::resonance, 0));
+        assert(pitchEngine.setPartParameter(12, PartParameter::egAttack, 0));
+        assert(pitchEngine.setPartParameter(12, PartParameter::egDecay, 0));
+        assert(pitchEngine.setPartParameter(12, PartParameter::egRelease, 0));
+        assert(pitchEngine.setPartParameter(12, PartParameter::transpose, transposeRaw));
+        assert(pitchEngine.setPartParameter(12, PartParameter::tune, tuneRaw));
+        pitchEngine.noteOn(12, 1, 69, 127);
+        float* channels[] = {left.data(), right.data()};
+        pitchEngine.render(channels, 2, pitchSamples);
+    };
+    std::array<float, pitchSamples> basePitchL{}, basePitchR{}, octavePitchL{}, octavePitchR{},
+        fineTunePitchL{}, fineTunePitchR{};
+    renderPitch(24, 64, basePitchL, basePitchR);
+    renderPitch(36, 64, octavePitchL, octavePitchR);
+    renderPitch(24, 127, fineTunePitchL, fineTunePitchR);
+    double octaveDifference = 0.0, fineTuneDifference = 0.0;
+    for (int i = 0; i < pitchSamples; ++i) {
+        octaveDifference += std::abs(basePitchL[static_cast<std::size_t>(i)] -
+                                     octavePitchL[static_cast<std::size_t>(i)]);
+        fineTuneDifference += std::abs(basePitchL[static_cast<std::size_t>(i)] -
+                                       fineTunePitchL[static_cast<std::size_t>(i)]);
+    }
+    assert(octaveDifference > 1.0);
+    assert(fineTuneDifference > 0.01);
+
     // Recovered firmware image layout: 8-byte name + 65 Common + four 24-byte Parts.
     CountingBackend imageBackend;
     MASSAudioEngine imageEngine(&imageBackend);

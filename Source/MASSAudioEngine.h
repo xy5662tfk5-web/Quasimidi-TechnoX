@@ -18,6 +18,11 @@ public:
         for (auto& part : values_)
             for (auto& value : part)
                 value.store(0, std::memory_order_relaxed);
+        // Neutral defaults for parameters with signed display offsets.
+        for (auto& part : values_) {
+            part[static_cast<std::size_t>(PartParameter::transpose)].store(24, std::memory_order_relaxed);
+            part[static_cast<std::size_t>(PartParameter::tune)].store(64, std::memory_order_relaxed);
+        }
     }
 
     bool set(int partIndex, PartParameter parameter, int rawValue) noexcept {

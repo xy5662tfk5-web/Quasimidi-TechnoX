@@ -75,6 +75,8 @@ public:
 
                 const int part = static_cast<int>(slot.part);
                 const int rawLevel = parts.get(part, PartParameter::level);
+                const int rawTranspose = parts.get(part, PartParameter::transpose);
+                const int rawTune = parts.get(part, PartParameter::tune);
                 const int rawCutoff = parts.get(part, PartParameter::cutoffFrequency);
                 const int rawResonance = parts.get(part, PartParameter::resonance);
                 const int rawAttack = parts.get(part, PartParameter::egAttack);
@@ -117,8 +119,13 @@ public:
                 const double bendSemitones = (static_cast<double>(bendRaw) / 8192.0) * bendRange;
                 const double vibratoSemitones = static_cast<double>(modWheel) * 0.5 *
                     std::sin(state.lfoPhase);
+                const double transposeSemitones = rawTranspose < 0
+                    ? 0.0 : static_cast<double>(rawTranspose - 24);
+                const double fineTuneSemitones = rawTune < 0
+                    ? 0.0 : static_cast<double>(rawTune - 64) / 100.0;
                 const double frequency = 440.0 * std::pow(2.0,
-                    (static_cast<double>(slot.note) - 69.0 + bendSemitones + vibratoSemitones +
+                    (static_cast<double>(slot.note) - 69.0 + transposeSemitones + fineTuneSemitones +
+                     bendSemitones + vibratoSemitones +
                      static_cast<double>(pitchModulation) * 12.0) / 12.0);
                 state.lfoPhase += twoPi * 5.0 / sampleRate_;
                 if (state.lfoPhase >= twoPi) state.lfoPhase -= twoPi;
