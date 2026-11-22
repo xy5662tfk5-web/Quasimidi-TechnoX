@@ -540,6 +540,24 @@ int main(int argc, char** argv) {
         assert(resumedToMain != 0u);
         assert(firmwareMachine.cpu().registers().pc == 0x32b0u);
         assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
+        const auto bootBurstWords = firmwareMachine.sam9407BurstWordCount();
+        std::printf("SAM9407 burst words after IC51 boot block (%zu):", bootBurstWords);
+        for (std::size_t i = 0; i < bootBurstWords; ++i) {
+            if ((i % 16u) == 0u) std::printf("\\n  %03zu:", i);
+            std::printf(" %04X", static_cast<unsigned>(
+                firmwareMachine.sam9407BurstWordAt(i).value));
+        }
+        std::printf("\\n");
+        for (std::size_t i = 0; i < bootBurstWords; ++i) {
+            if (i < 8u || i + 8u >= bootBurstWords) {
+                const auto& word = firmwareMachine.sam9407BurstWordAt(i);
+                std::printf("  burst[%03zu]=%04X lowPC=%04X highPC=%04X cycle=%llu\\n",
+                            i, static_cast<unsigned>(word.value),
+                            static_cast<unsigned>(word.lowInstructionPC),
+                            static_cast<unsigned>(word.highInstructionPC),
+                            static_cast<unsigned long long>(word.machineCycle));
+            }
+        }
 
         // Controlled test stimulus only: inject the expected AC signature so
         // the CPU can pass the otherwise-unmodeled external-device wait.
