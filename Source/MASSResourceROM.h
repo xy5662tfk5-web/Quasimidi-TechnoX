@@ -79,6 +79,7 @@ private:
 };
 
 struct MASS1C61InterpolationLookupResult {
+    bool lookupPerformed = false;
     std::uint8_t signedIndex = 0;
     std::uint8_t shiftCount = 0;
     std::uint8_t tableRemainder = 0;
@@ -86,22 +87,27 @@ struct MASS1C61InterpolationLookupResult {
     bool negativeBranch = false;
 };
 
-// Reconstructs 0x1CC6..0x1CDE / 0x1D23..0x1D2A. The low three bits
-// of R4 are optionally negated as an 8-bit value, divided by 12, and the
-// remainder selects one of the two 12-entry ROM interpolation tables.
+// Reconstructs 0x1CC9..0x1CDE / 0x1D23..0x1D2A. The signed control byte
+// comes from XDATA 0x2067; its bit7 selects the negative table. Negative
+// values are two's-complement-negated before division by 12.
 class MASS1C61InterpolationLookup {
 public:
     static bool resolve(const MASSFirmwareROMView& rom,
-                        std::uint8_t r4,
-                        bool negativeBranch,
+                        std::uint8_t interpolationControl,
                         MASS1C61InterpolationLookupResult& result) noexcept {
-        auto index = static_cast<std::uint8_t>(r4 & 0x07u);
-        if (negativeBranch)
-            index = static_cast<std::uint8_t>(0u - index);
+        MASS1C61InterpolationLookupResult decoded{};
+        if (interpolationControl == 0) {
+            result = decoded; // firmware exits the interpolation path at 0x1CCD
+            return true;
+        }
 
+        const bool negative = (interpolationControl & 0x80u) != 0;
+        const auto index = negative
+            ? static_cast<std::uint8_t>(0u - interpolationControl)
+            : interpolationControl;
         const auto quotient = static_cast<std::uint8_t>(index / 12u);
         const auto remainder = static_cast<std::uint8_t>(index % 12u);
-        const auto table = negativeBranch
+        const auto table = negative
             ? MASSFirmwareLookupTable::interpolationCurve11FC
             : MASSFirmwareLookupTable::interpolationCurve11F0;
 
@@ -109,7 +115,13 @@ public:
         if (!rom.read(table, remainder, coefficient))
             return false;
 
-        result = {index, quotient, remainder, coefficient, negativeBranch};
+        decoded.lookupPerformed = true;
+        decoded.signedIndex = index;
+        decoded.shiftCount = quotient;
+        decoded.tableRemainder = remainder;
+        decoded.coefficient = coefficient;
+        decoded.negativeBranch = negative;
+        result = decoded;
         return true;
     }
 };
@@ -122,8 +134,9 @@ struct MASS1C61Interpolation24Result {
 };
 
 // Executes the byte-level multiply and RLC/RRC loops after the 0x1C61
-// interpolation table lookup. R2:R3:R4 is little-endian; the multiply keeps
-// the upper 24 bits of value24*coefficient. Shifts preserve 8051 carry flow.
+// interpolation table lookup. The 24-bit operand is R4:R3:R2, with R4
+// already masked to three bits; the control byte from XDATA 0x2067 selects
+// the coefficient and shift count independently.
 class MASS1C61InterpolationArithmetic {
 public:
     static MASS1C61Interpolation24Result apply(
@@ -133,6 +146,9 @@ public:
         std::uint8_t r4) noexcept {
         const auto input = (static_cast<std::uint32_t>(r4 & 0x07u) << 16) |
                            (static_cast<std::uint32_t>(r3) << 8) | r2;
+        if (!lookup.lookupPerformed) {
+            return {r2, r3, static_cast<std::uint8_t>(r4 & 0x07u), input};
+        }
         const auto product = static_cast<std::uint64_t>(input) * lookup.coefficient;
         auto value = static_cast<std::uint32_t>((product >> 8) & 0x00ffffffu);
 

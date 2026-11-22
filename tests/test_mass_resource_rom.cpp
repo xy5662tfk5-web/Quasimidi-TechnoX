@@ -37,19 +37,34 @@ void testMASS1C61InterpolationLookup() {
     assert(view.attach(romBytes.data(), romBytes.size()));
 
     MASS1C61InterpolationLookupResult result{};
-    assert(MASS1C61InterpolationLookup::resolve(view, 0x07, false, result));
-    assert(result.signedIndex == 0x07 && result.shiftCount == 0);
-    assert(result.tableRemainder == 7 && result.coefficient == 0xc0);
-    assert(!result.negativeBranch);
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x07, result));
+    assert(result.lookupPerformed && result.signedIndex == 0x07);
+    assert(result.shiftCount == 0 && result.tableRemainder == 7);
+    assert(result.coefficient == 0xc0 && !result.negativeBranch);
 
-    assert(MASS1C61InterpolationLookup::resolve(view, 0x01, true, result));
-    assert(result.signedIndex == 0xff && result.shiftCount == 21);
-    assert(result.tableRemainder == 3 && result.coefficient == 0xd7);
+    // XDATA 0x2067 = -1 selects the negative table with magnitude 1.
+    assert(MASS1C61InterpolationLookup::resolve(view, 0xff, result));
+    assert(result.lookupPerformed && result.signedIndex == 0x01);
+    assert(result.shiftCount == 0 && result.tableRemainder == 1);
+    assert(result.coefficient == 0xf2 && result.negativeBranch);
+
+    // XDATA 0x2067 = -7 becomes +7 before division; table 0x11FC[7].
+    assert(MASS1C61InterpolationLookup::resolve(view, 0xf9, result));
+    assert(result.signedIndex == 0x07 && result.shiftCount == 0);
+    assert(result.tableRemainder == 7 && result.coefficient == 0xab);
+
+    // Positive +13 and negative -13 both produce quotient 1/remainder 1,
+    // but select different tables.
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x0d, result));
+    assert(result.signedIndex == 0x0d && result.shiftCount == 1);
+    assert(result.tableRemainder == 1 && result.coefficient == 0x88);
+    assert(MASS1C61InterpolationLookup::resolve(view, 0xf3, result));
+    assert(result.signedIndex == 0x0d && result.shiftCount == 1);
+    assert(result.tableRemainder == 1 && result.coefficient == 0xf2);
     assert(result.negativeBranch);
 
-    assert(MASS1C61InterpolationLookup::resolve(view, 0x07, true, result));
-    assert(result.signedIndex == 0xf9 && result.shiftCount == 20);
-    assert(result.tableRemainder == 9 && result.coefficient == 0x98);
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x00, result));
+    assert(!result.lookupPerformed);
 }
 
 void testMASS1C61InterpolationArithmetic() {
@@ -68,19 +83,24 @@ void testMASS1C61InterpolationArithmetic() {
     assert(view.attach(romBytes.data(), romBytes.size()));
 
     MASS1C61InterpolationLookupResult lookup{};
-    assert(MASS1C61InterpolationLookup::resolve(view, 0x01, false, lookup));
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x07, lookup));
     const auto positiveResult =
         MASS1C61InterpolationArithmetic::apply(lookup, 0x12, 0x34, 0x01);
-    assert(positiveResult.value24 == 0x014752);
-    assert(positiveResult.r2 == 0x52 && positiveResult.r3 == 0x47 &&
+    assert(positiveResult.value24 == 0x01ce1a);
+    assert(positiveResult.r2 == 0x1a && positiveResult.r3 == 0xce &&
            positiveResult.r4 == 0x01);
 
-    assert(MASS1C61InterpolationLookup::resolve(view, 0x01, true, lookup));
+    assert(MASS1C61InterpolationLookup::resolve(view, 0xf9, lookup));
     const auto negativeResult =
         MASS1C61InterpolationArithmetic::apply(lookup, 0x12, 0x34, 0x01);
-    assert(negativeResult.value24 == 0x102bb0);
-    assert(negativeResult.r2 == 0xb0 && negativeResult.r3 == 0x2b &&
-           negativeResult.r4 == 0x10);
+    assert(negativeResult.value24 == 0x00cdc8);
+    assert(negativeResult.r2 == 0xc8 && negativeResult.r3 == 0xcd &&
+           negativeResult.r4 == 0x00);
+
+    assert(MASS1C61InterpolationLookup::resolve(view, 0x00, lookup));
+    const auto unchanged =
+        MASS1C61InterpolationArithmetic::apply(lookup, 0x12, 0x34, 0x01);
+    assert(unchanged.value24 == 0x013412);
 }
 
 void testMASS1EDDLookupIndexBuilder() {
