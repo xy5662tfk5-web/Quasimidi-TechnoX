@@ -184,6 +184,7 @@ public:
             modWheel_[i].store(0, std::memory_order_relaxed);
             pitchBend_[i].store(0, std::memory_order_relaxed);
             expression_[i].store(127, std::memory_order_relaxed);
+            aftertouch_[i].store(0, std::memory_order_relaxed);
         }
     }
     bool setModWheel(int partIndex, int value) noexcept {
@@ -210,18 +211,28 @@ public:
     int expression(int partIndex) const noexcept {
         return valid(partIndex) ? expression_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 127;
     }
+    bool setAftertouch(int partIndex, int value) noexcept {
+        if (!valid(partIndex) || value < 0 || value > 127) return false;
+        aftertouch_[static_cast<std::size_t>(partIndex)].store(value, std::memory_order_release);
+        return true;
+    }
+    int aftertouch(int partIndex) const noexcept {
+        return valid(partIndex) ? aftertouch_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire) : 0;
+    }
     void reset(int partIndex) noexcept {
         if (!valid(partIndex)) return;
         const auto i = static_cast<std::size_t>(partIndex);
         modWheel_[i].store(0, std::memory_order_release);
         pitchBend_[i].store(0, std::memory_order_release);
         expression_[i].store(127, std::memory_order_release);
+        aftertouch_[i].store(0, std::memory_order_release);
     }
 private:
     static bool valid(int partIndex) noexcept { return partIndex >= 0 && partIndex < static_cast<int>(kPartCount); }
     std::array<std::atomic<int>, kPartCount> modWheel_{};
     std::array<std::atomic<int>, kPartCount> pitchBend_{};
     std::array<std::atomic<int>, kPartCount> expression_{};
+    std::array<std::atomic<int>, kPartCount> aftertouch_{};
 };
 
 class MASSPartRuntimeControlStore {
@@ -446,6 +457,8 @@ public:
     int getPitchBend(int partIndex) const noexcept { return modulationSources_.pitchBend(partIndex); }
     bool setExpression(int partIndex, int value) noexcept { return modulationSources_.setExpression(partIndex, value); }
     int getExpression(int partIndex) const noexcept { return modulationSources_.expression(partIndex); }
+    bool setAftertouch(int partIndex, int value) noexcept { return modulationSources_.setAftertouch(partIndex, value); }
+    int getAftertouch(int partIndex) const noexcept { return modulationSources_.aftertouch(partIndex); }
     bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
     bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
     bool setSustainPedal(int partIndex, bool enabled) noexcept {

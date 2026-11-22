@@ -294,6 +294,39 @@ int main() {
                                          fullWheelLeft[static_cast<std::size_t>(i)]);
     assert(modulationDifference > 0.01);
 
+    // Channel pressure can drive the modulation matrix without changing the
+    // default patch when no route is configured.
+    BasicMASSVoiceBackend noPressureBackend;
+    BasicMASSVoiceBackend pressureBackend;
+    MASSAudioEngine noPressureEngine(&noPressureBackend);
+    MASSAudioEngine pressureEngine(&pressureBackend);
+    noPressureEngine.prepare(48000.0, modulationSamples);
+    pressureEngine.prepare(48000.0, modulationSamples);
+    for (MASSAudioEngine* candidate : {&noPressureEngine, &pressureEngine}) {
+        assert(candidate->setPartParameter(12, PartParameter::level, 127));
+        assert(candidate->setPartParameter(12, PartParameter::cutoffFrequency, 100));
+        assert(candidate->setPartParameter(12, PartParameter::resonance, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egAttack, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egDecay, 0));
+        assert(candidate->setPartParameter(12, PartParameter::egRelease, 0));
+    }
+    assert(pressureEngine.setAftertouch(12, 127));
+    assert(pressureEngine.modulationMatrix().setRoute(
+        0, ModSource::aftertouch, ModDestination::pitch, 0.5f));
+    noPressureEngine.noteOn(12, 1, 69, 110);
+    pressureEngine.noteOn(12, 1, 69, 110);
+    std::array<float, modulationSamples> noPressureLeft{}, noPressureRight{};
+    std::array<float, modulationSamples> pressureLeft{}, pressureRight{};
+    float* noPressureChannels[] = {noPressureLeft.data(), noPressureRight.data()};
+    float* pressureChannels[] = {pressureLeft.data(), pressureRight.data()};
+    noPressureEngine.render(noPressureChannels, 2, modulationSamples);
+    pressureEngine.render(pressureChannels, 2, modulationSamples);
+    double pressureDifference = 0.0;
+    for (int i = 0; i < modulationSamples; ++i)
+        pressureDifference += std::abs(noPressureLeft[static_cast<std::size_t>(i)] -
+                                       pressureLeft[static_cast<std::size_t>(i)]);
+    assert(pressureDifference > 0.01);
+
     // Backend hand-off: a recovered DSP can replace the prototype without
     // rebuilding MIDI/Part routing, and receives the active host format.
     CountingBackend prototypeBackend;

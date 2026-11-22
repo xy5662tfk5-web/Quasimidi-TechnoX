@@ -49,14 +49,15 @@ public:
     }
 
     void render(float* const* channels, int channelCount, int sampleCount,
-                const VoiceManager& voices, const ModulationMatrix&,
+                const VoiceManager& voices, const ModulationMatrix& matrix,
                 const MASSPartParameterStore& parts, const MASSModulationSourceStore& sources,
                 const MASSPartRuntimeControlStore& runtimeControls, const MASSCommonControlStore&,
                 const MASSPerformanceImageStore&, const MASSDrumParameterStore&) noexcept override {
         if (channels == nullptr || channelCount <= 0 || sampleCount <= 0) return;
 
         for (int sample = 0; sample < sampleCount; ++sample) {
-            float mixed = 0.0f;
+            float mixedLeft = 0.0f;
+            float mixedRight = 0.0f;
             const auto& slots = voices.voices();
             for (std::size_t index = 0; index < slots.size(); ++index) {
                 const auto& slot = slots[index];
@@ -74,6 +75,17 @@ public:
                 const float level = rawLevel < 0 ? 0.8f : static_cast<float>(rawLevel) / 127.0f;
                 const float expression = static_cast<float>(sources.expression(part)) / 127.0f;
                 const float modWheel = static_cast<float>(sources.modWheel(part)) / 127.0f;
+                const float aftertouch = static_cast<float>(sources.aftertouch(part)) / 127.0f;
+                const float velocity = static_cast<float>(slot.velocity) / 127.0f;
+                const float keyTrack = juceSafeClamp((static_cast<float>(slot.note) - 60.0f) / 60.0f, -1.0f, 1.0f);
+                const float pitchModulation = matrix.contribution(
+                    ModDestination::pitch, modWheel, velocity, keyTrack, aftertouch);
+                const float cutoffModulation = matrix.contribution(
+                    ModDestination::cutoff, modWheel, velocity, keyTrack, aftertouch);
+                const float levelModulation = matrix.contribution(
+                    ModDestination::level, modWheel, velocity, keyTrack, aftertouch);
+                const float panModulation = juceSafeClamp(matrix.contribution(
+                    ModDestination::panorama, modWheel, velocity, keyTrack, aftertouch), -1.0f, 1.0f);
                 const float attack = timeSeconds(rawAttack, 0.002f, 1.5f);
                 const float decay = timeSeconds(rawDecay, 0.01f, 2.0f);
                 const float release = timeSeconds(rawRelease, 0.01f, 3.0f);
@@ -87,7 +99,8 @@ public:
                 const double vibratoSemitones = static_cast<double>(modWheel) * 0.5 *
                     std::sin(state.lfoPhase);
                 const double frequency = 440.0 * std::pow(2.0,
-                    (static_cast<double>(slot.note) - 69.0 + bendSemitones + vibratoSemitones) / 12.0);
+                    (static_cast<double>(slot.note) - 69.0 + bendSemitones + vibratoSemitones +
+                     static_cast<double>(pitchModulation) * 12.0) / 12.0);
                 state.lfoPhase += twoPi * 5.0 / sampleRate_;
                 if (state.lfoPhase >= twoPi) state.lfoPhase -= twoPi;
                 const float oscillator = static_cast<float>(std::sin(state.phase));
@@ -95,19 +108,32 @@ public:
                 if (state.phase >= twoPi) state.phase -= twoPi;
 
                 const float cutoffNorm = rawCutoff < 0 ? 0.78f : static_cast<float>(rawCutoff) / 127.0f;
-                const float modulatedCutoff = juceSafeClamp(cutoffNorm + modWheel * 0.35f, 0.0f, 1.0f);
+                const float modulatedCutoff = juceSafeClamp(
+                    cutoffNorm + modWheel * 0.35f + cutoffModulation, 0.0f, 1.0f);
                 const float cutoffHz = 35.0f * std::pow(350.0f, modulatedCutoff);
                 const float resonanceNorm = rawResonance < 0 ? 0.0f : static_cast<float>(rawResonance) / 127.0f;
                 const float q = 0.707f + resonanceNorm * 9.0f;
                 const float filtered = lowPass(state, oscillator, cutoffHz, q);
-                const float velocity = static_cast<float>(slot.velocity) / 127.0f;
-                mixed += filtered * state.envelope * velocity * level * expression * 0.18f;
+                const float modulatedLevel = juceSafeClamp(level + levelModulation, 0.0f, 1.0f);
+                const float voiceSample = filtered * state.envelope * velocity *
+                    modulatedLevel * expression * 0.18f;
+                const float leftGain = panModulation > 0.0f ? 1.0f - panModulation : 1.0f;
+                const float rightGain = panModulation < 0.0f ? 1.0f + panModulation : 1.0f;
+                mixedLeft += voiceSample * leftGain;
+                mixedRight += voiceSample * rightGain;
 
                 if (state.stage == Stage::off) state.active = false;
             }
-            const float limited = std::tanh(mixed);
-            for (int channel = 0; channel < channelCount; ++channel)
-                channels[channel][sample] += limited;
+            const float limitedLeft = std::tanh(mixedLeft);
+            const float limitedRight = std::tanh(mixedRight);
+            if (channelCount == 1) {
+                channels[0][sample] += 0.5f * (limitedLeft + limitedRight);
+            } else {
+                channels[0][sample] += limitedLeft;
+                channels[1][sample] += limitedRight;
+                for (int channel = 2; channel < channelCount; ++channel)
+                    channels[channel][sample] += 0.5f * (limitedLeft + limitedRight);
+            }
         }
     }
 

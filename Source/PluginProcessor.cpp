@@ -228,6 +228,10 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             const int bend = message.getPitchWheelValue() - 8192;
             for (int i = 0; i < targetCount; ++i)
                 massEngine.setPitchBend(12 + targetSlots[static_cast<std::size_t>(i)], bend);
+        } else if (message.isChannelPressure()) {
+            const int pressure = message.getChannelPressureValue();
+            for (int i = 0; i < targetCount; ++i)
+                massEngine.setAftertouch(12 + targetSlots[static_cast<std::size_t>(i)], pressure);
         } else if (message.isController()) {
             const int controller = message.getControllerNumber();
             const int value = message.getControllerValue();
