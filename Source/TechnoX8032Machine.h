@@ -546,7 +546,11 @@ public:
                 event.value = value;
                 event.mode = static_cast<std::uint8_t>(mode);
                 event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
-                const auto stackPointer = cpu_.registers().sp;
+                auto stackPointer = cpu_.registers().sp;
+                // AF05 saves R0 before the sound-RAM MOVX at AF10; skip that
+                // one stack byte to recover the caller return address.
+                if (event.instructionPC == 0xaf10u)
+                    stackPointer = static_cast<std::uint8_t>(stackPointer - 1u);
                 const auto returnHigh = readIndirect(stackPointer);
                 const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
                 event.returnPC = static_cast<std::uint16_t>(
