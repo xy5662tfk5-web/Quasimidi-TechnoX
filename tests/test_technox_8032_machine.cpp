@@ -409,6 +409,7 @@ int main(int argc, char** argv) {
         const std::array<std::uint8_t, 3> noteOn{{0x90, 0x3c, 0x64}};
         const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
         const auto ic51ReadsBeforeMidi = injectedResponseMachine.ic51ReadCount();
+        const auto commandCountBeforeMidi = injectedResponseMachine.soundCommandPacketCount();
         const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
             noteOn.data(), noteOn.size(), midiStartCycle));
@@ -431,11 +432,11 @@ int main(int argc, char** argv) {
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
-        std::printf("M.A.S.S. command packets after Note On: %zu\\n", commandCount);
-        const auto firstCommand = commandCount > 12u ? commandCount - 12u : 0u;
-        for (auto commandIndex = firstCommand; commandIndex < commandCount; ++commandIndex) {
+        std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
+                    commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
+        for (auto commandIndex = commandCountBeforeMidi; commandIndex < commandCount; ++commandIndex) {
             const auto& packet = injectedResponseMachine.soundCommandPacketAt(commandIndex);
-            std::printf("  CMD[%zu] cycle=%llu %02X %02X %02X %02X\\n",
+            std::printf("  MIDI-CMD[%zu] cycle=%llu %02X %02X %02X %02X\\n",
                         commandIndex,
                         static_cast<unsigned long long>(packet.machineCycle),
                         static_cast<unsigned>(packet.bytes[0]),
