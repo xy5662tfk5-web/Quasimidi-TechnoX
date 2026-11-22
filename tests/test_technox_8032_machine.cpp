@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
     // ACIA's active-low IRQ drives INT1; edge mode does not retrigger while held.
     machine.reset();
     machine.writeInternal(0x88, 0x04); // IT1 edge-triggered
-    machine.writeExternal(0xa000, 0x80);
+    machine.writeExternal(0xa000, 0x96);
     machine.injectAciaReceiveByte(0x31);
     machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) != 0);
