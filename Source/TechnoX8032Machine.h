@@ -216,8 +216,8 @@ public:
     }
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
-        if (address == 0xff10u)
-            return soundDeviceResponse_; // unknown until the external device is modeled
+        if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
+            return soundDeviceResponse_; // status port outside RAM mode
         if (isXdataRam(address)) {
             if (address >= 0xc000u) {
                 ++soundMemoryReadCount_;
@@ -243,8 +243,8 @@ public:
     }
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
-        if (address == 0xff10u) {
-            soundDeviceWrite_ = value; // capture bus traffic; do not invent device semantics
+        if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
+            soundDeviceWrite_ = value; // status-port traffic outside RAM mode
             return;
         }
         if (isXdataRam(address)) {
