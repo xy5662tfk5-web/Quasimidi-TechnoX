@@ -404,12 +404,10 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.elapsedMachineCycles() == 2);
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
         firmwareMachine.reset();
-        // Match the controlled external-RAM fixture used by the MIDI-path
-        // test before firmware startup, not only after the first boot.
-        firmwareMachine.enableTestExternalRamWindow7000(0x00u);
-        firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
 
         // Seed the same startup-cleared XDATA locations as the MIDI fixture.
+        // Keep the 7000 test window disabled until after the real IC51 loader;
+        // otherwise it changes the selected external-bus decode during boot.
         firmwareMachine.writeExternal(0x0000, 0xa5);
         firmwareMachine.writeExternal(0x34ff, 0xa5);
         firmwareMachine.writeExternal(0x3500, 0xa5);
