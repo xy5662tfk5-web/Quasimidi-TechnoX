@@ -213,3 +213,23 @@ IC51 is therefore a structured resource directory, not a flat PCM stream. The C+
 ## Next reverse-engineering target
 
 Identify the memory bank selected by descriptor byte `+10`, locate the external descriptor/command-stream backing memory, and correlate the extracted 24-bit values and hardware command IDs with sample address, pitch, envelope, and modulation behavior.
+
+## 8. Firmware bulk-transfer path into external XDATA (newly confirmed)
+
+A second, distinct path connects the IC51 resource image to an external memory window. The reachable IC4 disassembly at `0xAF1A` shows this directly; this is not inferred from the four-byte command port:
+
+1. The routine selects P2=`0xFF`, writes `0xFF` to offset `0x10`, then calculates the IC51 table address as `2 * R7`.
+2. It reads four consecutive bytes from the selected IC51 bank: a big-endian source address followed by two nested-loop counters. The high counter is incremented; a zero low counter naturally means 256 iterations because it is consumed by `DJNZ`.
+3. It selects P2=`0xC0`, starts R0 at `0x00`, and copies each byte read from IC51 through the helper at `0xAF05` into `MOVX @R0`. When R0 wraps, P2 is incremented, so the destination is a contiguous paged XDATA span beginning at `0xC000`.
+4. The byte helper toggles bit `0x1B` around the external write and switches SFR `0x8E` between `0x02` and `0x01`. After the transfer the routine sets bit `0xB2`, waits, returns P2 to `0xFF`, and polls offset `0x10` for marker `0xAC`; if the marker is absent it repeats the transfer.
+
+This is a confirmed firmware-controlled bulk copy from IC51 into the external XDATA address space starting at `0xC000`. It is a much stronger lead than treating IC51 as a flat sample file: the ROM contains source blocks which firmware stages into an external memory-mapped device before the command stream operates.
+
+For the already tested table entry R7=`0x48`, the source/count headers resolve to:
+
+| IC51 bank | Source address | Transfer length |
+|---|---:|---:|
+| 0 | `0x3C64` | 13,647 bytes (`0x354F`) |
+| 1 | `0x295C` | 9,588 bytes (`0x2574`) |
+
+**Still unknown:** what physical IC or logic owns the `0xC000` XDATA window, whether the copied bytes are PCM, compressed samples, wavetable data, or another representation, and how the `0xAC` completion marker is generated. The disassembly proves the copy protocol and destination address, not the receiving chip identity or audio encoding. The next implementation target is therefore an accurate paged external-XDATA model for this transfer protocol, with the handshake represented explicitly; audio decoding must wait until the stored data format is identified.
