@@ -72,7 +72,13 @@ int main(int argc, char** argv) {
     const auto& command = machine.commandPortBytes();
     assert(command[0] == 0x11 && command[1] == 0x22);
     assert(command[2] == 0x33 && command[3] == 0x44);
-    assert(machine.readExternal(0x8000) == 0xff);
+    assert(machine.readExternal(0x8000) == 0x11);
+    assert(machine.readExternal(0x8001) == 0x22);
+    assert(machine.readExternal(0x8002) == 0x33);
+    assert(machine.readExternal(0x8003) == 0x44);
+    assert(machine.soundCommandPacketCount() == 1u);
+    const auto& capturedCommand = machine.soundCommandPacketAt(0);
+    assert(capturedCommand.bytes == command);
 
     // 8032 upper IRAM and direct SFR reads are separate address spaces.
     machine.writeIndirect(0x80, 0x5a);
