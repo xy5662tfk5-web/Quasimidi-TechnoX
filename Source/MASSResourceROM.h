@@ -368,6 +368,73 @@ private:
     }
 };
 
+struct MASS1EDDParameterPipelineResult {
+    std::uint8_t r4 = 0xff;
+    std::uint8_t coefficientB = 0;
+    bool nonlinearLookupPerformed = false;
+    bool quantizeLookupUsed = false;
+    bool externalReadRequired = false;
+    bool externalTransformApplied = false;
+    std::uint16_t externalAddress = 0;
+    MASS1848Result externalTransform{};
+};
+
+// Connects the recovered 0x1EDD stages through its optional 0x2381/0x1848
+// tail. externalByte is the byte already read by the caller from the
+// P3-selected bus at externalAddress; physical bus emulation is not implied.
+class MASS1EDDParameterPipeline {
+public:
+    static bool process(const MASSFirmwareROMView& rom,
+                        std::uint8_t opcode,
+                        std::uint8_t ram30,
+                        std::uint8_t r3,
+                        std::uint8_t r4,
+                        std::uint8_t ram3F,
+                        std::uint8_t ram40,
+                        std::uint16_t basePointer,
+                        std::uint8_t selectorInputA,
+                        std::uint8_t ram2F,
+                        std::uint8_t r7,
+                        std::uint8_t externalByte,
+                        MASS1EDDParameterPipelineResult& result) noexcept {
+        MASS1EDDParameterPipelineResult decoded{};
+
+        MASS1EDDLookupResult first{};
+        if (!MASS1EDDLookupIndexBuilder::build(
+                rom, opcode, ram30, r4, first))
+            return false;
+
+        if (!first.lookupPerformed) {
+            // 0x1F46 substitutes R4=0xFF and jumps to the R7 tail.
+            decoded.r4 = 0xff;
+            decoded.coefficientB = r3; // B was loaded from R3 at 0x1F41.
+        } else {
+            MASS1EDDPostLookupResult post{};
+            if (!MASS1EDDPostLookup::apply(
+                    rom, opcode, ram3F, ram40, r3, first.curveValue, post))
+                return false;
+            decoded.r4 = post.r4;
+            decoded.coefficientB = post.coefficientB;
+            decoded.nonlinearLookupPerformed = true;
+            decoded.quantizeLookupUsed = post.quantizeLookupUsed;
+        }
+
+        if (r7 != 0) {
+            const auto external = MASS2381AddressBuilder::resolve(
+                basePointer, selectorInputA, ram2F);
+            decoded.externalReadRequired = true;
+            decoded.externalAddress = external.address;
+            decoded.externalTransform = MASS1848Arithmetic::execute(
+                externalByte, r7, decoded.coefficientB);
+            decoded.coefficientB = decoded.externalTransform.value;
+            decoded.externalTransformApplied = true;
+        }
+
+        result = decoded;
+        return true;
+    }
+};
+
 struct MASSResourceSelection {
     MASSResourceBank bank = MASSResourceBank::bank0;
     std::uint8_t pointerIndex = 0;

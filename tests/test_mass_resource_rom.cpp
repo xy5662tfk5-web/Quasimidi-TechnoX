@@ -50,6 +50,45 @@ void testMASS1EDDLookupIndexBuilder() {
     assert(!result.lookupPerformed);
 }
 
+void testMASS1EDDParameterPipeline() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    for (std::size_t i = 0; i < 128; ++i)
+        romBytes[0x1288 + i] = 0x55; // fixed curve value for deterministic pipeline tests
+    romBytes[0x1308 + 0x55] = 0xa6;
+
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+    MASS1EDDParameterPipelineResult result{};
+
+    // R4==0 skips both ROM tables. With R7==0, B remains the original R3.
+    assert(MASS1EDDParameterPipeline::process(
+        view, 0x04, 0x22, 0x33, 0x00, 0x00, 0x10,
+        0x1200, 0x02, 0x90, 0x00, 0x88, result));
+    assert(result.r4 == 0xff && result.coefficientB == 0x33);
+    assert(!result.nonlinearLookupPerformed && !result.externalReadRequired);
+
+    // Full nonlinear path: 0x1288 produces 0x55, then all three gates allow
+    // 0x1308 to map it to 0xA6. R7=0 skips the external 0x2381/0x1848 tail.
+    assert(MASS1EDDParameterPipeline::process(
+        view, 0x04, 0x22, 0x33, 0x21, 0x00, 0x10,
+        0x1200, 0x02, 0x90, 0x00, 0x88, result));
+    assert(result.r4 == 0xa6 && result.coefficientB == 0x33);
+    assert(result.nonlinearLookupPerformed && result.quantizeLookupUsed);
+    assert(!result.externalReadRequired && !result.externalTransformApplied);
+
+    // R7 nonzero invokes 0x2381 then 0x1848. The caller supplies the byte
+    // read from the computed P3-selected address.
+    assert(MASS1EDDParameterPipeline::process(
+        view, 0x04, 0x22, 0x5d, 0x00, 0x00, 0x10,
+        0x1200, 0x02, 0x90, 0x40, 0x80, result));
+    const auto expected = MASS1848Arithmetic::execute(0x80, 0x40, 0x5d);
+    assert(result.r4 == 0xff && result.externalReadRequired);
+    assert(result.externalAddress == 0x1260);
+    assert(result.externalTransformApplied);
+    assert(result.coefficientB == expected.value);
+    assert(result.externalTransform.overflow == expected.overflow);
+}
+
 void testMASS1EDDPostLookup() {
     std::vector<std::uint8_t> romBytes(0x20000, 0xff);
     romBytes[0x1308 + 0x55] = 0xa6;
@@ -660,6 +699,7 @@ int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testMASS1EDDLookupIndexBuilder();
     testMASS1EDDPostLookup();
+    testMASS1EDDParameterPipeline();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
     testMASS1848Arithmetic();
