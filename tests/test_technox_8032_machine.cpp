@@ -457,6 +457,7 @@ int main(int argc, char** argv) {
         if (!realIC51.empty())
             assert(injectedResponseMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         injectedResponseMachine.reset();
+        injectedResponseMachine.enableTestExternalRamWindow7000(0x00);
         injectedResponseMachine.writeExternal(0x0000, 0xa5);
         injectedResponseMachine.writeExternal(0x34ff, 0xa5);
         injectedResponseMachine.writeExternal(0x3500, 0xa5);
