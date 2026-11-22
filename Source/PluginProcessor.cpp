@@ -376,6 +376,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     }
     renderUntil(numSamples);
     clockFirmwareToSample(numSamples);
+    buffer.applyGain(getOutputGain());
 }
 void QuasimidiTechnoXAudioProcessor::setCurrentProgram(int index)
 {
