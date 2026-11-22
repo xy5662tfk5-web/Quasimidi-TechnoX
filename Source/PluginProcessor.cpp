@@ -197,16 +197,11 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     buffer.clear();
     const int numSamples = buffer.getNumSamples();
     const double hostSampleRate = getSampleRate();
-    if (firmwareMachine != nullptr && !firmwareMachine->cpuFaulted() && hostSampleRate > 0.0) {
-        // The MAME skeleton currently assumes 12 MHz but marks the actual
-        // oscillator unknown; use the machine's configurable 12T cycle rate.
-        firmwareCycleTarget += static_cast<double>(numSamples) *
-            static_cast<double>(firmwareMachine->machineCyclesPerSecond()) / hostSampleRate;
-        const auto targetCycles = static_cast<std::uint64_t>(firmwareCycleTarget);
-        const auto currentCycles = firmwareMachine->elapsedMachineCycles();
-        if (targetCycles > currentCycles)
-            firmwareMachine->runForMachineCycles(targetCycles - currentCycles);
-    }
+    const double firmwareBlockStartTarget = firmwareCycleTarget;
+    const double firmwareCyclesPerSample =
+        firmwareMachine != nullptr && hostSampleRate > 0.0
+            ? static_cast<double>(firmwareMachine->machineCyclesPerSecond()) / hostSampleRate
+            : 0.0;
     const int performanceIndex = getCurrentProgram();
     const int channelCount = buffer.getNumChannels();
     int renderedSamples = 0;
@@ -226,6 +221,21 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             channels[static_cast<std::size_t>(channel)] = buffer.getWritePointer(channel, renderedSamples);
         massEngine.render(channels.data(), channelCount, count);
         renderedSamples = end;
+    };
+
+    const auto clockFirmwareToSample =
+        [this, firmwareBlockStartTarget, firmwareCyclesPerSample, numSamples](int samplePosition)
+    {
+        if (firmwareMachine == nullptr || firmwareMachine->cpuFaulted() ||
+            firmwareCyclesPerSample <= 0.0)
+            return;
+        const int sample = juce::jlimit(0, numSamples, samplePosition);
+        firmwareCycleTarget = firmwareBlockStartTarget +
+            static_cast<double>(sample) * firmwareCyclesPerSample;
+        const auto targetCycles = static_cast<std::uint64_t>(firmwareCycleTarget);
+        const auto currentCycles = firmwareMachine->elapsedMachineCycles();
+        if (targetCycles > currentCycles)
+            firmwareMachine->runForMachineCycles(targetCycles - currentCycles);
     };
 
     const auto handleMessage = [this, performanceIndex](const juce::MidiMessage& message)
@@ -344,9 +354,20 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     for (const auto metadata : midiMessages) {
         const int eventSample = juce::jlimit(renderedSamples, numSamples, metadata.samplePosition);
         renderUntil(eventSample);
-        handleMessage(metadata.getMessage());
+        clockFirmwareToSample(eventSample);
+        const auto& message = metadata.getMessage();
+        if (firmwareMachine != nullptr && !firmwareMachine->cpuFaulted()) {
+            const auto* rawBytes = message.getRawData();
+            const auto rawSize = message.getRawDataSize();
+            if (rawBytes != nullptr && rawSize > 0)
+                firmwareMachine->scheduleAciaMidiBytes(
+                    rawBytes, static_cast<std::size_t>(rawSize),
+                    static_cast<std::uint64_t>(firmwareCycleTarget));
+        }
+        handleMessage(message);
     }
     renderUntil(numSamples);
+    clockFirmwareToSample(numSamples);
 }
 void QuasimidiTechnoXAudioProcessor::setCurrentProgram(int index)
 {
