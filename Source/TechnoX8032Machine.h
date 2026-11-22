@@ -59,6 +59,7 @@ public:
         soundDeviceBootRequested_ = false;
         soundDeviceDataLoaded_ = false;
         soundDeviceReady_ = false;
+        cpuFaulted_ = false;
         internal_[0x81] = 0x07; // SP reset value
     }
 
@@ -72,12 +73,33 @@ public:
     std::size_t runInstructions(std::size_t maximumInstructions) noexcept {
         std::size_t executed = 0;
         while (executed < maximumInstructions) {
-            if (step() == MCS51StepResult::unsupportedOpcode)
+            const auto result = step();
+            if (result != MCS51StepResult::executed) {
+                if (result == MCS51StepResult::unsupportedOpcode)
+                    cpuFaulted_ = true;
                 break;
+            }
             ++executed;
         }
         return executed;
     }
+
+    std::size_t runForMachineCycles(std::uint64_t cycleBudget) noexcept {
+        const auto target = elapsedMachineCycles_ + cycleBudget;
+        std::size_t executed = 0;
+        while (elapsedMachineCycles_ < target) {
+            const auto result = step();
+            if (result != MCS51StepResult::executed) {
+                if (result == MCS51StepResult::unsupportedOpcode)
+                    cpuFaulted_ = true;
+                break;
+            }
+            ++executed;
+        }
+        return executed;
+    }
+
+    bool cpuFaulted() const noexcept { return cpuFaulted_; }
 
     std::size_t runUntilProgramCounter(std::uint16_t target,
                                        std::size_t maximumInstructions) noexcept {
@@ -282,6 +304,7 @@ private:
     bool soundDeviceBootRequested_ = false;
     bool soundDeviceDataLoaded_ = false;
     bool soundDeviceReady_ = false;
+    bool cpuFaulted_ = false;
     bool romLoaded_ = false;
 };
 
