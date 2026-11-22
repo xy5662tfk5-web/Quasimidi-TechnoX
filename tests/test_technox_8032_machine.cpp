@@ -95,7 +95,10 @@ int main(int argc, char** argv) {
     const auto& burstWord = machine.soundHostBurstWordAt(0);
     assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
     assert(burstWord.value == 0x4433u);
-    machine.writeExternal(0x8003u, 0x80u); // standalone 0x0DCE-style control write
+    machine.writeExternal(0x8003u, 0x40u); // 0x0DCE handshake strobe
+    machine.writeExternal(0x8003u, 0xc0u); // opposite strobe phase
+    assert(machine.readExternal(0x8003u) == 0x44u); // payload survives strobes
+    machine.writeExternal(0x8003u, 0x80u); // standalone R4 payload update
     assert(machine.soundCommandPacketCount() == 1u);
     assert(machine.soundHostBurstWordCount() == 1u);
     assert(machine.soundHostWriteCount() == 5u);
