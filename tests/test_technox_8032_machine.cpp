@@ -87,10 +87,10 @@ int main(int argc, char** argv) {
     machine.reset();
     machine.writeExternal(0xa000, 0x96); // ACIA receive interrupt enabled
     const std::array<std::uint8_t, 3> midiBytes{{0x90, 0x3c, 0x64}};
-    const auto midiStart = machine.elapsedMachineCycles() + 5u;
+    const auto midiStart = machine.elapsedMachineCycles();
     assert(machine.scheduleAciaMidiBytes(midiBytes.data(), midiBytes.size(), midiStart));
     const auto midiByteCycles = machine.midiByteMachineCycles();
-    machine.advanceMachineCycles(4);
+    machine.advanceMachineCycles(static_cast<unsigned>(midiByteCycles - 1u));
     assert((machine.readExternal(0xa002) & 0x01u) == 0);
     machine.advanceMachineCycles(1);
     assert((machine.readExternal(0xa002) & 0x01u) != 0);
