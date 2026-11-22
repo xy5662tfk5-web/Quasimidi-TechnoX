@@ -430,7 +430,7 @@ public:
             registers_.a = value;
         } else if (opcode == 0xd6 || opcode == 0xd7) { // XCHD A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
-            const auto value = bus.readInternal(address);
+            const auto value = bus.readIndirect(address);
             bus.writeIndirect(address, static_cast<std::uint8_t>((value & 0xf0u) | (registers_.a & 0x0fu)));
             registers_.a = static_cast<std::uint8_t>((registers_.a & 0xf0u) | (value & 0x0fu));
         } else if (opcode == 0xd4) { // DA A
