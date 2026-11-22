@@ -666,11 +666,18 @@ public:
             } else {
                 // Registers 1..3 are the three-byte payload at the selected
                 // device index, matching the firmware's R2/R3/R4 readback.
-                soundHostData_[soundHostCommandLatch_][index - 1u] = value;
+                // 0x40/0xC0 writes to register 3 are handshake strobes from
+                // helpers 0x0DCE/0x0E21, not payload byte R4.
+                const bool handshakeStrobe =
+                    index == static_cast<std::size_t>(ExternalAudioRegister::register3) &&
+                    (value == 0x40u || value == 0xc0u);
+                if (!handshakeStrobe)
+                    soundHostData_[soundHostCommandLatch_][index - 1u] = value;
                 if (index == static_cast<std::size_t>(ExternalAudioRegister::register2)) {
                     auto& word = soundHostWords_[soundHostCommandLatch_];
                     word = static_cast<std::uint16_t>((word & 0xff00u) | value);
-                } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3)) {
+                } else if (index == static_cast<std::size_t>(ExternalAudioRegister::register3) &&
+                           !handshakeStrobe) {
                     auto& word = soundHostWords_[soundHostCommandLatch_];
                     word = static_cast<std::uint16_t>((word & 0x00ffu) |
                         (static_cast<std::uint16_t>(value) << 8u));
