@@ -474,6 +474,47 @@ int main() {
     assert(cycleCpu.totalCycles() == 5);
     assert(cycleBus.advancedMachineCycles == 5);
 
+    // External interrupt 1 uses vector 0x0013, pushes PC and returns via RETI.
+    TestBus interruptBus;
+    interruptBus.internal[0xa8] = 0x84; // EA + EX1
+    interruptBus.internal[0xb8] = 0x04; // EX1 high priority
+    interruptBus.internal[0x88] = 0x0c; // IT1 edge mode + IE1 pending
+    interruptBus.code[0x0013] = 0x32; // RETI
+    MCS51Core interruptCpu;
+    interruptCpu.registersForTesting().pc = 0x1234;
+    assert(interruptCpu.step(interruptBus) == MCS51StepResult::executed);
+    assert(interruptCpu.registers().pc == 0x0013);
+    assert(interruptCpu.registers().sp == 0x09);
+    assert(interruptBus.internal[0x08] == 0x34);
+    assert(interruptBus.internal[0x09] == 0x12);
+    assert((interruptBus.internal[0x88] & 0x08u) == 0);
+    assert(interruptCpu.totalCycles() == 2);
+    assert(interruptBus.advancedMachineCycles == 2);
+    assert(interruptCpu.step(interruptBus) == MCS51StepResult::executed);
+    assert(interruptCpu.registers().pc == 0x1234);
+    assert(interruptCpu.registers().sp == 0x07);
+
+    // A high-priority timer interrupt may pre-empt a low-priority external ISR.
+    TestBus nestedInterruptBus;
+    nestedInterruptBus.internal[0xa8] = 0x86; // EA + EX1 + ET0
+    nestedInterruptBus.internal[0xb8] = 0x02; // Timer 0 high, EX1 low
+    nestedInterruptBus.internal[0x88] = 0x0c; // edge-triggered INT1 pending
+    nestedInterruptBus.code[0x000b] = 0x32; // high-priority RETI
+    nestedInterruptBus.code[0x0013] = 0x32; // low-priority RETI
+    MCS51Core nestedInterruptCpu;
+    nestedInterruptCpu.registersForTesting().pc = 0x4567;
+    assert(nestedInterruptCpu.step(nestedInterruptBus) == MCS51StepResult::executed);
+    assert(nestedInterruptCpu.registers().pc == 0x0013);
+    nestedInterruptBus.internal[0x88] |= 0x20; // Timer 0 overflow while INT1 ISR is active
+    assert(nestedInterruptCpu.step(nestedInterruptBus) == MCS51StepResult::executed);
+    assert(nestedInterruptCpu.registers().pc == 0x000b);
+    assert((nestedInterruptBus.internal[0x88] & 0x20u) == 0); // TF0 auto-cleared on entry
+    assert(nestedInterruptCpu.step(nestedInterruptBus) == MCS51StepResult::executed);
+    assert(nestedInterruptCpu.registers().pc == 0x0013);
+    assert(nestedInterruptCpu.step(nestedInterruptBus) == MCS51StepResult::executed);
+    assert(nestedInterruptCpu.registers().pc == 0x4567);
+    assert(nestedInterruptCpu.registers().sp == 0x07);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
