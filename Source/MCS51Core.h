@@ -143,6 +143,22 @@ public:
             const auto destination = fetch8(bus);
             writeDirect(bus, destination, readDirect(bus, source));
             cycles = 2;
+        } else if (opcode >= 0x88 && opcode <= 0x8f) { // MOV direct,Rn
+            const auto destination = fetch8(bus);
+            writeDirect(bus, destination, readRegister(bus, opcode & 7u));
+            cycles = 2;
+        } else if (opcode == 0x86 || opcode == 0x87) { // MOV direct,@Ri
+            const auto destination = fetch8(bus);
+            const auto address = readRegister(bus, opcode & 1u);
+            writeDirect(bus, destination, bus.readInternal(address));
+            cycles = 2;
+        } else if (opcode >= 0xa8 && opcode <= 0xaf) { // MOV Rn,direct
+            writeRegister(bus, opcode & 7u, readDirect(bus, fetch8(bus)));
+            cycles = 2;
+        } else if (opcode == 0xa6 || opcode == 0xa7) { // MOV @Ri,direct
+            const auto source = readDirect(bus, fetch8(bus));
+            bus.writeInternal(readRegister(bus, opcode & 1u), source);
+            cycles = 2;
         } else if (opcode >= 0xe8 && opcode <= 0xef) { // MOV A,Rn
             registers_.a = readRegister(bus, opcode & 7u);
         } else if (opcode >= 0xf8 && opcode <= 0xff) { // MOV Rn,A
@@ -176,7 +192,7 @@ public:
             subtract(readDirect(bus, fetch8(bus)));
         } else if (opcode == 0x96 || opcode == 0x97) { // SUBB A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
-            subtract(readDirect(bus, address));
+            subtract(bus.readInternal(address));
         } else if (opcode >= 0x98 && opcode <= 0x9f) { // SUBB A,Rn
             subtract(readRegister(bus, opcode & 7u));
         } else if (opcode == 0x94) { // SUBB A,#data
@@ -314,6 +330,78 @@ public:
             const auto address = fetch8(bus);
             writeDirect(bus, address, pop(bus));
             cycles = 2;
+        } else if (opcode >= 0xb8 && opcode <= 0xbf) { // CJNE Rn,#data,rel
+            const auto immediate = fetch8(bus);
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            const auto operand = readRegister(bus, opcode & 7u);
+            registers_.psw.carry = operand < immediate;
+            if (operand != immediate)
+                registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode == 0xb4 || opcode == 0xb5) { // CJNE A,#data/direct,rel
+            const auto operand = opcode == 0xb4 ? fetch8(bus) : readDirect(bus, fetch8(bus));
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            registers_.psw.carry = registers_.a < operand;
+            if (registers_.a != operand)
+                registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode == 0xb6 || opcode == 0xb7) { // CJNE @Ri,#data,rel
+            const auto address = readRegister(bus, opcode & 1u);
+            const auto immediate = fetch8(bus);
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            const auto operand = bus.readInternal(address);
+            registers_.psw.carry = operand < immediate;
+            if (operand != immediate)
+                registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode == 0xd5) { // DJNZ direct,rel
+            const auto address = fetch8(bus);
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            const auto value = static_cast<std::uint8_t>(readDirect(bus, address) - 1u);
+            writeDirect(bus, address, value);
+            if (value != 0)
+                registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode >= 0xd8 && opcode <= 0xdf) { // DJNZ Rn,rel
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            const auto value = static_cast<std::uint8_t>(readRegister(bus, opcode & 7u) - 1u);
+            writeRegister(bus, opcode & 7u, value);
+            if (value != 0)
+                registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            cycles = 2;
+        } else if (opcode == 0xc5) { // XCH A,direct
+            const auto address = fetch8(bus);
+            const auto value = readDirect(bus, address);
+            writeDirect(bus, address, registers_.a);
+            registers_.a = value;
+        } else if (opcode == 0xc6 || opcode == 0xc7) { // XCH A,@Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            const auto value = bus.readInternal(address);
+            bus.writeInternal(address, registers_.a);
+            registers_.a = value;
+        } else if (opcode >= 0xc8 && opcode <= 0xcf) { // XCH A,Rn
+            const auto index = opcode & 7u;
+            const auto value = readRegister(bus, index);
+            writeRegister(bus, index, registers_.a);
+            registers_.a = value;
+        } else if (opcode == 0xd6 || opcode == 0xd7) { // XCHD A,@Ri
+            const auto address = readRegister(bus, opcode & 1u);
+            const auto value = bus.readInternal(address);
+            bus.writeInternal(address, static_cast<std::uint8_t>((value & 0xf0u) | (registers_.a & 0x0fu)));
+            registers_.a = static_cast<std::uint8_t>((registers_.a & 0xf0u) | (value & 0x0fu));
+        } else if (opcode == 0xd4) { // DA A
+            const auto original = registers_.a;
+            std::uint8_t correction = 0;
+            bool carry = registers_.psw.carry;
+            if ((original & 0x0fu) > 9u || registers_.psw.auxiliaryCarry)
+                correction |= 0x06u;
+            if (original > 0x99u || carry) {
+                correction |= 0x60u;
+                carry = true;
+            }
+            const auto adjusted = static_cast<unsigned>(original) + correction;
+            registers_.a = static_cast<std::uint8_t>(adjusted);
+            registers_.psw.carry = carry || adjusted > 0xffu;
         } else if (opcode == 0x73) { // JMP @A+DPTR
             registers_.pc = static_cast<std::uint16_t>(registers_.dptr + registers_.a);
             cycles = 2;
@@ -377,6 +465,7 @@ public:
         }
 
         updateParity();
+        syncArchitecturalSfrs(bus);
         totalCycles_ += cycles;
         return MCS51StepResult::executed;
     }
@@ -502,6 +591,15 @@ private:
         bits ^= static_cast<std::uint8_t>(bits >> 2u);
         bits ^= static_cast<std::uint8_t>(bits >> 1u);
         registers_.psw.parity = (bits & 1u) != 0;
+    }
+
+    void syncArchitecturalSfrs(MCS51Bus& bus) const noexcept {
+        bus.writeInternal(0x81u, registers_.sp);
+        bus.writeInternal(0x82u, registers_.dpl());
+        bus.writeInternal(0x83u, registers_.dph());
+        bus.writeInternal(0xd0u, registers_.psw.pack());
+        bus.writeInternal(0xe0u, registers_.a);
+        bus.writeInternal(0xf0u, registers_.b);
     }
 
     MCS51Registers registers_{};
