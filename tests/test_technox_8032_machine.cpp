@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
     assert(machine.readPortLatch(0xa0) == 0x12);
 
     // ACIA register map, receive data and its INT1 request.
-    machine.writeExternal(0xa000, 0x82); // divide-by-64, receive interrupt enabled
+    machine.writeExternal(0xa000, 0x96); // divide-by-64, 8N1, receive interrupt enabled
     machine.injectAciaReceiveByte(0x6c);
     assert((machine.readInternal(0x88) & 0x08u) == 0); // pin sampled on machine cycle
     machine.advanceMachineCycles(1);
