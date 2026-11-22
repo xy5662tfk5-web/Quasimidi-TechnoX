@@ -38,9 +38,10 @@ static_assert(sam9407HostAddress(SAM9407HostRegister::BurstDataHigh) == 0x8003u,
 class TechnoX8032Machine final : public MCS51Bus {
 public:
     struct SoundCommandPacket {
-        // A 0x8000-0x8003 transaction snapshots SAM9407 host registers 0-3:
-        // MPU-401 data, status/control, then the low/high bytes of the 16-bit
-        // burst port. It is not one four-byte sound opcode.
+        // A 0x8000-0x8003 transaction snapshots SAM9407 host accesses:
+        // 0x8000 = MPU-401 data (A2:A0=000), 0x8001 = status/control (001),
+        // 0x8002/0x8003 = low/high bytes of the 16-bit burst port (010).
+        // This is not one four-byte sound opcode.
         std::array<std::uint8_t, 4> bytes{};
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
