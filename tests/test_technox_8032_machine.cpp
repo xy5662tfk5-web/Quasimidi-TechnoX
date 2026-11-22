@@ -724,7 +724,6 @@ int main(int argc, char** argv) {
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
-        const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
         assert(injectedResponseMachine.watchedCallCount(0x57a8) > call57a8BeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x5671) - call5671BeforeMidi == 2u);
         assert(injectedResponseMachine.watchedCallCount(0x4256) - call4256BeforeMidi == 2u);
@@ -734,25 +733,6 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.watchedCallCount(0x0db7) > commandWriterCallsBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
-        std::printf("7BD0-7BD7 external-window trace (newest first):\\n");
-        const auto externalTraceCount = injectedResponseMachine.externalWindowTraceCount();
-        for (std::size_t age = 0; age < externalTraceCount && age < 64u; ++age) {
-            const auto& event = injectedResponseMachine.externalWindowTraceAt(externalTraceCount - 1u - age);
-            std::printf("  %c %04X=%02X cycle=%llu\\n",
-                        event.write ? 'W' : 'R',
-                        static_cast<unsigned>(event.address),
-                        static_cast<unsigned>(event.value),
-                        static_cast<unsigned long long>(event.machineCycle));
-        }
-        std::printf("Experimental 7B00-7FFF RAM image (16 bytes per row):\\n");
-        for (std::uint32_t base = 0x7b00u; base < 0x8000u; base += 16u) {
-            std::printf("  %04X:", base);
-            for (std::uint32_t offset = 0; offset < 16u; ++offset)
-                std::printf(" %02X", static_cast<unsigned>(
-                    injectedResponseMachine.testExternalRamByteForTesting(
-                        static_cast<std::uint16_t>(base + offset))));
-            std::printf("\\n");
-        }
         // Preserve the complete MIDI-triggered command burst in CI logs.
         // The machine trace is a 1024-packet ring, so skip only entries that
         // have genuinely been overwritten; do not hide the first 521 packets.
