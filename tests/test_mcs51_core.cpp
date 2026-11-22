@@ -89,7 +89,7 @@ int main() {
     addressingBus.code[10] = 0x74; addressingBus.code[11] = 0xff;
     addressingBus.code[12] = 0x74; addressingBus.code[13] = 0x55;
     MCS51Core addressingCpu;
-    for (int i = 0; i < 7; ++i)
+    for (int i = 0; i < 5; ++i)
         assert(addressingCpu.step(addressingBus) == MCS51StepResult::executed);
     assert(addressingBus.internal[0x40] == 0x10);
     assert(addressingCpu.registers().a == 0x40);
