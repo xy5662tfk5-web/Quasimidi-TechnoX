@@ -57,17 +57,17 @@ The descrambled IC4 image contains compact lookup tables reached by MOVC:
 | 0x11E0 | 8 | 0x23DF | First modulation-scale table in helper 0x23C7 |
 | 0x11E8 | 8 | 0x23EF | Second modulation-scale table in helper 0x23C7 |
 | 0x11F0 | 12 | 0x1CD4 | First 12-entry interpolation table in the 0x1C61 path |
-| 0x11FC | 12 | 0x1D27 | Alternate interpolation table selected by E7 |
+| 0x11FC | 12 | 0x1D27 | Alternate interpolation table selected when the current accumulator byte has ACC.7 set |
 | 0x1208 | 128 | 0x0D0E, 0x14CF | 7-bit selection/parameter remapping |
 | 0x1288 | 128 | 0x1F67 | Nonlinear scale curve in the common 0x1EDD path |
 | 0x1308 | 256 | 0x1F81 | Second-stage byte quantization map |
 
-In the common 0x1EDD branch, firmware derives a 7-bit index through 8051 rotate/complement operations at 0x1F63..0x1F6C, reads 0x1288, then uses that byte as the 0x1308 index at 0x1F7D..0x1F85. E0/E6/E7/F7 alter the surrounding arithmetic and can bypass or invert parts of this path. MASSFirmwareROMView exposes the numeric tables without assigning speculative musical names; lookupNonlinearScale models only the two MOVC lookups, not the surrounding ALU transformations.
+In the common 0x1EDD branch, firmware derives a 7-bit index through 8051 rotate/complement operations at 0x1F63..0x1F6C, reads 0x1288, then uses that byte as the 0x1308 index at 0x1F7D..0x1F85. E0, E2, E4, E6 and E7 are ACC bit tests on the byte currently held in A (often the opcode, RAM[0x30], RAM[0x3F] or RAM[0x40]); F7 is bit 7 of B, which can be the high byte produced by MUL AB. These are not persistent firmware mode flags. MASSFirmwareROMView exposes the numeric tables without assigning speculative musical names; lookupNonlinearScale models only the two MOVC lookups, not the surrounding ALU transformations.
 
 Related helpers:
 - 0x2381 constructs a pointer into a 0x30-byte record bank from the selected two-bit field in R5, base pointer RAM[0x38:0x39], and an offset derived from RAM[0x2F] + 0xF4; it then reads from the P3-selected external bus.
 - 0x1848 performs sign-aware rotate/multiply arithmetic using A, B/F0 and R2, with saturation returns 0x7F or 0x81 when the D2 condition is active. Its complete fixed-point interpretation remains under analysis.
-- 0x23C7 applies E6/E7-dependent modulation scaling. In mode 0x41 it uses the two 8-entry tables above; other modes may call 0x1890.
+- 0x23C7 applies data-dependent modulation scaling. It tests ACC.7 on the current RAM[0x41]/RAM[0x43] values before selecting the two 8-entry tables; its ACC.6 check is against the current mode/opcode byte, not a persistent flag. In the 0x41 mode it uses the two tables above; other modes may call 0x1890.
 
 CI checks table bounds and endpoint values against the real 128-KB descrambled IC4 image, verifies monotonicity of the 0x1208, 0x1288 and 0x1308 remapping curves, and evaluates all 128 composed 0x1288 -> 0x1308 lookups.
 
@@ -98,7 +98,7 @@ The dispatch table contains eight four-byte entries (an `LJMP` plus padding). Th
 | Masked group | Handler | Observed byte consumption and behavior |
 |---|---:|---|
 | `0x00` | `0x1C2B` | Conditional 4- or 7-byte path. If firmware flag bit `0x0A` is set, it consumes 4 bytes and writes a synthetic `0x38` slot. Otherwise byte +3 bit 3 clear consumes 4 bytes; set branches into `0x224C` at byte +3, where bytes +3..+6 become the nested opcode and three payload bytes. The final packet is `[RAM[0x2B], byte[+4], byte[+5], byte[+6] & 7]` unless the nested flag `0x08` skips the handler. |
-| `0x08` | `0x1C61` | 7-byte record. Input maps to `F0,R2,R3,R4,R7,R6,R5` in byte order. The handler writes raw fields to slot offsets 0,3,4,5,6, with offset 3 merged or replaced depending on E3, then performs fixed-point/pitch-related arithmetic and may interpolate a 24-bit quantity. |
+| `0x08` | `0x1C61` | 7-byte record. Input maps to `F0,R2,R3,R4,R7,R6,R5` in byte order. The handler writes raw fields to slot offsets 0,3,4,5,6; the merge decision tests ACC.3 of the current R4 byte (not a separate E3 mode flag). It then performs fixed-point/pitch-related arithmetic and may interpolate a 24-bit quantity. |
 | `0x10` | `0x1EDD` | 7-byte record. Input maps to `R2,R3,R5,R6,F0,R4,R7`. When byte +1 (`R3`) is zero, the handler restores external controls, writes a `0x38` filler slot and advances exactly 7 bytes without reading the remaining fields semantically. Otherwise it performs mode/flag-dependent nonlinear arithmetic and can emit up to three hardware packets. |
 | `0x18` | `0x224C` | 4-byte record: opcode plus three payload bytes. When firmware flag bit `0x08` is set it skips the command but still consumes 4 bytes; otherwise it writes the four-byte command port. |
 | `0x20` | `0x2301` | 4-byte terminal control record: opcode plus three payload bytes. With flag `0x0A` clear it fills all unoccupied eight-byte slots through offset `0xF0` with `0x38`, sets the current slot to `0xF8`, and stores the payload in the final slot. With flag `0x0A` set it skips the filler loop and jumps directly to slot `0xF8`. It emits a control packet and exits via `0x19CD`; following bytes are not parsed. |
@@ -143,7 +143,7 @@ The stream handlers use this port in several ways:
 
 ### Handshake
 
-`0x0DCE` synchronizes internal flag `0x0C` with `E7`. On a state change it writes either `0x40` or `0xC0` to port offset 3 (`0x8003)), then reads offset 2 (`0x8002`). This is a toggle/acknowledgement pattern; no busy-wait loop proving a conventional ready flag was found.
+`0x0DCE` compares internal bit `0x0C` with ACC.7 of the current R4 byte. On a state change it updates bit `0x0C` and writes either `0x40` or `0xC0` to port offset 3 (`0x8003`), then reads offset 2 (`0x8002`). ACC.7 is a data bit from R4, not a global flag. This is a toggle/acknowledgement pattern; no busy-wait loop proving a conventional ready flag was found.
 
 The MAME skeleton currently leaves `0x8000..0x8003` as no-op, and the physical target of this port remains unidentified. The firmware behavior strongly establishes a command interface, but not the chip model.
 
