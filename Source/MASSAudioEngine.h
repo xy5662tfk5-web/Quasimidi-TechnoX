@@ -514,7 +514,7 @@ public:
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
         if (!partParameters_.set(partIndex, parameter, rawValue)) return false;
         if (parameter == PartParameter::holdPedal && partIndex >= 0 &&
-            partIndex < static_cast<int>(kPartCount)) {
+            partIndex < static_cast<int>(MASSPartParameterStore::kPartCount)) {
             const bool pedalDown = sustainControllerDown_[static_cast<std::size_t>(partIndex)]
                 .load(std::memory_order_acquire);
             setSustainPedal(partIndex, pedalDown);
@@ -541,7 +541,7 @@ public:
     bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
     bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
     bool setSustainPedal(int partIndex, bool enabled) noexcept {
-        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return false;
+        if (partIndex < 0 || partIndex >= static_cast<int>(MASSPartParameterStore::kPartCount)) return false;
         const auto part = static_cast<std::size_t>(partIndex);
         sustainControllerDown_[part].store(enabled, std::memory_order_release);
         const bool holdPedalEnabled = partParameters_.get(partIndex, PartParameter::holdPedal) == 1;
@@ -565,7 +565,7 @@ public:
     bool softPedal(int partIndex) const noexcept { return runtimeControls_.softPedal(partIndex); }
     bool sustainPedal(int partIndex) const noexcept { return runtimeControls_.sustainPedal(partIndex); }
     bool sustainControllerDown(int partIndex) const noexcept {
-        return partIndex >= 0 && partIndex < static_cast<int>(kPartCount) &&
+        return partIndex >= 0 && partIndex < static_cast<int>(MASSPartParameterStore::kPartCount) &&
             sustainControllerDown_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire);
     }
     bool setRpn(int partIndex, int parameterIndex, int value) noexcept { return runtimeControls_.setRpn(partIndex, parameterIndex, value); }
