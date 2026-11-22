@@ -23,7 +23,7 @@ jobs:
       - name: Compile and test MCS-51 CPU core (C++17)
         run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_mcs51_core.cpp -o /tmp/test_mcs51_core && /tmp/test_mcs51_core
       - name: Compile and test TechnoX 8032 machine bus (C++17)
-        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_technox_8032_machine.cpp -o /tmp/test_technox_8032_machine && /tmp/test_technox_8032_machine technox_IC4_mx27c1000_v105.bin
+        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_technox_8032_machine.cpp -o /tmp/test_technox_8032_machine && /tmp/test_technox_8032_machine technox_IC4_mx27c1000_v105.bin technox_IC51_nm27c010_v105.bin
       - name: Compile and test MIDI control router (C++17)
         if: hashFiles('tests/test_midi_controller.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_midi_controller.cpp -o /tmp/test_midi_controller && /tmp/test_midi_controller
