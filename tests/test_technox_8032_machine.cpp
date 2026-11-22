@@ -466,6 +466,21 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(firmwareMachine.lastSoundMemoryWriteAddress()),
                     static_cast<unsigned>(firmwareMachine.lastSoundMemoryWriteValue()),
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
+        std::printf("IC4 loop registers: A=%02X B=%02X PSW=%02X bank=%02X R0=%02X R1=%02X R2=%02X R3=%02X DPTR=%04X\n",
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().a),
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().b),
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().psw.pack()),
+                    static_cast<unsigned>(bank),
+                    static_cast<unsigned>(firmwareMachine.readInternal(bank)),
+                    static_cast<unsigned>(firmwareMachine.readInternal(static_cast<std::uint8_t>(bank + 1u))),
+                    static_cast<unsigned>(firmwareMachine.readInternal(static_cast<std::uint8_t>(bank + 2u))),
+                    static_cast<unsigned>(firmwareMachine.readInternal(static_cast<std::uint8_t>(bank + 3u))),
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().dptr));
+        std::printf("IC4 recent instructions (newest first):\n");
+        for (std::size_t age = 0; age < 20u && age < firmwareMachine.cpu().recentInstructionCount(); ++age)
+            std::printf("  %04X: %02X\n",
+                        static_cast<unsigned>(firmwareMachine.cpu().recentInstructionPC(age)),
+                        static_cast<unsigned>(firmwareMachine.cpu().recentInstructionOpcode(age)));
         std::fflush(stdout);
         assert(peripheralInit > 0);
         std::fflush(stdout);
