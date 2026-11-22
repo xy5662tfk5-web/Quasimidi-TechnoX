@@ -108,6 +108,9 @@ int main(int argc, char** argv) {
     assert(machine.soundHostBurstWordCount() == 2u);
     assert(machine.soundHostWordForTesting(0x20u) == 0x5678u);
     machine.writeExternal(0x8000u, 0x11u);
+    // Readback is a three-byte per-index response (firmware R2/R3/R4),
+    // not a fabricated 16-bit echo from only registers 2 and 3.
+    assert(machine.readExternal(0x8001u) == 0x22u);
     assert(machine.readExternal(0x8002u) == 0x33u);
     assert(machine.readExternal(0x8003u) == 0x80u);
 
