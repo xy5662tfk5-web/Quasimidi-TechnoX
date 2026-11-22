@@ -588,6 +588,16 @@ int main(int argc, char** argv) {
             assert(word.value == expectedWord);
             assert(packet.returnPC == expectedCaller);
         }
+        const auto hostReads = firmwareMachine.sam9407HostReadCount();
+        std::printf("SAM9407 host reads (current loopback model, %zu):\\n", hostReads);
+        for (std::size_t i = 0; i < hostReads; ++i) {
+            const auto& read = firmwareMachine.sam9407HostReadAt(i);
+            std::printf("  read[%03zu] reg=%u value=%02X pc=%04X cycle=%llu\\n",
+                        i, static_cast<unsigned>(read.registerIndex),
+                        static_cast<unsigned>(read.value),
+                        static_cast<unsigned>(read.instructionPC),
+                        static_cast<unsigned long long>(read.machineCycle));
+        }
         std::printf("SAM9407 host transactions after IC51 boot block (%zu):\\n",
                     bootTransactions);
         for (std::size_t i = 0; i < bootTransactions; ++i) {
