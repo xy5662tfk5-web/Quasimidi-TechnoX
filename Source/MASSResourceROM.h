@@ -932,6 +932,57 @@ struct MASSResourceSelection {
     std::uint8_t normalizedPartParameter = 0;
 };
 
+// Four-byte bulk-transfer entry consumed by IC4 routine 0xAF1A.
+// R7 is multiplied by two, then the firmware reads:
+//   [source high, source low, count high, count low].
+// The nested DJNZ loops treat a zero low byte as a full 256-byte page.
+struct MASSIC51BulkBlockHeader {
+    std::uint16_t sourceAddress = 0;
+    std::uint8_t countHigh = 0;
+    std::uint8_t countLow = 0;
+
+    std::size_t firmwareByteCount() const noexcept {
+        const auto lowCount = countLow == 0 ? 0x100u : static_cast<unsigned>(countLow);
+        return static_cast<std::size_t>(countHigh) * 0x100u + lowCount;
+    }
+
+    static bool parse(const std::uint8_t* bankData,
+                      std::size_t bankSize,
+                      std::uint8_t r7,
+                      MASSIC51BulkBlockHeader& result) noexcept {
+        const auto offset = static_cast<std::size_t>(r7) * 2u;
+        if (bankData == nullptr || bankSize < 0x10000u ||
+            offset + 4u > bankSize)
+            return false;
+        MASSIC51BulkBlockHeader parsed{};
+        parsed.sourceAddress = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(bankData[offset]) << 8u) |
+            bankData[offset + 1u]);
+        parsed.countHigh = bankData[offset + 2u];
+        parsed.countLow = bankData[offset + 3u];
+        result = parsed;
+        return true;
+    }
+
+    // MOVX @DPTR followed by INC DPTR wraps the 16-bit source address.
+    static bool copyPayload(const std::uint8_t* bankData,
+                            std::size_t bankSize,
+                            const MASSIC51BulkBlockHeader& header,
+                            std::uint8_t* destination,
+                            std::size_t destinationSize) noexcept {
+        const auto count = header.firmwareByteCount();
+        if (bankData == nullptr || bankSize < 0x10000u ||
+            destination == nullptr || destinationSize < count)
+            return false;
+        for (std::size_t i = 0; i < count; ++i) {
+            const auto address = static_cast<std::uint16_t>(
+                static_cast<std::size_t>(header.sourceAddress) + i);
+            destination[i] = bankData[address];
+        }
+        return true;
+    }
+};
+
 class MASSResourceROM {
 public:
     static constexpr std::size_t kBankSize = 0x10000;
