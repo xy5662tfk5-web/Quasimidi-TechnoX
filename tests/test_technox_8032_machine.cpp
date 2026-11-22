@@ -79,6 +79,51 @@ int main(int argc, char** argv) {
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
 
+    // Timer 0 mode 1: 16-bit overflow raises TF0.
+    machine.reset();
+    machine.writeInternal(0x89, 0x01); // TMOD: Timer 0 mode 1
+    machine.writeInternal(0x8c, 0xff); // TH0
+    machine.writeInternal(0x8a, 0xfe); // TL0
+    machine.writeInternal(0x88, 0x10); // TR0
+    machine.advanceMachineCycles(2);
+    assert(machine.readInternal(0x8c) == 0x00);
+    assert(machine.readInternal(0x8a) == 0x00);
+    assert((machine.readInternal(0x88) & 0x20u) != 0); // TF0
+
+    // Timer 0 mode 2: overflow reloads TL0 from TH0.
+    machine.reset();
+    machine.writeInternal(0x89, 0x02); // mode 2
+    machine.writeInternal(0x8c, 0xa5); // reload
+    machine.writeInternal(0x8a, 0xff);
+    machine.writeInternal(0x88, 0x10); // TR0
+    machine.advanceMachineCycles(1);
+    assert(machine.readInternal(0x8a) == 0xa5);
+    assert((machine.readInternal(0x88) & 0x20u) != 0);
+
+    // Timer 2 auto-reload and interrupt flag behavior on the 8032.
+    machine.reset();
+    machine.writeInternal(0xcb, 0x12); // RCAP2H
+    machine.writeInternal(0xca, 0x34); // RCAP2L
+    machine.writeInternal(0xcd, 0xff); // TH2
+    machine.writeInternal(0xcc, 0xff); // TL2
+    machine.writeInternal(0xc8, 0x04); // TR2, auto-reload mode
+    machine.advanceMachineCycles(1);
+    assert(machine.readInternal(0xcd) == 0x12);
+    assert(machine.readInternal(0xcc) == 0x34);
+    assert((machine.readInternal(0xc8) & 0x80u) != 0); // TF2
+
+    // Timer 2 baud-rate mode reloads but suppresses TF2.
+    machine.reset();
+    machine.writeInternal(0xcb, 0x22);
+    machine.writeInternal(0xca, 0x11);
+    machine.writeInternal(0xcd, 0xff);
+    machine.writeInternal(0xcc, 0xff);
+    machine.writeInternal(0xc8, 0x24); // TR2 + RCLK
+    machine.advanceMachineCycles(1);
+    assert(machine.readInternal(0xcd) == 0x22);
+    assert(machine.readInternal(0xcc) == 0x11);
+    assert((machine.readInternal(0xc8) & 0x80u) == 0);
+
     // LCD stub and cycle accounting.
     machine.writeExternal(0xb001, 0x41);
     assert(machine.readExternal(0xb003) == 0x41);
