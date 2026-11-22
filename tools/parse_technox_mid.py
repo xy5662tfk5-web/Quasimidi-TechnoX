@@ -17,6 +17,7 @@ class Frame:
     raw: bytes
     track: int
     event_offset: int
+    delta_ticks: int = 0
     @property
     def record_index(self): return self.raw[5] if len(self.raw) > 5 else None
     @property
@@ -54,13 +55,14 @@ def _chunks(data: bytes):
         tracks.append((ti, data[start:end])); pos = end
     return fmt, division, tracks
 
-def extract_sysex(data: bytes) -> List[Frame]:
-    _, _, tracks = _chunks(data)
+def extract_sysex_timed(data: bytes):
+    _, division, tracks = _chunks(data)
+    tempo_us_per_quarter = 500000
     frames: List[Frame] = []
     for ti, tr in tracks:
-        p = 0; running = None; pending = None; pending_offset = 0
+        p = 0; running = None; pending = None; pending_offset = 0; pending_delta = 0
         while p < len(tr):
-            _, p = _read_vlq(tr, p)
+            delta_ticks, p = _read_vlq(tr, p)
             if p >= len(tr): raise MidiFormatError("missing event status")
             status = tr[p]
             has_status_byte = status >= 0x80
@@ -70,7 +72,11 @@ def extract_sysex(data: bytes) -> List[Frame]:
             else: p += 1
             if status == 0xFF:
                 if p >= len(tr): raise MidiFormatError("truncated meta event")
-                p += 1; n, p = _read_vlq(tr, p); p += n
+                meta_type = tr[p]; p += 1
+                n, p = _read_vlq(tr, p)
+                if meta_type == 0x51 and n == 3:
+                    tempo_us_per_quarter = int.from_bytes(tr[p:p+3], "big")
+                p += n
                 if p > len(tr): raise MidiFormatError("truncated meta payload")
                 running = None
             elif status in (0xF0, 0xF7):
@@ -78,14 +84,15 @@ def extract_sysex(data: bytes) -> List[Frame]:
                 if len(payload) != n: raise MidiFormatError("truncated SysEx event")
                 if status == 0xF0:
                     if pending is not None: raise MidiFormatError("new F0 before previous SysEx completed")
-                    pending = bytearray(b"\xF0" + payload); pending_offset = p - n
+                    pending = bytearray(b"\xF0" + payload); pending_offset = p - n; pending_delta = delta_ticks
                 else:
                     if pending is None:
-                        if payload.startswith(b"\xF0"): pending = bytearray(payload)
+                        if payload.startswith(b"\xF0"):
+                            pending = bytearray(payload); pending_delta = delta_ticks
                         else: continue
                     else: pending.extend(payload)
                 if pending is not None and pending.endswith(b"\xF7"):
-                    frames.append(Frame(bytes(pending), ti, pending_offset)); pending = None
+                    frames.append(Frame(bytes(pending), ti, pending_offset, pending_delta)); pending = None
                 running = None
             elif 0x80 <= status <= 0xEF:
                 running = status
@@ -95,7 +102,22 @@ def extract_sysex(data: bytes) -> List[Frame]:
             else:
                 raise MidiFormatError(f"unsupported system status 0x{status:02X}")
         if pending is not None: raise MidiFormatError(f"unterminated SysEx in track {ti}")
-    return frames
+    return division, tempo_us_per_quarter, frames
+
+def extract_sysex(data: bytes) -> List[Frame]:
+    return extract_sysex_timed(data)[2]
+
+def write_serial_stream(division: int, tempo_us_per_quarter: int,
+                        frames: List[Frame], path: Path):
+    output = bytearray(b"TXSB")
+    output.extend(division.to_bytes(2, "big"))
+    output.extend(tempo_us_per_quarter.to_bytes(3, "big"))
+    output.extend(len(frames).to_bytes(2, "big"))
+    for frame in frames:
+        output.extend(frame.delta_ticks.to_bytes(4, "big"))
+        output.extend(len(frame.raw).to_bytes(2, "big"))
+        output.extend(frame.raw)
+    path.write_bytes(output)
 
 def decode_bank(data: bytes, strict: bool = True) -> List[Performance]:
     frames = extract_sysex(data)
@@ -135,11 +157,17 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("midi", type=Path)
     ap.add_argument("-o","--output", type=Path)
+    ap.add_argument("--serial-stream-output", type=Path,
+                    help="write lossless TXSB stream with per-frame MIDI delta ticks")
     ap.add_argument("--allow-nonstandard", action="store_true")
     args=ap.parse_args()
     try:
-        perfs=decode_bank(args.midi.read_bytes(), strict=not args.allow_nonstandard)
+        midi_bytes = args.midi.read_bytes()
+        perfs=decode_bank(midi_bytes, strict=not args.allow_nonstandard)
         if args.output: export_json(perfs,args.output)
+        if args.serial_stream_output:
+            division, tempo, frames = extract_sysex_timed(midi_bytes)
+            write_serial_stream(division, tempo, frames, args.serial_stream_output)
         print(f"OK: {len(perfs)} Performances; {sum(5 for _ in perfs)} blocks per record")
         for p in perfs: print(f"{p.index:02d}  {p.name}")
     except (OSError, MidiFormatError) as e:
