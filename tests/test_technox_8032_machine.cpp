@@ -283,9 +283,11 @@ int main(int argc, char** argv) {
             ic51Probe.writeInternal(0xb0, 0xcdu); // P3.5/P3.4/P3.1 low: bank 0
             assert(ic51Probe.readExternal(0x0000) == realIC51[0x0000]);
             assert(ic51Probe.readExternal(0x1234) == realIC51[0x1234]);
+            assert(ic51Probe.ic51ReadsByBank(0) == 2u);
             ic51Probe.writeInternal(0xb0, 0xedu); // P3.5 high: bank 1
             assert(ic51Probe.readExternal(0x0000) == realIC51[0x10000]);
             assert(ic51Probe.readExternal(0x1234) == realIC51[0x11234]);
+            assert(ic51Probe.ic51ReadsByBank(1) == 2u);
             ic51Probe.writeInternal(0xb0, 0xffu); // deselect IC51
         }
 
@@ -402,6 +404,28 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.soundMemoryReadsByMode(2)));
         assert(injectedResponseMachine.cpu().registers().pc == 0x32b0);
         assert(injectedResponseMachine.soundMemoryWriteCount() > 0u);
+
+        // Exercise the real INT1/ACIA receive path with a MIDI Note On.
+        const std::array<std::uint8_t, 3> noteOn{{0x90, 0x3c, 0x64}};
+        const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
+        const auto ic51ReadsBeforeMidi = injectedResponseMachine.ic51ReadCount();
+        const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
+        assert(injectedResponseMachine.scheduleAciaMidiBytes(
+            noteOn.data(), noteOn.size(), midiStartCycle));
+        const auto midiInstructions = injectedResponseMachine.runForMachineCycles(100000);
+        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X\\n",
+                    midiInstructions,
+                    static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
+                    static_cast<unsigned>(ieBeforeMidi),
+                    static_cast<unsigned>(injectedResponseMachine.readInternal(0x88)),
+                    static_cast<unsigned>(injectedResponseMachine.readExternal(0xa002)),
+                    static_cast<unsigned>(injectedResponseMachine.readInternal(0xb0)),
+                    static_cast<unsigned long long>(injectedResponseMachine.ic51ReadCount()),
+                    static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(0)),
+                    static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(1)),
+                    static_cast<unsigned>(injectedResponseMachine.lastIC51ReadAddress()));
+        assert(!injectedResponseMachine.cpuFaulted());
+        (void)ic51ReadsBeforeMidi;
     }
     return 0;
 }
