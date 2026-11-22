@@ -122,6 +122,22 @@ public:
             registers_.pc = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(high) << 8u) | low);
             cycles = 2;
+        } else if ((opcode & 0x1fu) == 0x01u) { // AJMP addr11
+            const auto low = fetch8(bus);
+            const auto target = static_cast<std::uint16_t>(
+                (registers_.pc & 0xf800u) |
+                (static_cast<std::uint16_t>(opcode & 0xe0u) << 3u) | low);
+            registers_.pc = target;
+            cycles = 2;
+        } else if ((opcode & 0x1fu) == 0x11u) { // ACALL addr11
+            const auto low = fetch8(bus);
+            const auto returnAddress = registers_.pc;
+            push(bus, static_cast<std::uint8_t>(returnAddress & 0xffu));
+            push(bus, static_cast<std::uint8_t>(returnAddress >> 8u));
+            registers_.pc = static_cast<std::uint16_t>(
+                (returnAddress & 0xf800u) |
+                (static_cast<std::uint16_t>(opcode & 0xe0u) << 3u) | low);
+            cycles = 2;
         } else if (opcode == 0x80) { // SJMP rel
             const auto rel = static_cast<std::int8_t>(fetch8(bus));
             registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
@@ -289,6 +305,12 @@ public:
                 registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
             }
             cycles = 2;
+        } else if (opcode == 0xc3) { // CLR C
+            registers_.psw.carry = false;
+        } else if (opcode == 0xd3) { // SETB C
+            registers_.psw.carry = true;
+        } else if (opcode == 0xb3) { // CPL C
+            registers_.psw.carry = !registers_.psw.carry;
         } else if (opcode == 0x72 || opcode == 0x82 ||
                    opcode == 0xa0 || opcode == 0xb0) { // ORL/ANL C,bit or /bit
             const bool bit = readBit(bus, fetch8(bus));
@@ -418,6 +440,20 @@ public:
             cycles = 2;
         } else if (opcode == 0xf0) { // MOVX @DPTR,A
             bus.writeExternal(registers_.dptr, registers_.a);
+            cycles = 2;
+        } else if (opcode == 0xe2 || opcode == 0xe3) { // MOVX A,@Ri
+            const auto low = readRegister(bus, opcode & 1u);
+            const auto high = readDirect(bus, 0xa0u); // P2 output latch
+            const auto address = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(high) << 8u) | low);
+            registers_.a = bus.readExternal(address);
+            cycles = 2;
+        } else if (opcode == 0xf2 || opcode == 0xf3) { // MOVX @Ri,A
+            const auto low = readRegister(bus, opcode & 1u);
+            const auto high = readDirect(bus, 0xa0u); // P2 output latch
+            const auto address = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(high) << 8u) | low);
+            bus.writeExternal(address, registers_.a);
             cycles = 2;
         } else if (opcode == 0x84) { // DIV AB
             if (registers_.b == 0) {
