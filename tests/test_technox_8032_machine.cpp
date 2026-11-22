@@ -459,6 +459,35 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.mode),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        struct CallerCount { std::uint16_t pc = 0; std::size_t count = 0; };
+        std::array<CallerCount, 64> writeCallers{};
+        std::size_t writeCallerKinds = 0;
+        for (std::size_t i = 0; i < soundWrites; ++i) {
+            const auto caller = firmwareMachine.soundMemoryWriteTraceAt(i).returnPC;
+            std::size_t slot = 0;
+            while (slot < writeCallerKinds && writeCallers[slot].pc != caller) ++slot;
+            if (slot == writeCallerKinds && writeCallerKinds < writeCallers.size()) {
+                writeCallers[slot].pc = caller;
+                ++writeCallerKinds;
+            }
+            if (slot < writeCallerKinds) ++writeCallers[slot].count;
+        }
+        std::printf("Sound-memory write caller groups (%zu):\\n", writeCallerKinds);
+        for (std::size_t i = 0; i < writeCallerKinds; ++i)
+            std::printf("  return=%04X writes=%zu\\n",
+                        static_cast<unsigned>(writeCallers[i].pc), writeCallers[i].count);
+        std::printf("IC4 external sound-memory writes (last 12):\\n");
+        const auto firstRecentWrite = soundWrites > 12u ? soundWrites - 12u : 0u;
+        for (std::size_t i = firstRecentWrite; i < soundWrites; ++i) {
+            const auto& event = firmwareMachine.soundMemoryWriteTraceAt(i);
+            std::printf("  %04X=%02X pc=%04X ret=%04X mode=%u cycle=%llu\\n",
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.mode),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto ic51Reads = firmwareMachine.ic51ReadTraceCount();
         std::printf("IC51 source reads: total=%llu bank0=%llu bank1=%llu trace=%zu\\n",
                     static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()),
