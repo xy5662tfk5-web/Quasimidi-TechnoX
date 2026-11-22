@@ -95,6 +95,10 @@ int main(int argc, char** argv) {
     const auto& burstWord = machine.sam9407BurstWordAt(0);
     assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
     assert(burstWord.value == 0x4433u);
+    machine.writeExternal(0x8003u, 0x80u); // standalone 0x0DCE-style control write
+    assert(machine.soundCommandPacketCount() == 1u);
+    assert(machine.sam9407BurstWordCount() == 1u);
+    assert(machine.sam9407HostWriteCount() == 5u);
 
     // 8032 upper IRAM and direct SFR reads are separate address spaces.
     machine.writeIndirect(0x80, 0x5a);
@@ -542,7 +546,19 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
         const auto bootBurstWords = firmwareMachine.sam9407BurstWordCount();
         const auto bootTransactions = firmwareMachine.soundCommandPacketCount();
+        const auto hostWrites = firmwareMachine.sam9407HostWriteCount();
         assert(bootBurstWords == bootTransactions);
+        std::printf("SAM9407 boot: hostWrites=%zu completeTransactions=%zu burstWords=%zu\\n",
+                    hostWrites, bootTransactions, bootBurstWords);
+        std::printf("SAM9407 standalone register-3 writes (0x0DCE control path):\\n");
+        for (std::size_t i = 0; i < hostWrites; ++i) {
+            const auto& write = firmwareMachine.sam9407HostWriteAt(i);
+            if (write.registerIndex == 3u && write.instructionPC == 0x0de4u)
+                std::printf("  reg3=%02X pc=%04X cycle=%llu\\n",
+                            static_cast<unsigned>(write.value),
+                            static_cast<unsigned>(write.instructionPC),
+                            static_cast<unsigned long long>(write.machineCycle));
+        }
         std::printf("SAM9407 host transactions after IC51 boot block (%zu):\\n",
                     bootTransactions);
         for (std::size_t i = 0; i < bootTransactions; ++i) {
