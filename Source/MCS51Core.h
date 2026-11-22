@@ -206,6 +206,71 @@ public:
         } else if (opcode == 0x76 || opcode == 0x77) { // MOV @Ri,#data
             const auto value = fetch8(bus);
             bus.writeInternal(readRegister(bus, opcode & 1u), value);
+        } else if (opcode == 0x42) { // ORL direct,A
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) | registers_.a));
+            cycles = 2;
+        } else if (opcode == 0x43) { // ORL direct,#data
+            const auto address = fetch8(bus);
+            const auto immediate = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) | immediate));
+            cycles = 2;
+        } else if (opcode == 0x44) { // ORL A,#data
+            registers_.a |= fetch8(bus);
+        } else if (opcode == 0x45) { // ORL A,direct
+            registers_.a |= bus.readInternal(fetch8(bus));
+        } else if (opcode == 0x46 || opcode == 0x47) { // ORL A,@Ri
+            registers_.a |= bus.readInternal(readRegister(bus, opcode & 1u));
+        } else if (opcode >= 0x48 && opcode <= 0x4f) { // ORL A,Rn
+            registers_.a |= readRegister(bus, opcode & 7u);
+        } else if (opcode == 0x52) { // ANL direct,A
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) & registers_.a));
+            cycles = 2;
+        } else if (opcode == 0x53) { // ANL direct,#data
+            const auto address = fetch8(bus);
+            const auto immediate = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) & immediate));
+            cycles = 2;
+        } else if (opcode == 0x54) { // ANL A,#data
+            registers_.a &= fetch8(bus);
+        } else if (opcode == 0x55) { // ANL A,direct
+            registers_.a &= bus.readInternal(fetch8(bus));
+        } else if (opcode == 0x56 || opcode == 0x57) { // ANL A,@Ri
+            registers_.a &= bus.readInternal(readRegister(bus, opcode & 1u));
+        } else if (opcode >= 0x58 && opcode <= 0x5f) { // ANL A,Rn
+            registers_.a &= readRegister(bus, opcode & 7u);
+        } else if (opcode == 0x62) { // XRL direct,A
+            const auto address = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) ^ registers_.a));
+            cycles = 2;
+        } else if (opcode == 0x63) { // XRL direct,#data
+            const auto address = fetch8(bus);
+            const auto immediate = fetch8(bus);
+            bus.writeInternal(address, static_cast<std::uint8_t>(bus.readInternal(address) ^ immediate));
+            cycles = 2;
+        } else if (opcode == 0x64) { // XRL A,#data
+            registers_.a ^= fetch8(bus);
+        } else if (opcode == 0x65) { // XRL A,direct
+            registers_.a ^= bus.readInternal(fetch8(bus));
+        } else if (opcode == 0x66 || opcode == 0x67) { // XRL A,@Ri
+            registers_.a ^= bus.readInternal(readRegister(bus, opcode & 1u));
+        } else if (opcode >= 0x68 && opcode <= 0x6f) { // XRL A,Rn
+            registers_.a ^= readRegister(bus, opcode & 7u);
+        } else if (opcode == 0x03) { // RR A
+            registers_.a = static_cast<std::uint8_t>((registers_.a >> 1u) | (registers_.a << 7u));
+        } else if (opcode == 0x13) { // RRC A
+            const bool oldCarry = registers_.psw.carry;
+            registers_.psw.carry = (registers_.a & 1u) != 0;
+            registers_.a = static_cast<std::uint8_t>((registers_.a >> 1u) | (oldCarry ? 0x80u : 0u));
+        } else if (opcode == 0x23) { // RL A
+            registers_.a = static_cast<std::uint8_t>((registers_.a << 1u) | (registers_.a >> 7u));
+        } else if (opcode == 0x33) { // RLC A
+            const bool oldCarry = registers_.psw.carry;
+            registers_.psw.carry = (registers_.a & 0x80u) != 0;
+            registers_.a = static_cast<std::uint8_t>((registers_.a << 1u) | (oldCarry ? 1u : 0u));
+        } else if (opcode == 0xc4) { // SWAP A
+            registers_.a = static_cast<std::uint8_t>((registers_.a << 4u) | (registers_.a >> 4u));
         } else if (opcode == 0xa3) { // INC DPTR
             ++registers_.dptr;
             cycles = 2;
