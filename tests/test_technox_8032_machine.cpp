@@ -449,6 +449,10 @@ int main(int argc, char** argv) {
         std::fflush(stdout);
         // Diagnostic run: keep the observed transfer count visible while the
         // IC51 P3 decode is being reconciled with the firmware's port toggles.
+        assert(firmwareMachine.soundMemoryWriteCount() == 13647u);
+        assert(firmwareMachine.ic51ReadsByBank(0) == 13651u); // 4-byte header + payload
+        assert(firmwareMachine.ic51ReadsByBank(1) == 64u);    // descriptor-table reads
+        assert(firmwareMachine.xdataByteForTesting(0xf5b2) == 0xd2u); // final uploaded byte
         assert(firmwareMachine.soundMemoryWriteTraceCount() ==
                firmwareMachine.soundMemoryWriteCount());
         std::printf("IC4 external sound-memory writes (first 12):\\n");
@@ -569,7 +573,10 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.soundMemoryWritesByMode(2)),
                     static_cast<unsigned long long>(injectedResponseMachine.soundMemoryReadsByMode(2)));
         assert(injectedResponseMachine.cpu().registers().pc == 0x32b0);
-        assert(injectedResponseMachine.soundMemoryWriteCount() > 0u);
+        assert(injectedResponseMachine.soundMemoryWriteCount() == 13647u);
+        assert(injectedResponseMachine.ic51ReadsByBank(0) == 13651u);
+        assert(injectedResponseMachine.ic51ReadsByBank(1) == 64u);
+        assert(injectedResponseMachine.xdataByteForTesting(0xf5b2) == 0xd2u);
 
         if (!factoryFrames.empty()) {
             const auto factoryStartCycle = injectedResponseMachine.elapsedMachineCycles();
