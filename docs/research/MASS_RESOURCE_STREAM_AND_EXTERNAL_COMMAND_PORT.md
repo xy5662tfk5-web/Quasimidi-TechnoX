@@ -54,20 +54,20 @@ This establishes the chain:
 
 ### Stream control bytes
 
-- `0xFF` is the stream terminator.
-- If `(byte & 0x38) == 0x38`, the byte follows the marker path: the stream pointer advances and the current output-window index advances. It is not dispatched through the handler table.
+- `0xFF` is the stream terminator; the interpreter exits before dispatching it.
+- A byte whose masked group is `0x38` is consumed as a slot marker before the jump table: the firmware writes a `0x38` filler record, advances the stream pointer by one, and completes the current eight-byte output slot.
 - Other bytes are dispatched using `(byte & 0x38) >> 1` into the table at `0x1BC3`.
 
-The dispatch table contains eight four-byte entries (an `LJMP` plus padding):
+The dispatch table contains eight four-byte entries (an `LJMP` plus padding). The handler table includes the `0x38` entry, but the interpreter's earlier marker check means that entry is not reached for ordinary stream parsing:
 
-| Masked group | Handler | Observed behavior |
+| Masked group | Handler | Observed byte consumption and behavior |
 |---|---:|---|
-| `0x00` | `0x1C2B` | One-byte advance; its bit-3 conditional is not taken for this dispatch group |
-| `0x08` | `0x1C61` | Seven-byte parameter record; fixed-point scaling and interpolation |
-| `0x10` | `0x1EDD` | Seven-byte active record; if its second byte is zero, skips the remaining record bytes |
-| `0x18` | `0x224C` | Four-byte command record |
-| `0x20` | `0x2301` | Command byte plus three payload bytes |
-| `0x28..0x37` | `0x2374` | One-byte advance |
+| `0x00` | `0x1C2B` | Conditional 4- or 7-byte path. If firmware flag bit `0x0A` is set, it consumes 4 bytes and writes a synthetic `0x38` slot. Otherwise byte +3 bit 3 clear consumes 4 bytes; set branches into `0x224C` at byte +3 and consumes 7 bytes total. |
+| `0x08` | `0x1C61` | 7-byte record: opcode plus six payload bytes; stores/scales fields and may interpolate a 24-bit value. |
+| `0x10` | `0x1EDD` | 7-byte record: opcode plus six payload bytes. If byte +1 is zero, it takes a filler-slot path but still advances exactly 7 bytes. Otherwise it performs the active 24-bit/nonlinear parameter transform. |
+| `0x18` | `0x224C` | 4-byte record: opcode plus three payload bytes. When firmware flag bit `0x08` is set it skips the command but still consumes 4 bytes; otherwise it writes the four-byte command port. |
+| `0x20` | `0x2301` | 4-byte record: opcode plus three payload bytes; may initialize remaining slot records and emits a command. |
+| `0x28` / `0x30` | `0x2374` | One-byte advance for each group; the output slot is then advanced by the interpreter. |
 
 The interpreter initializes a 16-iteration counter (`RAM[0x2C] = 0x10`). The caller `0x16C3` sets P2 to `RAM[0x2D]` before calling `0x189D`; therefore `RAM[0x2E]` is the low-byte offset within that selected XDATA page, not a page number:
 

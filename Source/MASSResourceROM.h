@@ -231,7 +231,7 @@ enum class MASSResourceCommandKind : std::uint8_t {
 struct MASSResourceCommand {
     std::uint16_t bankOffset = 0;
     std::uint8_t opcode = 0;
-    MASSResourceCommandKind kind = MASSResourceCommandKind::singleByte;
+    MASSResourceCommandKind kind = MASSResourceCommandKind::conditionalRecord;
     std::uint8_t length = 0;
     bool routesToHardware = false;
     std::array<std::uint8_t, 8> bytes{};
