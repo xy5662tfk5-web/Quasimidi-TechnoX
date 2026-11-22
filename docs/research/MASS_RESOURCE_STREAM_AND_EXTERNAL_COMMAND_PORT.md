@@ -62,7 +62,7 @@ The dispatch table contains eight four-byte entries (an `LJMP` plus padding). Th
 
 | Masked group | Handler | Observed byte consumption and behavior |
 |---|---:|---|
-| `0x00` | `0x1C2B` | Conditional 4- or 7-byte path. If firmware flag bit `0x0A` is set, it consumes 4 bytes and writes a synthetic `0x38` slot. Otherwise byte +3 bit 3 clear consumes 4 bytes; set branches into `0x224C` at byte +3 and consumes 7 bytes total. |
+| `0x00` | `0x1C2B` | Conditional 4- or 7-byte path. If firmware flag bit `0x0A` is set, it consumes 4 bytes and writes a synthetic `0x38` slot. Otherwise byte +3 bit 3 clear consumes 4 bytes; set branches into `0x224C` at byte +3, where bytes +3..+6 become the nested opcode and three payload bytes. The final packet is `[RAM[0x2B], byte[+4], byte[+5], byte[+6] & 7]` unless the nested flag `0x08` skips the handler. |
 | `0x08` | `0x1C61` | 7-byte record. Input maps to `F0,R2,R3,R4,R7,R6,R5` in byte order. The handler writes raw fields to slot offsets 0,3,4,5,6, with offset 3 merged or replaced depending on E3, then performs fixed-point/pitch-related arithmetic and may interpolate a 24-bit quantity. |
 | `0x10` | `0x1EDD` | 7-byte record. Input maps to `R2,R3,R5,R6,F0,R4,R7`. When byte +1 (`R3`) is zero, the handler restores external controls, writes a `0x38` filler slot and advances exactly 7 bytes without reading the remaining fields semantically. Otherwise it performs mode/flag-dependent nonlinear arithmetic and can emit up to three hardware packets. |
 | `0x18` | `0x224C` | 4-byte record: opcode plus three payload bytes. When firmware flag bit `0x08` is set it skips the command but still consumes 4 bytes; otherwise it writes the four-byte command port. |

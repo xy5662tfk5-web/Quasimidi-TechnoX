@@ -179,6 +179,25 @@ void testMultiParameterPacketSequenceBuilder() {
         command, registers, false, buffered, sequence));
 }
 
+void testConditionalExtendedPacketBuilder() {
+    MASSResourceCommand command{};
+    command.opcode = 0x00;
+    command.kind = MASSResourceCommandKind::conditionalRecord;
+    command.length = 7;
+    command.branchesToExtendedCommand = true;
+    command.bytes = {{0x00, 0x11, 0x22, 0x08, 0xa1, 0xb2, 0xfd}};
+
+    MASSHardwareCommandPacket packet{};
+    assert(MASSResourceHardwareCommandBuilder::buildConditionalExtendedPacket(
+        command, 0x30, false, packet));
+    assert((packet.bytes == std::array<std::uint8_t, 4>{{0x30, 0xa1, 0xb2, 0x05}}));
+    assert(!MASSResourceHardwareCommandBuilder::buildConditionalExtendedPacket(
+        command, 0x30, true, packet));
+    command.branchesToExtendedCommand = false;
+    assert(!MASSResourceHardwareCommandBuilder::buildConditionalExtendedPacket(
+        command, 0x30, false, packet));
+}
+
 void testFourByteParameterPacketBuilder() {
     MASSResourceCommand command{};
     command.opcode = 0x1b;
@@ -456,6 +475,7 @@ int main(int argc, char** argv) {
     testResourceSelectionRecordParser();
     testCommandRegisterFieldDecoders();
     testMultiParameterPacketSequenceBuilder();
+    testConditionalExtendedPacketBuilder();
     testFourByteParameterPacketBuilder();
     testTerminalHardwarePacketBuilder();
     testDescriptorParser();

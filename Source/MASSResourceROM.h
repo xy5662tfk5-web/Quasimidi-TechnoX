@@ -460,6 +460,30 @@ public:
         return true;
     }
 
+    // Handler 0x224C reached from group 0x00 at byte +3. The leading
+    // three bytes belong to the outer conditional record; the nested handler
+    // interprets bytes +3..+6 as opcode and three payload bytes.
+    static bool buildConditionalExtendedPacket(
+        const MASSResourceCommand& command,
+        std::uint8_t ram2B,
+        bool firmwareFlag08Set,
+        MASSHardwareCommandPacket& result) noexcept {
+        if (firmwareFlag08Set ||
+            command.kind != MASSResourceCommandKind::conditionalRecord ||
+            command.length != 7 || !command.branchesToExtendedCommand)
+            return false;
+
+        MASSHardwareCommandPacket packet{};
+        packet.bytes = {
+            ram2B,
+            command.bytes[4],
+            command.bytes[5],
+            static_cast<std::uint8_t>(command.bytes[6] & 0x07)
+        };
+        result = packet;
+        return true;
+    }
+
     // Handler 0x224C / group 0x18. The flag-0x08 branch exits before the
     // record is read. On the normal branch the hardware packet receives the
     // command byte plus R2, R3 and the three-bit R4 payload.
