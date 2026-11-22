@@ -156,14 +156,14 @@ public:
             add(readDirect(bus, fetch8(bus)), false);
         } else if (opcode == 0x26 || opcode == 0x27) { // ADD A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
-            add(readDirect(bus, address), false);
+            add(bus.readInternal(address), false);
         } else if (opcode >= 0x28 && opcode <= 0x2f) { // ADD A,Rn
             add(readRegister(bus, opcode & 7u), false);
         } else if (opcode == 0x35) { // ADDC A,direct
             add(readDirect(bus, fetch8(bus)), registers_.psw.carry);
         } else if (opcode == 0x36 || opcode == 0x37) { // ADDC A,@Ri
             const auto address = readRegister(bus, opcode & 1u);
-            add(readDirect(bus, address), registers_.psw.carry);
+            add(bus.readInternal(address), registers_.psw.carry);
         } else if (opcode >= 0x38 && opcode <= 0x3f) { // ADDC A,Rn
             add(readRegister(bus, opcode & 7u), registers_.psw.carry);
         } else if (opcode == 0x95) { // SUBB A,direct
