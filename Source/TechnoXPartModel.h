@@ -62,6 +62,12 @@ public:
     std::size_t partNumber() const noexcept {
         return isLoaded() && edited_[6] >= 1 && edited_[6] <= 4 ? 12 + edited_[6] : 0;
     }
+    // Firmware event IDs are zero-based runtime record indices 12..15;
+    // the manual/UI numbers the same four Performance Parts 13..16.
+    std::size_t runtimeEventId() const noexcept {
+        const auto number = partNumber();
+        return number == 0 ? 0 : number - 1;
+    }
 
     int rawValue(std::size_t index) const noexcept {
         if (!isLoaded() || index >= kDataSize) return -1;
