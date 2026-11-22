@@ -577,7 +577,9 @@ int main(int argc, char** argv) {
                 assert(!injectedResponseMachine.cpuFaulted());
                 totalFactoryBytes += frame.bytes.size();
             }
-            injectedResponseMachine.runForMachineCycles(100000);
+            // Let the firmware finish consuming the complete factory SysEx
+            // stream before the separate Program Change / Note On stimulus.
+            injectedResponseMachine.runForMachineCycles(5000000u);
             std::printf("Factory RAM Performance SysEx loaded: frames=%zu bytes=%llu tempo=%u division=%u commands=%zu IC51=%llu\\n",
                         factoryFrames.size(),
                         static_cast<unsigned long long>(totalFactoryBytes),
