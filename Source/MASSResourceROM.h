@@ -89,9 +89,11 @@ struct MASS2381AddressResult {
 class MASS2381AddressBuilder {
 public:
     static MASS2381AddressResult resolve(std::uint16_t basePointer,
-                                         std::uint8_t r5,
+                                         std::uint8_t selectorInputA,
                                          std::uint8_t ram2F) noexcept {
-        const auto selector = static_cast<std::uint8_t>((r5 >> 4) & 0x03u);
+        // 0x2381 receives the already-normalized selector in A. Callers
+        // prepare it differently: e.g. SWAP R5; ANL A,#3 or MOVX A; ANL A,#3.
+        const auto selector = static_cast<std::uint8_t>(selectorInputA & 0x03u);
         const auto adjusted = static_cast<std::uint8_t>(ram2F + 0xf4u);
         std::uint8_t offset = 0;
 

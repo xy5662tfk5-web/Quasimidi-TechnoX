@@ -22,17 +22,27 @@ void writePointerBE(std::vector<std::uint8_t>& image,
 }
 
 void testMASS2381AddressBuilder() {
-    const auto low = MASS2381AddressBuilder::resolve(0x1200, 0x3f, 0x20);
+    const auto low = MASS2381AddressBuilder::resolve(0x1200, 0x03, 0x20);
     assert(low.selector == 3 && low.offset == 0x0a && low.address == 0x129a);
 
-    const auto clamped = MASS2381AddressBuilder::resolve(0x1200, 0x30, 0x70);
+    const auto clamped = MASS2381AddressBuilder::resolve(0x1200, 0x03, 0x70);
     assert(clamped.selector == 3 && clamped.offset == 0x2f && clamped.address == 0x12bf);
 
-    const auto zeroOffset = MASS2381AddressBuilder::resolve(0x1200, 0x20, 0x90);
+    const auto zeroOffset = MASS2381AddressBuilder::resolve(0x1200, 0x02, 0x90);
     assert(zeroOffset.selector == 2 && zeroOffset.offset == 0x00 && zeroOffset.address == 0x1260);
 
     const auto wrap = MASS2381AddressBuilder::resolve(0xfff0, 0x00, 0x20);
     assert(wrap.selector == 0 && wrap.offset == 0x0a && wrap.address == 0xfffa);
+
+    // Caller-side preprocessing paths: R5 high nibble or an external byte.
+    const std::uint8_t rawR5 = 0x3f;
+    const auto fromR5 = MASS2381AddressBuilder::resolve(
+        0x1200, static_cast<std::uint8_t>(((rawR5 << 4) | (rawR5 >> 4)) & 0x03),
+        0x20);
+    assert(fromR5.selector == 3 && fromR5.address == low.address);
+    const auto fromExternalByte = MASS2381AddressBuilder::resolve(
+        0x1200, static_cast<std::uint8_t>(0xA7 & 0x03), 0x20);
+    assert(fromExternalByte.selector == 3 && fromExternalByte.address == low.address);
 }
 
 void testMASSModulationScaleMode41() {
