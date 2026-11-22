@@ -358,9 +358,26 @@ void testMASS1EDDSlotCoefficientStage() {
     assert(!result.slotOpcodeScaleApplied && result.modulationApplied);
     assert(result.coefficientB == 0x20);
 
-    // The unresolved 0x1890 path is reported, not approximated.
-    assert(!MASS1EDDSlotCoefficientStage::apply(
-        view, 0x01, 0x40, 0x00, 0x00, 0x80, 0x00, result));
+    // 0x01 dispatches RAM[0x43] through the alternate 0x1890 entry.
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x01, 0x7f, 0x00, 0x00, 0x80, 0x40, result));
+    assert(result.modulationApplied && result.coefficientB == 0x7f);
+
+    // 0x40 dispatches RAM[0x41] through the same entry. The selected
+    // parameter's high-bit path and the final OV/CY saturation are preserved.
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x40, 0x7f, 0x00, 0x00, 0x80, 0x40, result));
+    assert(result.modulationApplied && result.coefficientB == 0x00);
+
+    // If the selected side is zero, 0x23C7 returns without changing R2,
+    // even if the other modulation byte is nonzero.
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x01, 0x55, 0x00, 0x00, 0x80, 0x00, result));
+    assert(!result.modulationApplied && result.coefficientB == 0x55);
+
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x40, 0x55, 0x00, 0x00, 0x00, 0x80, result));
+    assert(!result.modulationApplied && result.coefficientB == 0x55);
 }
 
 void testMASS1848Arithmetic() {
