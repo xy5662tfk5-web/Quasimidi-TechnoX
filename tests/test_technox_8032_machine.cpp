@@ -228,6 +228,12 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.readExternal(0x0000) == 0x00);
         assert(firmwareMachine.readExternal(0x34ff) == 0x00);
         assert(firmwareMachine.readExternal(0x3500) == 0xa5);
+
+        const auto resourceInit = firmwareMachine.runUntilProgramCounter(0x326a, 50000);
+        std::printf("IC4 resource-table handoff: instructions=%zu PC=%04X\\n",
+                    resourceInit, static_cast<unsigned>(firmwareMachine.cpu().registers().pc));
+        assert(resourceInit != 0);
+        assert(firmwareMachine.cpu().registers().pc == 0x326a);
         assert(firmwareMachine.cpu().totalCycles() != 0);
     }
     return 0;
