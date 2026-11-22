@@ -98,15 +98,15 @@ int main(int argc, char** argv) {
     machine.writeExternal(0x8003u, 0x80u); // standalone 0x0DCE-style control write
     assert(machine.soundCommandPacketCount() == 1u);
     assert(machine.soundHostBurstWordCount() == 1u);
-    assert(machine.soundHostHostWriteCount() == 5u);
-    assert(machine.soundHostHostWordForTesting(0x11u) == 0x8033u);
+    assert(machine.soundHostWriteCount() == 5u);
+    assert(machine.soundHostWordForTesting(0x11u) == 0x8033u);
     machine.writeExternal(0x8000u, 0x20u);
     machine.writeExternal(0x8001u, 0x00u);
     machine.writeExternal(0x8002u, 0x78u);
     machine.writeExternal(0x8003u, 0x56u);
     assert(machine.soundCommandPacketCount() == 2u);
     assert(machine.soundHostBurstWordCount() == 2u);
-    assert(machine.soundHostHostWordForTesting(0x20u) == 0x5678u);
+    assert(machine.soundHostWordForTesting(0x20u) == 0x5678u);
     machine.writeExternal(0x8000u, 0x11u);
     assert(machine.readExternal(0x8002u) == 0x33u);
     assert(machine.readExternal(0x8003u) == 0x80u);
@@ -562,13 +562,13 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
         const auto bootBurstWords = firmwareMachine.soundHostBurstWordCount();
         const auto bootTransactions = firmwareMachine.soundCommandPacketCount();
-        const auto hostWrites = firmwareMachine.soundHostHostWriteCount();
+        const auto hostWrites = firmwareMachine.soundHostWriteCount();
         assert(bootBurstWords == bootTransactions);
         std::printf("SoundHost boot: hostWrites=%zu completeTransactions=%zu burstWords=%zu\\n",
                     hostWrites, bootTransactions, bootBurstWords);
         std::printf("SoundHost standalone register-3 writes (outside complete transactions):\\n");
         for (std::size_t i = 0; i < hostWrites; ++i) {
-            const auto& write = firmwareMachine.soundHostHostWriteAt(i);
+            const auto& write = firmwareMachine.soundHostWriteAt(i);
             if (write.registerIndex == 3u && write.instructionPC != 0x0dc5u)
                 std::printf("  reg3=%02X pc=%04X cycle=%llu\\n",
                             static_cast<unsigned>(write.value),
@@ -599,10 +599,10 @@ int main(int argc, char** argv) {
             assert(word.value == expectedWord);
             assert(packet.returnPC == expectedCaller);
         }
-        const auto hostReads = firmwareMachine.soundHostHostReadCount();
+        const auto hostReads = firmwareMachine.soundHostReadCount();
         std::printf("SoundHost host reads (current loopback model, %zu):\\n", hostReads);
         for (std::size_t i = 0; i < hostReads; ++i) {
-            const auto& read = firmwareMachine.soundHostHostReadAt(i);
+            const auto& read = firmwareMachine.soundHostReadAt(i);
             std::printf("  read[%03zu] reg=%u value=%02X pc=%04X cycle=%llu\\n",
                         i, static_cast<unsigned>(read.registerIndex),
                         static_cast<unsigned>(read.value),
@@ -669,7 +669,7 @@ int main(int argc, char** argv) {
         const auto realMidiStart = firmwareMachine.elapsedMachineCycles();
         const auto realPacketBaseline = firmwareMachine.soundCommandPacketCount();
         const auto realBurstBaseline = firmwareMachine.soundHostBurstWordCount();
-        const auto realHostWriteBaseline = firmwareMachine.soundHostHostWriteCount();
+        const auto realHostWriteBaseline = firmwareMachine.soundHostWriteCount();
         const auto realWriterBaseline = firmwareMachine.watchedCallCount(0x0db7u);
         const auto realAC00Baseline = firmwareMachine.watchedCallCount(0xac00u);
         const auto realAC88Baseline = firmwareMachine.watchedCallCount(0xac88u);
@@ -690,7 +690,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     firmwareMachine.soundCommandPacketCount() - realPacketBaseline,
                     firmwareMachine.soundHostBurstWordCount() - realBurstBaseline,
-                    firmwareMachine.soundHostHostWriteCount() - realHostWriteBaseline,
+                    firmwareMachine.soundHostWriteCount() - realHostWriteBaseline,
                     static_cast<unsigned long long>(
                         firmwareMachine.watchedCallCount(0x0db7u) - realWriterBaseline),
                     static_cast<unsigned long long>(
