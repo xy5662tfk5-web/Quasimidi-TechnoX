@@ -645,25 +645,57 @@ int main(int argc, char** argv) {
         const auto realMidiStart = firmwareMachine.elapsedMachineCycles();
         const auto realPacketBaseline = firmwareMachine.soundCommandPacketCount();
         const auto realBurstBaseline = firmwareMachine.sam9407BurstWordCount();
+        const auto realHostWriteBaseline = firmwareMachine.sam9407HostWriteCount();
         const auto realWriterBaseline = firmwareMachine.watchedCallCount(0x0db7u);
+        const auto realAC00Baseline = firmwareMachine.watchedCallCount(0xac00u);
+        const auto realAC88Baseline = firmwareMachine.watchedCallCount(0xac88u);
+        const auto real4256Baseline = firmwareMachine.watchedCallCount(0x4256u);
+        const auto real1494Baseline = firmwareMachine.watchedCallCount(0x1494u);
+        const auto real57A8Baseline = firmwareMachine.watchedCallCount(0x57a8u);
+        const auto real5671Baseline = firmwareMachine.watchedCallCount(0x5671u);
         const auto realIC51Baseline = firmwareMachine.ic51ReadCount();
         assert(firmwareMachine.scheduleAciaMidiBytes(
             realRomProgramAndNote.data(), realRomProgramAndNote.size(), realMidiStart));
         const auto realMidiInstructions = firmwareMachine.runForMachineCycles(2000000u);
         const auto realMidiDrain = firmwareMachine.runForMachineCycles(5000000u);
         std::printf("Real IC51 MIDI probe: instructions=%zu drain=%zu PC=%04X "
-                    "newPackets=%zu newBurstWords=%zu new0DB7=%llu newIC51=%llu "
-                    "validACIA=%llu lastRX=%02X\\n",
+                    "newPackets=%zu newBurstWords=%zu newHostWrites=%zu "
+                    "calls[0DB7=%llu AC00=%llu AC88=%llu 4256=%llu 1494=%llu 57A8=%llu 5671=%llu] "
+                    "newIC51=%llu validACIA=%llu lastRX=%02X\\n",
                     realMidiInstructions, realMidiDrain,
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     firmwareMachine.soundCommandPacketCount() - realPacketBaseline,
                     firmwareMachine.sam9407BurstWordCount() - realBurstBaseline,
+                    firmwareMachine.sam9407HostWriteCount() - realHostWriteBaseline,
                     static_cast<unsigned long long>(
                         firmwareMachine.watchedCallCount(0x0db7u) - realWriterBaseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0xac00u) - realAC00Baseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0xac88u) - realAC88Baseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0x4256u) - real4256Baseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0x1494u) - real1494Baseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0x57a8u) - real57A8Baseline),
+                    static_cast<unsigned long long>(
+                        firmwareMachine.watchedCallCount(0x5671u) - real5671Baseline),
                     static_cast<unsigned long long>(
                         firmwareMachine.ic51ReadCount() - realIC51Baseline),
                     static_cast<unsigned long long>(firmwareMachine.aciaValidReceiveReadCount()),
                     static_cast<unsigned>(firmwareMachine.lastValidAciaReceiveRead()));
+        const std::uint16_t midiWatchAddresses[] = {
+            0x7d95u, 0x3702u, 0x3704u, 0x370au, 0x370bu, 0x3039u, 0x303au,
+            0x304bu, 0x3050u, 0x3051u, 0x2fb3u, 0x2fb4u, 0x2b8bu, 0x2b8cu,
+            0x2b8du, 0x2b8fu, 0x2b98u, 0x2b99u, 0x2fd7u, 0x2fa2u, 0x7c17u,
+            0x7c1cu, 0x7c26u, 0x7bd5u
+        };
+        std::printf("Real IC51 MIDI XDATA:");
+        for (const auto address : midiWatchAddresses)
+            std::printf(" %04X=%02X", static_cast<unsigned>(address),
+                        static_cast<unsigned>(firmwareMachine.xdataByteForTesting(address)));
+        std::printf("\\n");
         assert(!firmwareMachine.cpuFaulted());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.sam9407BurstWordCount();
