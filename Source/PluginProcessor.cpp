@@ -185,7 +185,7 @@ bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& l
 void QuasimidiTechnoXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     massEngine.prepare(sampleRate, samplesPerBlock);
-    firmwareCycleRemainder = 0.0;
+    firmwareCycleTarget = 0.0;
 }
 void QuasimidiTechnoXAudioProcessor::releaseResources() {}
 
@@ -199,12 +199,12 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     if (firmwareMachine != nullptr && !firmwareMachine->cpuFaulted() && hostSampleRate > 0.0) {
         // MAME clocks the 8032 at 12 MHz; the classic 12T core executes
         // one machine cycle per microsecond. Keep fractional cycles per block.
-        const double exactCycles = static_cast<double>(numSamples) *
-            1000000.0 / hostSampleRate + firmwareCycleRemainder;
-        const auto cycleBudget = static_cast<std::uint64_t>(exactCycles);
-        firmwareCycleRemainder = exactCycles - static_cast<double>(cycleBudget);
-        if (cycleBudget != 0)
-            firmwareMachine->runForMachineCycles(cycleBudget);
+        firmwareCycleTarget += static_cast<double>(numSamples) *
+            1000000.0 / hostSampleRate;
+        const auto targetCycles = static_cast<std::uint64_t>(firmwareCycleTarget);
+        const auto currentCycles = firmwareMachine->elapsedMachineCycles();
+        if (targetCycles > currentCycles)
+            firmwareMachine->runForMachineCycles(targetCycles - currentCycles);
     }
     const int performanceIndex = getCurrentProgram();
     const int channelCount = buffer.getNumChannels();
