@@ -556,7 +556,6 @@ private:
             return false;
         const auto interruptPriority = bus.readInternal(0xb8u); // IP
         const auto tcon = bus.readInternal(0x88u);
-        const auto scon = bus.readInternal(0x98u);
 
         struct PendingInterrupt {
             std::uint8_t enableMask;
