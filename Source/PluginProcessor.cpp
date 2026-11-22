@@ -35,8 +35,9 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         performanceBank.loadFromMidi(midiData, midiSize);
     if (const auto* catalogData = BinaryData::getNamedResource("technox_ins_json", catalogSize))
         soundCatalog.loadFromJson(catalogData, catalogSize);
-    if (const auto* resourceData = BinaryData::getNamedResource(
-            "technox_IC51_nm27c010_v105_bin", resourceRomSize))
+    const auto* resourceData = BinaryData::getNamedResource(
+        "technox_IC51_nm27c010_v105_bin", resourceRomSize);
+    if (resourceData != nullptr)
         resourceROM.load(reinterpret_cast<const std::uint8_t*>(resourceData),
                          static_cast<std::size_t>(resourceRomSize));
     int firmwareRomSize = 0;
@@ -46,7 +47,14 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         if (firmwareMachine->loadIC4Rom(
                 reinterpret_cast<const std::uint8_t*>(firmwareData),
                 static_cast<std::size_t>(firmwareRomSize))) {
-            firmwareMachine->reset(); // CPU starts at the original reset vector
+            if (resourceData != nullptr &&
+                !firmwareMachine->loadIC51Rom(
+                    reinterpret_cast<const std::uint8_t*>(resourceData),
+                    static_cast<std::size_t>(resourceRomSize))) {
+                firmwareMachine.reset();
+            } else {
+                firmwareMachine->reset(); // CPU starts at the original reset vector
+            }
         } else {
             firmwareMachine.reset();
         }
