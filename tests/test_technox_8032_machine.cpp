@@ -255,18 +255,10 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.readCode(0xade0) == 0x37);
         for (unsigned i = 0; i < 256; ++i) {
             const auto logical = static_cast<std::uint8_t>(i);
-            std::uint8_t expected = 0x04;
-            if ((logical & 0x01u) != 0) expected ^= 0x21;
-            if ((logical & 0x02u) != 0) expected ^= 0x12;
-            if ((logical & 0x04u) != 0) expected ^= 0x80;
-            if ((logical & 0x08u) != 0) expected ^= 0x20;
-            if ((logical & 0x10u) != 0) expected ^= 0x40;
-            if ((logical & 0x20u) != 0) expected ^= 0x08;
-            if ((logical & 0x40u) != 0) expected ^= 0x04;
-            if ((logical & 0x80u) != 0) expected ^= 0x10;
             const auto mapped = firmwareMachine.readCode(
                 static_cast<std::uint16_t>(0xadddu + i));
-            assert(mapped == expected);
+            assert(mapped == TechnoX8032Machine::mapSoundMemoryLowAddress(logical));
+            assert(TechnoX8032Machine::unmapSoundMemoryLowAddress(mapped) == logical);
             assert(!mappedAddressSeen[mapped]);
             mappedAddressSeen[mapped] = true;
         }
