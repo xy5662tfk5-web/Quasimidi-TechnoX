@@ -851,6 +851,43 @@ void testCommandStreamDecoder() {
     assert(decoded.commands.empty());
 }
 
+void testActualBulkBlockLoader(const char* path) {
+    std::ifstream file(path, std::ios::binary);
+    assert(file.good());
+    std::vector<std::uint8_t> image(
+        (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    assert(image.size() == MASSResourceROM::kImageSize);
+
+    // IC4 0xAF1A indexes the four-byte transfer record at DPTR = 2*R7.
+    // Startup calls it with R7=0x48. The two IC51 banks contain distinct
+    // source/length records for that same firmware index.
+    MASSIC51BulkBlockHeader bank0{};
+    MASSIC51BulkBlockHeader bank1{};
+    assert(MASSIC51BulkBlockHeader::parse(
+        image.data(), MASSResourceROM::kBankSize, 0x48, bank0));
+    assert(MASSIC51BulkBlockHeader::parse(
+        image.data() + MASSResourceROM::kBankSize,
+        MASSResourceROM::kBankSize, 0x48, bank1));
+
+    assert(bank0.sourceAddress == 0x3c64);
+    assert(bank0.countHigh == 0x35 && bank0.countLow == 0x4f);
+    assert(bank0.firmwareByteCount() == 0x354f);
+    assert(bank1.sourceAddress == 0x295c);
+    assert(bank1.countHigh == 0x25 && bank1.countLow == 0x74);
+    assert(bank1.firmwareByteCount() == 0x2574);
+
+    std::vector<std::uint8_t> payload0(bank0.firmwareByteCount());
+    std::vector<std::uint8_t> payload1(bank1.firmwareByteCount());
+    assert(MASSIC51BulkBlockHeader::copyPayload(
+        image.data(), MASSResourceROM::kBankSize, bank0,
+        payload0.data(), payload0.size()));
+    assert(MASSIC51BulkBlockHeader::copyPayload(
+        image.data() + MASSResourceROM::kBankSize, MASSResourceROM::kBankSize,
+        bank1, payload1.data(), payload1.size()));
+    assert(payload0.size() == 13647u && payload1.size() == 9588u);
+    assert(payload0.front() == 0x00 && payload1.front() == 0x18);
+}
+
 void testBankProgramResolver(const char* path) {
     std::ifstream file(path, std::ios::binary);
     assert(file.good());
@@ -1006,6 +1043,7 @@ int main(int argc, char** argv) {
     testCommandStreamDecoder();
     if (argc > 1) {
         testActualIC51(argv[1]);
+        testActualBulkBlockLoader(argv[1]);
         testBankProgramResolver(argv[1]);
     }
     return 0;
