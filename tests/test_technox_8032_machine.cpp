@@ -83,6 +83,14 @@ int main(int argc, char** argv) {
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
 
+    // Machine-cycle scheduler executes complete instructions and may only
+    // overshoot a requested budget by the final instruction's cycle count.
+    machine.reset();
+    machine.writeCodeForTesting(0, 0xa4); // MUL AB, four machine cycles
+    assert(machine.runForMachineCycles(3) == 1);
+    assert(machine.elapsedMachineCycles() == 4);
+    assert(machine.cpu().registers().pc == 0x0001);
+
     // External sound-device boot handshake: reset low, request FF10,
     // download data into C000+, then release reset and expose ready=AC.
     machine.reset();
