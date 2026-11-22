@@ -52,8 +52,17 @@ public:
                 const VoiceManager& voices, const ModulationMatrix& matrix,
                 const MASSPartParameterStore& parts, const MASSModulationSourceStore& sources,
                 const MASSPartRuntimeControlStore& runtimeControls, const MASSCommonControlStore&,
-                const MASSPerformanceImageStore&, const MASSDrumParameterStore&) noexcept override {
+                const MASSPerformanceImageStore& performanceImage,
+                const MASSDrumParameterStore&) noexcept override {
         if (channels == nullptr || channelCount <= 0 || sampleCount <= 0) return;
+
+        // Common parameter 0 is the overall Performance level (0..127).
+        // The prototype defaults to unity when no complete Performance image
+        // has been loaded into the engine.
+        const int rawPerformanceLevel = performanceImage.isLoaded()
+            ? performanceImage.commonByte(0) : 127;
+        const float performanceGain = rawPerformanceLevel < 0
+            ? 1.0f : static_cast<float>(rawPerformanceLevel) / 127.0f;
 
         for (int sample = 0; sample < sampleCount; ++sample) {
             float mixedLeft = 0.0f;
@@ -143,8 +152,8 @@ public:
 
                 if (state.stage == Stage::off) state.active = false;
             }
-            const float limitedLeft = std::tanh(mixedLeft);
-            const float limitedRight = std::tanh(mixedRight);
+            const float limitedLeft = std::tanh(mixedLeft) * performanceGain;
+            const float limitedRight = std::tanh(mixedRight) * performanceGain;
             if (channelCount == 1) {
                 channels[0][sample] += 0.5f * (limitedLeft + limitedRight);
             } else {

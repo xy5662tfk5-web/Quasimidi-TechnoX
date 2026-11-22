@@ -405,6 +405,38 @@ int main() {
     assert(replacementBackend.noteOnCalls == 1);
     assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
 
+    // Common parameter 0 is the saved overall Performance output level.
+    BasicMASSVoiceBackend performanceLevelBackend;
+    MASSAudioEngine performanceLevelEngine(&performanceLevelBackend);
+    constexpr int performanceSamples = 512;
+    performanceLevelEngine.prepare(48000.0, performanceSamples);
+    assert(performanceLevelEngine.setPartParameter(12, PartParameter::level, 127));
+    assert(performanceLevelEngine.setPartParameter(12, PartParameter::cutoffFrequency, 127));
+    assert(performanceLevelEngine.setPartParameter(12, PartParameter::resonance, 0));
+    assert(performanceLevelEngine.setPartParameter(12, PartParameter::egAttack, 0));
+    assert(performanceLevelEngine.setPartParameter(12, PartParameter::egDecay, 0));
+    assert(performanceLevelEngine.setPartParameter(12, PartParameter::egRelease, 0));
+    assert(performanceLevelEngine.setPerformanceCommonByte(0, 0));
+    performanceLevelEngine.markPerformanceImageLoaded();
+    performanceLevelEngine.noteOn(12, 1, 69, 127);
+    std::array<float, performanceSamples> performanceLeft{}, performanceRight{};
+    float* performanceChannels[] = {performanceLeft.data(), performanceRight.data()};
+    performanceLevelEngine.render(performanceChannels, 2, performanceSamples);
+    double mutedPerformanceEnergy = 0.0;
+    for (int i = 0; i < performanceSamples; ++i)
+        mutedPerformanceEnergy += std::abs(performanceLeft[static_cast<std::size_t>(i)]) +
+                                  std::abs(performanceRight[static_cast<std::size_t>(i)]);
+    assert(mutedPerformanceEnergy == 0.0);
+    assert(performanceLevelEngine.setPerformanceCommonByte(0, 127));
+    performanceLeft.fill(0.0f);
+    performanceRight.fill(0.0f);
+    performanceLevelEngine.render(performanceChannels, 2, performanceSamples);
+    double fullPerformanceEnergy = 0.0;
+    for (int i = 0; i < performanceSamples; ++i)
+        fullPerformanceEnergy += std::abs(performanceLeft[static_cast<std::size_t>(i)]) +
+                                 std::abs(performanceRight[static_cast<std::size_t>(i)]);
+    assert(fullPerformanceEnergy > 0.01);
+
     // Recovered firmware image layout: 8-byte name + 65 Common + four 24-byte Parts.
     CountingBackend imageBackend;
     MASSAudioEngine imageEngine(&imageBackend);
