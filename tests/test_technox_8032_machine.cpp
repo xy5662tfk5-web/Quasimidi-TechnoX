@@ -92,17 +92,23 @@ int main(int argc, char** argv) {
     assert((machine.readInternal(0x88) & 0x08u) == 0); // pin sampled on machine cycle
     machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) != 0); // TCON.IE1 level request
-    assert((machine.readExternal(0xa002) & 0x01u) != 0); // RDRF
+    assert((machine.readExternal(0xa002) & 0x81u) == 0x81u); // IRQ + RDRF
     assert(machine.readExternal(0xa003) == 0x6c);
-    assert((machine.readExternal(0xa002) & 0x01u) == 0);
+    assert((machine.readExternal(0xa002) & 0x81u) == 0); // data read clears IRQ
     machine.advanceMachineCycles(1);
     assert((machine.readInternal(0x88) & 0x08u) == 0);
 
     machine.writeExternal(0xa001, 0x7d);
     std::uint8_t transmitted = 0;
+    assert((machine.readExternal(0xa002) & 0x02u) == 0); // TDRE clears on write
     assert(machine.takeAciaTransmitByte(transmitted));
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
+    const auto txBitCycles = static_cast<unsigned>(machine.midiByteMachineCycles() / 10u);
+    machine.advanceMachineCycles(txBitCycles - 1u);
+    assert((machine.readExternal(0xa002) & 0x02u) == 0);
+    machine.advanceMachineCycles(1);
+    assert((machine.readExternal(0xa002) & 0x02u) != 0); // TDRE after one TX clock
 
     // MIDI bytes arrive over the ACIA at 31.25 kbaud (10 serial bits per byte).
     machine.reset();
