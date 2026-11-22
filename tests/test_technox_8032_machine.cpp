@@ -521,6 +521,7 @@ int main(int argc, char** argv) {
         }};
         const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
         const auto commandCountBeforeMidi = injectedResponseMachine.soundCommandPacketCount();
+        const auto commandWriterCallsBeforeMidi = injectedResponseMachine.watchedCallCount(0x0db7);
         const auto aciaReadsBeforeMidi = injectedResponseMachine.aciaReceiveReadCount();
         const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
@@ -714,8 +715,19 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.watchedCallCount(0x4256) > 0u);
         assert(injectedResponseMachine.watchedCallCount(0x1494) > 0u);
         assert(commandCount > commandCountBeforeMidi);
+        assert(injectedResponseMachine.watchedCallCount(0x0db7) - commandWriterCallsBeforeMidi ==
+               commandCount - commandCountBeforeMidi);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
+        std::printf("Experimental 7C00-7FFF RAM image (16 bytes per row):\\n");
+        for (std::uint32_t base = 0x7c00u; base < 0x8000u; base += 16u) {
+            std::printf("  %04X:", base);
+            for (std::uint32_t offset = 0; offset < 16u; ++offset)
+                std::printf(" %02X", static_cast<unsigned>(
+                    injectedResponseMachine.testExternalRamByteForTesting(
+                        static_cast<std::uint16_t>(base + offset))));
+            std::printf("\\n");
+        }
         const auto firstNewCommand = commandCount > commandCountBeforeMidi + 32u
             ? commandCount - 32u : commandCountBeforeMidi;
         for (auto commandIndex = firstNewCommand; commandIndex < commandCount; ++commandIndex) {
