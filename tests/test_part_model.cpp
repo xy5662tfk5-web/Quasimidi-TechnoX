@@ -9,6 +9,14 @@ int main() {
     frame[5]=5; frame[6]=1; frame[7]=0; frame[32]=0xf7;
     PartEditModel model(frame);
     assert(model.isLoaded() && !model.isDirty() && model.partNumber()==13);
+    assert(model.runtimeEventId()==0x0C);
+    for (std::uint8_t selector = 1; selector <= 4; ++selector) {
+        frame[6] = selector;
+        const PartEditModel mapped(frame);
+        assert(mapped.partNumber() == 12 + selector);
+        assert(mapped.runtimeEventId() == 11 + selector);
+    }
+    frame[6] = 1;
     assert(model.setParameterValue(PartParameter::bankNumber, 3));
     assert(!model.setParameterValue(PartParameter::bankNumber, 4));
     assert(model.setDisplayValue(PartParameter::transpose, 0));
