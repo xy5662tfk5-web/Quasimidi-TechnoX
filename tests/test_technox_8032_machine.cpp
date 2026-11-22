@@ -535,6 +535,8 @@ int main(int argc, char** argv) {
         // This is explicitly a synthetic SAM9407 handshake, not a claim that
         // the unimplemented DSP returned AC on physical hardware.
         const auto loadedBlockWrites = firmwareMachine.soundMemoryWriteCount();
+        firmwareMachine.enableTestExternalRamWindow7000(0x00u);
+        firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
         firmwareMachine.setSoundDeviceResponseForTesting(0xacu);
         const auto resumedToMain = firmwareMachine.runUntilProgramCounter(0x32b0u, 2000000u);
         std::printf("IC4 after synthetic SAM9407-ready response: instructions=%llu PC=%04X "
@@ -602,11 +604,9 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.returnPC));
         }
 
-        // Experimental real-IC51 MIDI path: keep the actual resource ROM and
-        // bulk-loaded sound RAM, while providing only the known synthetic
-        // 7BD5 external status byte needed by the current bus fixture.
-        firmwareMachine.enableTestExternalRamWindow7000(0x00u);
-        firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
+        // Experimental real-IC51 MIDI path: the controlled external-RAM
+        // window and 7BD5 status override were enabled immediately after the
+        // IC51 bulk load, before the firmware resumed its main initialization.
         if (!factoryFrames.empty()) {
             const auto factoryStartCycle = firmwareMachine.elapsedMachineCycles();
             const auto cyclesPerSecond = firmwareMachine.machineCyclesPerSecond();
@@ -694,11 +694,16 @@ int main(int argc, char** argv) {
             0x2b8du, 0x2b8fu, 0x2b98u, 0x2b99u, 0x2fd7u, 0x2fa2u, 0x7c17u,
             0x7c1cu, 0x7c26u, 0x7bd5u
         };
-        std::printf("Real IC51 MIDI XDATA:");
-        for (const auto address : midiWatchAddresses)
+        std::printf("Real IC51 MIDI RAM:");
+        for (const auto address : midiWatchAddresses) {
+            const auto value = address >= 0x7000u && address <= 0x7fffu
+                ? firmwareMachine.testExternalRamByteForTesting(address)
+                : firmwareMachine.xdataByteForTesting(address);
             std::printf(" %04X=%02X", static_cast<unsigned>(address),
-                        static_cast<unsigned>(firmwareMachine.xdataByteForTesting(address)));
-        std::printf("\\n");
+                        static_cast<unsigned>(value));
+        }
+        std::printf(" effective7BD5=%02X\\n",
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)));
         assert(!firmwareMachine.cpuFaulted());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.sam9407BurstWordCount();
