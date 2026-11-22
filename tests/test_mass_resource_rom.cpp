@@ -180,7 +180,7 @@ void testCommandStreamDecoder() {
     assert(MASSCommandStreamDecoder::decode(
         bank.data(), bank.size(), 0x1450, decoded, true));
     assert(decoded.terminated && decoded.slotsConsumed == 1);
-    assert(decoded.commands[0].length == 4 && !decoded.commands[0].routesToHardware);
+    assert(decoded.commands[0].length == 4 && !decoded.commands[0].branchesToExtendedCommand);
 
     bank[0x1500] = 0x3b; // 0x38 filler/slot marker, not the end-of-stream byte
     bank[0x1501] = 0x28; // group 0x28 advances by one byte
