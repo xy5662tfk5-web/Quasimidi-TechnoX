@@ -42,6 +42,8 @@ public:
 
     const technox::PerformanceBank& getPerformanceBank() const noexcept { return performanceBank; }
     juce::String getCurrentPerformanceName() const;
+    float getOutputGain() const noexcept { return outputGain.load(std::memory_order_acquire); }
+    void setOutputGain(float value) noexcept { outputGain.store(juce::jlimit(0.0f, 1.0f, value), std::memory_order_release); }
     juce::String getCurrentPartSoundName(int partIndex) const;
     juce::String getCurrentPartResourceSummary(int partIndex) const;
     int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
@@ -78,6 +80,7 @@ private:
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
+    std::atomic<float> outputGain{0.8f};
     double firmwareCycleTarget = 0.0;
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
