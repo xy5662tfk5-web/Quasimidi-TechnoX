@@ -221,8 +221,8 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
         const auto executed = firmwareMachine.runInstructions(41277);
         std::printf("IC4 boot trace: instructions=%zu PC=%04X SP=%02X cycles=%llu\n",
-                    executed, firmwareMachine.cpu().registers().pc,
-                    firmwareMachine.cpu().registers().sp,
+                    executed, static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
+                    static_cast<unsigned>(firmwareMachine.cpu().registers().sp),
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
         assert(executed == 41277);
         assert(firmwareMachine.cpu().registers().pc == 0xeb8d);
