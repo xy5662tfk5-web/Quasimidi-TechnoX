@@ -9,9 +9,14 @@ public:
     std::uint8_t code[65536]{};
     std::uint8_t internal[256]{};
     std::uint8_t external[65536]{};
+    std::uint8_t portLatches[4]{};
     std::uint8_t readCode(std::uint16_t a) const noexcept override { return code[a]; }
     std::uint8_t readInternal(std::uint8_t a) const noexcept override { return internal[a]; }
     void writeInternal(std::uint8_t a, std::uint8_t v) noexcept override { internal[a] = v; }
+    std::uint8_t readPortLatch(std::uint8_t a) const noexcept override {
+        return a == 0x80 ? portLatches[0] : a == 0x90 ? portLatches[1] :
+               a == 0xa0 ? portLatches[2] : a == 0xb0 ? portLatches[3] : readInternal(a);
+    }
     std::uint8_t readExternal(std::uint16_t a) noexcept override { return external[a]; }
     void writeExternal(std::uint16_t a, std::uint8_t v) noexcept override { external[a] = v; }
 };
@@ -364,7 +369,8 @@ int main() {
 
     // Indexed MOVX uses P2 as the high address byte and Ri as the low byte.
     TestBus indexedXdataBus;
-    indexedXdataBus.internal[0xa0] = 0x12; // P2 latch
+    indexedXdataBus.internal[0xa0] = 0xee; // P2 pin state differs from latch
+    indexedXdataBus.portLatches[2] = 0x12; // P2 output latch supplies MOVX high byte
     indexedXdataBus.internal[0] = 0x34; // R0
     indexedXdataBus.internal[1] = 0x35; // R1
     indexedXdataBus.external[0x1234] = 0x6c;
