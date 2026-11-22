@@ -514,8 +514,8 @@ public:
     }
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
-        // IC51 is a read source; writes on the same address bus can still
-        // reach the separately selected external RAM/sound-memory target.
+        if (isIC51Selected())
+            return; // IC51 is a read-only source; do not write into the ROM window.
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
             soundDeviceWrite_ = value; // status-port traffic outside RAM mode
             return;
@@ -777,9 +777,13 @@ private:
     }
 
     bool isIC51Selected() const noexcept {
-        // Candidate decode retained from the first pass: both active-low
-        // control pins must be low. P3.5 selects the 64-KiB bank.
-        return ic51RomLoaded_ && (portPins_[3] & 0x12u) == 0;
+        const auto pins = portPins_[3];
+        // The directory path (B3BC) asserts P3.4/P3.1 low; P3.5 selects
+        // bank 0/1. The AF1A bulk loader uses the alternate P3 pattern
+        // P3.4/P3.1 high with P3.5 low, which selects bank 0.
+        const bool directorySelect = (pins & 0x12u) == 0;
+        const bool bulkBlockSelect = (pins & 0x32u) == 0x12u;
+        return ic51RomLoaded_ && (directorySelect || bulkBlockSelect);
     }
 
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
