@@ -568,6 +568,15 @@ int main(int argc, char** argv) {
         // not yet evidence that a voice command reached the external engine.
         assert(injectedResponseMachine.readExternal(0x304c) == 0x90u);
         assert(injectedResponseMachine.readExternal(0x2b9d) == 0x3cu);
+        std::printf("Firmware call counts: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu B34D=%llu\\n",
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x57a8)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x5671)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x4256)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x1494)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x0db7)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac00)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac88)),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xb34d)));
         std::printf("MIDI voice-gate XDATA: 7D95=%02X 3702=%02X 3704=%02X 370A=%02X 370B=%02X 3039=%02X 303A=%02X 304B=%02X 3050=%02X 3051=%02X 2FB3=%02X 2FB4=%02X\\n",
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x7d95)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3702)),
