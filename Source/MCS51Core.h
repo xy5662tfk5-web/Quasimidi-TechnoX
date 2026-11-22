@@ -108,12 +108,16 @@ public:
         registers_ = MCS51Registers{};
         halted_ = false;
         totalCycles_ = 0;
+        interruptDepth_ = 0;
+        interruptPriorityStack_ = {};
     }
 
     const MCS51Registers& registers() const noexcept { return registers_; }
     MCS51Registers& registersForTesting() noexcept { return registers_; }
 
     MCS51StepResult step(MCS51Bus& bus) noexcept {
+        if (servicePendingInterrupt(bus))
+            return MCS51StepResult::executed;
         const auto opcode = fetch8(bus);
         unsigned cycles = 1;
 
@@ -352,6 +356,8 @@ public:
             const auto low = pop(bus);
             registers_.pc = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(high) << 8u) | low);
+            if (opcode == 0x32 && interruptDepth_ != 0)
+                --interruptDepth_;
             cycles = 2;
         } else if (opcode == 0xc0) { // PUSH direct
             push(bus, readDirect(bus, fetch8(bus)));
@@ -533,6 +539,69 @@ public:
     }
 
 private:
+    bool servicePendingInterrupt(MCS51Bus& bus) noexcept {
+        if (interruptDepth_ >= interruptPriorityStack_.size())
+            return false;
+
+        const auto interruptEnable = bus.readInternal(0xa8u); // IE
+        if ((interruptEnable & 0x80u) == 0)
+            return false;
+        const auto interruptPriority = bus.readInternal(0xb8u); // IP
+        const auto tcon = bus.readInternal(0x88u);
+        const auto scon = bus.readInternal(0x98u);
+
+        struct PendingInterrupt {
+            std::uint8_t enableMask;
+            std::uint8_t flagAddress;
+            std::uint8_t flagMask;
+            std::uint8_t priorityMask;
+            std::uint8_t vectorLow;
+            std::uint8_t clearMode; // 1=always, 2=edge-triggered external flag
+        };
+        static constexpr PendingInterrupt sources[] = {
+            {0x01u, 0x88u, 0x02u, 0x01u, 0x03u, 2u}, // INT0
+            {0x02u, 0x88u, 0x20u, 0x02u, 0x0bu, 1u}, // Timer 0
+            {0x04u, 0x88u, 0x08u, 0x04u, 0x13u, 2u}, // INT1
+            {0x08u, 0x88u, 0x80u, 0x08u, 0x1bu, 1u}, // Timer 1
+            {0x10u, 0x98u, 0x03u, 0x10u, 0x23u, 0u}  // Serial RI or TI
+        };
+
+        const int currentPriority = interruptDepth_ == 0
+            ? -1 : static_cast<int>(interruptPriorityStack_[interruptDepth_ - 1]);
+        for (int priority = 1; priority >= 0; --priority) {
+            if (priority <= currentPriority)
+                continue;
+            for (const auto& source : sources) {
+                if ((interruptEnable & source.enableMask) == 0)
+                    continue;
+                if (((interruptPriority & source.priorityMask) != 0) != (priority != 0))
+                    continue;
+                const auto flags = source.flagAddress == 0x88u ? tcon : scon;
+                if ((flags & source.flagMask) == 0)
+                    continue;
+
+                push(bus, static_cast<std::uint8_t>(registers_.pc & 0xffu));
+                push(bus, static_cast<std::uint8_t>(registers_.pc >> 8u));
+                registers_.pc = source.vectorLow;
+
+                if (source.clearMode == 1u ||
+                    (source.clearMode == 2u &&
+                     (tcon & (source.vectorLow == 0x03u ? 0x01u : 0x04u)) != 0)) {
+                    const auto current = bus.readInternal(source.flagAddress);
+                    bus.writeInternal(source.flagAddress,
+                        static_cast<std::uint8_t>(current & static_cast<std::uint8_t>(~source.flagMask)));
+                }
+
+                interruptPriorityStack_[interruptDepth_++] = static_cast<std::uint8_t>(priority);
+                syncArchitecturalSfrs(bus);
+                bus.advanceMachineCycles(2);
+                totalCycles_ += 2;
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::uint8_t fetch8(MCS51Bus& bus) noexcept {
         const auto value = bus.readCode(registers_.pc);
         registers_.pc = static_cast<std::uint16_t>(registers_.pc + 1u);
@@ -650,6 +719,8 @@ private:
     MCS51Registers registers_{};
     bool halted_ = false;
     std::uint64_t totalCycles_ = 0;
+    std::array<std::uint8_t, 2> interruptPriorityStack_{};
+    std::uint8_t interruptDepth_ = 0;
 };
 
 } // namespace technox
