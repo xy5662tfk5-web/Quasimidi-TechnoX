@@ -120,6 +120,99 @@ struct MASS1C61SecondaryTableBytes {
     std::array<std::uint8_t, 3> bytes{};
 };
 
+struct MASS1C61AccumulatorResult {
+    std::uint8_t r2 = 0;
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+    bool zeroInputBypass = false;
+    bool negativeInput = false;
+    bool initialCarry = false;
+};
+
+// Instruction-level model of 0x1DC8..0x1E04. initialCarry is the CY left
+// by ADD A,R7 at 0x1D95 before the first RLC A. The helper deliberately takes
+// it as input because it depends on the table-base/offset addition upstream.
+class MASS1C61AccumulatorTransform {
+public:
+    static MASS1C61AccumulatorResult apply(
+        std::uint8_t r2,
+        std::uint8_t r3,
+        std::uint8_t r4,
+        std::uint8_t r5,
+        std::uint8_t r6,
+        std::uint8_t r7,
+        bool initialCarry,
+        std::uint8_t directRam05,
+        std::uint8_t directRam06,
+        std::uint8_t directRam07) noexcept {
+        if (r2 == 0) {
+            return {directRam05, directRam06, directRam07, true, false, initialCarry};
+        }
+
+        const bool negative = (r2 & 0x80u) != 0;
+        const auto magnitude = negative
+            ? static_cast<std::uint8_t>(0u - r2) : r2;
+
+        const auto firstProduct = static_cast<std::uint16_t>(magnitude) * r3;
+        const auto firstLow = static_cast<std::uint8_t>(firstProduct & 0xffu);
+        const auto firstHigh = static_cast<std::uint8_t>(firstProduct >> 8);
+
+        // RLC A uses the incoming carry from the earlier table pointer ADD.
+        const auto rotateResult = static_cast<std::uint16_t>(
+            (static_cast<unsigned>(firstLow) << 1) | (initialCarry ? 1u : 0u));
+        const auto carryFromRotate = (firstLow & 0x80u) != 0;
+        const auto rotatedLow = static_cast<std::uint8_t>(rotateResult & 0xffu);
+
+        const auto secondProduct = static_cast<std::uint16_t>(magnitude) * r4;
+        const auto secondLow = static_cast<std::uint8_t>(secondProduct & 0xffu);
+        const auto secondHigh = static_cast<std::uint8_t>(secondProduct >> 8);
+
+        // ADDC A,R3 followed by XCH A,F0 and ADDC A,#0.
+        const auto lowSum = static_cast<unsigned>(secondLow) +
+                            static_cast<unsigned>(firstHigh) +
+                            (carryFromRotate ? 1u : 0u);
+        auto outR2 = static_cast<std::uint8_t>(lowSum & 0xffu);
+        const bool carryToHigh = lowSum > 0xffu;
+
+        const auto highSum = static_cast<unsigned>(secondHigh) +
+                             (carryToHigh ? 1u : 0u);
+        auto outR3 = static_cast<std::uint8_t>(highSum & 0xffu);
+        const bool carryOut16 = highSum > 0xffu;
+        std::uint8_t outR4 = 0;
+
+        if (negative) {
+            const auto negLow = static_cast<unsigned>(
+                static_cast<std::uint8_t>(~outR2)) + 1u;
+            outR2 = static_cast<std::uint8_t>(negLow & 0xffu);
+            const bool negCarry = negLow > 0xffu;
+
+            const auto negHigh = static_cast<unsigned>(
+                static_cast<std::uint8_t>(~outR3)) + (negCarry ? 1u : 0u);
+            outR3 = static_cast<std::uint8_t>(negHigh & 0xffu);
+            const bool negCarryOut = negHigh > 0xffu;
+
+            // Firmware only sets the 24-bit sign extension when the negated
+            // 16-bit value did not wrap through zero.
+            if (!negCarryOut)
+                outR4 = 0xff;
+        }
+
+        const auto addLow = static_cast<unsigned>(outR2) + r5;
+        outR2 = static_cast<std::uint8_t>(addLow & 0xffu);
+        const bool c0 = addLow > 0xffu;
+
+        const auto addMid = static_cast<unsigned>(outR3) + r6 + (c0 ? 1u : 0u);
+        outR3 = static_cast<std::uint8_t>(addMid & 0xffu);
+        const bool c1 = addMid > 0xffu;
+
+        const auto addHigh = static_cast<unsigned>(outR4) + r7 + (c1 ? 1u : 0u);
+        outR4 = static_cast<std::uint8_t>(addHigh & 0xffu);
+        outR4 &= 0x07u;
+
+        return {outR2, outR3, outR4, false, negative, initialCarry};
+    }
+};
+
 struct MASS1C61PackedLookupFields {
     std::uint8_t r3 = 0;
     std::uint8_t r4 = 0;
