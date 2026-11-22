@@ -261,8 +261,32 @@ int main(int argc, char** argv) {
         const std::istreambuf_iterator<char> romEnd{};
         const std::vector<std::uint8_t> realRom(romBegin, romEnd);
         assert(realRom.size() == TechnoX8032Machine::kIC4RomSize);
+
+        std::vector<std::uint8_t> realIC51;
+        if (argc > 2) {
+            std::ifstream ic51File(argv[2], std::ios::binary);
+            assert(ic51File.good());
+            const std::istreambuf_iterator<char> ic51Begin{ic51File};
+            const std::istreambuf_iterator<char> ic51End{};
+            realIC51.assign(ic51Begin, ic51End);
+            assert(realIC51.size() == TechnoX8032Machine::kIC51RomSize);
+
+            TechnoX8032Machine ic51Probe;
+            assert(ic51Probe.loadIC51Rom(realIC51.data(), realIC51.size()));
+            ic51Probe.reset();
+            ic51Probe.writeInternal(0xb0, 0xcdu); // P3.5/P3.4/P3.1 low: bank 0
+            assert(ic51Probe.readExternal(0x0000) == realIC51[0x0000]);
+            assert(ic51Probe.readExternal(0x1234) == realIC51[0x1234]);
+            ic51Probe.writeInternal(0xb0, 0xedu); // P3.5 high: bank 1
+            assert(ic51Probe.readExternal(0x0000) == realIC51[0x10000]);
+            assert(ic51Probe.readExternal(0x1234) == realIC51[0x11234]);
+            ic51Probe.writeInternal(0xb0, 0xffu); // deselect IC51
+        }
+
         TechnoX8032Machine firmwareMachine;
         assert(firmwareMachine.loadIC4Rom(realRom.data(), realRom.size()));
+        if (!realIC51.empty())
+            assert(firmwareMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         assert(firmwareMachine.readCode(0x0000) == 0x02); // LJMP reset vector
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
         assert(firmwareMachine.readCode(0x0002) == 0x32);
@@ -353,6 +377,8 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.loadIC4Rom(
             realRom.data(),
             realRom.size()));
+        if (!realIC51.empty())
+            assert(injectedResponseMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         injectedResponseMachine.reset();
         injectedResponseMachine.writeExternal(0x0000, 0xa5);
         injectedResponseMachine.writeExternal(0x34ff, 0xa5);
