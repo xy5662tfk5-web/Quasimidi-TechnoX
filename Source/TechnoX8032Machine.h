@@ -35,6 +35,8 @@ public:
     };
     struct IC51ReadEvent {
         std::uint16_t address = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
         std::uint8_t bank = 0;
         std::uint8_t value = 0xff;
         std::uint64_t machineCycle = 0;
@@ -398,6 +400,12 @@ public:
             const auto value = ic51Rom_[bank * 0x10000u + address];
             auto& event = ic51ReadTrace_[ic51ReadTraceCount_ % ic51ReadTrace_.size()];
             event.address = address;
+            event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+            const auto stackPointer = cpu_.registers().sp;
+            const auto returnHigh = readIndirect(stackPointer);
+            const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+            event.returnPC = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
             event.bank = static_cast<std::uint8_t>(bank);
             event.value = value;
             event.machineCycle = elapsedMachineCycles_;
