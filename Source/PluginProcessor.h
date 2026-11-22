@@ -6,6 +6,7 @@
 #include "MASSAudioEngine.h"
 #include "MASSResourceROM.h"
 #include "BasicMASSVoiceBackend.h"
+#include "TechnoX8032Machine.h"
 #include <array>
 #include <atomic>
 #include <vector>
@@ -66,6 +67,7 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MASSResourceROM resourceROM;
+    std::unique_ptr<technox::TechnoX8032Machine> firmwareMachine;
     mutable std::array<technox::MASSResolvedProgramResource, 4> resolvedResources{};
     mutable std::array<int, 4> resolvedResourceBanks{{-1, -1, -1, -1}};
     mutable std::array<int, 4> resolvedResourcePrograms{{-1, -1, -1, -1}};
