@@ -110,6 +110,12 @@ public:
         unsigned cycles = 1;
 
         if (opcode == 0x00) { // NOP
+        } else if (opcode == 0x90) { // MOV DPTR,#data16
+            const auto high = fetch8(bus);
+            const auto low = fetch8(bus);
+            registers_.dptr = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(high) << 8u) | low);
+            cycles = 2;
         } else if (opcode == 0x02) { // LJMP addr16
             const auto high = fetch8(bus);
             const auto low = fetch8(bus);
@@ -311,6 +317,39 @@ public:
         } else if (opcode == 0x73) { // JMP @A+DPTR
             registers_.pc = static_cast<std::uint16_t>(registers_.dptr + registers_.a);
             cycles = 2;
+        } else if (opcode == 0x83) { // MOVC A,@A+PC
+            const auto address = static_cast<std::uint16_t>(registers_.pc + registers_.a);
+            registers_.a = bus.readCode(address);
+            cycles = 2;
+        } else if (opcode == 0x93) { // MOVC A,@A+DPTR
+            const auto address = static_cast<std::uint16_t>(registers_.dptr + registers_.a);
+            registers_.a = bus.readCode(address);
+            cycles = 2;
+        } else if (opcode == 0xe0) { // MOVX A,@DPTR
+            registers_.a = bus.readExternal(registers_.dptr);
+            cycles = 2;
+        } else if (opcode == 0xf0) { // MOVX @DPTR,A
+            bus.writeExternal(registers_.dptr, registers_.a);
+            cycles = 2;
+        } else if (opcode == 0x84) { // DIV AB
+            if (registers_.b == 0) {
+                registers_.psw.overflow = true;
+                registers_.psw.carry = false;
+            } else {
+                const auto dividend = registers_.a;
+                registers_.a = static_cast<std::uint8_t>(dividend / registers_.b);
+                registers_.b = static_cast<std::uint8_t>(dividend % registers_.b);
+                registers_.psw.overflow = false;
+                registers_.psw.carry = false;
+            }
+            cycles = 4;
+        } else if (opcode == 0xa4) { // MUL AB
+            const auto product = static_cast<std::uint16_t>(registers_.a) * registers_.b;
+            registers_.a = static_cast<std::uint8_t>(product & 0xffu);
+            registers_.b = static_cast<std::uint8_t>(product >> 8u);
+            registers_.psw.carry = false;
+            registers_.psw.overflow = registers_.b != 0;
+            cycles = 4;
         } else if (opcode == 0x03) { // RR A
             registers_.a = static_cast<std::uint8_t>((registers_.a >> 1u) | (registers_.a << 7u));
         } else if (opcode == 0x13) { // RRC A
