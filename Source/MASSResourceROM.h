@@ -289,6 +289,63 @@ public:
     }
 };
 
+struct MASS1EDDSlotCoefficientResult {
+    std::uint8_t coefficientB = 0;
+    bool slotOpcodeScaleApplied = false;
+    bool modulationApplied = false;
+};
+
+// Models 0x1FCB..0x2005 after the core 0x1EDD transform. It applies the
+// optional RAM[0x31]/RAM[0x32] two-MUL scale, then the 0x23C7 call when either
+// RAM[0x41] or RAM[0x43] is nonzero. Alternate 0x1890 modes are not guessed.
+class MASS1EDDSlotCoefficientStage {
+public:
+    static bool apply(const MASSFirmwareROMView& rom,
+                      std::uint8_t slotOpcode,
+                      std::uint8_t initialCoefficientB,
+                      std::uint8_t ram31,
+                      std::uint8_t ram32,
+                      std::uint8_t ram41,
+                      std::uint8_t ram43,
+                      MASS1EDDSlotCoefficientResult& result) noexcept {
+        auto coefficient = initialCoefficientB;
+        bool scaled = false;
+
+        if ((slotOpcode & 0x02u) != 0 && coefficient != 0) {
+            scaled = true;
+            const auto firstA = rotateLeft(ram31);
+            const auto firstProduct = static_cast<std::uint16_t>(firstA) * coefficient;
+            coefficient = static_cast<std::uint8_t>(firstProduct >> 8);
+
+            if (coefficient != 0) {
+                const auto secondA = rotateLeft(coefficient);
+                const auto secondProduct = static_cast<std::uint16_t>(secondA) * ram32;
+                coefficient = static_cast<std::uint8_t>(secondProduct >> 8);
+                if (coefficient == 0 && ram32 != 0)
+                    coefficient = 1;
+            }
+        }
+
+        bool modulation = false;
+        if (ram41 != 0 || ram43 != 0) {
+            MASSModulationScaleResult mod{};
+            if (!MASSModulationScaleMode41::apply(
+                    rom, slotOpcode, ram41, ram43, coefficient, mod))
+                return false; // this opcode would take the unresolved 0x1890 path
+            coefficient = mod.value;
+            modulation = true;
+        }
+
+        result = {coefficient, scaled, modulation};
+        return true;
+    }
+
+private:
+    static constexpr std::uint8_t rotateLeft(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>((value << 1) | (value >> 7));
+    }
+};
+
 struct MASS1848Result {
     std::uint8_t value = 0;
     bool carryOut = false;

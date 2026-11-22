@@ -167,6 +167,41 @@ void testMASSModulationScaleMode41() {
     assert(!MASSModulationScaleMode41::apply(view, 0x01, 0x80, 0x80, 0x7f, result));
 }
 
+void testMASS1EDDSlotCoefficientStage() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    const std::array<std::uint8_t, 8> table0{{0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0}};
+    const std::array<std::uint8_t, 8> table1{{0x10, 0x20, 0x38, 0x50, 0x70, 0x90, 0xc0, 0xe0}};
+    std::copy(table0.begin(), table0.end(), romBytes.begin() + 0x11e0);
+    std::copy(table1.begin(), table1.end(), romBytes.begin() + 0x11e8);
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASS1EDDSlotCoefficientResult result{};
+
+    // Opcode bit1 enables the two-MUL scale: RL(40)=80; high(80*FF)=7F;
+    // RL(7F)=FE; high(FE*FF)=FD.
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x02, 0xff, 0x40, 0xff, 0x00, 0x00, result));
+    assert(result.slotOpcodeScaleApplied && !result.modulationApplied);
+    assert(result.coefficientB == 0xfd);
+
+    // The second MUL can produce zero; nonzero RAM[32] forces coefficient 1.
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x02, 0xff, 0x40, 0x01, 0x00, 0x00, result));
+    assert(result.coefficientB == 1);
+
+    // Opcode bit1 clear bypasses the slot scale; mode 0x41 modulation still
+    // runs when either RAM[0x41] or RAM[0x43] is nonzero.
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x41, 0x40, 0x00, 0x00, 0x80, 0x00, result));
+    assert(!result.slotOpcodeScaleApplied && result.modulationApplied);
+    assert(result.coefficientB == 0x20);
+
+    // The unresolved 0x1890 path is reported, not approximated.
+    assert(!MASS1EDDSlotCoefficientStage::apply(
+        view, 0x01, 0x40, 0x00, 0x00, 0x80, 0x00, result));
+}
+
 void testMASS1848Arithmetic() {
     const auto ordinary = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d);
     assert(ordinary.value == 0x5d && !ordinary.carryOut &&
@@ -700,6 +735,7 @@ int main(int argc, char** argv) {
     testMASS1EDDLookupIndexBuilder();
     testMASS1EDDPostLookup();
     testMASS1EDDParameterPipeline();
+    testMASS1EDDSlotCoefficientStage();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
     testMASS1848Arithmetic();
