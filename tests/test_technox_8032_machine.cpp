@@ -339,6 +339,32 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.soundMemoryWriteCount() > 0u);
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
+
+        // Controlled test stimulus only: inject the expected AC signature so
+        // the CPU can pass the otherwise-unmodeled external-device wait.
+        TechnoX8032Machine injectedResponseMachine;
+        assert(injectedResponseMachine.loadIC4Rom(
+            reinterpret_cast<const std::uint8_t*>(firmwareData),
+            static_cast<std::size_t>(firmwareRomSize)));
+        injectedResponseMachine.reset();
+        injectedResponseMachine.writeExternal(0x0000, 0xa5);
+        injectedResponseMachine.writeExternal(0x34ff, 0xa5);
+        injectedResponseMachine.writeExternal(0x3500, 0xa5);
+        assert(injectedResponseMachine.runUntilProgramCounter(0xeb8d, 50000) == 41278);
+        assert(injectedResponseMachine.runUntilProgramCounter(0x326a, 50000) != 0);
+        injectedResponseMachine.setSoundDeviceResponseForTesting(0xac);
+        const auto injectedBoot = injectedResponseMachine.runUntilProgramCounter(0x32b0, 2000000);
+        std::printf("IC4 injected-response diagnostic (test-only AC): instructions=%zu PC=%04X XWR=%llu XRD=%llu mode2WR=%llu mode2RD=%llu\\n",
+                    injectedBoot,
+                    static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
+                    static_cast<unsigned long long>(injectedResponseMachine.soundMemoryWriteCount()),
+                    static_cast<unsigned long long>(injectedResponseMachine.soundMemoryReadCount()),
+                    static_cast<unsigned long long>(injectedResponseMachine.soundMemoryWritesByMode(2)),
+                    static_cast<unsigned long long>(injectedResponseMachine.soundMemoryReadsByMode(2)));
+        assert(injectedResponseMachine.cpu().registers().pc == 0x32b0);
+        assert(injectedResponseMachine.soundMemoryWritesByMode(2) >= 0x4000u);
+        assert(injectedResponseMachine.soundMemoryReadsByMode(2) >= 0x4000u);
+        assert(injectedResponseMachine.soundBusModeWriteCount() >= 2u);
     }
     return 0;
 }
