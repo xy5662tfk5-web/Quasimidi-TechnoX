@@ -306,6 +306,11 @@ int main(int argc, char** argv) {
             assert(ic51Probe.readExternal(0x0000) == realIC51[0x10000]);
             assert(ic51Probe.readExternal(0x1234) == realIC51[0x11234]);
             assert(ic51Probe.ic51ReadsByBank(1) == 2u);
+            ic51Probe.writeInternal(0xb0, 0xdau); // AF1A bulk-read select: bank 0
+            assert(ic51Probe.readExternal(0x0090) == realIC51[0x0090]);
+            assert(ic51Probe.ic51ReadsByBank(0) == 3u);
+            ic51Probe.writeInternal(0xb0, 0xfau); // high/high/high is deselected
+            assert(ic51Probe.readExternal(0x0090) == 0x00u);
             ic51Probe.writeInternal(0xb0, 0xffu); // deselect IC51
         }
 
