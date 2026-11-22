@@ -591,7 +591,8 @@ public:
 
 struct MASSModulationScaleResult {
     std::uint8_t value = 0;
-    std::uint8_t combinedCoefficient = 0;
+    std::uint8_t combinedCoefficient = 0; // Used by the 0x41 coefficient-table branch.
+    bool transformApplied = false;
 };
 
 // Table-driven 0x23C7 branch for slot-byte mask 0x41 only. Other opcode
@@ -631,9 +632,93 @@ public:
         const auto finalProduct = static_cast<std::uint16_t>(r2) * b;
         result = {
             static_cast<std::uint8_t>(finalProduct >> 8),
-            b
+            b,
+            true
         };
         return true;
+    }
+};
+
+// Alternate 0x1890 entry used by 0x23C7 when (slotOpcode & 0x41)
+// is 0x01 or 0x40. This is the exact entry at 0x1890, not the full 0x1848
+// routine: it joins the latter's second multiply/accumulate half at 0x1865.
+class MASS1890Arithmetic {
+public:
+    static std::uint8_t apply(std::uint8_t accumulator, std::uint8_t r2) noexcept {
+        auto b = r2;
+        if ((accumulator & 0x80u) == 0) {
+            swap(accumulator, b);
+            accumulator = static_cast<std::uint8_t>(
+                static_cast<std::uint8_t>(0u - accumulator) + 0x7fu);
+        }
+
+        bool tempBit3 = false; // internal bit address 0x03
+        if ((accumulator & 0x80u) != 0) {
+            tempBit3 = true;
+            accumulator = negate(accumulator);
+        }
+
+        swap(accumulator, b);
+        if ((accumulator & 0x80u) != 0) {
+            tempBit3 = !tempBit3;
+            accumulator = negate(accumulator);
+        }
+
+        accumulator = static_cast<std::uint8_t>(rotateLeft(accumulator) | 0x01u);
+        const auto product = static_cast<std::uint16_t>(accumulator) * b;
+        accumulator = static_cast<std::uint8_t>(product >> 8); // MUL AB, then XCH A,B
+        if (tempBit3)
+            accumulator = negate(accumulator);
+
+        const auto sum = static_cast<unsigned>(accumulator) + r2;
+        const auto raw = static_cast<std::uint8_t>(sum & 0xffu);
+        const bool carry = sum > 0xffu;
+        const bool overflow =
+            ((static_cast<std::uint8_t>(~(accumulator ^ r2)) &
+              static_cast<std::uint8_t>(accumulator ^ raw) & 0x80u) != 0);
+        if (overflow)
+            return carry ? 0x81u : 0x7fu;
+        return raw;
+    }
+
+private:
+    static constexpr std::uint8_t negate(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>(0u - value);
+    }
+    static constexpr std::uint8_t rotateLeft(std::uint8_t value) noexcept {
+        return static_cast<std::uint8_t>((value << 1) | (value >> 7));
+    }
+    static void swap(std::uint8_t& a, std::uint8_t& b) noexcept {
+        const auto temp = a; a = b; b = temp;
+    }
+};
+
+class MASSModulationScaleDispatcher {
+public:
+    static bool apply(const MASSFirmwareROMView& rom,
+                      std::uint8_t slotOpcode,
+                      std::uint8_t ram41,
+                      std::uint8_t ram43,
+                      std::uint8_t r2,
+                      MASSModulationScaleResult& result) noexcept {
+        switch (slotOpcode & 0x41u) {
+            case 0x41u:
+                return MASSModulationScaleMode41::apply(
+                    rom, slotOpcode, ram41, ram43, r2, result);
+            case 0x40u:
+                result = {ram41 != 0 ? MASS1890Arithmetic::apply(ram41, r2) : r2,
+                          0, ram41 != 0};
+                return true;
+            case 0x01u:
+                result = {ram43 != 0 ? MASS1890Arithmetic::apply(ram43, r2) : r2,
+                          0, ram43 != 0};
+                return true;
+            case 0x00u:
+                result = {r2, 0, false};
+                return true;
+            default:
+                return false;
+        }
     }
 };
 
@@ -644,8 +729,8 @@ struct MASS1EDDSlotCoefficientResult {
 };
 
 // Models 0x1FCB..0x2005 after the core 0x1EDD transform. It applies the
-// optional RAM[0x31]/RAM[0x32] two-MUL scale, then the 0x23C7 call when either
-// RAM[0x41] or RAM[0x43] is nonzero. Alternate 0x1890 modes are not guessed.
+// optional RAM[0x31]/RAM[0x32] two-MUL scale, then the complete 0x23C7
+// dispatch (0x41 table scale, 0x40/0x01 alternate 0x1890 arithmetic).
 class MASS1EDDSlotCoefficientStage {
 public:
     static bool apply(const MASSFirmwareROMView& rom,
@@ -677,11 +762,11 @@ public:
         bool modulation = false;
         if (ram41 != 0 || ram43 != 0) {
             MASSModulationScaleResult mod{};
-            if (!MASSModulationScaleMode41::apply(
+            if (!MASSModulationScaleDispatcher::apply(
                     rom, slotOpcode, ram41, ram43, coefficient, mod))
-                return false; // this opcode would take the unresolved 0x1890 path
+                return false;
             coefficient = mod.value;
-            modulation = true;
+            modulation = mod.transformApplied;
         }
 
         result = {coefficient, scaled, modulation};
