@@ -8,11 +8,19 @@ class TestBus final : public technox::MCS51Bus {
 public:
     std::uint8_t code[65536]{};
     std::uint8_t internal[256]{};
+    std::uint8_t upperInternal[128]{};
     std::uint8_t external[65536]{};
     std::uint8_t portLatches[4]{};
     unsigned advancedMachineCycles = 0;
     std::uint8_t readCode(std::uint16_t a) const noexcept override { return code[a]; }
     std::uint8_t readInternal(std::uint8_t a) const noexcept override { return internal[a]; }
+    std::uint8_t readIndirect(std::uint8_t a) const noexcept override {
+        return a < 0x80 ? internal[a] : upperInternal[a - 0x80];
+    }
+    void writeIndirect(std::uint8_t a, std::uint8_t v) noexcept override {
+        if (a < 0x80) internal[a] = v;
+        else upperInternal[a - 0x80] = v;
+    }
     void writeInternal(std::uint8_t a, std::uint8_t v) noexcept override {
         internal[a] = v;
         if (a == 0x80) portLatches[0] = v;
@@ -528,6 +536,38 @@ int main() {
     assert(timer2InterruptBus.internal[0xc8] == 0xc0); // firmware must clear Timer 2 flags
     assert(timer2InterruptCpu.step(timer2InterruptBus) == MCS51StepResult::executed);
     assert(timer2InterruptCpu.registers().pc == 0x2345);
+
+    // On the 8032, indirect 80h-FFh accesses upper IRAM while direct
+    // accesses at the same addresses still select SFRs.
+    TestBus upperIramBus;
+    upperIramBus.internal[0x00] = 0x80; // R0 points into upper IRAM
+    upperIramBus.internal[0x80] = 0xa5; // P0 SFR value
+    upperIramBus.code[0] = 0x76; upperIramBus.code[1] = 0x66; // MOV @R0,#66
+    upperIramBus.code[2] = 0xe6; // MOV A,@R0
+    MCS51Core upperIramCpu;
+    assert(upperIramCpu.step(upperIramBus) == MCS51StepResult::executed);
+    assert(upperIramCpu.step(upperIramBus) == MCS51StepResult::executed);
+    assert(upperIramBus.upperInternal[0] == 0x66);
+    assert(upperIramBus.internal[0x80] == 0xa5);
+    assert(upperIramCpu.registers().a == 0x66);
+
+    // Stack pointers crossing 7Fh use upper IRAM, not SFR addresses.
+    TestBus upperStackBus;
+    upperStackBus.code[0x1234] = 0x12; // LCALL 2000
+    upperStackBus.code[0x1235] = 0x20;
+    upperStackBus.code[0x1236] = 0x00;
+    upperStackBus.code[0x2000] = 0x22; // RET
+    MCS51Core upperStackCpu;
+    upperStackCpu.registersForTesting().pc = 0x1234;
+    upperStackCpu.registersForTesting().sp = 0x7f;
+    assert(upperStackCpu.step(upperStackBus) == MCS51StepResult::executed);
+    assert(upperStackCpu.registers().sp == 0x81);
+    assert(upperStackBus.upperInternal[0] == 0x37);
+    assert(upperStackBus.upperInternal[1] == 0x12);
+    assert(upperStackBus.internal[0x81] == 0x81); // SP SFR mirror
+    assert(upperStackCpu.step(upperStackBus) == MCS51StepResult::executed);
+    assert(upperStackCpu.registers().pc == 0x1237);
+    assert(upperStackCpu.registers().sp == 0x7f);
 
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
