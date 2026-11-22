@@ -731,9 +731,9 @@ int main(int argc, char** argv) {
         bool sawVelocityRegisterWrite = false;
         bool sawVelocityRegisterRead = false;
         bool sawLayerCountRead = false;
-        const auto midiExternalTraceCount = injectedResponseMachine.externalWindowTraceCount();
+        const auto midiExternalTraceCount = injectedResponseMachine.xdataWatchTraceCount();
         for (std::size_t age = 0; age < midiExternalTraceCount; ++age) {
-            const auto& event = injectedResponseMachine.externalWindowTraceAt(age);
+            const auto& event = injectedResponseMachine.xdataWatchTraceAt(age);
             if (event.address == 0x7bd4u && event.write && event.value == 0x7fu)
                 sawControlBlockInitD4 = true;
             if (event.address == 0x7bd5u && event.write && event.value == 0x00u)
