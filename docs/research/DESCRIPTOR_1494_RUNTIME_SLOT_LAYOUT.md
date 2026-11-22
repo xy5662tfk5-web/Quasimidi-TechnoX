@@ -51,6 +51,20 @@ When internal flag 0x06 is clear, the routine adds the descriptor's first decode
 
 This is an indexed record/slot mechanism. The existence of a 128-byte stride does not by itself prove that the slots are voices, waveforms, or sample buffers.
 
+
+## 3A. Startup explicitly clears all 16 primary slots
+
+Reset/initialization code at `0x011F–0x012B` performs:
+
+- `DPTR = 0x2068`
+- outer counter `R0 = 0x10` (16 iterations)
+- inner counter `R1 = 0x80` (128 bytes per iteration)
+- writes zero with `MOVX @DPTR,A`, increments DPTR, and repeats.
+
+This clears exactly 16 × 128 = 2048 bytes, from `0x2068` through `0x2867`, before the rest of startup proceeds. The 16-slot region is therefore not just a mathematical pointer range: firmware explicitly initializes the entire area as a 16-record workspace.
+
+This still does not establish that each 128-byte record is a hardware voice. It confirms the existence and startup lifecycle of the 16 indexed records.
+
 ## 4. How the descriptor reaches the selected-page mailbox
 
 After parsing and slot selection, the routine stores the selected page in `RAM[0x2D]` and eventually reaches `0x16C3` (directly or via the shared `0x1491` jump path).
