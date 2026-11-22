@@ -762,6 +762,10 @@ int main(int argc, char** argv) {
         assert(tableWriteSecondLast.returnPC == 0x0e1du);
         assert(tableWriteFirst.bytes[0] == 0x0fu && tableWriteFirst.bytes[2] == 0x40u);
         assert(tableWriteLast.bytes[0] == 0xffu && tableWriteLast.bytes[2] == 0x40u);
+        const auto& midpointControl = injectedResponseMachine.soundCommandPacketAt(1083u);
+        assert(midpointControl.returnPC == 0x0e0bu);
+        assert(midpointControl.bytes[0] == 0xffu && midpointControl.bytes[2] == 0x40u);
+        assert(midpointControl.bytes[3] == 0xc0u);
         assert(tableWriteSecondFirst.bytes[0] == 0x0fu && tableWriteSecondFirst.bytes[3] == 0x80u);
         assert(tableWriteSecondLast.bytes[0] == 0xffu && tableWriteSecondLast.bytes[3] == 0x80u);
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
