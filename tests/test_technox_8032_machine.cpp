@@ -99,6 +99,17 @@ int main(int argc, char** argv) {
     assert(machine.soundCommandPacketCount() == 1u);
     assert(machine.sam9407BurstWordCount() == 1u);
     assert(machine.sam9407HostWriteCount() == 5u);
+    assert(machine.sam9407HostWordForTesting(0x11u) == 0x8033u);
+    machine.writeExternal(0x8000u, 0x20u);
+    machine.writeExternal(0x8001u, 0x00u);
+    machine.writeExternal(0x8002u, 0x78u);
+    machine.writeExternal(0x8003u, 0x56u);
+    assert(machine.soundCommandPacketCount() == 2u);
+    assert(machine.sam9407BurstWordCount() == 2u);
+    assert(machine.sam9407HostWordForTesting(0x20u) == 0x5678u);
+    machine.writeExternal(0x8000u, 0x11u);
+    assert(machine.readExternal(0x8002u) == 0x33u);
+    assert(machine.readExternal(0x8003u) == 0x80u);
 
     // 8032 upper IRAM and direct SFR reads are separate address spaces.
     machine.writeIndirect(0x80, 0x5a);
