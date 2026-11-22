@@ -61,6 +61,7 @@ public:
     }
 
     static constexpr std::size_t kIC4RomSize = 0x20000;
+    static constexpr std::size_t kIC51RomSize = 0x20000;
     static constexpr std::size_t kCodeSpaceSize = 0x10000;
 
     bool loadIC4Rom(const std::uint8_t* raw, std::size_t size) noexcept {
@@ -79,6 +80,16 @@ public:
         romLoaded_ = true;
         return true;
     }
+
+    bool loadIC51Rom(const std::uint8_t* image, std::size_t size) noexcept {
+        if (image == nullptr || size != kIC51RomSize)
+            return false;
+        std::copy_n(image, size, ic51Rom_.begin());
+        ic51RomLoaded_ = true;
+        return true;
+    }
+
+    bool ic51RomLoaded() const noexcept { return ic51RomLoaded_; }
 
     void reset() noexcept {
         cpu_.reset();
@@ -216,6 +227,10 @@ public:
     }
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
+        if (isIC51Selected()) {
+            const auto bank = (portPins_[3] & 0x20u) != 0 ? 1u : 0u;
+            return ic51Rom_[bank * 0x10000u + address];
+        }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
             return soundDeviceResponse_; // status port outside RAM mode
         if (isXdataRam(address)) {
@@ -243,6 +258,8 @@ public:
     }
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
+        if (isIC51Selected())
+            return; // selected IC51 bank is read-only
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
             soundDeviceWrite_ = value; // status-port traffic outside RAM mode
             return;
@@ -378,6 +395,12 @@ private:
                address == 0xa0u ? 2 : address == 0xb0u ? 3 : -1;
     }
 
+    bool isIC51Selected() const noexcept {
+        // IC4 B385 selects IC51 by pulling P3.4 and P3.1 low.
+        // P3.5 is the bank line: low selects bank 0, high selects bank 1.
+        return ic51RomLoaded_ && (portPins_[3] & 0x12u) == 0;
+    }
+
     static constexpr bool isXdataRam(std::uint16_t address) noexcept {
         // 0000-38FF is the mapped work RAM. IC4 routine B34D explicitly
         // writes and reads the complete 16-KiB C000-FFFF sound-memory window.
@@ -414,7 +437,9 @@ private:
     MCS51Core cpu_{};
     MCS51TimerUnit timers_{};
     std::array<std::uint8_t, kIC4RomSize> rom_{};
+    std::array<std::uint8_t, kIC51RomSize> ic51Rom_{};
     std::array<std::uint8_t, kCodeSpaceSize> code_{};
+    bool ic51RomLoaded_ = false;
     std::array<std::uint8_t, 0x100> internal_{};
     std::array<std::uint8_t, 0x80> upperIram_{};
     std::array<std::uint8_t, 0x10000> xdata_{};
