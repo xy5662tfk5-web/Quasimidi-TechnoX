@@ -318,7 +318,8 @@ public:
         } else if (opcode == 0x10 || opcode == 0x20 || opcode == 0x30) { // JBC/JB/JNB bit,rel
             const auto bitAddress = fetch8(bus);
             const auto rel = static_cast<std::int8_t>(fetch8(bus));
-            const bool bit = readBitForRmw(bus, bitAddress);
+            const bool bit = opcode == 0x10 ? readBitForRmw(bus, bitAddress)
+                                                : readBit(bus, bitAddress);
             const bool take = opcode == 0x10 ? bit : opcode == 0x20 ? bit : !bit;
             if (take) {
                 if (opcode == 0x10) writeBit(bus, bitAddress, false);
