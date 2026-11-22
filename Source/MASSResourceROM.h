@@ -359,6 +359,29 @@ public:
         result = packet;
         return true;
     }
+
+    // Handler 0x224C / group 0x18. The flag-0x08 branch exits before the
+    // record is read. On the normal branch the hardware packet receives the
+    // command byte plus R2, R3 and the three-bit R4 payload.
+    static bool buildFourByteParameterPacket(const MASSResourceCommand& command,
+                                             std::uint8_t ram2B,
+                                             bool firmwareFlag08Set,
+                                             MASSHardwareCommandPacket& result) noexcept {
+        if (firmwareFlag08Set ||
+            command.kind != MASSResourceCommandKind::fourByteCommand ||
+            command.length != 4 || (command.opcode & 0x38) != 0x18)
+            return false;
+
+        MASSHardwareCommandPacket packet{};
+        packet.bytes = {
+            ram2B,
+            command.bytes[1],
+            command.bytes[2],
+            static_cast<std::uint8_t>(command.bytes[3] & 0x07)
+        };
+        result = packet;
+        return true;
+    }
 };
 
 struct MASSDecodedResourceStream {

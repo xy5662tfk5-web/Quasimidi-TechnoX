@@ -106,6 +106,25 @@ void testResourceSelectionRecordParser() {
         nullptr, page.size(), 0, parsed));
 }
 
+void testFourByteParameterPacketBuilder() {
+    MASSResourceCommand command{};
+    command.opcode = 0x1b;
+    command.kind = MASSResourceCommandKind::fourByteCommand;
+    command.length = 4;
+    command.bytes = {{0x1b, 0xa1, 0xb2, 0xfd}};
+
+    MASSHardwareCommandPacket packet{};
+    assert(MASSResourceHardwareCommandBuilder::buildFourByteParameterPacket(
+        command, 0x30, false, packet));
+    assert((packet.bytes == std::array<std::uint8_t, 4>{{0x30, 0xa1, 0xb2, 0x05}}));
+    assert(!MASSResourceHardwareCommandBuilder::buildFourByteParameterPacket(
+        command, 0x30, true, packet));
+
+    command.opcode = 0x22;
+    assert(!MASSResourceHardwareCommandBuilder::buildFourByteParameterPacket(
+        command, 0x30, false, packet));
+}
+
 void testTerminalHardwarePacketBuilder() {
     MASSResourceCommand command{};
     command.opcode = 0x22; // (opcode & 0x38) == 0x20 terminal group
@@ -362,6 +381,7 @@ void testActualIC51(const char* path) {
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testResourceSelectionRecordParser();
+    testFourByteParameterPacketBuilder();
     testTerminalHardwarePacketBuilder();
     testDescriptorParser();
     testCommandStreamDecoder();
