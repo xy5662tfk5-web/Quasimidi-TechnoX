@@ -630,6 +630,16 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        const auto xdataWatchCount = injectedResponseMachine.xdataWatchTraceCount();
+        std::printf("XDATA 7BD4-7BD7 accesses (newest first):\\n");
+        for (std::size_t age = 0; age < xdataWatchCount && age < 64u; ++age) {
+            const auto& event = injectedResponseMachine.xdataWatchTraceAt(xdataWatchCount - 1u - age);
+            std::printf("  %c %04X=%02X cycle=%llu\\n",
+                        event.write ? 'W' : 'R',
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto portWrites = injectedResponseMachine.portWriteCount();
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
