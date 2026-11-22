@@ -445,6 +445,20 @@ int main(int argc, char** argv) {
         std::fflush(stdout);
         assert(peripheralInit > 0);
         assert(firmwareMachine.soundMemoryWriteCount() > 0u);
+        assert(firmwareMachine.soundMemoryWriteTraceCount() ==
+               firmwareMachine.soundMemoryWriteCount());
+        std::printf("IC4 external sound-memory writes (first 12):\\n");
+        const auto soundWrites = firmwareMachine.soundMemoryWriteTraceCount();
+        for (std::size_t i = 0; i < 12u && i < soundWrites; ++i) {
+            const auto& event = firmwareMachine.soundMemoryWriteTraceAt(i);
+            std::printf("  %04X=%02X pc=%04X ret=%04X mode=%u cycle=%llu\\n",
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.mode),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
 
