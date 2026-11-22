@@ -472,6 +472,27 @@ int main(int argc, char** argv) {
         // Diagnostic run: keep the observed transfer count visible while the
         // IC51 P3 decode is being reconciled with the firmware's port toggles.
         assert(firmwareMachine.soundMemoryWriteCount() == 13647u);
+        // Reconstruct the exact IC51 payload through the firmware's 256-byte
+        // address permutation. This verifies every byte, not just the transfer count.
+        const auto bulkTableOffset = 0x48u * 2u;
+        const auto bulkSource = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(realIC51[bulkTableOffset]) << 8u) |
+            realIC51[bulkTableOffset + 1u]);
+        const auto bulkCountHigh = realIC51[bulkTableOffset + 2u];
+        const auto bulkCountLow = realIC51[bulkTableOffset + 3u];
+        const auto bulkLength = static_cast<std::size_t>(bulkCountHigh) * 256u +
+            (bulkCountLow != 0u ? bulkCountLow : 256u);
+        assert(bulkLength == firmwareMachine.soundMemoryWriteCount());
+        for (std::size_t i = 0; i < bulkLength; ++i) {
+            const auto page = static_cast<std::uint16_t>(0xc0u + (i >> 8u));
+            const auto low = TechnoX8032Machine::mapSoundMemoryLowAddress(
+                static_cast<std::uint8_t>(i & 0xffu));
+            const auto physicalAddress = static_cast<std::uint16_t>(
+                (page << 8u) | low);
+            assert(firmwareMachine.xdataByteForTesting(physicalAddress) ==
+                   realIC51[static_cast<std::size_t>(bulkSource) + i]);
+        }
+        assert(firmwareMachine.lastSoundMemoryWriteAddress() == 0xf5b2u);
         assert(firmwareMachine.ic51ReadsByBank(0) == 13651u); // 4-byte header + payload
         assert(firmwareMachine.ic51ReadsByBank(1) == 64u);    // descriptor-table reads
         assert(firmwareMachine.xdataByteForTesting(0xf5b2) == 0xd2u); // final uploaded byte
