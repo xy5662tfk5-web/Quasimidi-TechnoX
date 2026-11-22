@@ -508,11 +508,12 @@ int main(int argc, char** argv) {
         }};
         const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
         const auto commandCountBeforeMidi = injectedResponseMachine.soundCommandPacketCount();
+        const auto aciaReadsBeforeMidi = injectedResponseMachine.aciaReceiveReadCount();
         const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
             programAndNote.data(), programAndNote.size(), midiStartCycle));
         const auto midiInstructions = injectedResponseMachine.runForMachineCycles(2000000);
-        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X\\n",
+        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X ACIAreads=%llu lastRX=%02X\\n",
                     midiInstructions,
                     static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
                     static_cast<unsigned>(ieBeforeMidi),
@@ -522,8 +523,12 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.ic51ReadCount()),
                     static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(0)),
                     static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(1)),
-                    static_cast<unsigned>(injectedResponseMachine.lastIC51ReadAddress()));
+                    static_cast<unsigned>(injectedResponseMachine.lastIC51ReadAddress()),
+                    static_cast<unsigned long long>(injectedResponseMachine.aciaReceiveReadCount()),
+                    static_cast<unsigned>(injectedResponseMachine.lastAciaReceiveRead()));
         assert(!injectedResponseMachine.cpuFaulted());
+        assert(injectedResponseMachine.aciaReceiveReadCount() == aciaReadsBeforeMidi + programAndNote.size());
+        assert(injectedResponseMachine.lastAciaReceiveRead() == programAndNote.back());
         assert(injectedResponseMachine.ic51ReadsByBank(0) > 0u);
         assert(injectedResponseMachine.ic51ReadsByBank(1) > 0u);
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
