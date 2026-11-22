@@ -43,6 +43,12 @@ public:
         bool write = false;
         std::uint64_t machineCycle = 0;
     };
+    struct UnmappedBusEvent {
+        std::uint16_t address = 0;
+        std::uint8_t value = 0xff;
+        bool write = false;
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -132,6 +138,10 @@ public:
     const XdataWatchEvent& xdataWatchTraceAt(std::size_t index) const noexcept {
         return xdataWatchTrace_[index % xdataWatchTrace_.size()];
     }
+    std::size_t unmappedBusTraceCount() const noexcept { return unmappedBusTraceCount_; }
+    const UnmappedBusEvent& unmappedBusTraceAt(std::size_t index) const noexcept {
+        return unmappedBusTrace_[index % unmappedBusTrace_.size()];
+    }
 
     void reset() noexcept {
         cpu_.reset();
@@ -155,6 +165,8 @@ public:
         ic51ReadTraceCount_ = 0;
         xdataWatchTrace_.fill(XdataWatchEvent{});
         xdataWatchTraceCount_ = 0;
+        unmappedBusTrace_.fill(UnmappedBusEvent{});
+        unmappedBusTraceCount_ = 0;
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -398,7 +410,16 @@ public:
             }
             case 0xb002: return lcdStatus_;
             case 0xb003: return lcdData_;
-            default: return 0xff; // open bus / unmodeled hardware
+            default:
+                if (address >= 0x3900u && address <= 0xbfffu) {
+                    auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
+                    event.address = address;
+                    event.value = 0xff;
+                    event.write = false;
+                    event.machineCycle = elapsedMachineCycles_;
+                    ++unmappedBusTraceCount_;
+                }
+                return 0xff; // open bus / unmodeled hardware
         }
     }
 
@@ -467,7 +488,16 @@ public:
                 break;
             case 0xb000: lcdInstruction_ = value; break;
             case 0xb001: lcdData_ = value; break;
-            default: break; // writes to unmapped/stub regions are ignored
+            default:
+                if (address >= 0x3900u && address <= 0xbfffu) {
+                    auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
+                    event.address = address;
+                    event.value = value;
+                    event.write = true;
+                    event.machineCycle = elapsedMachineCycles_;
+                    ++unmappedBusTraceCount_;
+                }
+                break; // writes to unmapped/stub regions are ignored
         }
     }
 
@@ -642,6 +672,8 @@ private:
     std::size_t ic51ReadTraceCount_ = 0;
     std::array<XdataWatchEvent, 512> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
+    std::array<UnmappedBusEvent, 512> unmappedBusTrace_{};
+    std::size_t unmappedBusTraceCount_ = 0;
     std::array<std::uint8_t, 0x100> internal_{};
     std::array<std::uint8_t, 0x80> upperIram_{};
     std::array<std::uint8_t, 0x10000> xdata_{};
