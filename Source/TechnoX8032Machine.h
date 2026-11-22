@@ -127,6 +127,7 @@ public:
         portWriteCount_ = 0;
         portReadTrace_.fill(PortReadEvent{});
         portReadCount_ = 0;
+        watchedCallCounts_.fill(0);
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -167,7 +168,40 @@ public:
     MCS51Core& cpuForTesting() noexcept { return cpu_; }
     std::uint64_t elapsedMachineCycles() const noexcept { return elapsedMachineCycles_; }
 
-    MCS51StepResult step() noexcept { return cpu_.step(*this); }
+    std::uint64_t watchedCallCount(std::uint16_t target) const noexcept {
+        switch (target) {
+            case 0x57a8: return watchedCallCounts_[0];
+            case 0x5671: return watchedCallCounts_[1];
+            case 0x4256: return watchedCallCounts_[2];
+            case 0x1494: return watchedCallCounts_[3];
+            case 0x0db7: return watchedCallCounts_[4];
+            case 0xac00: return watchedCallCounts_[5];
+            case 0xac88: return watchedCallCounts_[6];
+            case 0xb34d: return watchedCallCounts_[7];
+            default: return 0;
+        }
+    }
+
+    MCS51StepResult step() noexcept {
+        const auto pc = cpu_.registers().pc;
+        if (code_[pc] == 0x12u) {
+            const auto target = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(code_[static_cast<std::uint16_t>(pc + 1u)]) << 8) |
+                code_[static_cast<std::uint16_t>(pc + 2u)]);
+            switch (target) {
+                case 0x57a8: ++watchedCallCounts_[0]; break;
+                case 0x5671: ++watchedCallCounts_[1]; break;
+                case 0x4256: ++watchedCallCounts_[2]; break;
+                case 0x1494: ++watchedCallCounts_[3]; break;
+                case 0x0db7: ++watchedCallCounts_[4]; break;
+                case 0xac00: ++watchedCallCounts_[5]; break;
+                case 0xac88: ++watchedCallCounts_[6]; break;
+                case 0xb34d: ++watchedCallCounts_[7]; break;
+                default: break;
+            }
+        }
+        return cpu_.step(*this);
+    }
 
     std::size_t runInstructions(std::size_t maximumInstructions) noexcept {
         std::size_t executed = 0;
@@ -567,6 +601,7 @@ private:
     std::size_t portWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
     mutable std::size_t portReadCount_ = 0;
+    std::array<std::uint64_t, 8> watchedCallCounts_{};
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
