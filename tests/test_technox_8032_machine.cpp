@@ -83,6 +83,28 @@ int main(int argc, char** argv) {
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
 
+    // MIDI bytes arrive over the ACIA at 31.25 kbaud (10 serial bits per byte).
+    machine.reset();
+    machine.writeExternal(0xa000, 0x96); // ACIA receive interrupt enabled
+    const std::array<std::uint8_t, 3> midiBytes{{0x90, 0x3c, 0x64}};
+    const auto midiStart = machine.elapsedMachineCycles() + 5u;
+    assert(machine.scheduleAciaMidiBytes(midiBytes.data(), midiBytes.size(), midiStart));
+    const auto midiByteCycles = machine.midiByteMachineCycles();
+    machine.advanceMachineCycles(4);
+    assert((machine.readExternal(0xa002) & 0x01u) == 0);
+    machine.advanceMachineCycles(1);
+    assert((machine.readExternal(0xa002) & 0x01u) != 0);
+    assert((machine.readInternal(0xb0) & 0x08u) == 0); // INT1 active low
+    assert(machine.readExternal(0xa003) == 0x90);
+    machine.advanceMachineCycles(static_cast<unsigned>(midiByteCycles - 1u));
+    assert((machine.readExternal(0xa002) & 0x01u) == 0);
+    machine.advanceMachineCycles(1);
+    assert((machine.readExternal(0xa002) & 0x01u) != 0);
+    assert(machine.readExternal(0xa003) == 0x3c);
+    machine.advanceMachineCycles(static_cast<unsigned>(midiByteCycles));
+    assert((machine.readExternal(0xa002) & 0x01u) != 0);
+    assert(machine.readExternal(0xa003) == 0x64);
+
     // External sound-device boot handshake: reset low, request FF10,
     // download data into C000+, then release reset and expose ready=AC.
     machine.reset();
