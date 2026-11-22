@@ -459,6 +459,19 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.mode),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        const auto ic51Reads = firmwareMachine.ic51ReadTraceCount();
+        std::printf("IC51 source reads (last 12):\\n");
+        const auto firstRecentRead = ic51Reads > 12u ? ic51Reads - 12u : 0u;
+        for (std::size_t i = firstRecentRead; i < ic51Reads; ++i) {
+            const auto& event = firmwareMachine.ic51ReadTraceAt(i);
+            std::printf("  bank=%u %04X=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                        static_cast<unsigned>(event.bank),
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
 
