@@ -1,5 +1,6 @@
 #include "../Source/TechnoX8032Machine.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -295,6 +296,57 @@ int main(int argc, char** argv) {
             assert(ic51Probe.readExternal(0x1234) == realIC51[0x11234]);
             assert(ic51Probe.ic51ReadsByBank(1) == 2u);
             ic51Probe.writeInternal(0xb0, 0xffu); // deselect IC51
+        }
+
+        struct TimedSysExFrame {
+            std::uint32_t deltaTicks = 0;
+            std::vector<std::uint8_t> bytes;
+        };
+        std::vector<TimedSysExFrame> factoryFrames;
+        std::uint16_t factoryDivision = 0;
+        std::uint32_t factoryTempo = 0;
+        if (argc > 3) {
+            std::ifstream streamFile(argv[3], std::ios::binary);
+            assert(streamFile.good());
+            const std::istreambuf_iterator<char> streamBegin{streamFile};
+            const std::istreambuf_iterator<char> streamEnd{};
+            const std::vector<std::uint8_t> streamBytes(streamBegin, streamEnd);
+            assert(streamBytes.size() >= 11u);
+            assert(streamBytes[0] == 'T' && streamBytes[1] == 'X' &&
+                   streamBytes[2] == 'S' && streamBytes[3] == 'B');
+            factoryDivision = static_cast<std::uint16_t>(
+                (static_cast<unsigned>(streamBytes[4]) << 8u) | streamBytes[5]);
+            factoryTempo = (static_cast<std::uint32_t>(streamBytes[6]) << 16u) |
+                           (static_cast<std::uint32_t>(streamBytes[7]) << 8u) |
+                           streamBytes[8];
+            const auto frameCount = static_cast<std::uint16_t>(
+                (static_cast<unsigned>(streamBytes[9]) << 8u) | streamBytes[10]);
+            assert(factoryDivision == 384u);
+            assert(factoryTempo == 600000u);
+            std::size_t offset = 11u;
+            for (unsigned frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
+                assert(offset + 6u <= streamBytes.size());
+                const auto deltaTicks =
+                    (static_cast<std::uint32_t>(streamBytes[offset]) << 24u) |
+                    (static_cast<std::uint32_t>(streamBytes[offset + 1u]) << 16u) |
+                    (static_cast<std::uint32_t>(streamBytes[offset + 2u]) << 8u) |
+                    streamBytes[offset + 3u];
+                const auto length = static_cast<std::uint16_t>(
+                    (static_cast<unsigned>(streamBytes[offset + 4u]) << 8u) |
+                    streamBytes[offset + 5u]);
+                offset += 6u;
+                assert(offset + length <= streamBytes.size());
+                TimedSysExFrame frame;
+                frame.deltaTicks = deltaTicks;
+                frame.bytes.assign(streamBytes.begin() + static_cast<std::ptrdiff_t>(offset),
+                                   streamBytes.begin() + static_cast<std::ptrdiff_t>(offset + length));
+                assert(frame.bytes.size() >= 2u && frame.bytes.front() == 0xf0u &&
+                       frame.bytes.back() == 0xf7u);
+                factoryFrames.push_back(std::move(frame));
+                offset += length;
+            }
+            assert(offset == streamBytes.size());
+            assert(factoryFrames.size() == 300u);
         }
 
         TechnoX8032Machine firmwareMachine;
