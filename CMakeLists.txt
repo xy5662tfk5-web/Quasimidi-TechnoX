@@ -54,6 +54,8 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSAudioEngine.h
     Source/MASSResourceROM.h
     Source/BasicMASSVoiceBackend.h
+    Source/MCS51Core.h
+    Source/TechnoX8032Machine.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC
@@ -83,6 +85,18 @@ if (BUILD_TESTING)
     target_compile_options(technox_mcs51_core_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_mcs51_core_tests
         COMMAND technox_mcs51_core_tests
+    )
+endif()
+
+# Intel 8032 bus and IC4 ROM-loader tests are dependency-free.
+if (BUILD_TESTING)
+    add_executable(technox_8032_machine_tests
+        tests/test_technox_8032_machine.cpp
+    )
+    target_compile_features(technox_8032_machine_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_8032_machine_tests PRIVATE -UNDEBUG)
+    add_test(NAME technox_8032_machine_tests
+        COMMAND technox_8032_machine_tests
     )
 endif()
 
