@@ -911,6 +911,11 @@ public:
         return true;
     }
 
+    const std::uint8_t* dataForBank(MASSResourceBank bank) const noexcept {
+        if (!loaded_ || !validBank(bank)) return nullptr;
+        return image_.data() + bankBase(bank);
+    }
+
 private:
     static bool validBank(MASSResourceBank bank) noexcept {
         return bank == MASSResourceBank::bank0 || bank == MASSResourceBank::bank1;
@@ -1475,6 +1480,59 @@ public:
             !decoded.terminated && !decoded.endedByControlCommand &&
             !decoded.truncated;
         result = std::move(decoded);
+        return true;
+    }
+};
+
+// Resolves a Part bank/program pair through the firmware-derived IC51
+// pointer table, descriptor parser and stream decoder. It recovers resource
+// metadata and command streams only; it does not decode PCM or render audio.
+struct MASSResolvedProgramResource {
+    MASSResourceSelection selection{};
+    std::uint8_t bankNumber = 0;
+    std::uint8_t soundNumber = 0;
+    std::uint16_t descriptorAddress = 0;
+    MASSResourceDescriptor descriptor{};
+    MASSDecodedResourceStream stream{};
+};
+
+class MASSResourceProgramResolver {
+public:
+    static bool resolve(const MASSResourceROM& rom,
+                        int bankNumber,
+                        int soundNumber,
+                        MASSResolvedProgramResource& result,
+                        bool firmwareFlag0ASet = false) {
+        if (bankNumber < 0 || bankNumber > 3 || soundNumber < 0 || soundNumber > 127)
+            return false;
+
+        MASSResolvedProgramResource resolved{};
+        resolved.bankNumber = static_cast<std::uint8_t>(bankNumber);
+        resolved.soundNumber = static_cast<std::uint8_t>(soundNumber);
+        if (!MASSResourceROM::resolvePartResource(
+                bankNumber, resolved.soundNumber, resolved.selection))
+            return false;
+        if (!rom.readResourceDescriptorAddress(
+                resolved.selection.bank, resolved.selection.pointerIndex,
+                resolved.descriptorAddress))
+            return false;
+
+        const auto* bankData = rom.dataForBank(resolved.selection.bank);
+        if (bankData == nullptr ||
+            !MASSResourceDescriptorParser::parse(
+                bankData, MASSResourceROM::kBankSize, resolved.descriptorAddress,
+                resolved.descriptor))
+            return false;
+        if (!MASSCommandStreamDecoder::decode(
+                bankData, MASSResourceROM::kBankSize,
+                resolved.descriptor.commandStreamPointer, resolved.stream,
+                firmwareFlag0ASet) || resolved.stream.truncated)
+            return false;
+        if (!resolved.stream.terminated && !resolved.stream.endedByControlCommand &&
+            !resolved.stream.slotLimitReached)
+            return false;
+
+        result = std::move(resolved);
         return true;
     }
 };

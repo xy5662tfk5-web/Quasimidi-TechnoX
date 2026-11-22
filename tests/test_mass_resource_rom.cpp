@@ -826,6 +826,45 @@ void testCommandStreamDecoder() {
     assert(decoded.commands.empty());
 }
 
+void testBankProgramResolver(const char* path) {
+    std::ifstream file(path, std::ios::binary);
+    assert(file.good());
+    std::vector<std::uint8_t> image(
+        (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    assert(image.size() == MASSResourceROM::kImageSize);
+
+    MASSResourceROM rom;
+    assert(rom.load(image.data(), image.size()));
+    std::set<std::pair<int, int>> resolvedPairs;
+    std::set<std::pair<int, std::uint16_t>> resolvedDescriptors;
+    for (int bankNumber = 0; bankNumber < 4; ++bankNumber) {
+        for (int soundNumber = 0; soundNumber < 128; ++soundNumber) {
+            MASSResolvedProgramResource resolved{};
+            assert(MASSResourceProgramResolver::resolve(
+                rom, bankNumber, soundNumber, resolved));
+            assert(resolved.bankNumber == bankNumber);
+            assert(resolved.soundNumber == soundNumber);
+            const int expectedBank = bankNumber < 2 ? 0 : 1;
+            const int expectedIndex = soundNumber + ((bankNumber & 1) ? 0x80 : 0);
+            assert(static_cast<int>(resolved.selection.bank) == expectedBank);
+            assert(resolved.selection.pointerIndex == expectedIndex);
+            assert(resolvedDescriptors.insert({expectedBank, resolved.descriptorAddress}).second);
+            assert(!resolved.stream.truncated);
+            assert(resolved.stream.terminated || resolved.stream.endedByControlCommand ||
+                   resolved.stream.slotLimitReached);
+            assert(resolvedPairs.insert({bankNumber, soundNumber}).second);
+        }
+    }
+    assert(resolvedPairs.size() == 512);
+    assert(resolvedDescriptors.size() == 512);
+
+    MASSResolvedProgramResource invalid{};
+    assert(!MASSResourceProgramResolver::resolve(rom, -1, 0, invalid));
+    assert(!MASSResourceProgramResolver::resolve(rom, 4, 0, invalid));
+    assert(!MASSResourceProgramResolver::resolve(rom, 0, -1, invalid));
+    assert(!MASSResourceProgramResolver::resolve(rom, 0, 128, invalid));
+}
+
 void testActualIC51(const char* path) {
     std::ifstream file(path, std::ios::binary);
     assert(file.good());
@@ -915,7 +954,9 @@ int main(int argc, char** argv) {
     testTerminalHardwarePacketBuilder();
     testDescriptorParser();
     testCommandStreamDecoder();
-    if (argc > 1)
+    if (argc > 1) {
         testActualIC51(argv[1]);
+        testBankProgramResolver(argv[1]);
+    }
     return 0;
 }
