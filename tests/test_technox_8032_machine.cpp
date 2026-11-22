@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
         assert(resourceInit != 0);
         assert(firmwareMachine.cpu().registers().pc == 0x326a);
 
-        const auto peripheralInit = firmwareMachine.runUntilProgramCounter(0x32b0, 500000);
+        const auto peripheralInit = firmwareMachine.runUntilProgramCounter(0x32b0, 2000000);
         const bool reachedPeripheralHandoff = firmwareMachine.cpu().registers().pc == 0x32b0;
         const auto bank = firmwareMachine.cpu().registers().psw.registerBankBase();
         std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X cycles=%llu\\n",
