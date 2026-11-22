@@ -15,33 +15,24 @@
 
 namespace technox {
 
-// SoundHost host-interface register map (A2:A0), exposed by the TechnoX
-// 8032 external bus at 0x8000-0x8007.
-enum class soundHostRegister : std::uint8_t {
-    Mpu401Data = 0,
-    Mpu401StatusControl = 1,
-    BurstDataLow = 2,
-    BurstDataHigh = 3,
-    GameSound0 = 4,
-    GameSound1 = 5,
-    GameSound2 = 6,
-    GameSound3 = 7
+// Undocumented external register window observed at 0x8000-0x8003.
+// Register meanings are intentionally left unnamed until the hardware is identified.
+enum class ExternalAudioRegister : std::uint8_t {
+    register0 = 0, register1 = 1, register2 = 2, register3 = 3
 };
 
-constexpr std::uint16_t soundHostAddress(soundHostRegister reg) noexcept {
+constexpr std::uint16_t externalAudioRegisterAddress(ExternalAudioRegister reg) noexcept {
     return static_cast<std::uint16_t>(0x8000u + static_cast<std::uint8_t>(reg));
 }
 
-static_assert(soundHostAddress(soundHostRegister::BurstDataHigh) == 0x8003u,
-              "TechnoX packet trace must terminate at SoundHost register 3");
+static_assert(soundHostAddress(ExternalAudioRegister::register3) == 0x8003u,
+              "Observed external register window ends at offset 3");
 
 class TechnoX8032Machine final : public MCS51Bus {
 public:
     struct SoundCommandPacket {
-        // A 0x8000-0x8003 transaction snapshots SoundHost host accesses:
-        // 0x8000 = MPU-401 data (A2:A0=000), 0x8001 = status/control (001),
-        // 0x8002/0x8003 = low/high bytes of the 16-bit burst port (010).
-        // This is not one four-byte sound opcode.
+        // Snapshot of sequential writes to the undocumented 0x8000-0x8003
+        // external register window. The register meanings are not established.
         std::array<std::uint8_t, 4> bytes{};
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
@@ -503,7 +494,7 @@ public:
         if (address >= 0x8000u && address <= 0x8003u) {
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             std::uint8_t value = commandPort_[index];
-            if (index == static_cast<std::size_t>(soundHostRegister::BurstDataLow))
+            if (index == static_cast<std::size_t>(ExternalAudioRegister::register2))
                 value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] & 0xffu);
             else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataHigh))
                 value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] >> 8u);
@@ -643,10 +634,9 @@ public:
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             const auto instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
             commandPort_[index] = value;
-            if (index == static_cast<std::size_t>(soundHostRegister::Mpu401Data)) {
-                // IC4 selects a byte-wide host command/index before accessing
-                // the SoundHost 16-bit burst window. Its internal meaning is
-                // still being decoded; preserve the observed indexed behavior.
+            if (index == static_cast<std::size_t>(ExternalAudioRegister::register0)) {
+                // IC4 writes this register before the following register accesses.
+                // Preserve the observed ordering without assigning semantics.
                 soundHostCommandLatch_ = value;
             } else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataLow)) {
                 auto& word = soundHostWords_[soundHostCommandLatch_];
@@ -665,9 +655,8 @@ public:
             hostWrite.machineCycle = elapsedMachineCycles_;
             ++soundHostWriteCount_;
 
-            // Only a contiguous 0,1,2,3 sequence is a complete four-register
-            // host transaction. The firmware also writes register 3 alone
-            // in its 0x0DCE control path; do not turn that into a fake packet.
+            // Only a contiguous 0,1,2,3 sequence is captured as a complete
+            // four-register transaction. Other writes remain individual events.
             if (index == static_cast<std::size_t>(soundHostRegister::Mpu401Data)) {
                 soundHostTransactionBytes_[0] = value;
                 soundHostExpectedRegister_ = 1;
