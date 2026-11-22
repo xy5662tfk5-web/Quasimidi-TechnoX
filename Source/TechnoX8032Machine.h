@@ -28,11 +28,11 @@ enum class soundHostRegister : std::uint8_t {
     GameSound3 = 7
 };
 
-constexpr std::uint16_t soundHostHostAddress(soundHostRegister reg) noexcept {
+constexpr std::uint16_t soundHostAddress(soundHostRegister reg) noexcept {
     return static_cast<std::uint16_t>(0x8000u + static_cast<std::uint8_t>(reg));
 }
 
-static_assert(soundHostHostAddress(soundHostRegister::BurstDataHigh) == 0x8003u,
+static_assert(soundHostAddress(soundHostRegister::BurstDataHigh) == 0x8003u,
               "TechnoX packet trace must terminate at SoundHost register 3");
 
 class TechnoX8032Machine final : public MCS51Bus {
@@ -233,14 +233,14 @@ public:
         externalPortInputMask_.fill(0);
         externalPortInputValue_.fill(0xff);
         commandPort_.fill(0);
-        soundHostHostCommandLatch_ = 0;
-        soundHostHostWords_.fill(0);
+        soundHostCommandLatch_ = 0;
+        soundHostWords_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
-        soundHostHostReadCount_ = 0;
-        soundHostHostReadTrace_.fill(soundHostReadEvent{});
-        soundHostHostWriteCount_ = 0;
-        soundHostHostWriteTrace_.fill(soundHostWriteEvent{});
+        soundHostReadCount_ = 0;
+        soundHostReadTrace_.fill(soundHostReadEvent{});
+        soundHostWriteCount_ = 0;
+        soundHostWriteTrace_.fill(soundHostWriteEvent{});
         soundHostTransactionActive_ = false;
         soundHostExpectedRegister_ = 0;
         soundHostTransactionBytes_.fill(0);
@@ -504,16 +504,16 @@ public:
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             std::uint8_t value = commandPort_[index];
             if (index == static_cast<std::size_t>(soundHostRegister::BurstDataLow))
-                value = static_cast<std::uint8_t>(soundHostHostWords_[soundHostHostCommandLatch_] & 0xffu);
+                value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] & 0xffu);
             else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataHigh))
-                value = static_cast<std::uint8_t>(soundHostHostWords_[soundHostHostCommandLatch_] >> 8u);
-            auto& event = soundHostHostReadTrace_[
-                soundHostHostReadCount_ % soundHostHostReadTrace_.size()];
+                value = static_cast<std::uint8_t>(soundHostWords_[soundHostCommandLatch_] >> 8u);
+            auto& event = soundHostReadTrace_[
+                soundHostReadCount_ % soundHostReadTrace_.size()];
             event.registerIndex = static_cast<std::uint8_t>(index);
             event.value = value;
             event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
             event.machineCycle = elapsedMachineCycles_;
-            ++soundHostHostReadCount_;
+            ++soundHostReadCount_;
             return value;
         }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
@@ -647,23 +647,23 @@ public:
                 // IC4 selects a byte-wide host command/index before accessing
                 // the SoundHost 16-bit burst window. Its internal meaning is
                 // still being decoded; preserve the observed indexed behavior.
-                soundHostHostCommandLatch_ = value;
+                soundHostCommandLatch_ = value;
             } else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataLow)) {
-                auto& word = soundHostHostWords_[soundHostHostCommandLatch_];
+                auto& word = soundHostWords_[soundHostCommandLatch_];
                 word = static_cast<std::uint16_t>((word & 0xff00u) | value);
             } else if (index == static_cast<std::size_t>(soundHostRegister::BurstDataHigh)) {
-                auto& word = soundHostHostWords_[soundHostHostCommandLatch_];
+                auto& word = soundHostWords_[soundHostCommandLatch_];
                 word = static_cast<std::uint16_t>((word & 0x00ffu) |
                     (static_cast<std::uint16_t>(value) << 8u));
             }
 
-            auto& hostWrite = soundHostHostWriteTrace_[
-                soundHostHostWriteCount_ % soundHostHostWriteTrace_.size()];
+            auto& hostWrite = soundHostWriteTrace_[
+                soundHostWriteCount_ % soundHostWriteTrace_.size()];
             hostWrite.registerIndex = static_cast<std::uint8_t>(index);
             hostWrite.value = value;
             hostWrite.instructionPC = instructionPC;
             hostWrite.machineCycle = elapsedMachineCycles_;
-            ++soundHostHostWriteCount_;
+            ++soundHostWriteCount_;
 
             // Only a contiguous 0,1,2,3 sequence is a complete four-register
             // host transaction. The firmware also writes register 3 alone
@@ -840,16 +840,16 @@ public:
         return commandPort_;
     }
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
-    std::uint16_t soundHostHostWordForTesting(std::uint8_t index) const noexcept {
-        return soundHostHostWords_[index];
+    std::uint16_t soundHostWordForTesting(std::uint8_t index) const noexcept {
+        return soundHostWords_[index];
     }
-    std::size_t soundHostHostReadCount() const noexcept { return soundHostHostReadCount_; }
-    const soundHostReadEvent& soundHostHostReadAt(std::size_t index) const noexcept {
-        return soundHostHostReadTrace_[index % soundHostHostReadTrace_.size()];
+    std::size_t soundHostReadCount() const noexcept { return soundHostReadCount_; }
+    const soundHostReadEvent& soundHostReadAt(std::size_t index) const noexcept {
+        return soundHostReadTrace_[index % soundHostReadTrace_.size()];
     }
-    std::size_t soundHostHostWriteCount() const noexcept { return soundHostHostWriteCount_; }
-    const soundHostWriteEvent& soundHostHostWriteAt(std::size_t index) const noexcept {
-        return soundHostHostWriteTrace_[index % soundHostHostWriteTrace_.size()];
+    std::size_t soundHostWriteCount() const noexcept { return soundHostWriteCount_; }
+    const soundHostWriteEvent& soundHostWriteAt(std::size_t index) const noexcept {
+        return soundHostWriteTrace_[index % soundHostWriteTrace_.size()];
     }
     std::size_t soundHostBurstWordCount() const noexcept { return soundHostBurstWordCount_; }
     const SoundHostBurstWordEvent& soundHostBurstWordAt(std::size_t index) const noexcept {
@@ -1023,14 +1023,14 @@ private:
     std::array<std::uint8_t, 4> externalPortInputMask_{};
     std::array<std::uint8_t, 4> externalPortInputValue_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> commandPort_{};
-    std::uint8_t soundHostHostCommandLatch_ = 0;
-    std::array<std::uint16_t, 256> soundHostHostWords_{};
+    std::uint8_t soundHostCommandLatch_ = 0;
+    std::array<std::uint16_t, 256> soundHostWords_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
-    std::array<soundHostReadEvent, 2048> soundHostHostReadTrace_{};
-    std::size_t soundHostHostReadCount_ = 0;
-    std::array<soundHostWriteEvent, 4096> soundHostHostWriteTrace_{};
-    std::size_t soundHostHostWriteCount_ = 0;
+    std::array<soundHostReadEvent, 2048> soundHostReadTrace_{};
+    std::size_t soundHostReadCount_ = 0;
+    std::array<soundHostWriteEvent, 4096> soundHostWriteTrace_{};
+    std::size_t soundHostWriteCount_ = 0;
     bool soundHostTransactionActive_ = false;
     std::uint8_t soundHostExpectedRegister_ = 0;
     std::array<std::uint8_t, 4> soundHostTransactionBytes_{};
