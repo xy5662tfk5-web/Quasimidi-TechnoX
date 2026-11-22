@@ -142,6 +142,14 @@ public:
     const UnmappedBusEvent& unmappedBusTraceAt(std::size_t index) const noexcept {
         return unmappedBusTrace_[index % unmappedBusTrace_.size()];
     }
+    std::uint64_t unmappedReadCountAt7xxx(std::uint16_t address) const noexcept {
+        return address >= 0x7000u && address <= 0x7fffu
+            ? unmappedReadCounts7xxx_[address - 0x7000u] : 0;
+    }
+    std::uint64_t unmappedWriteCountAt7xxx(std::uint16_t address) const noexcept {
+        return address >= 0x7000u && address <= 0x7fffu
+            ? unmappedWriteCounts7xxx_[address - 0x7000u] : 0;
+    }
 
     void reset() noexcept {
         cpu_.reset();
@@ -167,6 +175,8 @@ public:
         xdataWatchTraceCount_ = 0;
         unmappedBusTrace_.fill(UnmappedBusEvent{});
         unmappedBusTraceCount_ = 0;
+        unmappedReadCounts7xxx_.fill(0);
+        unmappedWriteCounts7xxx_.fill(0);
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -418,6 +428,8 @@ public:
                     event.write = false;
                     event.machineCycle = elapsedMachineCycles_;
                     ++unmappedBusTraceCount_;
+                    if (address >= 0x7000u && address <= 0x7fffu)
+                        ++unmappedReadCounts7xxx_[address - 0x7000u];
                 }
                 return 0xff; // open bus / unmodeled hardware
         }
@@ -496,6 +508,8 @@ public:
                     event.write = true;
                     event.machineCycle = elapsedMachineCycles_;
                     ++unmappedBusTraceCount_;
+                    if (address >= 0x7000u && address <= 0x7fffu)
+                        ++unmappedWriteCounts7xxx_[address - 0x7000u];
                 }
                 break; // writes to unmapped/stub regions are ignored
         }
@@ -674,6 +688,8 @@ private:
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 512> unmappedBusTrace_{};
     std::size_t unmappedBusTraceCount_ = 0;
+    std::array<std::uint64_t, 0x1000> unmappedReadCounts7xxx_{};
+    std::array<std::uint64_t, 0x1000> unmappedWriteCounts7xxx_{};
     std::array<std::uint8_t, 0x100> internal_{};
     std::array<std::uint8_t, 0x80> upperIram_{};
     std::array<std::uint8_t, 0x10000> xdata_{};
