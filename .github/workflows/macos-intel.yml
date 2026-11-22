@@ -36,6 +36,20 @@ jobs:
         run: python3 tools/analyze_technox_rom.py --write-descrambled-ic4 build/technox_ic4_descrambled.bin
       - name: Disassemble reachable TechnoX MCS-51 firmware
         run: python3 tools/disassemble_technox_8051.py --output build/technox_ic4_disassembly.txt
+      - name: Disassemble indirect audio/resource command handlers
+        run: |
+          python3 tools/disassemble_technox_8051.py \
+            --entry 0xEB32 --entry 0x000B --entry 0x0013 --entry 0x001B \
+            --entry 0x1C2B --entry 0x1C61 --entry 0x1EDD \
+            --entry 0x224C --entry 0x2301 --entry 0x2374 \
+            --output build/technox_ic4_command_handlers.txt
+      - name: Upload indirect command-handler disassembly
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-ic4-command-handlers
+          path: build/technox_ic4_command_handlers.txt
+          if-no-files-found: error
+          compression-level: 6
       - name: Upload TechnoX firmware disassembly
         uses: actions/upload-artifact@v4
         with:
