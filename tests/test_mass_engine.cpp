@@ -96,6 +96,7 @@ int main() {
     BasicMASSVoiceBackend holdParameterBackend;
     MASSAudioEngine holdParameterEngine(&holdParameterBackend);
     holdParameterEngine.prepare(48000.0, 128);
+    assert(!holdParameterEngine.sustainControllerDown(12));
     assert(holdParameterEngine.setPartParameter(12, PartParameter::holdPedal, 1));
     assert(holdParameterEngine.setSustainPedal(12, true));
     holdParameterEngine.noteOn(12, 1, 62, 100);

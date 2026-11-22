@@ -399,7 +399,10 @@ public:
 class MASSAudioEngine {
 public:
     explicit MASSAudioEngine(IMASSVoiceBackend* backend = nullptr) noexcept
-        : backend_(backend != nullptr ? backend : &nullBackend_) {}
+        : backend_(backend != nullptr ? backend : &nullBackend_) {
+        for (auto& pedalDown : sustainControllerDown_)
+            pedalDown.store(false, std::memory_order_relaxed);
+    }
 
     // Install a different DSP implementation while the host is stopped.
     // The engine owns neither backend; the supplied object must outlive it.
