@@ -78,6 +78,35 @@ private:
     std::size_t imageSize_ = 0;
 };
 
+struct MASS2381AddressResult {
+    std::uint16_t address = 0;
+    std::uint8_t selector = 0;
+    std::uint8_t offset = 0;
+};
+
+// Reconstructs the DPTR calculation in IC4 helper 0x2381. The returned
+// address is a bus address only; caller still supplies the P3-selected memory.
+class MASS2381AddressBuilder {
+public:
+    static MASS2381AddressResult resolve(std::uint16_t basePointer,
+                                         std::uint8_t r5,
+                                         std::uint8_t ram2F) noexcept {
+        const auto selector = static_cast<std::uint8_t>((r5 >> 4) & 0x03u);
+        const auto adjusted = static_cast<std::uint8_t>(ram2F + 0xf4u);
+        std::uint8_t offset = 0;
+
+        if ((adjusted & 0x80u) == 0) {
+            const auto half = static_cast<std::uint8_t>(adjusted >> 1);
+            const auto threshold = static_cast<std::uint8_t>(half + 0xd0u);
+            offset = (threshold & 0x80u) != 0 ? half : 0x2f;
+        }
+
+        const auto address = static_cast<std::uint16_t>(
+            basePointer + static_cast<unsigned>(selector) * 0x30u + offset);
+        return {address, selector, offset};
+    }
+};
+
 struct MASSModulationScaleResult {
     std::uint8_t value = 0;
     std::uint8_t combinedCoefficient = 0;

@@ -21,6 +21,20 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testMASS2381AddressBuilder() {
+    const auto low = MASS2381AddressBuilder::resolve(0x1200, 0x3f, 0x20);
+    assert(low.selector == 3 && low.offset == 0x0a && low.address == 0x129a);
+
+    const auto clamped = MASS2381AddressBuilder::resolve(0x1200, 0x30, 0x70);
+    assert(clamped.selector == 3 && clamped.offset == 0x2f && clamped.address == 0x12bf);
+
+    const auto zeroOffset = MASS2381AddressBuilder::resolve(0x1200, 0x20, 0x90);
+    assert(zeroOffset.selector == 2 && zeroOffset.offset == 0x00 && zeroOffset.address == 0x1260);
+
+    const auto wrap = MASS2381AddressBuilder::resolve(0xfff0, 0x00, 0x20);
+    assert(wrap.selector == 0 && wrap.offset == 0x0a && wrap.address == 0xfffa);
+}
+
 void testMASSModulationScaleMode41() {
     std::vector<std::uint8_t> romBytes(0x20000, 0xff);
     const std::array<std::uint8_t, 8> table0{{0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0}};
@@ -573,6 +587,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
     testMASS1848Arithmetic();
     testFirmwareROMTableView();
