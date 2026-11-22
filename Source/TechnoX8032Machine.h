@@ -15,9 +15,9 @@
 
 namespace technox {
 
-// SAM9407 host-interface register map (A2:A0), exposed by the TechnoX
+// UnidentifiedSoundHost host-interface register map (A2:A0), exposed by the TechnoX
 // 8032 external bus at 0x8000-0x8007.
-enum class SAM9407HostRegister : std::uint8_t {
+enum class UnidentifiedSoundHostHostRegister : std::uint8_t {
     Mpu401Data = 0,
     Mpu401StatusControl = 1,
     BurstDataLow = 2,
@@ -28,17 +28,17 @@ enum class SAM9407HostRegister : std::uint8_t {
     GameSound3 = 7
 };
 
-constexpr std::uint16_t sam9407HostAddress(SAM9407HostRegister reg) noexcept {
+constexpr std::uint16_t unidentifiedSoundHostHostAddress(UnidentifiedSoundHostHostRegister reg) noexcept {
     return static_cast<std::uint16_t>(0x8000u + static_cast<std::uint8_t>(reg));
 }
 
-static_assert(sam9407HostAddress(SAM9407HostRegister::BurstDataHigh) == 0x8003u,
-              "TechnoX packet trace must terminate at SAM9407 register 3");
+static_assert(unidentifiedSoundHostHostAddress(UnidentifiedSoundHostHostRegister::BurstDataHigh) == 0x8003u,
+              "TechnoX packet trace must terminate at UnidentifiedSoundHost register 3");
 
 class TechnoX8032Machine final : public MCS51Bus {
 public:
     struct SoundCommandPacket {
-        // A 0x8000-0x8003 transaction snapshots SAM9407 host accesses:
+        // A 0x8000-0x8003 transaction snapshots UnidentifiedSoundHost host accesses:
         // 0x8000 = MPU-401 data (A2:A0=000), 0x8001 = status/control (001),
         // 0x8002/0x8003 = low/high bytes of the 16-bit burst port (010).
         // This is not one four-byte sound opcode.
@@ -47,19 +47,19 @@ public:
         std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
     };
-    struct SAM9407HostReadEvent {
+    struct UnidentifiedSoundHostHostReadEvent {
         std::uint8_t registerIndex = 0;
         std::uint8_t value = 0xff;
         std::uint16_t instructionPC = 0;
         std::uint64_t machineCycle = 0;
     };
-    struct SAM9407HostWriteEvent {
+    struct UnidentifiedSoundHostHostWriteEvent {
         std::uint8_t registerIndex = 0;
         std::uint8_t value = 0;
         std::uint16_t instructionPC = 0;
         std::uint64_t machineCycle = 0;
     };
-    struct SAM9407BurstWordEvent {
+    struct UnidentifiedSoundHostBurstWordEvent {
         std::uint16_t value = 0;
         std::uint8_t lowByte = 0;
         std::uint8_t highByte = 0;
@@ -233,22 +233,22 @@ public:
         externalPortInputMask_.fill(0);
         externalPortInputValue_.fill(0xff);
         commandPort_.fill(0);
-        sam9407HostCommandLatch_ = 0;
-        sam9407HostWords_.fill(0);
+        unidentifiedSoundHostHostCommandLatch_ = 0;
+        unidentifiedSoundHostHostWords_.fill(0);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
-        sam9407HostReadCount_ = 0;
-        sam9407HostReadTrace_.fill(SAM9407HostReadEvent{});
-        sam9407HostWriteCount_ = 0;
-        sam9407HostWriteTrace_.fill(SAM9407HostWriteEvent{});
-        sam9407TransactionActive_ = false;
-        sam9407ExpectedRegister_ = 0;
-        sam9407TransactionBytes_.fill(0);
-        sam9407BurstWordCount_ = 0;
-        sam9407BurstWordTrace_.fill(SAM9407BurstWordEvent{});
-        sam9407BurstLowPending_ = false;
-        sam9407BurstLowByte_ = 0;
-        sam9407BurstLowInstructionPC_ = 0;
+        unidentifiedSoundHostHostReadCount_ = 0;
+        unidentifiedSoundHostHostReadTrace_.fill(UnidentifiedSoundHostHostReadEvent{});
+        unidentifiedSoundHostHostWriteCount_ = 0;
+        unidentifiedSoundHostHostWriteTrace_.fill(UnidentifiedSoundHostHostWriteEvent{});
+        unidentifiedSoundHostTransactionActive_ = false;
+        unidentifiedSoundHostExpectedRegister_ = 0;
+        unidentifiedSoundHostTransactionBytes_.fill(0);
+        unidentifiedSoundHostBurstWordCount_ = 0;
+        unidentifiedSoundHostBurstWordTrace_.fill(UnidentifiedSoundHostBurstWordEvent{});
+        unidentifiedSoundHostBurstLowPending_ = false;
+        unidentifiedSoundHostBurstLowByte_ = 0;
+        unidentifiedSoundHostBurstLowInstructionPC_ = 0;
         portWriteTrace_.fill(PortWriteEvent{});
         portWriteCount_ = 0;
         portReadTrace_.fill(PortReadEvent{});
@@ -503,17 +503,17 @@ public:
         if (address >= 0x8000u && address <= 0x8003u) {
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             std::uint8_t value = commandPort_[index];
-            if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow))
-                value = static_cast<std::uint8_t>(sam9407HostWords_[sam9407HostCommandLatch_] & 0xffu);
-            else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh))
-                value = static_cast<std::uint8_t>(sam9407HostWords_[sam9407HostCommandLatch_] >> 8u);
-            auto& event = sam9407HostReadTrace_[
-                sam9407HostReadCount_ % sam9407HostReadTrace_.size()];
+            if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataLow))
+                value = static_cast<std::uint8_t>(unidentifiedSoundHostHostWords_[unidentifiedSoundHostHostCommandLatch_] & 0xffu);
+            else if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataHigh))
+                value = static_cast<std::uint8_t>(unidentifiedSoundHostHostWords_[unidentifiedSoundHostHostCommandLatch_] >> 8u);
+            auto& event = unidentifiedSoundHostHostReadTrace_[
+                unidentifiedSoundHostHostReadCount_ % unidentifiedSoundHostHostReadTrace_.size()];
             event.registerIndex = static_cast<std::uint8_t>(index);
             event.value = value;
             event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
             event.machineCycle = elapsedMachineCycles_;
-            ++sam9407HostReadCount_;
+            ++unidentifiedSoundHostHostReadCount_;
             return value;
         }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
@@ -643,61 +643,61 @@ public:
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             const auto instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
             commandPort_[index] = value;
-            if (index == static_cast<std::size_t>(SAM9407HostRegister::Mpu401Data)) {
+            if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::Mpu401Data)) {
                 // IC4 selects a byte-wide host command/index before accessing
-                // the SAM9407 16-bit burst window. Its internal meaning is
+                // the UnidentifiedSoundHost 16-bit burst window. Its internal meaning is
                 // still being decoded; preserve the observed indexed behavior.
-                sam9407HostCommandLatch_ = value;
-            } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow)) {
-                auto& word = sam9407HostWords_[sam9407HostCommandLatch_];
+                unidentifiedSoundHostHostCommandLatch_ = value;
+            } else if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataLow)) {
+                auto& word = unidentifiedSoundHostHostWords_[unidentifiedSoundHostHostCommandLatch_];
                 word = static_cast<std::uint16_t>((word & 0xff00u) | value);
-            } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh)) {
-                auto& word = sam9407HostWords_[sam9407HostCommandLatch_];
+            } else if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataHigh)) {
+                auto& word = unidentifiedSoundHostHostWords_[unidentifiedSoundHostHostCommandLatch_];
                 word = static_cast<std::uint16_t>((word & 0x00ffu) |
                     (static_cast<std::uint16_t>(value) << 8u));
             }
 
-            auto& hostWrite = sam9407HostWriteTrace_[
-                sam9407HostWriteCount_ % sam9407HostWriteTrace_.size()];
+            auto& hostWrite = unidentifiedSoundHostHostWriteTrace_[
+                unidentifiedSoundHostHostWriteCount_ % unidentifiedSoundHostHostWriteTrace_.size()];
             hostWrite.registerIndex = static_cast<std::uint8_t>(index);
             hostWrite.value = value;
             hostWrite.instructionPC = instructionPC;
             hostWrite.machineCycle = elapsedMachineCycles_;
-            ++sam9407HostWriteCount_;
+            ++unidentifiedSoundHostHostWriteCount_;
 
             // Only a contiguous 0,1,2,3 sequence is a complete four-register
             // host transaction. The firmware also writes register 3 alone
             // in its 0x0DCE control path; do not turn that into a fake packet.
-            if (index == static_cast<std::size_t>(SAM9407HostRegister::Mpu401Data)) {
-                sam9407TransactionBytes_[0] = value;
-                sam9407ExpectedRegister_ = 1;
-                sam9407TransactionActive_ = true;
-            } else if (sam9407TransactionActive_ && index == sam9407ExpectedRegister_) {
-                sam9407TransactionBytes_[index] = value;
-                ++sam9407ExpectedRegister_;
-                if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataLow)) {
-                    sam9407BurstLowByte_ = value;
-                    sam9407BurstLowInstructionPC_ = instructionPC;
-                    sam9407BurstLowPending_ = true;
-                } else if (index == static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh)) {
-                    if (sam9407BurstLowPending_) {
-                        auto& word = sam9407BurstWordTrace_[
-                            sam9407BurstWordCount_ % sam9407BurstWordTrace_.size()];
-                        word.lowByte = sam9407BurstLowByte_;
+            if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::Mpu401Data)) {
+                unidentifiedSoundHostTransactionBytes_[0] = value;
+                unidentifiedSoundHostExpectedRegister_ = 1;
+                unidentifiedSoundHostTransactionActive_ = true;
+            } else if (unidentifiedSoundHostTransactionActive_ && index == unidentifiedSoundHostExpectedRegister_) {
+                unidentifiedSoundHostTransactionBytes_[index] = value;
+                ++unidentifiedSoundHostExpectedRegister_;
+                if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataLow)) {
+                    unidentifiedSoundHostBurstLowByte_ = value;
+                    unidentifiedSoundHostBurstLowInstructionPC_ = instructionPC;
+                    unidentifiedSoundHostBurstLowPending_ = true;
+                } else if (index == static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataHigh)) {
+                    if (unidentifiedSoundHostBurstLowPending_) {
+                        auto& word = unidentifiedSoundHostBurstWordTrace_[
+                            unidentifiedSoundHostBurstWordCount_ % unidentifiedSoundHostBurstWordTrace_.size()];
+                        word.lowByte = unidentifiedSoundHostBurstLowByte_;
                         word.highByte = value;
                         word.value = static_cast<std::uint16_t>(
-                            static_cast<std::uint16_t>(sam9407BurstLowByte_) |
+                            static_cast<std::uint16_t>(unidentifiedSoundHostBurstLowByte_) |
                             (static_cast<std::uint16_t>(value) << 8u));
-                        word.lowInstructionPC = sam9407BurstLowInstructionPC_;
+                        word.lowInstructionPC = unidentifiedSoundHostBurstLowInstructionPC_;
                         word.highInstructionPC = instructionPC;
                         word.machineCycle = elapsedMachineCycles_;
-                        ++sam9407BurstWordCount_;
+                        ++unidentifiedSoundHostBurstWordCount_;
                     }
-                    sam9407BurstLowPending_ = false;
+                    unidentifiedSoundHostBurstLowPending_ = false;
 
                     auto& packet = soundCommandTrace_[
                         soundCommandPacketCount_ % soundCommandTrace_.size()];
-                    packet.bytes = sam9407TransactionBytes_;
+                    packet.bytes = unidentifiedSoundHostTransactionBytes_;
                     packet.instructionPC = instructionPC;
                     const auto stackPointer = cpu_.registers().sp;
                     const auto returnHigh = readIndirect(stackPointer);
@@ -706,17 +706,17 @@ public:
                         (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
                     packet.machineCycle = elapsedMachineCycles_;
                     ++soundCommandPacketCount_;
-                    sam9407TransactionActive_ = false;
-                    sam9407ExpectedRegister_ = 0;
+                    unidentifiedSoundHostTransactionActive_ = false;
+                    unidentifiedSoundHostExpectedRegister_ = 0;
                 }
             } else {
-                sam9407TransactionActive_ = false;
-                sam9407ExpectedRegister_ = 0;
-                sam9407BurstLowPending_ = false;
+                unidentifiedSoundHostTransactionActive_ = false;
+                unidentifiedSoundHostExpectedRegister_ = 0;
+                unidentifiedSoundHostBurstLowPending_ = false;
             }
-            if (index != static_cast<std::size_t>(SAM9407HostRegister::BurstDataHigh))
-                sam9407BurstLowPending_ = index == static_cast<std::size_t>(
-                    SAM9407HostRegister::BurstDataLow);
+            if (index != static_cast<std::size_t>(UnidentifiedSoundHostHostRegister::BurstDataHigh))
+                unidentifiedSoundHostBurstLowPending_ = index == static_cast<std::size_t>(
+                    UnidentifiedSoundHostHostRegister::BurstDataLow);
             return;
         }
 
@@ -840,20 +840,20 @@ public:
         return commandPort_;
     }
     std::size_t soundCommandPacketCount() const noexcept { return soundCommandPacketCount_; }
-    std::uint16_t sam9407HostWordForTesting(std::uint8_t index) const noexcept {
-        return sam9407HostWords_[index];
+    std::uint16_t unidentifiedSoundHostHostWordForTesting(std::uint8_t index) const noexcept {
+        return unidentifiedSoundHostHostWords_[index];
     }
-    std::size_t sam9407HostReadCount() const noexcept { return sam9407HostReadCount_; }
-    const SAM9407HostReadEvent& sam9407HostReadAt(std::size_t index) const noexcept {
-        return sam9407HostReadTrace_[index % sam9407HostReadTrace_.size()];
+    std::size_t unidentifiedSoundHostHostReadCount() const noexcept { return unidentifiedSoundHostHostReadCount_; }
+    const UnidentifiedSoundHostHostReadEvent& unidentifiedSoundHostHostReadAt(std::size_t index) const noexcept {
+        return unidentifiedSoundHostHostReadTrace_[index % unidentifiedSoundHostHostReadTrace_.size()];
     }
-    std::size_t sam9407HostWriteCount() const noexcept { return sam9407HostWriteCount_; }
-    const SAM9407HostWriteEvent& sam9407HostWriteAt(std::size_t index) const noexcept {
-        return sam9407HostWriteTrace_[index % sam9407HostWriteTrace_.size()];
+    std::size_t unidentifiedSoundHostHostWriteCount() const noexcept { return unidentifiedSoundHostHostWriteCount_; }
+    const UnidentifiedSoundHostHostWriteEvent& unidentifiedSoundHostHostWriteAt(std::size_t index) const noexcept {
+        return unidentifiedSoundHostHostWriteTrace_[index % unidentifiedSoundHostHostWriteTrace_.size()];
     }
-    std::size_t sam9407BurstWordCount() const noexcept { return sam9407BurstWordCount_; }
-    const SAM9407BurstWordEvent& sam9407BurstWordAt(std::size_t index) const noexcept {
-        return sam9407BurstWordTrace_[index % sam9407BurstWordTrace_.size()];
+    std::size_t unidentifiedSoundHostBurstWordCount() const noexcept { return unidentifiedSoundHostBurstWordCount_; }
+    const UnidentifiedSoundHostBurstWordEvent& unidentifiedSoundHostBurstWordAt(std::size_t index) const noexcept {
+        return unidentifiedSoundHostBurstWordTrace_[index % unidentifiedSoundHostBurstWordTrace_.size()];
     }
     std::uint64_t aciaReceiveReadCount() const noexcept { return aciaReceiveReadCount_; }
     std::uint64_t aciaValidReceiveReadCount() const noexcept { return aciaValidReceiveReadCount_; }
@@ -1023,22 +1023,22 @@ private:
     std::array<std::uint8_t, 4> externalPortInputMask_{};
     std::array<std::uint8_t, 4> externalPortInputValue_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> commandPort_{};
-    std::uint8_t sam9407HostCommandLatch_ = 0;
-    std::array<std::uint16_t, 256> sam9407HostWords_{};
+    std::uint8_t unidentifiedSoundHostHostCommandLatch_ = 0;
+    std::array<std::uint16_t, 256> unidentifiedSoundHostHostWords_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
-    std::array<SAM9407HostReadEvent, 2048> sam9407HostReadTrace_{};
-    std::size_t sam9407HostReadCount_ = 0;
-    std::array<SAM9407HostWriteEvent, 4096> sam9407HostWriteTrace_{};
-    std::size_t sam9407HostWriteCount_ = 0;
-    bool sam9407TransactionActive_ = false;
-    std::uint8_t sam9407ExpectedRegister_ = 0;
-    std::array<std::uint8_t, 4> sam9407TransactionBytes_{};
-    std::array<SAM9407BurstWordEvent, 2048> sam9407BurstWordTrace_{};
-    std::size_t sam9407BurstWordCount_ = 0;
-    bool sam9407BurstLowPending_ = false;
-    std::uint8_t sam9407BurstLowByte_ = 0;
-    std::uint16_t sam9407BurstLowInstructionPC_ = 0;
+    std::array<UnidentifiedSoundHostHostReadEvent, 2048> unidentifiedSoundHostHostReadTrace_{};
+    std::size_t unidentifiedSoundHostHostReadCount_ = 0;
+    std::array<UnidentifiedSoundHostHostWriteEvent, 4096> unidentifiedSoundHostHostWriteTrace_{};
+    std::size_t unidentifiedSoundHostHostWriteCount_ = 0;
+    bool unidentifiedSoundHostTransactionActive_ = false;
+    std::uint8_t unidentifiedSoundHostExpectedRegister_ = 0;
+    std::array<std::uint8_t, 4> unidentifiedSoundHostTransactionBytes_{};
+    std::array<UnidentifiedSoundHostBurstWordEvent, 2048> unidentifiedSoundHostBurstWordTrace_{};
+    std::size_t unidentifiedSoundHostBurstWordCount_ = 0;
+    bool unidentifiedSoundHostBurstLowPending_ = false;
+    std::uint8_t unidentifiedSoundHostBurstLowByte_ = 0;
+    std::uint16_t unidentifiedSoundHostBurstLowInstructionPC_ = 0;
     std::array<SoundMemoryWriteEvent, 8192> soundMemoryWriteTrace_{};
     std::size_t soundMemoryWriteTraceCount_ = 0;
     std::array<IC51BusProbeEvent, 256> ic51BusProbeTrace_{};
