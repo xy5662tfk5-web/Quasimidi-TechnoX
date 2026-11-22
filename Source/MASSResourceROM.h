@@ -292,6 +292,7 @@ struct MASSDecodedResourceStream {
     std::uint8_t slotsConsumed = 0;
     bool terminated = false; // saw the explicit 0xFF stream terminator
     bool endedByControlCommand = false; // opcode group 0x20 returns via 0x19CD
+    bool fillsRemainingSlots = false; // group 0x20 emits 0x38 filler slots when flag 0x0A is clear
     bool truncated = false;
     bool slotLimitReached = false;
     std::vector<MASSResourceCommand> commands;
@@ -301,9 +302,10 @@ class MASSCommandStreamDecoder {
 public:
     static constexpr std::size_t kMaximumSlots = 16;
 
-    // Decodes a stream from the memory bank selected by P3 flags loaded from
-    // byte +9 of the separate 12-byte resource-selection record. The caller
-    // supplies the bank; it need not be the IC51 pointer-table bank.
+    // Decodes the memory window selected by P3 flags loaded from byte +9 of
+    // the 12-byte XDATA resource-selection record. The same P3 mask is used
+    // for the IC51 pointer-table read; the caller supplies the resulting
+    // memory window because the P2/page mapping is not yet reconstructed.
     // firmwareFlag0ASet changes the group-0 path: when clear, byte +3 bit 3
     // can branch to handler 0x224C. Its port write remains flag-dependent.
     static bool decode(const std::uint8_t* bankData,
@@ -402,6 +404,10 @@ public:
             // 0x38 records before issuing the control packet.
             if (group == 0x20) {
                 decoded.endedByControlCommand = true;
+                // Handler 0x2301 fills all unoccupied 8-byte output slots
+                // with 0x38 when flag 0x0A is clear. When it is set, firmware
+                // jumps straight to the reserved final slot at offset 0xF8.
+                decoded.fillsRemainingSlots = !firmwareFlag0ASet;
                 break;
             }
         }

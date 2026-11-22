@@ -18,7 +18,7 @@ For the normal branch (Part index other than the special index 9), `0x418E` rece
 
 The routine performs two related lookups:
 
-1. It reads `0x5C3D + RAM[0x6F]` from code ROM. The first four bytes are `07 07 06 06`. This value is written to descriptor byte `+9` at `0x2909 + 12*PartIndex`.
+1. It reads `0x5C3D + RAM[0x6F]` from code ROM. The first four bytes are `07 07 06 06`. This P3 control mask is written to byte `+9` of the 12-byte per-Part resource-selection record at `0x2900 + 12*PartIndex` (address `0x2909 + 12*PartIndex`).
 2. It forms a 256-entry pointer-table index:
    `index = RAM[0x70] + 0x80 * (RAM[0x6F] & 1)`.
    The code extracts parameter bit 0 into bit 7, then adds `RAM[0x70]`.
@@ -27,10 +27,10 @@ The routine performs two related lookups:
 
 `0xB3BC` receives the pointer-table index in `R7` and the bank mask in `R5`:
 
-- `R5` is loaded from descriptor byte `+9`.
+- `R5` is loaded from the `0x5C3D` mode-mask lookup. The same mask is stored in selection-record byte `+9` and reused by the descriptor/stream path.
 - `B385` tests bits 0, 1, and 2 of A (=R5), clearing P3.5, P3.4, and P3.1 respectively. These are active-low external control lines from the DS5002FP.
 - With those lines asserted, `B3BC` reads two bytes from XDATA address `2*index` and `2*index+1`.
-- The low byte returns in `R6`, the high byte in `R7`.
+- The first table byte returns in `R6` (pointer high byte), the second in `R7` (pointer low byte).
 - `B395` restores P3.5, P3.4, and P3.1 high after the read.
 
 Thus the normal path uses a 256-entry, two-byte pointer table in a bank-selected XDATA window. The mask values for Part parameters 0..3 are `07, 07, 06, 06`. The special Part-index-9 branch follows a different path and is not covered by this formula.
@@ -39,14 +39,14 @@ Thus the normal path uses a 256-entry, two-byte pointer table in a bank-selected
 
 `0x418E` writes the returned pointer to descriptor bytes `+5/+6`:
 
-- `+5`: pointer low byte (`R6`)
-- `+6`: pointer high byte (`R7`)
+- `+5`: pointer high byte (`R6`)
+- `+6`: pointer low byte (`R7`)
 
-`0x1494` reads the 13-byte descriptor. It loads byte `+5` into `RAM[0x37]` and byte `+6` into `RAM[0x36]`, forming the 16-bit stream pointer `RAM[0x36]:RAM[0x37]`. Byte `+9` of the separate 12-byte resource-selection record is read into the accumulator; firmware copies ACC.0..ACC.2 into internal flags 0..2. Those flags control the active-low P3 lines during subsequent external-memory accesses. This is not a byte from the eight-byte fixed descriptor header.
+`0x1494` reads a 12-byte resource-selection record from XDATA. It sets P2 from `RAM[0x29]`, R0 from `RAM[0x2A]`, and reads the record through `MOVX @R0`. The record is the per-Part block at `0x2900 + 12*PartIndex`; the runtime pointer to it is staged at `0x2B98`. Bytes `+5/+6` carry the external descriptor pointer: byte `+5` becomes DPH (`RAM[0x37]`), byte `+6` becomes DPL (`RAM[0x36]`). At `0x15AE`, descriptor scanning begins at this pointer plus eight bytes. Byte `+9` contains the same P3 mask loaded from `0x5C3D`; firmware copies its bits 0..2 into internal flags 0..2, controlling active-low P3 lines during subsequent external-memory reads.
 
 This establishes the chain:
 
-`Part parameter -> 0x5C3D bank mask + pointer-table index -> banked XDATA pointer -> descriptor +5/+6 -> 0x1494 -> 0x189D`.
+`Part parameter -> 0x5C3D P3 mask + IC51 pointer-table index -> 16-bit descriptor address -> per-Part 12-byte XDATA selection record -> 0x1494 / 0x15AE descriptor scan -> command-stream pointer -> 0x189D`.
 
 ## 2. Command-stream interpreter
 
@@ -66,7 +66,7 @@ The dispatch table contains eight four-byte entries (an `LJMP` plus padding). Th
 | `0x08` | `0x1C61` | 7-byte record: opcode plus six payload bytes; stores/scales fields and may interpolate a 24-bit value. |
 | `0x10` | `0x1EDD` | 7-byte record: opcode plus six payload bytes. If byte +1 is zero, it takes a filler-slot path but still advances exactly 7 bytes. Otherwise it performs the active 24-bit/nonlinear parameter transform. |
 | `0x18` | `0x224C` | 4-byte record: opcode plus three payload bytes. When firmware flag bit `0x08` is set it skips the command but still consumes 4 bytes; otherwise it writes the four-byte command port. |
-| `0x20` | `0x2301` | 4-byte terminal control record: opcode plus three payload bytes. It may fill the rest of the 16-record output window with `0x38` filler records, emits a control packet, and exits the interpreter through `0x19CD`; bytes following it are not parsed. |
+| `0x20` | `0x2301` | 4-byte terminal control record: opcode plus three payload bytes. With flag `0x0A` clear it fills all unoccupied eight-byte slots through offset `0xF0` with `0x38`, sets the current slot to `0xF8`, and stores the payload in the final slot. With flag `0x0A` set it skips the filler loop and jumps directly to slot `0xF8`. It emits a control packet and exits via `0x19CD`; following bytes are not parsed. |
 | `0x28` / `0x30` | `0x2374` | One-byte advance for each group; the output slot is then advanced by the interpreter. |
 
 The interpreter initializes a 16-iteration counter (`RAM[0x2C] = 0x10`). The caller `0x16C3` sets P2 to `RAM[0x2D]` before calling `0x189D`; therefore `RAM[0x2E]` is the low-byte offset within that selected XDATA page, not a page number:
@@ -163,7 +163,7 @@ The pointer-table entry does not point directly to a command stream. `0x1494` sc
 - Table B contains records of `key + 2 data bytes` for keys `0..5`. A key `>= 6` ends Table B.
 - The next two bytes form the command-stream pointer in **little-endian** order. The code reads the first into `RAM[0x36]`, the second into `RAM[0x37]`, then loads DPL from `RAM[0x36]` and DPH from `RAM[0x37]`.
 
-The descriptor and command-stream reads use the P3 flag field loaded from byte `+9` of the separate 12-byte resource-selection record before descriptor parsing. It is not safe to assume that the descriptor/stream memory bank is identical to the IC51 pointer-table bank. The actual physical memory selected by those flags remains unresolved.
+The descriptor and command-stream reads use the same P3 control mask used for the IC51 pointer-table read: `0x418E` writes the `0x5C3D` mask into selection-record byte `+9`, and `0x1494` copies those bits into the P3 control flags. Thus the P3-selected external bus path is continuous from directory lookup into descriptor/stream reads. The additional P2/page mapping and exact physical device/window are still unresolved; this is not yet a byte-for-byte proof of the physical memory map.
 
 ### XDATA staging buffer and hardware port
 

@@ -182,6 +182,18 @@ void testCommandStreamDecoder() {
     assert(decoded.terminated && decoded.slotsConsumed == 1);
     assert(decoded.commands[0].length == 4 && !decoded.commands[0].branchesToExtendedCommand);
 
+    // Without flag 0x0A, a clear bit 3 in byte +3 takes the short four-byte
+    // branch and does not enter handler 0x224C.
+    bank[0x1480] = 0x00;
+    bank[0x1481] = 0x11;
+    bank[0x1482] = 0x22;
+    bank[0x1483] = 0x00;
+    bank[0x1484] = 0xff;
+    assert(MASSCommandStreamDecoder::decode(
+        bank.data(), bank.size(), 0x1480, decoded));
+    assert(decoded.terminated && decoded.commands[0].length == 4);
+    assert(!decoded.commands[0].branchesToExtendedCommand);
+
     bank[0x1500] = 0x3b; // 0x38 filler/slot marker, not the end-of-stream byte
     bank[0x1501] = 0x28; // group 0x28 advances by one byte
     bank[0x1502] = 0x30; // group 0x30 advances by one byte
@@ -212,8 +224,19 @@ void testCommandStreamDecoder() {
     assert(MASSCommandStreamDecoder::decode(
         bank.data(), bank.size(), 0x1700, decoded));
     assert(!decoded.terminated && decoded.endedByControlCommand);
+    assert(decoded.fillsRemainingSlots);
     assert(decoded.slotsConsumed == 1 && decoded.commands.size() == 1);
     assert(decoded.bytesConsumed == 4 && decoded.endOffset == 0x1704);
+
+    bank[0x1710] = 0x20;
+    bank[0x1711] = 0x11;
+    bank[0x1712] = 0x22;
+    bank[0x1713] = 0x03;
+    bank[0x1714] = 0xff;
+    assert(MASSCommandStreamDecoder::decode(
+        bank.data(), bank.size(), 0x1710, decoded, true));
+    assert(!decoded.terminated && decoded.endedByControlCommand);
+    assert(!decoded.fillsRemainingSlots && decoded.bytesConsumed == 4);
 
     bank[0xfffc] = 0x08;
     bank[0xfffd] = 0x01;
