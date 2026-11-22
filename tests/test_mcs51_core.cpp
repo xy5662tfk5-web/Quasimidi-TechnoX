@@ -148,6 +148,36 @@ int main() {
     assert(rotateCarryCpu.registers().a == 0x80);
     assert(!rotateCarryCpu.registers().psw.carry);
 
+    // LCALL/RET preserve the full 16-bit return address on the internal stack.
+    TestBus callBus;
+    callBus.code[0] = 0x12; callBus.code[1] = 0x00; callBus.code[2] = 0x10; // LCALL 0010
+    callBus.code[0x10] = 0x74; callBus.code[0x11] = 0x66; // MOV A,#66
+    callBus.code[0x12] = 0x22; // RET
+    MCS51Core callCpu;
+    assert(callCpu.step(callBus) == MCS51StepResult::executed);
+    assert(callCpu.registers().pc == 0x0010);
+    assert(callCpu.registers().sp == 0x09);
+    assert(callBus.internal[0x08] == 0x03); // return low
+    assert(callBus.internal[0x09] == 0x00); // return high
+    assert(callCpu.step(callBus) == MCS51StepResult::executed);
+    assert(callCpu.registers().a == 0x66);
+    assert(callCpu.step(callBus) == MCS51StepResult::executed);
+    assert(callCpu.registers().pc == 0x0003);
+    assert(callCpu.registers().sp == 0x07);
+
+    // PUSH/POP use the hardware stack growth convention and synchronize SP SFR.
+    TestBus pushPopBus;
+    pushPopBus.code[0] = 0x75; pushPopBus.code[1] = 0x30; pushPopBus.code[2] = 0xa5;
+    pushPopBus.code[3] = 0xc0; pushPopBus.code[4] = 0x30; // PUSH 30
+    pushPopBus.code[5] = 0x75; pushPopBus.code[6] = 0x30; pushPopBus.code[7] = 0x00;
+    pushPopBus.code[8] = 0xd0; pushPopBus.code[9] = 0x30; // POP 30
+    MCS51Core pushPopCpu;
+    for (int i = 0; i < 4; ++i)
+        assert(pushPopCpu.step(pushPopBus) == MCS51StepResult::executed);
+    assert(pushPopBus.internal[0x30] == 0xa5);
+    assert(pushPopCpu.registers().sp == 0x07);
+    assert(pushPopBus.internal[0x81] == 0x07);
+
     TestBus unsupportedBus;
     unsupportedBus.code[0] = 0xa5; // reserved opcode in classic 8051
     MCS51Core unsupported;
