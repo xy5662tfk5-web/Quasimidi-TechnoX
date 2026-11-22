@@ -521,6 +521,12 @@ int main(int argc, char** argv) {
         }};
         const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
         const auto commandCountBeforeMidi = injectedResponseMachine.soundCommandPacketCount();
+        const auto call57a8BeforeMidi = injectedResponseMachine.watchedCallCount(0x57a8);
+        const auto call5671BeforeMidi = injectedResponseMachine.watchedCallCount(0x5671);
+        const auto call4256BeforeMidi = injectedResponseMachine.watchedCallCount(0x4256);
+        const auto call1494BeforeMidi = injectedResponseMachine.watchedCallCount(0x1494);
+        const auto callAC00BeforeMidi = injectedResponseMachine.watchedCallCount(0xac00);
+        const auto callAC88BeforeMidi = injectedResponseMachine.watchedCallCount(0xac88);
         const auto commandWriterCallsBeforeMidi = injectedResponseMachine.watchedCallCount(0x0db7);
         const auto aciaReadsBeforeMidi = injectedResponseMachine.aciaReceiveReadCount();
         const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
@@ -573,6 +579,14 @@ int main(int argc, char** argv) {
         // not yet evidence that a voice command reached the external engine.
         assert(injectedResponseMachine.readExternal(0x304c) == 0x90u);
         assert(injectedResponseMachine.readExternal(0x2b9d) == 0x3cu);
+        std::printf("Firmware call deltas: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu\\n",
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x57a8) - call57a8BeforeMidi),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x5671) - call5671BeforeMidi),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x4256) - call4256BeforeMidi),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x1494) - call1494BeforeMidi),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x0db7) - commandWriterCallsBeforeMidi),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac00) - callAC00BeforeMidi),
+                    static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac88) - callAC88BeforeMidi));
         std::printf("Firmware call counts: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu B34D=%llu\\n",
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x57a8)),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x5671)),
@@ -711,9 +725,8 @@ int main(int argc, char** argv) {
         assert((injectedResponseMachine.readExternal(0xa002) & 0x01u) == 0);
         assert(injectedResponseMachine.cpu().registers().pc != 0x32b0);
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
-        assert(injectedResponseMachine.watchedCallCount(0x5671) > 0u);
-        assert(injectedResponseMachine.watchedCallCount(0x4256) > 0u);
-        assert(injectedResponseMachine.watchedCallCount(0x1494) > 0u);
+        assert(injectedResponseMachine.watchedCallCount(0x57a8) > call57a8BeforeMidi);
+        assert(injectedResponseMachine.watchedCallCount(0x5671) > call5671BeforeMidi);
         assert(commandCount > commandCountBeforeMidi);
         assert(injectedResponseMachine.watchedCallCount(0x0db7) - commandWriterCallsBeforeMidi ==
                commandCount - commandCountBeforeMidi);
