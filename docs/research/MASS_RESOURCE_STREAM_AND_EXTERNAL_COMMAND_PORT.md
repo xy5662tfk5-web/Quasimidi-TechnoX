@@ -73,12 +73,13 @@ CI checks table bounds and endpoint values against the real 128-KB descrambled I
 
 ## 3. Fixed-point helper 0x1848
 
-Subroutine 0x1848 is now represented at instruction level in MASS1848Arithmetic. Its entry arguments are the accumulator A, B/F0 and R2, plus the live E7 and D2 flags. The routine:
+Subroutine 0x1848 is represented at instruction level in MASS1848Arithmetic. Its entry arguments are A, B/F0 and R2. Crucially, addresses 0xE0..0xE7 are bits of the current accumulator A, so E7 is re-tested after each XCH rather than treated as a persistent mode flag. Address 0x03 is a temporary bit in bit-addressable internal RAM. Address 0xD2 is PSW.2/OV, set by the final ADD A,R2; it is not an independent input flag. The routine:
 
-1. Applies E7-controlled two's-complement transforms around the first A/B swap.
-2. Rotates the active A operand left, forces bit 0 to one, multiplies A*B, then swaps the 8051 MUL result so A receives the high byte.
-3. Loads R2 into B/F0, applies the second E7-controlled transform, performs the same rotate/force-bit/multiply/high-byte extraction, and adds R2.
-4. If D2 is clear, returns the low eight-bit sum. If D2 is set, it saturates to 0x7F when the final addition has no carry or 0x81 when carry is set.
+1. Tests ACC.7; if set, records temporary bit 0x03 and two's-complement negates A.
+2. Exchanges A/B and tests the new ACC.7 independently. If set, toggles bit 0x03 and negates A again.
+3. Rotates A left, forces bit 0 to one, multiplies A*B, exchanges A/B to retain the high product byte in A, and conditionally negates it according to temporary bit 0x03.
+4. Loads R2 into B/F0, repeats the fresh ACC.7 tests and sign corrections around the second exchange, performs the second rotate/force-bit/multiply/high-byte extraction, then adds the original R2.
+5. The final ADD sets PSW.2/OV and carry. If OV is clear, the raw low byte is returned. If OV is set, the result saturates to 0x7F when carry is clear or 0x81 when carry is set.
 
 The E7 branch changes the operands before both multiplications; it is not a final sign-bit toggle. The C++ model retains the byte-level operations and carries rather than substituting a floating-point approximation. Tests cover E7 on/off, positive and carry-producing sums, and both saturation endpoints.
 

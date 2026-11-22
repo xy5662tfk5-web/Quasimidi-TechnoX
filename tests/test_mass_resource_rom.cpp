@@ -22,19 +22,25 @@ void writePointerBE(std::vector<std::uint8_t>& image,
 }
 
 void testMASS1848Arithmetic() {
-    const auto positive = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d, false, false);
-    assert(positive.value == 0x96 && !positive.carryOut && !positive.saturated);
+    const auto ordinary = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d);
+    assert(ordinary.value == 0x5d && !ordinary.carryOut &&
+           !ordinary.overflow && !ordinary.saturated);
 
-    const auto e7Set = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d, true, false);
-    assert(e7Set.value == 0xee && !e7Set.carryOut && !e7Set.saturated);
+    // A set ACC.7 causes sign normalization; each XCH is followed by a
+    // fresh test of the current accumulator sign bit.
+    const auto signedInputs = MASS1848Arithmetic::execute(0x20, 0x70, 0xf0);
+    assert(signedInputs.value == 0xed && signedInputs.carryOut &&
+           !signedInputs.overflow && !signedInputs.saturated);
 
-    const auto unclampedCarry = MASS1848Arithmetic::execute(0xff, 0xff, 0x7f, false, false);
-    assert(unclampedCarry.value == 0x7e && unclampedCarry.carryOut);
-    const auto clampHigh = MASS1848Arithmetic::execute(0xff, 0xff, 0x7f, false, true);
-    assert(clampHigh.value == 0x81 && clampHigh.carryOut && clampHigh.saturated);
+    // Signed overflow with no carry saturates upward to 0x7F.
+    const auto clampPositive = MASS1848Arithmetic::execute(0x7f, 0x7f, 0x7f);
+    assert(clampPositive.value == 0x7f && !clampPositive.carryOut &&
+           clampPositive.overflow && clampPositive.saturated);
 
-    const auto clampLow = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d, false, true);
-    assert(clampLow.value == 0x7f && !clampLow.carryOut && clampLow.saturated);
+    // Signed overflow with carry saturates downward to 0x81.
+    const auto clampNegative = MASS1848Arithmetic::execute(0x80, 0x81, 0x81);
+    assert(clampNegative.value == 0x81 && clampNegative.carryOut &&
+           clampNegative.overflow && clampNegative.saturated);
 }
 
 void testFirmwareROMTableView() {
