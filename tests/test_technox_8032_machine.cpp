@@ -219,12 +219,14 @@ int main(int argc, char** argv) {
         firmwareMachine.writeExternal(0x3500, 0xa5);
         assert(firmwareMachine.step() == technox::MCS51StepResult::executed);
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
-        const auto executed = firmwareMachine.runInstructions(50000);
+        const auto executed = firmwareMachine.runInstructions(41277);
         std::printf("IC4 boot trace: instructions=%zu PC=%04X SP=%02X cycles=%llu\\n",
                     executed, firmwareMachine.cpu().registers().pc,
                     firmwareMachine.cpu().registers().sp,
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
-        assert(executed == 50000);
+        assert(executed == 41277);
+        assert(firmwareMachine.cpu().registers().pc == 0xeb8d);
+        assert(firmwareMachine.cpu().registers().sp == 0xb5);
         assert(firmwareMachine.readExternal(0x0000) == 0x00);
         assert(firmwareMachine.readExternal(0x34ff) == 0x00);
         assert(firmwareMachine.readExternal(0x3500) == 0xa5);
