@@ -21,6 +21,28 @@ void writePointerBE(std::vector<std::uint8_t>& image,
     image[offset + 1] = static_cast<std::uint8_t>(address & 0xff);
 }
 
+void testMASSModulationScaleMode41() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    const std::array<std::uint8_t, 8> table0{{0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0}};
+    const std::array<std::uint8_t, 8> table1{{0x10, 0x20, 0x38, 0x50, 0x70, 0x90, 0xc0, 0xe0}};
+    std::copy(table0.begin(), table0.end(), romBytes.begin() + 0x11e0);
+    std::copy(table1.begin(), table1.end(), romBytes.begin() + 0x11e8);
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASSModulationScaleResult result{};
+    assert(MASSModulationScaleMode41::apply(view, 0x41, 0x80, 0x00, 0x7f, result));
+    assert(result.combinedCoefficient == 0x80 && result.value == 0x3f);
+
+    assert(MASSModulationScaleMode41::apply(view, 0x41, 0x00, 0x80, 0x7f, result));
+    assert(result.combinedCoefficient == 0x0f && result.value == 0x07);
+
+    assert(MASSModulationScaleMode41::apply(view, 0x41, 0x80, 0x80, 0x7f, result));
+    assert(result.combinedCoefficient == 0x08 && result.value == 0x03);
+
+    assert(!MASSModulationScaleMode41::apply(view, 0x01, 0x80, 0x80, 0x7f, result));
+}
+
 void testMASS1848Arithmetic() {
     const auto ordinary = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d);
     assert(ordinary.value == 0x5d && !ordinary.carryOut &&
@@ -551,6 +573,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASSModulationScaleMode41();
     testMASS1848Arithmetic();
     testFirmwareROMTableView();
     if (argc > 2)

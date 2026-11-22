@@ -78,6 +78,54 @@ private:
     std::size_t imageSize_ = 0;
 };
 
+struct MASSModulationScaleResult {
+    std::uint8_t value = 0;
+    std::uint8_t combinedCoefficient = 0;
+};
+
+// Table-driven 0x23C7 branch for slot-byte mask 0x41 only. Other opcode
+// masks enter the alternate 0x1890 paths and are deliberately not guessed.
+class MASSModulationScaleMode41 {
+public:
+    static bool apply(const MASSFirmwareROMView& rom,
+                      std::uint8_t slotOpcode,
+                      std::uint8_t ram41,
+                      std::uint8_t ram43,
+                      std::uint8_t r2,
+                      MASSModulationScaleResult& result) noexcept {
+        if ((slotOpcode & 0x41u) != 0x41u)
+            return false;
+
+        std::uint8_t b = 0xff;
+        std::uint8_t coefficient = 0xff;
+        std::uint8_t lookup = 0;
+
+        if (ram41 != 0 && (ram41 & 0x80u) != 0) {
+            const auto index = static_cast<std::uint8_t>((ram41 >> 4) & 0x07u);
+            if (!rom.read(MASSFirmwareLookupTable::modulationScale11E0,
+                          index, coefficient))
+                return false;
+            b = coefficient;
+        }
+
+        if (ram43 != 0 && (ram43 & 0x80u) != 0) {
+            const auto index = static_cast<std::uint8_t>((ram43 >> 4) & 0x07u);
+            if (!rom.read(MASSFirmwareLookupTable::modulationScale11E8,
+                          index, lookup))
+                return false;
+            const auto product = static_cast<std::uint16_t>(lookup) * b;
+            b = static_cast<std::uint8_t>(product >> 8);
+        }
+
+        const auto finalProduct = static_cast<std::uint16_t>(r2) * b;
+        result = {
+            static_cast<std::uint8_t>(finalProduct >> 8),
+            b
+        };
+        return true;
+    }
+};
+
 struct MASS1848Result {
     std::uint8_t value = 0;
     bool carryOut = false;

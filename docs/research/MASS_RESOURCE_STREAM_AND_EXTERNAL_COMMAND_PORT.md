@@ -67,7 +67,7 @@ In the common 0x1EDD branch, firmware derives a 7-bit index through 8051 rotate/
 Related helpers:
 - 0x2381 constructs a pointer into a 0x30-byte record bank from the selected two-bit field in R5, base pointer RAM[0x38:0x39], and an offset derived from RAM[0x2F] + 0xF4; it then reads from the P3-selected external bus.
 - 0x1848 performs sign-aware rotate/multiply arithmetic using A, B/F0 and R2, with saturation returns 0x7F or 0x81 when the D2 condition is active. Its complete fixed-point interpretation remains under analysis.
-- 0x23C7 applies data-dependent modulation scaling. It tests ACC.7 on the current RAM[0x41]/RAM[0x43] values before selecting the two 8-entry tables; its ACC.6 check is against the current mode/opcode byte, not a persistent flag. In the 0x41 mode it uses the two tables above; other modes may call 0x1890.
+- 0x23C7 applies data-dependent modulation scaling. When the slot opcode masked by 0x41 equals 0x41, it initializes B to 0xFF, conditionally loads the 0x11E0 coefficient from RAM[0x41] bits 4..6 when RAM[0x41] is nonzero and bit 7 is set, then conditionally multiplies by the 0x11E8 coefficient selected from RAM[0x43] the same way. It finishes with MUL AB using R2 and the current B high-byte coefficient, storing the result's high byte back in R2. The alternate opcode masks take separate paths through 0x1890 and are not yet implemented.
 
 CI checks table bounds and endpoint values against the real 128-KB descrambled IC4 image, verifies monotonicity of the 0x1208, 0x1288 and 0x1308 remapping curves, and evaluates all 128 composed 0x1288 -> 0x1308 lookups.
 
