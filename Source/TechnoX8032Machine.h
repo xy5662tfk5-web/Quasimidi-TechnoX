@@ -514,8 +514,8 @@ public:
     }
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
-        if (isIC51Selected())
-            return; // selected IC51 bank is read-only
+        // IC51 is a read source; writes on the same address bus can still
+        // reach the separately selected external RAM/sound-memory target.
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
             soundDeviceWrite_ = value; // status-port traffic outside RAM mode
             return;
