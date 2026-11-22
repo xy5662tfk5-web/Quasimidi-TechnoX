@@ -513,8 +513,9 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
             programAndNote.data(), programAndNote.size(), midiStartCycle));
         const auto midiInstructions = injectedResponseMachine.runForMachineCycles(2000000);
-        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X ACIAreads=%llu lastRX=%02X\\n",
-                    midiInstructions,
+        const auto midiDrainInstructions = injectedResponseMachine.runForMachineCycles(100000u);
+        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu drain=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X ACIAreads=%llu lastRX=%02X RAM49=%02X RAM47=%02X RAM59=%02X RAM5E=%02X\\n",
+                    midiInstructions, midiDrainInstructions,
                     static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
                     static_cast<unsigned>(ieBeforeMidi),
                     static_cast<unsigned>(injectedResponseMachine.readInternal(0x88)),
@@ -525,7 +526,11 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.ic51ReadsByBank(1)),
                     static_cast<unsigned>(injectedResponseMachine.lastIC51ReadAddress()),
                     static_cast<unsigned long long>(injectedResponseMachine.aciaReceiveReadCount()),
-                    static_cast<unsigned>(injectedResponseMachine.lastAciaReceiveRead()));
+                    static_cast<unsigned>(injectedResponseMachine.lastAciaReceiveRead()),
+                    static_cast<unsigned>(injectedResponseMachine.readInternal(0x49)),
+                    static_cast<unsigned>(injectedResponseMachine.readInternal(0x47)),
+                    static_cast<unsigned>(injectedResponseMachine.readInternal(0x59)),
+                    static_cast<unsigned>(injectedResponseMachine.readInternal(0x5e)));
         assert(!injectedResponseMachine.cpuFaulted());
         assert(injectedResponseMachine.aciaReceiveReadCount() == aciaReadsBeforeMidi + programAndNote.size());
         assert(injectedResponseMachine.lastAciaReceiveRead() == programAndNote.back());
