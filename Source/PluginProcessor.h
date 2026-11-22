@@ -4,6 +4,7 @@
 #include "TechnoXSoundCatalog.h"
 #include "TechnoXMidiControlRouter.h"
 #include "MASSAudioEngine.h"
+#include "MASSResourceROM.h"
 #include "BasicMASSVoiceBackend.h"
 #include <array>
 #include <atomic>
@@ -41,6 +42,7 @@ public:
     const technox::PerformanceBank& getPerformanceBank() const noexcept { return performanceBank; }
     juce::String getCurrentPerformanceName() const;
     juce::String getCurrentPartSoundName(int partIndex) const;
+    juce::String getCurrentPartResourceSummary(int partIndex) const;
     int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
     bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
     int getCommonControlRaw(int performanceIndex, technox::MASSCommonControl control) const noexcept;
@@ -63,6 +65,11 @@ public:
 private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
+    technox::MASSResourceROM resourceROM;
+    mutable std::array<technox::MASSResolvedProgramResource, 4> resolvedResources{};
+    mutable std::array<int, 4> resolvedResourceBanks{{-1, -1, -1, -1}};
+    mutable std::array<int, 4> resolvedResourcePrograms{{-1, -1, -1, -1}};
+    mutable std::array<bool, 4> resolvedResourceValid{};
     technox::MidiControlRouter midiControlRouter;
     std::unique_ptr<technox::IMASSVoiceBackend> voiceBackend;
     technox::MASSAudioEngine massEngine;

@@ -192,6 +192,10 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         ? juce::String("All incoming channels trigger the active Performance layers.")
         : juce::String("MIDI channels are assigned individually to Parts 13–16.");
     g.drawText(routingHint, 350, 153, 820, 20, juce::Justification::right, false);
+    g.setFont(juce::Font("Courier New", 10.0f, juce::Font::bold));
+    g.setColour(juce::Colour(0xff9be034));
+    g.drawText(audioProcessor.getCurrentPartResourceSummary(selectedPartSlot),
+               750, 122, 430, 24, juce::Justification::right, false);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)

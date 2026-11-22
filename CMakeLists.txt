@@ -22,6 +22,7 @@ juce_add_binary_data(TechnoXAssets
         assets/technox_front_panel.svg
         TECHNOX.MID
         data/technox_ins.json
+        technox_IC51_nm27c010_v105.bin
 )
 
 juce_add_plugin(QuasimidiTechnoX

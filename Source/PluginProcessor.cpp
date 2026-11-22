@@ -30,10 +30,15 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
 
     int midiSize = 0;
     int catalogSize = 0;
+    int resourceRomSize = 0;
     if (const auto* midiData = BinaryData::getNamedResource("TECHNOX_MID", midiSize))
         performanceBank.loadFromMidi(midiData, midiSize);
     if (const auto* catalogData = BinaryData::getNamedResource("technox_ins_json", catalogSize))
         soundCatalog.loadFromJson(catalogData, catalogSize);
+    if (const auto* resourceData = BinaryData::getNamedResource(
+            "technox_IC51_nm27c010_v105_bin", resourceRomSize))
+        resourceROM.load(reinterpret_cast<const std::uint8_t*>(resourceData),
+                         static_cast<std::size_t>(resourceRomSize));
     initialisePartStates();
     initialiseCommonControlsFromBank();
     syncCurrentPerformanceToEngine();
@@ -447,6 +452,35 @@ juce::String QuasimidiTechnoXAudioProcessor::getCurrentPartSoundName(int partInd
     const int bank = getPartParameterRaw(performance, partIndex, technox::PartParameter::bankNumber);
     const int sound = getPartParameterRaw(performance, partIndex, technox::PartParameter::soundNumber);
     return soundCatalog.nameFor(bank, sound);
+}
+
+juce::String QuasimidiTechnoXAudioProcessor::getCurrentPartResourceSummary(int partIndex) const
+{
+    if (partIndex < 0 || partIndex >= 4)
+        return "Part unavailable";
+
+    const int performance = static_cast<int>(performanceBank.selectedIndex());
+    const int bank = getPartParameterRaw(performance, partIndex, technox::PartParameter::bankNumber);
+    const int sound = getPartParameterRaw(performance, partIndex, technox::PartParameter::soundNumber);
+    const auto index = static_cast<std::size_t>(partIndex);
+    if (bank != resolvedResourceBanks[index] || sound != resolvedResourcePrograms[index]) {
+        technox::MASSResolvedProgramResource resolved{};
+        resolvedResourceValid[index] = technox::MASSResourceProgramResolver::resolve(
+            resourceROM, bank, sound, resolved);
+        resolvedResourceBanks[index] = bank;
+        resolvedResourcePrograms[index] = sound;
+        if (resolvedResourceValid[index])
+            resolvedResources[index] = std::move(resolved);
+    }
+
+    if (!resolvedResourceValid[index])
+        return resourceROM.isLoaded() ? "IC51 resource unavailable" : "IC51 ROM not embedded";
+
+    const auto& resource = resolvedResources[index];
+    return juce::String::formatted("IC51 %04X  STREAM %04X  %d CMD",
+        static_cast<int>(resource.descriptorAddress),
+        static_cast<int>(resource.descriptor.commandStreamPointer),
+        static_cast<int>(resource.stream.commands.size()));
 }
 
 juce::AudioProcessorEditor* QuasimidiTechnoXAudioProcessor::createEditor()
