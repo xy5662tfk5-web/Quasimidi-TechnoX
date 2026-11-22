@@ -68,9 +68,8 @@ public:
         lcdInstruction_ = 0;
         elapsedMachineCycles_ = 0;
         soundDeviceResetReleased_ = true;
-        soundDeviceBootRequested_ = false;
-        soundDeviceDataLoaded_ = false;
-        soundDeviceReady_ = false;
+        soundDeviceWrite_ = 0;
+        soundDeviceResponse_ = 0xff; // external sound-device response is unknown/open bus
         cpuFaulted_ = false;
         scheduledAciaHead_ = 0;
         scheduledAciaTail_ = 0;
@@ -151,15 +150,10 @@ public:
             if (port == 3) {
                 const bool wasReleased = (previousPins & 0x04u) != 0;
                 const bool nowReleased = (value & 0x04u) != 0;
-                if (wasReleased && !nowReleased) {
+                if (wasReleased && !nowReleased)
                     soundDeviceResetReleased_ = false;
-                    soundDeviceBootRequested_ = false;
-                    soundDeviceDataLoaded_ = false;
-                    soundDeviceReady_ = false;
-                } else if (!wasReleased && nowReleased) {
+                else if (!wasReleased && nowReleased)
                     soundDeviceResetReleased_ = true;
-                    soundDeviceReady_ = soundDeviceBootRequested_ && soundDeviceDataLoaded_;
-                }
             }
         } else {
             internal_[address] = value;
@@ -181,8 +175,8 @@ public:
     }
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
-        if (address == 0xff10u && soundDeviceReady_)
-            return 0xacu; // IC4 expects the external sound block's ready signature
+        if (address == 0xff10u)
+            return soundDeviceResponse_; // unknown until the external device is modeled
         if (isXdataRam(address))
             return xdata_[address];
 
@@ -203,16 +197,11 @@ public:
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
         if (address == 0xff10u) {
-            xdata_[address] = value;
-            if (!soundDeviceResetReleased_ && value == 0xffu)
-                soundDeviceBootRequested_ = true;
+            soundDeviceWrite_ = value; // capture bus traffic; do not invent device semantics
             return;
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
-            if (address >= 0xc000u && address != 0xff10u &&
-                !soundDeviceResetReleased_ && soundDeviceBootRequested_)
-                soundDeviceDataLoaded_ = true;
             return;
         }
 
@@ -303,9 +292,10 @@ public:
         return commandPort_;
     }
 
-    bool soundDeviceBootRequested() const noexcept { return soundDeviceBootRequested_; }
-    bool soundDeviceDataLoaded() const noexcept { return soundDeviceDataLoaded_; }
-    bool soundDeviceReady() const noexcept { return soundDeviceReady_; }
+    std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
+    void setSoundDeviceResponseForTesting(std::uint8_t value) noexcept {
+        soundDeviceResponse_ = value;
+    }
 
     static constexpr std::uint8_t descrambledOffset(std::uint8_t offset) noexcept {
         constexpr std::uint8_t order[8] = {1, 2, 3, 6, 5, 7, 1, 0};
@@ -379,9 +369,8 @@ private:
     std::uint8_t lcdInstruction_ = 0;
     std::uint64_t elapsedMachineCycles_ = 0;
     bool soundDeviceResetReleased_ = true;
-    bool soundDeviceBootRequested_ = false;
-    bool soundDeviceDataLoaded_ = false;
-    bool soundDeviceReady_ = false;
+    std::uint8_t soundDeviceWrite_ = 0;
+    std::uint8_t soundDeviceResponse_ = 0xff;
     bool cpuFaulted_ = false;
     bool romLoaded_ = false;
 };
