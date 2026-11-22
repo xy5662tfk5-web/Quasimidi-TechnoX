@@ -64,6 +64,7 @@ int main() {
     BasicMASSVoiceBackend sustainBackend;
     MASSAudioEngine sustainEngine(&sustainBackend);
     sustainEngine.prepare(48000.0, 128);
+    assert(sustainEngine.setPartParameter(12, PartParameter::holdPedal, 1));
     assert(sustainEngine.setSustainPedal(12, true));
     assert(sustainEngine.sustainPedal(12));
     assert(!sustainEngine.sustainPedal(13));
@@ -88,6 +89,42 @@ int main() {
     assert(part12Released);
     sustainEngine.resetPartControllers(12);
     assert(!sustainEngine.sustainPedal(12));
+    assert(!sustainEngine.sustainControllerDown(12));
+
+    // Per-Part HoldPed disables CC64 sustain, and switching it off while the
+    // pedal is down releases notes that were being held by that Part.
+    BasicMASSVoiceBackend holdParameterBackend;
+    MASSAudioEngine holdParameterEngine(&holdParameterBackend);
+    holdParameterEngine.prepare(48000.0, 128);
+    assert(holdParameterEngine.setPartParameter(12, PartParameter::holdPedal, 1));
+    assert(holdParameterEngine.setSustainPedal(12, true));
+    holdParameterEngine.noteOn(12, 1, 62, 100);
+    holdParameterEngine.noteOff(1, 62);
+    bool holdParameterVoiceSustained = false;
+    for (const auto& voice : holdParameterEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 62)
+            holdParameterVoiceSustained = voice.sustained && !voice.releasing;
+    assert(holdParameterVoiceSustained);
+    assert(holdParameterEngine.setPartParameter(12, PartParameter::holdPedal, 0));
+    assert(!holdParameterEngine.sustainPedal(12));
+    bool holdParameterVoiceReleased = false;
+    for (const auto& voice : holdParameterEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 62)
+            holdParameterVoiceReleased = voice.releasing && !voice.sustained;
+    assert(holdParameterVoiceReleased);
+
+    BasicMASSVoiceBackend disabledHoldBackend;
+    MASSAudioEngine disabledHoldEngine(&disabledHoldBackend);
+    disabledHoldEngine.prepare(48000.0, 128);
+    assert(disabledHoldEngine.setSustainPedal(12, true));
+    assert(!disabledHoldEngine.sustainPedal(12));
+    disabledHoldEngine.noteOn(12, 1, 63, 100);
+    disabledHoldEngine.noteOff(1, 63);
+    bool disabledHoldReleased = false;
+    for (const auto& voice : disabledHoldEngine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 63)
+            disabledHoldReleased = voice.releasing && !voice.sustained;
+    assert(disabledHoldReleased);
     for (int i = 0; i < 21; ++i) engine.noteOn(0, 1, static_cast<std::uint8_t>(48+i), 100);
     assert(engine.voiceManager().activeVoiceCount() == 21);
     engine.noteOff(1, 48);

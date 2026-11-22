@@ -509,7 +509,14 @@ public:
     }
 
     bool setPartParameter(int partIndex, PartParameter parameter, int rawValue) noexcept {
-        return partParameters_.set(partIndex, parameter, rawValue);
+        if (!partParameters_.set(partIndex, parameter, rawValue)) return false;
+        if (parameter == PartParameter::holdPedal && partIndex >= 0 &&
+            partIndex < static_cast<int>(kPartCount)) {
+            const bool pedalDown = sustainControllerDown_[static_cast<std::size_t>(partIndex)]
+                .load(std::memory_order_acquire);
+            setSustainPedal(partIndex, pedalDown);
+        }
+        return true;
     }
     int getPartParameter(int partIndex, PartParameter parameter) const noexcept {
         return partParameters_.get(partIndex, parameter);
@@ -531,9 +538,14 @@ public:
     bool setPortamento(int partIndex, bool enabled) noexcept { return runtimeControls_.setPortamento(partIndex, enabled); }
     bool setSoftPedal(int partIndex, bool enabled) noexcept { return runtimeControls_.setSoftPedal(partIndex, enabled); }
     bool setSustainPedal(int partIndex, bool enabled) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount)) return false;
+        const auto part = static_cast<std::size_t>(partIndex);
+        sustainControllerDown_[part].store(enabled, std::memory_order_release);
+        const bool holdPedalEnabled = partParameters_.get(partIndex, PartParameter::holdPedal) == 1;
+        const bool effectiveEnabled = enabled && holdPedalEnabled;
         const bool wasEnabled = runtimeControls_.sustainPedal(partIndex);
-        if (!runtimeControls_.setSustainPedal(partIndex, enabled)) return false;
-        if (wasEnabled && !enabled) {
+        if (!runtimeControls_.setSustainPedal(partIndex, effectiveEnabled)) return false;
+        if (wasEnabled && !effectiveEnabled) {
             const auto& slots = voices_.voices();
             for (std::size_t i = 0; i < slots.size(); ++i) {
                 const auto& voice = slots[i];
@@ -549,6 +561,10 @@ public:
     bool portamento(int partIndex) const noexcept { return runtimeControls_.portamento(partIndex); }
     bool softPedal(int partIndex) const noexcept { return runtimeControls_.softPedal(partIndex); }
     bool sustainPedal(int partIndex) const noexcept { return runtimeControls_.sustainPedal(partIndex); }
+    bool sustainControllerDown(int partIndex) const noexcept {
+        return partIndex >= 0 && partIndex < static_cast<int>(kPartCount) &&
+            sustainControllerDown_[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire);
+    }
     bool setRpn(int partIndex, int parameterIndex, int value) noexcept { return runtimeControls_.setRpn(partIndex, parameterIndex, value); }
     int getRpn(int partIndex, int parameterIndex) const noexcept { return runtimeControls_.rpn(partIndex, parameterIndex); }
     bool setRpnLsb(int partIndex, int parameterIndex, int value) noexcept {
@@ -594,6 +610,7 @@ private:
     MASSCommonControlStore commonControls_;
     MASSPerformanceImageStore performanceImage_;
     MASSDrumParameterStore drumParameters_;
+    std::array<std::atomic<bool>, MASSPartParameterStore::kPartCount> sustainControllerDown_{};
 };
 
 } // namespace technox
