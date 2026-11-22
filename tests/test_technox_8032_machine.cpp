@@ -91,6 +91,10 @@ int main(int argc, char** argv) {
     assert(machine.soundCommandPacketCount() == 1u);
     const auto& capturedCommand = machine.soundCommandPacketAt(0);
     assert(capturedCommand.bytes == command);
+    assert(machine.sam9407BurstWordCount() == 1u);
+    const auto& burstWord = machine.sam9407BurstWordAt(0);
+    assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
+    assert(burstWord.value == 0x4433u);
 
     // 8032 upper IRAM and direct SFR reads are separate address spaces.
     machine.writeIndirect(0x80, 0x5a);
