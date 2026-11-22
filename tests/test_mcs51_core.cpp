@@ -12,7 +12,13 @@ public:
     std::uint8_t portLatches[4]{};
     std::uint8_t readCode(std::uint16_t a) const noexcept override { return code[a]; }
     std::uint8_t readInternal(std::uint8_t a) const noexcept override { return internal[a]; }
-    void writeInternal(std::uint8_t a, std::uint8_t v) noexcept override { internal[a] = v; }
+    void writeInternal(std::uint8_t a, std::uint8_t v) noexcept override {
+        internal[a] = v;
+        if (a == 0x80) portLatches[0] = v;
+        if (a == 0x90) portLatches[1] = v;
+        if (a == 0xa0) portLatches[2] = v;
+        if (a == 0xb0) portLatches[3] = v;
+    }
     std::uint8_t readPortLatch(std::uint8_t a) const noexcept override {
         return a == 0x80 ? portLatches[0] : a == 0x90 ? portLatches[1] :
                a == 0xa0 ? portLatches[2] : a == 0xb0 ? portLatches[3] : readInternal(a);
