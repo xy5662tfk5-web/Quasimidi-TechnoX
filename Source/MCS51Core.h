@@ -83,6 +83,12 @@ public:
     virtual std::uint8_t readInternal(std::uint8_t address) const noexcept = 0;
     virtual void writeInternal(std::uint8_t address, std::uint8_t value) noexcept = 0;
 
+    // MOVX @Ri drives the P2 output latch as the high address byte. This can
+    // differ from reading the external pin state through MOV A,P2.
+    virtual std::uint8_t readPortLatch(std::uint8_t portAddress) const noexcept {
+        return readInternal(portAddress);
+    }
+
     // External data space is separately mapped; IC4 XDATA hardware semantics
     // must be supplied by a device model, not guessed by the CPU core.
     virtual std::uint8_t readExternal(std::uint16_t address) noexcept = 0;
@@ -442,7 +448,7 @@ public:
             cycles = 2;
         } else if (opcode == 0xe2 || opcode == 0xe3) { // MOVX A,@Ri
             const auto low = readRegister(bus, opcode & 1u);
-            const auto high = readDirect(bus, 0xa0u); // P2 output latch
+            const auto high = bus.readPortLatch(0xa0u); // P2 output latch
             const auto address = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(high) << 8u) | low);
             registers_.a = bus.readExternal(address);
