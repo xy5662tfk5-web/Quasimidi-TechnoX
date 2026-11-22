@@ -15,9 +15,32 @@
 
 namespace technox {
 
+// SAM9407 host-interface register map (A2:A0), exposed by the TechnoX
+// 8032 external bus at 0x8000-0x8007.
+enum class SAM9407HostRegister : std::uint8_t {
+    Mpu401Data = 0,
+    Mpu401StatusControl = 1,
+    BurstDataLow = 2,
+    BurstDataHigh = 3,
+    GameSound0 = 4,
+    GameSound1 = 5,
+    GameSound2 = 6,
+    GameSound3 = 7
+};
+
+constexpr std::uint16_t sam9407HostAddress(SAM9407HostRegister reg) noexcept {
+    return static_cast<std::uint16_t>(0x8000u + static_cast<std::uint8_t>(reg));
+}
+
+static_assert(sam9407HostAddress(SAM9407HostRegister::BurstDataHigh) == 0x8003u,
+              "TechnoX packet trace must terminate at SAM9407 register 3");
+
 class TechnoX8032Machine final : public MCS51Bus {
 public:
     struct SoundCommandPacket {
+        // A 0x8000-0x8003 transaction snapshots SAM9407 host registers 0-3:
+        // MPU-401 data, status/control, then the low/high bytes of the 16-bit
+        // burst port. It is not one four-byte sound opcode.
         std::array<std::uint8_t, 4> bytes{};
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
