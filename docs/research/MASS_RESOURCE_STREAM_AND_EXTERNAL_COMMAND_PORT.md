@@ -42,7 +42,7 @@ Thus the normal path uses a 256-entry, two-byte pointer table in a bank-selected
 - `+5`: pointer low byte (`R6`)
 - `+6`: pointer high byte (`R7`)
 
-`0x1494` reads the 13-byte descriptor. It loads byte `+5` into `RAM[0x37]` and byte `+6` into `RAM[0x36]`, forming the 16-bit stream pointer `RAM[0x36]:RAM[0x37]`. Descriptor byte `+10` bits 0..2 are copied into internal flags 0..2; the firmware's external-memory helpers use these flags when controlling the same P3 lines during subsequent accesses.
+`0x1494` reads the 13-byte descriptor. It loads byte `+5` into `RAM[0x37]` and byte `+6` into `RAM[0x36]`, forming the 16-bit stream pointer `RAM[0x36]:RAM[0x37]`. Byte `+9` of the separate 12-byte resource-selection record is read into the accumulator; firmware copies ACC.0..ACC.2 into internal flags 0..2. Those flags control the active-low P3 lines during subsequent external-memory accesses. This is not a byte from the eight-byte fixed descriptor header.
 
 This establishes the chain:
 
@@ -66,7 +66,7 @@ The dispatch table contains eight four-byte entries (an `LJMP` plus padding). Th
 | `0x08` | `0x1C61` | 7-byte record: opcode plus six payload bytes; stores/scales fields and may interpolate a 24-bit value. |
 | `0x10` | `0x1EDD` | 7-byte record: opcode plus six payload bytes. If byte +1 is zero, it takes a filler-slot path but still advances exactly 7 bytes. Otherwise it performs the active 24-bit/nonlinear parameter transform. |
 | `0x18` | `0x224C` | 4-byte record: opcode plus three payload bytes. When firmware flag bit `0x08` is set it skips the command but still consumes 4 bytes; otherwise it writes the four-byte command port. |
-| `0x20` | `0x2301` | 4-byte record: opcode plus three payload bytes; may initialize remaining slot records and emits a command. |
+| `0x20` | `0x2301` | 4-byte terminal control record: opcode plus three payload bytes. It may fill the rest of the 16-record output window with `0x38` filler records, emits a control packet, and exits the interpreter through `0x19CD`; bytes following it are not parsed. |
 | `0x28` / `0x30` | `0x2374` | One-byte advance for each group; the output slot is then advanced by the interpreter. |
 
 The interpreter initializes a 16-iteration counter (`RAM[0x2C] = 0x10`). The caller `0x16C3` sets P2 to `RAM[0x2D]` before calling `0x189D`; therefore `RAM[0x2E]` is the low-byte offset within that selected XDATA page, not a page number:
@@ -103,7 +103,7 @@ The stream handlers use this port in several ways:
 
 - `0x1C61` updates an interpolated 24-bit parameter through `0x09B9`.
 - `0x224C` emits a command with a three-byte payload.
-- `0x2301` emits a command whose first byte is `RAM[0x2B] | 0x0F`, with payload `[RAM[0x02], 0x02, R4]`.
+- `0x2301` emits a command whose first byte is `RAM[0x2B] | 0x0F`, with payload `[RAM[0x02], 0x02, R4]`. It then exits the stream interpreter via `0x19CD`; the decoder must stop after this four-byte record.
 - `0x1EDD` can emit a sequence of up to three packets: command `RAM[0x2B]-2` with buffered data, command `RAM[0x2B]` with `[R5,R6,R7]`, and command `RAM[0x2B]-1` with `[R2,R3,R4]`.
 
 ### Handshake
@@ -163,7 +163,7 @@ The pointer-table entry does not point directly to a command stream. `0x1494` sc
 - Table B contains records of `key + 2 data bytes` for keys `0..5`. A key `>= 6` ends Table B.
 - The next two bytes form the command-stream pointer in **little-endian** order. The code reads the first into `RAM[0x36]`, the second into `RAM[0x37]`, then loads DPL from `RAM[0x36]` and DPH from `RAM[0x37]`.
 
-The descriptor and command-stream reads use the separate P3 flag field from descriptor byte `+10`; it is not safe to assume that the descriptor/stream memory bank is identical to the IC51 pointer-table bank. The actual physical memory selected by those flags remains unresolved.
+The descriptor and command-stream reads use the P3 flag field loaded from byte `+9` of the separate 12-byte resource-selection record before descriptor parsing. It is not safe to assume that the descriptor/stream memory bank is identical to the IC51 pointer-table bank. The actual physical memory selected by those flags remains unresolved.
 
 ### XDATA staging buffer and hardware port
 
@@ -171,7 +171,7 @@ The descriptor and command-stream reads use the separate P3 flag field from desc
 
 The four-byte hardware port at `0x8000..0x8003` is separate. The firmware temporarily selects P2 page `0x80` for hardware writes, then restores P2 to `RAM[0x2D]`. This distinguishes the decoded per-page staging records from the external sound-processor command interface.
 
-IC51 is therefore a structured resource directory, not a flat PCM stream. The descriptor parser and command-stream decoder are now separate C++ components: `MASSResourceROM` reads the big-endian IC51 directory, `MASSResourceDescriptorParser` parses the external descriptor, and `MASSCommandStreamDecoder` decodes a stream only when its actual memory bank is supplied. None of these components claims to decode PCM or reproduce the original M.A.S.S. synthesis.
+IC51 is therefore a structured resource directory, not a flat PCM stream. The C++ components now include `MASSResourceROM` for the big-endian IC51 directory, `MASSResourceSelectionRecordParser` for the 12-byte selection record (descriptor address and P3 flags), `MASSResourceDescriptorParser` for the external descriptor, and `MASSCommandStreamDecoder` for streams decoded from a caller-supplied memory bank. None of these components claims to decode PCM or reproduce the original M.A.S.S. synthesis.
 
 ## Next reverse-engineering target
 

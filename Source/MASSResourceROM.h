@@ -102,6 +102,52 @@ private:
     bool loaded_ = false;
 };
 
+// Twelve-byte resource-selection record read through the currently selected
+// XDATA page by firmware routine 0x1494. It points to a separate descriptor;
+// the IC51 pointer-directory address is not assumed to be this record's
+// physical XDATA address.
+struct MASSResourceSelectionRecord {
+    std::array<std::uint8_t, 12> bytes{};
+
+    std::uint8_t selectionCode() const noexcept {
+        return static_cast<std::uint8_t>(bytes[0] & 0x7f);
+    }
+
+    // 0x1494 loads byte +5 into RAM[0x37] (DPH) and byte +6 into
+    // RAM[0x36] (DPL), then 0x15AE begins scanning at address +8.
+    std::uint16_t descriptorAddress() const noexcept {
+        return static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(bytes[5]) << 8 | bytes[6]);
+    }
+
+    // 0x14E8 reads byte +9 into A and copies ACC.0..ACC.2 into
+    // internal flags 0..2; those flags drive the active-low P3 controls.
+    std::uint8_t p3ControlFlags() const noexcept {
+        return static_cast<std::uint8_t>(bytes[9] & 0x07);
+    }
+
+    // These two input bytes are separately translated through code-ROM
+    // lookup table 0x1208 by the firmware; expose indices, not guessed names.
+    std::uint8_t lookupIndex0() const noexcept { return bytes[2]; }
+    std::uint8_t lookupIndex1() const noexcept { return bytes[10]; }
+};
+
+class MASSResourceSelectionRecordParser {
+public:
+    static bool parse(const std::uint8_t* bankData,
+                      std::size_t bankSize,
+                      std::size_t recordOffset,
+                      MASSResourceSelectionRecord& result) noexcept {
+        if (bankData == nullptr || recordOffset > bankSize ||
+            bankSize - recordOffset < 12)
+            return false;
+        MASSResourceSelectionRecord parsed{};
+        std::copy_n(bankData + recordOffset, parsed.bytes.size(), parsed.bytes.begin());
+        result = parsed;
+        return true;
+    }
+};
+
 struct MASSResourceDescriptorEntry {
     std::uint8_t selector = 0;
     std::uint8_t data0 = 0;
@@ -233,7 +279,9 @@ struct MASSResourceCommand {
     std::uint8_t opcode = 0;
     MASSResourceCommandKind kind = MASSResourceCommandKind::conditionalRecord;
     std::uint8_t length = 0;
-    bool routesToHardware = false;
+    // True when a group-0 record branches to 0x224C at byte +3. The
+    // nested handler can still suppress the physical hardware-port write.
+    bool branchesToExtendedCommand = false;
     std::array<std::uint8_t, 8> bytes{};
 };
 
@@ -242,7 +290,8 @@ struct MASSDecodedResourceStream {
     std::size_t endOffset = 0;
     std::size_t bytesConsumed = 0;
     std::uint8_t slotsConsumed = 0;
-    bool terminated = false;
+    bool terminated = false; // saw the explicit 0xFF stream terminator
+    bool endedByControlCommand = false; // opcode group 0x20 returns via 0x19CD
     bool truncated = false;
     bool slotLimitReached = false;
     std::vector<MASSResourceCommand> commands;
@@ -252,12 +301,11 @@ class MASSCommandStreamDecoder {
 public:
     static constexpr std::size_t kMaximumSlots = 16;
 
-    // Decodes a stream from the memory bank selected by the descriptor's
-    // P3 flags. The bank is supplied separately; no assumption is made that
-    // the stream resides in the IC51 pointer-table bank.
-    // firmwareFlag0ASet is the live firmware flag 0x0A which changes how
-    // opcode group 0x00 is interpreted. With it clear, byte +3 bit 3 can
-    // select the longer path through handler 0x224C.
+    // Decodes a stream from the memory bank selected by P3 flags loaded from
+    // byte +9 of the separate 12-byte resource-selection record. The caller
+    // supplies the bank; it need not be the IC51 pointer-table bank.
+    // firmwareFlag0ASet changes the group-0 path: when clear, byte +3 bit 3
+    // can branch to handler 0x224C. Its port write remains flag-dependent.
     static bool decode(const std::uint8_t* bankData,
                        std::size_t bankSize,
                        std::uint16_t streamPointer,
@@ -303,7 +351,7 @@ public:
                     }
                     if ((bankData[cursor + 3] & 0x08) != 0) {
                         command.length = 7;
-                        command.routesToHardware = true;
+                        command.branchesToExtendedCommand = true;
                     }
                 }
             } else if (group == 0x08) {
@@ -347,6 +395,15 @@ public:
             decoded.commands.push_back(command);
             cursor += command.length;
             ++decoded.slotsConsumed;
+
+            // Handler 0x2301 always leaves the interpreter via 0x19CD after
+            // consuming this four-byte command. When flag 0x0A is clear it
+            // also fills the remainder of the 16-slot output window with
+            // 0x38 records before issuing the control packet.
+            if (group == 0x20) {
+                decoded.endedByControlCommand = true;
+                break;
+            }
         }
 
         decoded.endOffset = cursor;

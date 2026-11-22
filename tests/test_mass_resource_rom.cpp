@@ -60,6 +60,27 @@ void testPointerTableAndPartMapping() {
     assert(!rom.readResourceDescriptorAddress(MASSResourceBank::bank0, 0, address));
 }
 
+void testResourceSelectionRecordParser() {
+    std::array<std::uint8_t, 20> page{};
+    const std::array<std::uint8_t, 12> record = {
+        0x92, 0x31, 0x15, 0x44, 0x55, 0x24, 0xd4, 0x77, 0x88, 0x05, 0x2a, 0x66
+    };
+    std::copy(record.begin(), record.end(), page.begin() + 4);
+
+    MASSResourceSelectionRecord parsed{};
+    assert(MASSResourceSelectionRecordParser::parse(
+        page.data(), page.size(), 4, parsed));
+    assert(parsed.selectionCode() == 0x12);
+    assert(parsed.descriptorAddress() == 0x24d4);
+    assert(parsed.p3ControlFlags() == 0x05);
+    assert(parsed.lookupIndex0() == 0x15);
+    assert(parsed.lookupIndex1() == 0x2a);
+    assert(!MASSResourceSelectionRecordParser::parse(
+        page.data(), page.size(), 9, parsed));
+    assert(!MASSResourceSelectionRecordParser::parse(
+        nullptr, page.size(), 0, parsed));
+}
+
 void testDescriptorParser() {
     std::vector<std::uint8_t> bank(0x10000, 0xff);
     constexpr std::uint16_t base = 0x0200;
@@ -149,7 +170,7 @@ void testCommandStreamDecoder() {
         bank.data(), bank.size(), 0x1400, decoded));
     assert(decoded.terminated && decoded.slotsConsumed == 1);
     assert(decoded.commands[0].kind == MASSResourceCommandKind::conditionalRecord);
-    assert(decoded.commands[0].length == 7 && decoded.commands[0].routesToHardware);
+    assert(decoded.commands[0].length == 7 && decoded.commands[0].branchesToExtendedCommand);
 
     bank[0x1450] = 0x00;
     bank[0x1451] = 0x11;
@@ -179,6 +200,20 @@ void testCommandStreamDecoder() {
         bank.data(), bank.size(), 0x1600, decoded));
     assert(!decoded.terminated && decoded.slotLimitReached);
     assert(decoded.slotsConsumed == MASSCommandStreamDecoder::kMaximumSlots);
+
+    // Group 0x20 is an interpreter-exit command: data after its four bytes
+    // must not be consumed even if it resembles another valid command.
+    bank[0x1700] = 0x20;
+    bank[0x1701] = 0x11;
+    bank[0x1702] = 0x22;
+    bank[0x1703] = 0x03;
+    bank[0x1704] = 0x28;
+    bank[0x1705] = 0xff;
+    assert(MASSCommandStreamDecoder::decode(
+        bank.data(), bank.size(), 0x1700, decoded));
+    assert(!decoded.terminated && decoded.endedByControlCommand);
+    assert(decoded.slotsConsumed == 1 && decoded.commands.size() == 1);
+    assert(decoded.bytesConsumed == 4 && decoded.endOffset == 0x1704);
 
     bank[0xfffc] = 0x08;
     bank[0xfffd] = 0x01;
@@ -219,6 +254,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testResourceSelectionRecordParser();
     testDescriptorParser();
     testCommandStreamDecoder();
     if (argc > 1)
