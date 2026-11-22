@@ -83,14 +83,6 @@ int main(int argc, char** argv) {
     assert(transmitted == 0x7d);
     assert(!machine.takeAciaTransmitByte(transmitted));
 
-    // Machine-cycle scheduler executes complete instructions and may only
-    // overshoot a requested budget by the final instruction's cycle count.
-    machine.reset();
-    machine.writeCodeForTesting(0, 0xa4); // MUL AB, four machine cycles
-    assert(machine.runForMachineCycles(3) == 1);
-    assert(machine.elapsedMachineCycles() == 4);
-    assert(machine.cpu().registers().pc == 0x0001);
-
     // External sound-device boot handshake: reset low, request FF10,
     // download data into C000+, then release reset and expose ready=AC.
     machine.reset();
@@ -237,6 +229,13 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
         assert(firmwareMachine.readCode(0x0002) == 0x32);
         firmwareMachine.reset();
+        // The reset vector is a two-machine-cycle LJMP to EB32. A budget of
+        // one cycle must finish that instruction rather than split it.
+        assert(firmwareMachine.runForMachineCycles(1) == 1);
+        assert(firmwareMachine.elapsedMachineCycles() == 2);
+        assert(firmwareMachine.cpu().registers().pc == 0xeb32);
+        firmwareMachine.reset();
+
         // Seed the firmware's startup-cleared XDATA range and one byte just
         // beyond its documented 0000-34FF initialization loop.
         firmwareMachine.writeExternal(0x0000, 0xa5);
