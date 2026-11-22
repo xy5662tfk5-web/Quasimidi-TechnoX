@@ -723,6 +723,9 @@ public:
     std::uint16_t lastSoundMemoryWriteAddress() const noexcept { return lastSoundMemoryWriteAddress_; }
     std::uint8_t lastSoundMemoryWriteValue() const noexcept { return lastSoundMemoryWriteValue_; }
     std::uint8_t externalSoundBusMode() const noexcept { return internal_[0x8e]; }
+    std::uint8_t xdataByteForTesting(std::uint16_t address) const noexcept {
+        return xdata_[address];
+    }
     std::uint64_t soundMemoryReadsByMode(std::size_t mode) const noexcept {
         return mode < soundMemoryReadsByMode_.size() ? soundMemoryReadsByMode_[mode] : 0;
     }
