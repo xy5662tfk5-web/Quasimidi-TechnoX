@@ -344,8 +344,8 @@ int main(int argc, char** argv) {
         // the CPU can pass the otherwise-unmodeled external-device wait.
         TechnoX8032Machine injectedResponseMachine;
         assert(injectedResponseMachine.loadIC4Rom(
-            reinterpret_cast<const std::uint8_t*>(firmwareData),
-            static_cast<std::size_t>(firmwareRomSize)));
+            realRom.data(),
+            realRom.size()));
         injectedResponseMachine.reset();
         injectedResponseMachine.writeExternal(0x0000, 0xa5);
         injectedResponseMachine.writeExternal(0x34ff, 0xa5);
