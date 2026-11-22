@@ -69,11 +69,11 @@ The dispatch table contains eight four-byte entries (an `LJMP` plus padding):
 | `0x20` | `0x2301` | Command byte plus three payload bytes |
 | `0x28..0x37` | `0x2374` | One-byte advance |
 
-The interpreter initializes a 16-iteration counter (`RAM[0x2C] = 0x10`). It derives the current high-XDATA window as:
+The interpreter initializes a 16-iteration counter (`RAM[0x2C] = 0x10`). The caller `0x16C3` sets P2 to `RAM[0x2D]` before calling `0x189D`; therefore `RAM[0x2E]` is the low-byte offset within that selected XDATA page, not a page number:
 
 `RAM[0x2E] = 0x80 + 8 * (RAM[0x2B] & 0x0F)`
 
-After each slot, it increments `RAM[0x2E]` by 8 and `RAM[0x2B]` by 1. This selects 16 high-XDATA windows spaced by `0x0800` (page values `0x80, 0x88, ... 0xF8`). Their exact physical ownership—Part, command slot, or another hardware resource—remains unproven.
+After each slot, it increments `RAM[0x2E]` by 8 and `RAM[0x2B]` by 1. This fills 16 eight-byte records at offsets `0x80, 0x88, ... 0xF8` within one XDATA page selected by `RAM[0x2D]`. The companion one-byte slot identifiers/status values at offsets `0x70..0x7F` are scanned by `0x0D0E`. The page value is derived from `RAM[0x3E] & 0x1F`; startup code initializes the 32 pages `0x00..0x1F` using the page map at `0x0078`. The exact meaning of each page (Part, voice, or resource workspace) remains unresolved.
 
 ## 3. Pitch and parameter arithmetic
 
@@ -93,11 +93,11 @@ Handler `0x1EDD` also performs 24-bit arithmetic and uses nonlinear lookup table
 
 ### Packet format
 
-`0x0DB7` writes four bytes to the current XDATA page at offsets 0..3 in this order:
+`0x0DB7` writes four bytes to the current P2-selected XDATA page at offsets 0..3 in this order:
 
 `[R5, R2, R3, R4]`
 
-Callers select page `0x80`, so this is the port at `0x8000..0x8003`. The first byte is the command; the remaining three are its payload.
+When the caller is sending a hardware command, it temporarily selects P2 page `0x80`, so the port is `0x8000..0x8003`. Helper `0x09B9` does this for an interpolated update and restores P2 to `RAM[0x2D]` afterward. The page-`0x80` hardware port is therefore separate from the 16-record buffer in the selected `RAM[0x2D]` page. The first byte is the command; the remaining three are its payload.
 
 The stream handlers use this port in several ways:
 
@@ -127,20 +127,25 @@ This is a real firmware note-state/release mechanism, but the selector's complet
 
 **Not established:** the identity of the receiving IC, the meaning of every command ID, the contents/codec of the external resource memory, or the original M.A.S.S. oscillator/sample playback algorithm. The current plug-in still uses its generic test synthesis backend; it must not be presented as original TechnoX sound.
 
-## 7. IC51 sample-ROM directory and four resource groups
+## 7. IC51 pointer directory, external descriptors and command streams
 
 MAME's `src/mame/skeleton/qmquasar.cpp` declares IC51 as the sample ROM region. The TechnoX v1.05 image is `0x20000` bytes (128 KB), CRC32 `d669570e`, SHA1 `0645a1b022ed25a836152933e6df32da4448f49a`.
 
-The image divides naturally into two 64KB banks:
+The image divides into two 64KB banks:
 
 - bank 0: file offsets `0x00000..0x0FFFF`
 - bank 1: file offsets `0x10000..0x1FFFF`
 
-The first `0x200` bytes of each bank form a 256-entry pointer table. Each entry is a little-endian 16-bit address relative to that 64KB bank. This byte order matches the firmware: `0xB3BC` reads the first byte into R6, the second into R7; `0x418E` stores R6/R7 at descriptor `+5/+6`; `0x1494` places byte `+5` in DPL and byte `+6` in DPH.
+The first `0x200` bytes of each bank form a 256-entry pointer table. The entries are **big-endian 16-bit descriptor addresses**. The byte order is established by the complete firmware path:
+
+1. `0xB3BC` reads the first table byte into R6 and the second into R7.
+2. `0x418E` stores R6/R7 at descriptor bytes `+5/+6`.
+3. `0x1494` loads byte `+5` into `RAM[0x37]` and byte `+6` into `RAM[0x36]`.
+4. At `0x15AE`, the firmware places `RAM[0x37]` in DPH and `RAM[0x36] + 8` in DPL. Thus the pointer-table value is big-endian and the descriptor scan begins at descriptor address `+8`.
 
 Combining the pointer-table lookup with the normal `0x418E` path gives four 128-entry resource groups:
 
-| Part parameter | P3 mask | ROM bank | Pointer index |
+| Part parameter | P3 mask | Pointer-table bank | Pointer index |
 |---:|---:|---:|---|
 | 0 | `0x07` | 0 | `R3 + 0x00` |
 | 1 | `0x07` | 0 | `R3 + 0x80` |
@@ -149,10 +154,25 @@ Combining the pointer-table lookup with the normal `0x418E` path gives four 128-
 
 The two P3 masks differ only in bit 0, which controls P3.5. Since IC51 is a 128KB EPROM, P3.5 is a strong candidate for its A16 bank-select line; P3.4 and P3.1 remain asserted low in both masks and are likely enable/control lines. This pin-to-EPROM mapping is a hardware hypothesis until confirmed by PCB continuity or a schematic.
 
-A scan of the 512 pointer entries found no duplicate pointer values within either bank. In this dump, 224 bank-0 streams and 163 bank-1 streams begin with a non-`0xFF` command byte; 32 and 93 respectively begin with `0xFF` and are empty/unused from the interpreter's perspective. The known 16-slot parser can walk the entries without crossing their 64KB bank boundaries.
+### External resource descriptor format
 
-This establishes that IC51 is not merely one flat PCM byte stream: it contains a pointer directory and structured M.A.S.S. command streams. It does **not** prove that no waveform payloads exist elsewhere in IC51, nor does it identify the sample codec. The C++ decoder `MASSResourceROM` now models this pointer table, the four-group Part-parameter mapping, and the raw command-stream record boundaries; it deliberately leaves command semantics and audio decoding unresolved.
+The pointer-table entry does not point directly to a command stream. `0x1494` scans a descriptor beginning at `descriptorAddress + 8`:
+
+- The first eight descriptor bytes are retained as a fixed header; their full semantics are not yet mapped.
+- Table A contains group IDs `0..4`. Each group contains records of `selector + 2 data bytes`; selector `0x7F` ends the current group. A group ID `>= 5` ends Table A.
+- Table B contains records of `key + 2 data bytes` for keys `0..5`. A key `>= 6` ends Table B.
+- The next two bytes form the command-stream pointer in **little-endian** order. The code reads the first into `RAM[0x36]`, the second into `RAM[0x37]`, then loads DPL from `RAM[0x36]` and DPH from `RAM[0x37]`.
+
+The descriptor and command-stream reads use the separate P3 flag field from descriptor byte `+10`; it is not safe to assume that the descriptor/stream memory bank is identical to the IC51 pointer-table bank. The actual physical memory selected by those flags remains unresolved.
+
+### XDATA staging buffer and hardware port
+
+`0x16C3` sets P2 to `RAM[0x2D]` before calling `0x189D`. The stream interpreter writes sixteen eight-byte records into offsets `0x80..0xF8` of that one selected XDATA page. The companion slot identifiers/status values at offsets `0x70..0x7F` are scanned by `0x0D0E`. Startup initializes the 32 pages `0x00..0x1F` using the page map at `0x0078`; the exact meaning of each page remains open.
+
+The four-byte hardware port at `0x8000..0x8003` is separate. The firmware temporarily selects P2 page `0x80` for hardware writes, then restores P2 to `RAM[0x2D]`. This distinguishes the decoded per-page staging records from the external sound-processor command interface.
+
+IC51 is therefore a structured resource directory, not a flat PCM stream. The descriptor parser and command-stream decoder are now separate C++ components: `MASSResourceROM` reads the big-endian IC51 directory, `MASSResourceDescriptorParser` parses the external descriptor, and `MASSCommandStreamDecoder` decodes a stream only when its actual memory bank is supplied. None of these components claims to decode PCM or reproduce the original M.A.S.S. synthesis.
 
 ## Next reverse-engineering target
 
-Decode the payload fields of the `0x1C61`, `0x1EDD`, `0x224C`, and `0x2301` records across the four resource groups. Then correlate the resulting 24-bit parameters and external command IDs with the sound engine's sample, pitch, envelope, and modulation behavior.
+Identify the memory bank selected by descriptor byte `+10`, locate the external descriptor/command-stream backing memory, and correlate the extracted 24-bit values and hardware command IDs with sample address, pitch, envelope, and modulation behavior.

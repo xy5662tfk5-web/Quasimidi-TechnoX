@@ -1,8 +1,8 @@
 #pragma once
 
-// Decoder for the IC51 resource directory and M.A.S.S. command streams.
-// This models the firmware-visible ROM structure only; it does not decode
-// PCM samples or emulate the external sound processor.
+// IC51 resource directory, external descriptor and M.A.S.S. stream decoders.
+// These classes model firmware-visible data structures only. They do not
+// decode PCM samples or emulate the external sound processor.
 
 #include <algorithm>
 #include <array>
@@ -18,42 +18,11 @@ enum class MASSResourceBank : std::uint8_t {
     bank1 = 1
 };
 
-enum class MASSResourceCommandKind : std::uint8_t {
-    singleByte,
-    pitchParameter,
-    multiParameter,
-    emptyMultiParameter,
-    fourByteCommand,
-    threePayloadCommand,
-    marker
-};
-
 struct MASSResourceSelection {
     MASSResourceBank bank = MASSResourceBank::bank0;
     std::uint8_t pointerIndex = 0;
     std::uint8_t p3BankMask = 0;
     std::uint8_t normalizedPartParameter = 0;
-};
-
-struct MASSResourceCommand {
-    std::uint16_t bankOffset = 0;
-    std::uint8_t opcode = 0;
-    MASSResourceCommandKind kind = MASSResourceCommandKind::singleByte;
-    std::uint8_t length = 0;
-    std::array<std::uint8_t, 8> bytes{};
-};
-
-struct MASSDecodedResourceStream {
-    MASSResourceBank bank = MASSResourceBank::bank0;
-    std::uint8_t resourceIndex = 0;
-    std::uint16_t startPointer = 0;
-    std::uint16_t endOffset = 0;
-    std::uint16_t bytesConsumed = 0;
-    std::uint8_t slotsConsumed = 0;
-    bool terminated = false;
-    bool truncated = false;
-    bool slotLimitReached = false;
-    std::vector<MASSResourceCommand> commands;
 };
 
 class MASSResourceROM {
@@ -63,7 +32,6 @@ public:
     static constexpr std::size_t kImageSize = kBankSize * kBankCount;
     static constexpr std::size_t kPointerCount = 256;
     static constexpr std::size_t kPointerTableSize = kPointerCount * 2;
-    static constexpr std::size_t kMaximumSlots = 16;
 
     bool load(const std::uint8_t* bytes, std::size_t size) noexcept {
         if (bytes == nullptr || size != kImageSize)
@@ -81,11 +49,11 @@ public:
     bool isLoaded() const noexcept { return loaded_; }
 
     // Normal Part path reconstructed from IC4 0x418E:
-    // parameter 0/1 selects P3 mask 0x07 and bank 0;
-    // parameter 2/3 selects P3 mask 0x06 and bank 1.
-    // Bit 0 chooses the lower/upper 128-entry half of the 256-entry table.
-    // Firmware clamps values above 3 to 3. The special runtime Part index 9
-    // follows a separate path and is not represented by this helper.
+    // parameter 0/1 selects P3 mask 0x07 and ROM bank 0;
+    // parameter 2/3 selects P3 mask 0x06 and ROM bank 1.
+    // Bit 0 selects the lower/upper 128-entry half of the pointer table.
+    // Firmware clamps values above 3 to 3. Runtime Part index 9 has a
+    // separate firmware path and is not represented by this helper.
     static bool resolvePartResource(int partParameter,
                                     std::uint8_t resourceSubIndex,
                                     MASSResourceSelection& selection) noexcept {
@@ -103,113 +71,21 @@ public:
         return true;
     }
 
-    // The firmware reads the first pointer byte into R6, the second into R7,
-    // then places R6 at descriptor +5 and R7 at +6. The resulting DPTR is
-    // therefore a little-endian 16-bit pointer in each 64KB bank.
-    bool readPointer(MASSResourceBank bank,
-                     std::uint8_t resourceIndex,
-                     std::uint16_t& pointer) const noexcept {
+    // IC51 pointer-table entries are big-endian descriptor addresses.
+    // The firmware reads byte 0 into R6 and byte 1 into R7, then 0x1494
+    // forms the descriptor address with R6 as the high byte.
+    bool readResourceDescriptorAddress(MASSResourceBank bank,
+                                       std::uint8_t resourceIndex,
+                                       std::uint16_t& address) const noexcept {
         if (!loaded_ || !validBank(bank))
             return false;
 
-        const auto address = bankBase(bank) +
+        const auto offset = bankBase(bank) +
             static_cast<std::size_t>(resourceIndex) * 2;
-        const auto low = image_[address];
-        const auto high = image_[address + 1];
-        pointer = static_cast<std::uint16_t>(
+        const auto high = image_[offset];
+        const auto low = image_[offset + 1];
+        address = static_cast<std::uint16_t>(
             static_cast<std::uint16_t>(high) << 8 | low);
-        return true;
-    }
-
-    // Parses at most 16 command slots, matching the firmware's RAM[0x2C]
-    // counter. Command payload bytes are retained verbatim; parameter
-    // semantics are deliberately not guessed.
-    bool decodeResource(MASSResourceBank bank,
-                        std::uint8_t resourceIndex,
-                        MASSDecodedResourceStream& result) const {
-        std::uint16_t pointer = 0;
-        if (!readPointer(bank, resourceIndex, pointer))
-            return false;
-
-        MASSDecodedResourceStream decoded{};
-        decoded.bank = bank;
-        decoded.resourceIndex = resourceIndex;
-        decoded.startPointer = pointer;
-
-        const auto base = bankBase(bank);
-        const auto bankEnd = base + kBankSize;
-        auto cursor = base + pointer;
-
-        while (decoded.slotsConsumed < kMaximumSlots) {
-            if (cursor >= bankEnd) {
-                decoded.truncated = true;
-                break;
-            }
-
-            const auto opcode = image_[cursor];
-            if (opcode == 0xff) {
-                decoded.terminated = true;
-                break;
-            }
-
-            const auto group = static_cast<std::uint8_t>(opcode & 0x38);
-            MASSResourceCommand command{};
-            command.bankOffset = static_cast<std::uint16_t>(cursor - base);
-            command.opcode = opcode;
-            command.bytes[0] = opcode;
-            command.length = 1;
-
-            if (group == 0x00) {
-                command.kind = MASSResourceCommandKind::singleByte;
-            } else if (group == 0x08) {
-                command.kind = MASSResourceCommandKind::pitchParameter;
-                command.length = 7;
-            } else if (group == 0x10) {
-                if (cursor + 1 >= bankEnd) {
-                    decoded.truncated = true;
-                    break;
-                }
-                if (image_[cursor + 1] == 0) {
-                    // Firmware 0x1EDD skips eight bytes when byte 1 is zero.
-                    command.kind = MASSResourceCommandKind::emptyMultiParameter;
-                    command.length = 8;
-                } else {
-                    command.kind = MASSResourceCommandKind::multiParameter;
-                    command.length = 7;
-                }
-            } else if (group == 0x18) {
-                command.kind = MASSResourceCommandKind::fourByteCommand;
-                command.length = 4;
-            } else if (group == 0x20) {
-                command.kind = MASSResourceCommandKind::threePayloadCommand;
-                command.length = 4;
-            } else if (group == 0x38) {
-                // 0x38..0x3F are handled by the interpreter's marker path,
-                // not by the 0x1BC3 jump table.
-                command.kind = MASSResourceCommandKind::marker;
-            } else {
-                // Groups 0x28 and 0x30 share handler 0x2374 (advance by one).
-                command.kind = MASSResourceCommandKind::singleByte;
-            }
-
-            if (cursor + command.length > bankEnd) {
-                decoded.truncated = true;
-                break;
-            }
-
-            std::copy_n(image_.begin() + static_cast<std::ptrdiff_t>(cursor),
-                        command.length, command.bytes.begin());
-            decoded.commands.push_back(command);
-            cursor += command.length;
-            ++decoded.slotsConsumed;
-        }
-
-        decoded.endOffset = static_cast<std::uint16_t>(cursor - base);
-        decoded.bytesConsumed = static_cast<std::uint16_t>(cursor - (base + pointer));
-        decoded.slotLimitReached =
-            decoded.slotsConsumed == kMaximumSlots &&
-            !decoded.terminated && !decoded.truncated;
-        result = std::move(decoded);
         return true;
     }
 
@@ -224,6 +100,238 @@ private:
 
     std::array<std::uint8_t, kImageSize> image_{};
     bool loaded_ = false;
+};
+
+struct MASSResourceDescriptorEntry {
+    std::uint8_t selector = 0;
+    std::uint8_t data0 = 0;
+    std::uint8_t data1 = 0;
+};
+
+struct MASSResourceDescriptorGroup {
+    std::uint8_t groupId = 0;
+    std::vector<MASSResourceDescriptorEntry> entries;
+};
+
+struct MASSResourceDescriptorTableEntry {
+    std::uint8_t key = 0;
+    std::uint8_t data0 = 0;
+    std::uint8_t data1 = 0;
+};
+
+struct MASSResourceDescriptor {
+    std::uint16_t descriptorAddress = 0;
+    std::array<std::uint8_t, 8> fixedHeader{};
+    std::vector<MASSResourceDescriptorGroup> tableA;
+    std::vector<MASSResourceDescriptorTableEntry> tableB;
+    std::uint8_t tableATerminator = 0;
+    std::uint8_t tableBTerminator = 0;
+    std::uint16_t commandStreamPointer = 0;
+    std::size_t headerEndOffset = 0;
+};
+
+class MASSResourceDescriptorParser {
+public:
+    // Parses the descriptor memory bank selected by the firmware's separate
+    // P3 flags (descriptor byte +10). This bank is not assumed to be IC51.
+    // At descriptor +8 the firmware scans:
+    //   Table A: group IDs 0..4; selector + two data bytes; selector 0x7F
+    //            terminates a group; group ID >=5 terminates Table A.
+    //   Table B: keys 0..5 plus two data bytes; key >=6 terminates Table B.
+    // The following two bytes are the little-endian command-stream pointer.
+    static bool parse(const std::uint8_t* bankData,
+                      std::size_t bankSize,
+                      std::uint16_t descriptorAddress,
+                      MASSResourceDescriptor& result) {
+        if (bankData == nullptr ||
+            static_cast<std::size_t>(descriptorAddress) + 8 > bankSize)
+            return false;
+
+        MASSResourceDescriptor parsed{};
+        parsed.descriptorAddress = descriptorAddress;
+        std::copy_n(bankData + descriptorAddress, 8, parsed.fixedHeader.begin());
+        std::size_t cursor = static_cast<std::size_t>(descriptorAddress) + 8;
+
+        bool tableAEnded = false;
+        for (std::size_t groupNumber = 0; groupNumber < 6; ++groupNumber) {
+            if (cursor >= bankSize)
+                return false;
+            const auto groupId = bankData[cursor++];
+            if (groupId >= 5) {
+                parsed.tableATerminator = groupId;
+                tableAEnded = true;
+                break;
+            }
+
+            MASSResourceDescriptorGroup group{};
+            group.groupId = groupId;
+            bool groupEnded = false;
+            for (std::size_t entryNumber = 0; entryNumber < 256; ++entryNumber) {
+                if (cursor + 2 >= bankSize)
+                    return false;
+                MASSResourceDescriptorEntry entry{};
+                entry.selector = bankData[cursor++];
+                entry.data0 = bankData[cursor++];
+                entry.data1 = bankData[cursor++];
+                group.entries.push_back(entry);
+                if (entry.selector == 0x7f) {
+                    groupEnded = true;
+                    break;
+                }
+            }
+            if (!groupEnded)
+                return false;
+            parsed.tableA.push_back(std::move(group));
+        }
+        if (!tableAEnded)
+            return false;
+
+        bool tableBEnded = false;
+        for (std::size_t entryNumber = 0; entryNumber < 256; ++entryNumber) {
+            if (cursor >= bankSize)
+                return false;
+            const auto key = bankData[cursor++];
+            if (key >= 6) {
+                parsed.tableBTerminator = key;
+                tableBEnded = true;
+                break;
+            }
+            if (cursor + 1 >= bankSize)
+                return false;
+            MASSResourceDescriptorTableEntry entry{};
+            entry.key = key;
+            entry.data0 = bankData[cursor++];
+            entry.data1 = bankData[cursor++];
+            parsed.tableB.push_back(entry);
+        }
+        if (!tableBEnded || cursor + 1 >= bankSize)
+            return false;
+
+        const auto low = bankData[cursor++];
+        const auto high = bankData[cursor++];
+        parsed.commandStreamPointer = static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(high) << 8 | low);
+        parsed.headerEndOffset = cursor;
+        result = std::move(parsed);
+        return true;
+    }
+};
+
+enum class MASSResourceCommandKind : std::uint8_t {
+    singleByte,
+    pitchParameter,
+    multiParameter,
+    emptyMultiParameter,
+    fourByteCommand,
+    threePayloadCommand,
+    marker,
+    singleByteAdvance
+};
+
+struct MASSResourceCommand {
+    std::uint16_t bankOffset = 0;
+    std::uint8_t opcode = 0;
+    MASSResourceCommandKind kind = MASSResourceCommandKind::singleByte;
+    std::uint8_t length = 0;
+    std::array<std::uint8_t, 8> bytes{};
+};
+
+struct MASSDecodedResourceStream {
+    std::uint16_t streamPointer = 0;
+    std::size_t endOffset = 0;
+    std::size_t bytesConsumed = 0;
+    std::uint8_t slotsConsumed = 0;
+    bool terminated = false;
+    bool truncated = false;
+    bool slotLimitReached = false;
+    std::vector<MASSResourceCommand> commands;
+};
+
+class MASSCommandStreamDecoder {
+public:
+    static constexpr std::size_t kMaximumSlots = 16;
+
+    // Decodes a stream from the memory bank selected by the descriptor's
+    // P3 flags. The bank is supplied separately; no assumption is made that
+    // the stream resides in the IC51 pointer-table bank.
+    static bool decode(const std::uint8_t* bankData,
+                       std::size_t bankSize,
+                       std::uint16_t streamPointer,
+                       MASSDecodedResourceStream& result) {
+        if (bankData == nullptr || static_cast<std::size_t>(streamPointer) >= bankSize)
+            return false;
+
+        MASSDecodedResourceStream decoded{};
+        decoded.streamPointer = streamPointer;
+        std::size_t cursor = streamPointer;
+
+        while (decoded.slotsConsumed < kMaximumSlots) {
+            if (cursor >= bankSize) {
+                decoded.truncated = true;
+                break;
+            }
+
+            const auto opcode = bankData[cursor];
+            if (opcode == 0xff) {
+                decoded.terminated = true;
+                break;
+            }
+
+            const auto group = static_cast<std::uint8_t>(opcode & 0x38);
+            MASSResourceCommand command{};
+            command.bankOffset = static_cast<std::uint16_t>(cursor);
+            command.opcode = opcode;
+            command.bytes[0] = opcode;
+            command.length = 1;
+
+            if (group == 0x00) {
+                command.kind = MASSResourceCommandKind::singleByte;
+            } else if (group == 0x08) {
+                command.kind = MASSResourceCommandKind::pitchParameter;
+                command.length = 7;
+            } else if (group == 0x10) {
+                if (cursor + 1 >= bankSize) {
+                    decoded.truncated = true;
+                    break;
+                }
+                if (bankData[cursor + 1] == 0) {
+                    command.kind = MASSResourceCommandKind::emptyMultiParameter;
+                    command.length = 8;
+                } else {
+                    command.kind = MASSResourceCommandKind::multiParameter;
+                    command.length = 7;
+                }
+            } else if (group == 0x18) {
+                command.kind = MASSResourceCommandKind::fourByteCommand;
+                command.length = 4;
+            } else if (group == 0x20) {
+                command.kind = MASSResourceCommandKind::threePayloadCommand;
+                command.length = 4;
+            } else if (group == 0x38) {
+                command.kind = MASSResourceCommandKind::marker;
+            } else {
+                command.kind = MASSResourceCommandKind::singleByteAdvance;
+            }
+
+            if (cursor + command.length > bankSize) {
+                decoded.truncated = true;
+                break;
+            }
+
+            std::copy_n(bankData + cursor, command.length, command.bytes.begin());
+            decoded.commands.push_back(command);
+            cursor += command.length;
+            ++decoded.slotsConsumed;
+        }
+
+        decoded.endOffset = cursor;
+        decoded.bytesConsumed = cursor - streamPointer;
+        decoded.slotLimitReached =
+            decoded.slotsConsumed == kMaximumSlots &&
+            !decoded.terminated && !decoded.truncated;
+        result = std::move(decoded);
+        return true;
+    }
 };
 
 } // namespace technox

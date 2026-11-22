@@ -29,6 +29,8 @@ jobs:
       - name: Compile and test Part editor model (C++17)
         if: hashFiles('tests/test_part_model.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_part_model.cpp -o /tmp/test_part_model && /tmp/test_part_model
+      - name: Compile and test IC51 directory/descriptor decoder (C++17)
+        run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_mass_resource_rom.cpp -o /tmp/test_mass_resource_rom && /tmp/test_mass_resource_rom technox_IC51_nm27c010_v105.bin
       - name: Compile and test Performance layer selection (C++17)
         if: hashFiles('tests/test_performance_layers.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_performance_layers.cpp -o /tmp/test_performance_layers && /tmp/test_performance_layers
@@ -91,6 +93,10 @@ jobs:
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
         run: cmake --build build --config Release --parallel 2
+      - name: Build and run Intel C++ regression tests
+        run: |
+          cmake --build build --config Release --parallel 2 --target technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests
+          ctest --test-dir build -C Release --output-on-failure
       - name: Verify Catalina (10.15) deployment target
         run: |
           APP="build/QuasimidiTechnoX_artefacts/Release/Standalone/Quasimidi TechnoX Lab.app"

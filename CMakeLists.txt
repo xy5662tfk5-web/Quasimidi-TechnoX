@@ -84,14 +84,16 @@ if (BUILD_TESTING)
     )
 endif()
 
-# Dependency-free IC51 pointer-table and command-stream decoder tests.
+# Dependency-free IC51 directory, descriptor and command-stream decoder tests.
 if (BUILD_TESTING)
     add_executable(technox_mass_resource_rom_tests
         tests/test_mass_resource_rom.cpp
     )
     target_compile_features(technox_mass_resource_rom_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_mass_resource_rom_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_mass_resource_rom_tests
         COMMAND technox_mass_resource_rom_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC51_nm27c010_v105.bin"
     )
 endif()
 
