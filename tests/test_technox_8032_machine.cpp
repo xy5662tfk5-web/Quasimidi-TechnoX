@@ -41,15 +41,19 @@ int main(int argc, char** argv) {
     machine.reset();
     machine.writeInternal(0x8e, 0x02);
     for (unsigned i = 0; i < 0x4000; ++i) {
+        const auto address = static_cast<std::uint16_t>(0xc000u + i);
+        if (address == 0xff10u) continue; // mapped sound-device status/data port
         const auto value = static_cast<std::uint8_t>((i * 37u) ^ 0xa5u);
-        machine.writeExternal(static_cast<std::uint16_t>(0xc000u + i), value);
+        machine.writeExternal(address, value);
     }
     for (unsigned i = 0; i < 0x4000; ++i) {
+        const auto address = static_cast<std::uint16_t>(0xc000u + i);
+        if (address == 0xff10u) continue; // mapped sound-device status/data port
         const auto expected = static_cast<std::uint8_t>((i * 37u) ^ 0xa5u);
-        assert(machine.readExternal(static_cast<std::uint16_t>(0xc000u + i)) == expected);
+        assert(machine.readExternal(address) == expected);
     }
-    assert(machine.soundMemoryWritesByMode(2) == 0x4000u);
-    assert(machine.soundMemoryReadsByMode(2) == 0x4000u);
+    assert(machine.soundMemoryWritesByMode(2) == 0x3fffu);
+    assert(machine.soundMemoryReadsByMode(2) == 0x3fffu);
 
     // Unmapped/stub windows remain open bus instead of being fabricated as RAM.
     machine.writeExternal(0x3900, 0xaa);
