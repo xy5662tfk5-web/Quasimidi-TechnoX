@@ -106,6 +106,12 @@ public:
         scheduledAciaTail_ = 0;
         scheduledAciaCount_ = 0;
         nextAciaReceiveCycle_ = 0;
+        soundMemoryReadCount_ = 0;
+        soundMemoryWriteCount_ = 0;
+        soundBusModeWriteCount_ = 0;
+        p35TransitionCount_ = 0;
+        lastSoundMemoryWriteAddress_ = 0;
+        lastSoundMemoryWriteValue_ = 0;
         internal_[0x81] = 0x07; // SP reset value
     }
 
@@ -179,6 +185,8 @@ public:
             portLatch_[index] = value;
             portPins_[index] = value;
             if (port == 3) {
+                if (((previousPins ^ value) & 0x20u) != 0)
+                    ++p35TransitionCount_;
                 const bool wasReleased = (previousPins & 0x04u) != 0;
                 const bool nowReleased = (value & 0x04u) != 0;
                 if (wasReleased && !nowReleased)
@@ -188,6 +196,8 @@ public:
             }
         } else {
             internal_[address] = value;
+            if (address == 0x8eu)
+                ++soundBusModeWriteCount_;
         }
     }
 
@@ -208,8 +218,11 @@ public:
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
         if (address == 0xff10u)
             return soundDeviceResponse_; // unknown until the external device is modeled
-        if (isXdataRam(address))
+        if (isXdataRam(address)) {
+            if (address >= 0xc000u)
+                ++soundMemoryReadCount_;
             return xdata_[address];
+        }
 
         switch (address) {
             case 0xa002: return (aciaControl_ & 0x03u) == 0x03u
@@ -233,6 +246,11 @@ public:
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
+            if (address >= 0xc000u) {
+                ++soundMemoryWriteCount_;
+                lastSoundMemoryWriteAddress_ = address;
+                lastSoundMemoryWriteValue_ = value;
+            }
             return;
         }
 
@@ -324,6 +342,12 @@ public:
     }
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
+    std::uint64_t soundMemoryReadCount() const noexcept { return soundMemoryReadCount_; }
+    std::uint64_t soundMemoryWriteCount() const noexcept { return soundMemoryWriteCount_; }
+    std::uint64_t soundBusModeWriteCount() const noexcept { return soundBusModeWriteCount_; }
+    std::uint64_t p35TransitionCount() const noexcept { return p35TransitionCount_; }
+    std::uint16_t lastSoundMemoryWriteAddress() const noexcept { return lastSoundMemoryWriteAddress_; }
+    std::uint8_t lastSoundMemoryWriteValue() const noexcept { return lastSoundMemoryWriteValue_; }
     void setSoundDeviceResponseForTesting(std::uint8_t value) noexcept {
         soundDeviceResponse_ = value;
     }
@@ -402,6 +426,12 @@ private:
     bool soundDeviceResetReleased_ = true;
     std::uint8_t soundDeviceWrite_ = 0;
     std::uint8_t soundDeviceResponse_ = 0xff;
+    std::uint64_t soundMemoryReadCount_ = 0;
+    std::uint64_t soundMemoryWriteCount_ = 0;
+    std::uint64_t soundBusModeWriteCount_ = 0;
+    std::uint64_t p35TransitionCount_ = 0;
+    std::uint16_t lastSoundMemoryWriteAddress_ = 0;
+    std::uint8_t lastSoundMemoryWriteValue_ = 0;
     bool cpuFaulted_ = false;
     bool romLoaded_ = false;
 };
