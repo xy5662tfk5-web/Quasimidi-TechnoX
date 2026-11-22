@@ -501,13 +501,16 @@ int main(int argc, char** argv) {
             std::fflush(stdout);
         }
 
-        // Exercise the real INT1/ACIA receive path with a MIDI Note On.
-        const std::array<std::uint8_t, 3> noteOn{{0x90, 0x3c, 0x64}};
+        // Select the first restored RAM Performance (source/program 5),
+        // then send a Note On through the real INT1/ACIA receive path.
+        const std::array<std::uint8_t, 5> programAndNote{{
+            0xc0, 0x05, 0x90, 0x3c, 0x64
+        }};
         const auto midiStartCycle = injectedResponseMachine.elapsedMachineCycles();
         const auto commandCountBeforeMidi = injectedResponseMachine.soundCommandPacketCount();
         const auto ieBeforeMidi = injectedResponseMachine.readInternal(0xa8);
         assert(injectedResponseMachine.scheduleAciaMidiBytes(
-            noteOn.data(), noteOn.size(), midiStartCycle));
+            programAndNote.data(), programAndNote.size(), midiStartCycle));
         const auto midiInstructions = injectedResponseMachine.runForMachineCycles(2000000);
         std::printf("IC4 MIDI Note On diagnostic: instructions=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X\\n",
                     midiInstructions,
