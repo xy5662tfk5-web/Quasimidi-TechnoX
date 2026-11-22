@@ -404,10 +404,15 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.elapsedMachineCycles() == 2);
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
         firmwareMachine.reset();
+        // Match the controlled external-RAM fixture used by the MIDI-path
+        // test before firmware startup, not only after the first boot.
+        firmwareMachine.enableTestExternalRamWindow7000(0x00u);
+        firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
 
-        // Seed two locations in the firmware's startup-cleared XDATA range.
+        // Seed the same startup-cleared XDATA locations as the MIDI fixture.
         firmwareMachine.writeExternal(0x0000, 0xa5);
         firmwareMachine.writeExternal(0x34ff, 0xa5);
+        firmwareMachine.writeExternal(0x3500, 0xa5);
         const auto executed = firmwareMachine.runUntilProgramCounter(0xeb8d, 50000);
         std::printf("IC4 boot trace: instructions=%zu PC=%04X SP=%02X cycles=%llu\n",
                     executed, static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
