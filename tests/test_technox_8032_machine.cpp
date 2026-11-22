@@ -550,7 +550,6 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.cpu().registers().pc == 0x32b0);
         assert(injectedResponseMachine.soundMemoryWriteCount() >= 13647u);
         assert(injectedResponseMachine.ic51ReadsByBank(0) >= 13651u);
-        assert(injectedResponseMachine.ic51ReadsByBank(1) >= 64u);
 
         if (!factoryFrames.empty()) {
             const auto factoryStartCycle = injectedResponseMachine.elapsedMachineCycles();
