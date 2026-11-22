@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
                     executed, static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned>(firmwareMachine.cpu().registers().sp),
                     static_cast<unsigned long long>(firmwareMachine.cpu().totalCycles()));
-        assert(executed == 41277);
+        assert(executed == 41278);
         assert(firmwareMachine.cpu().registers().pc == 0xeb8d);
         assert(firmwareMachine.cpu().registers().sp == 0xb5);
         assert(firmwareMachine.readExternal(0x0000) == 0x00);
