@@ -1,8 +1,7 @@
 #pragma once
 
-// Architectural foundation and initial instruction subset for the classic
-// Intel MCS-51 / 8051 core. Unsupported instructions are reported explicitly;
-// this is not yet a complete 8051 emulator.
+// Classic MCS-51 instruction core. Peripheral timing and pin-level behavior
+// are supplied by MCS51Bus; unsupported/reserved opcodes are reported explicitly.
 
 #include <array>
 #include <cstdint>
@@ -563,7 +562,8 @@ private:
             {0x02u, 0x88u, 0x20u, 0x02u, 0x0bu, 1u}, // Timer 0
             {0x04u, 0x88u, 0x08u, 0x04u, 0x13u, 2u}, // INT1
             {0x08u, 0x88u, 0x80u, 0x08u, 0x1bu, 1u}, // Timer 1
-            {0x10u, 0x98u, 0x03u, 0x10u, 0x23u, 0u}  // Serial RI or TI
+            {0x10u, 0x98u, 0x03u, 0x10u, 0x23u, 0u}, // Serial RI or TI
+            {0x20u, 0xc8u, 0xc0u, 0x20u, 0x2bu, 0u}  // 8052/8032 Timer 2
         };
 
         const int currentPriority = interruptDepth_ == 0
