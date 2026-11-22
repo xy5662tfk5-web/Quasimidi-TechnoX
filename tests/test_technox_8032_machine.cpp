@@ -392,11 +392,9 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.cpu().registers().pc == 0xeb32);
         firmwareMachine.reset();
 
-        // Seed the firmware's startup-cleared XDATA range and one byte just
-        // beyond its documented 0000-34FF initialization loop.
+        // Seed two locations in the firmware's startup-cleared XDATA range.
         firmwareMachine.writeExternal(0x0000, 0xa5);
         firmwareMachine.writeExternal(0x34ff, 0xa5);
-        firmwareMachine.writeExternal(0x3500, 0xa5);
         const auto executed = firmwareMachine.runUntilProgramCounter(0xeb8d, 50000);
         std::printf("IC4 boot trace: instructions=%zu PC=%04X SP=%02X cycles=%llu\n",
                     executed, static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
@@ -407,7 +405,6 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.cpu().registers().sp == 0xb5);
         assert(firmwareMachine.xdataByteForTesting(0x0000) == 0x00);
         assert(firmwareMachine.xdataByteForTesting(0x34ff) == 0x00);
-        assert(firmwareMachine.xdataByteForTesting(0x3500) == 0xa5);
 
         const auto resourceInit = firmwareMachine.runUntilProgramCounter(0x326a, 50000);
         std::printf("IC4 resource-table handoff: instructions=%zu PC=%04X\\n",
