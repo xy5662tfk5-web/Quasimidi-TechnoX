@@ -240,12 +240,14 @@ int main() {
     mathBus.code[0] = 0x75; mathBus.code[1] = 0xe0; mathBus.code[2] = 0x10; // ACC=16
     mathBus.code[3] = 0x75; mathBus.code[4] = 0xf0; mathBus.code[5] = 0x03; // B=3
     mathBus.code[6] = 0xa4; // MUL AB -> 48
-    mathBus.code[7] = 0x84; // DIV AB -> quotient 16, remainder 0
+    mathBus.code[7] = 0x75; mathBus.code[8] = 0xe0; mathBus.code[9] = 0x10;
+    mathBus.code[10] = 0x75; mathBus.code[11] = 0xf0; mathBus.code[12] = 0x03;
+    mathBus.code[13] = 0x84; // DIV AB -> quotient 5, remainder 1
     MCS51Core mathCpu;
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 7; ++i)
         assert(mathCpu.step(mathBus) == MCS51StepResult::executed);
-    assert(mathCpu.registers().a == 16);
-    assert(mathCpu.registers().b == 0);
+    assert(mathCpu.registers().a == 5);
+    assert(mathCpu.registers().b == 1);
     assert(!mathCpu.registers().psw.carry);
     assert(!mathCpu.registers().psw.overflow);
 
