@@ -440,7 +440,9 @@ int main(int argc, char** argv) {
         const auto commandCount = injectedResponseMachine.soundCommandPacketCount();
         std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
-        for (auto commandIndex = commandCountBeforeMidi; commandIndex < commandCount; ++commandIndex) {
+        const auto firstNewCommand = commandCount > commandCountBeforeMidi + 32u
+            ? commandCount - 32u : commandCountBeforeMidi;
+        for (auto commandIndex = firstNewCommand; commandIndex < commandCount; ++commandIndex) {
             const auto& packet = injectedResponseMachine.soundCommandPacketAt(commandIndex);
             std::printf("  MIDI-CMD[%zu] cycle=%llu %02X %02X %02X %02X\\n",
                         commandIndex,
