@@ -44,7 +44,7 @@ private:
 
     static void incrementTimer(MCS51Bus& bus, std::uint8_t highAddress,
                                std::uint8_t lowAddress, std::uint8_t tconMask,
-                               std::uint8_t mode, bool timer0) noexcept {
+                               std::uint8_t mode) noexcept {
         auto low = bus.readInternal(lowAddress);
         auto high = bus.readInternal(highAddress);
         bool overflow = false;
@@ -75,7 +75,6 @@ private:
             bus.writeInternal(highAddress, high);
         if (overflow)
             setFlag(bus, 0x88u, tconMask);
-        (void)timer0;
     }
 
     static void advanceTimer0And1(MCS51Bus& bus, bool t0Falling,
@@ -108,13 +107,13 @@ private:
             ((tmod & 0x08u) == 0 || int0High) &&
             ((tmod & 0x04u) == 0 || t0Falling);
         if (run0)
-            incrementTimer(bus, 0x8cu, 0x8au, 0x20u, mode0, true);
+            incrementTimer(bus, 0x8cu, 0x8au, 0x20u, mode0);
 
         const bool run1 = (tcon & 0x40u) != 0 &&
             ((tmod & 0x80u) == 0 || int1High) &&
             ((tmod & 0x40u) == 0 || t1Falling);
         if (run1 && mode1 != 3u)
-            incrementTimer(bus, 0x8du, 0x8bu, 0x80u, mode1, false);
+            incrementTimer(bus, 0x8du, 0x8bu, 0x80u, mode1);
     }
 
     static void advanceTimer2(MCS51Bus& bus, bool t2Falling,
