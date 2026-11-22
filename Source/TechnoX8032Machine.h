@@ -26,6 +26,11 @@ public:
         std::uint8_t value = 0xff;
         std::uint64_t machineCycle = 0;
     };
+    struct PortReadEvent {
+        std::uint8_t port = 0;
+        std::uint8_t value = 0xff;
+        std::uint64_t machineCycle = 0;
+    };
     // MAME's skeleton driver currently assumes 12 MHz but explicitly marks
     // the actual oscillator as unknown. Keep the rate injectable.
     static constexpr std::uint32_t kAssumedOscillatorHz = 12'000'000u;
@@ -120,6 +125,8 @@ public:
         soundCommandTrace_.fill(SoundCommandPacket{});
         portWriteTrace_.fill(PortWriteEvent{});
         portWriteCount_ = 0;
+        portReadTrace_.fill(PortReadEvent{});
+        portReadCount_ = 0;
         aciaControl_ = 0;
         aciaStatus_ = 0x02; // TDRE
         aciaReceive_ = 0;
@@ -217,8 +224,15 @@ public:
         if (port < 0) return internal_[address];
         const auto index = static_cast<std::size_t>(port);
         const auto mask = externalPortInputMask_[index];
-        return static_cast<std::uint8_t>((portPins_[index] & static_cast<std::uint8_t>(~mask)) |
-                                         (externalPortInputValue_[index] & mask));
+        const auto value = static_cast<std::uint8_t>(
+            (portPins_[index] & static_cast<std::uint8_t>(~mask)) |
+            (externalPortInputValue_[index] & mask));
+        auto& event = portReadTrace_[portReadCount_ % portReadTrace_.size()];
+        event.port = static_cast<std::uint8_t>(port);
+        event.value = value;
+        event.machineCycle = elapsedMachineCycles_;
+        ++portReadCount_;
+        return value;
     }
 
     void setExternalPortInputs(std::uint8_t portAddress, std::uint8_t mask,
@@ -447,6 +461,10 @@ public:
     const PortWriteEvent& portWriteAt(std::size_t index) const noexcept {
         return portWriteTrace_[index % portWriteTrace_.size()];
     }
+    std::size_t portReadCount() const noexcept { return portReadCount_; }
+    const PortReadEvent& portReadAt(std::size_t index) const noexcept {
+        return portReadTrace_[index % portReadTrace_.size()];
+    }
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
     std::uint64_t soundMemoryReadCount() const noexcept { return soundMemoryReadCount_; }
@@ -547,6 +565,8 @@ private:
     std::size_t soundCommandPacketCount_ = 0;
     std::array<PortWriteEvent, 256> portWriteTrace_{};
     std::size_t portWriteCount_ = 0;
+    mutable std::array<PortReadEvent, 512> portReadTrace_{};
+    mutable std::size_t portReadCount_ = 0;
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
