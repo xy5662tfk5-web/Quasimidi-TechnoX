@@ -640,6 +640,16 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
+        const auto unmappedCount = injectedResponseMachine.unmappedBusTraceCount();
+        std::printf("Unmapped external bus accesses (newest first, last 64):\\n");
+        for (std::size_t age = 0; age < unmappedCount && age < 64u; ++age) {
+            const auto& event = injectedResponseMachine.unmappedBusTraceAt(unmappedCount - 1u - age);
+            std::printf("  %c %04X=%02X cycle=%llu\\n",
+                        event.write ? 'W' : 'R',
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto portWrites = injectedResponseMachine.portWriteCount();
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
