@@ -604,6 +604,41 @@ int main(int argc, char** argv) {
         // 7BD5 external status byte needed by the current bus fixture.
         firmwareMachine.enableTestExternalRamWindow7000(0x00u);
         firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
+        if (!factoryFrames.empty()) {
+            const auto factoryStartCycle = firmwareMachine.elapsedMachineCycles();
+            const auto cyclesPerSecond = firmwareMachine.machineCyclesPerSecond();
+            const auto byteCycles = firmwareMachine.midiByteMachineCycles();
+            const auto tickDenominator =
+                static_cast<std::uint64_t>(factoryDivision) * 1000000u;
+            std::uint64_t timelineNumerator = 0;
+            std::uint64_t totalFactoryBytes = 0;
+            for (const auto& frame : factoryFrames) {
+                timelineNumerator += static_cast<std::uint64_t>(frame.deltaTicks) *
+                    factoryTempo * cyclesPerSecond;
+                const auto eventCycle = factoryStartCycle +
+                    timelineNumerator / tickDenominator;
+                const auto firstArrivalBase = std::max(
+                    eventCycle, firmwareMachine.elapsedMachineCycles());
+                assert(firmwareMachine.scheduleAciaMidiBytes(
+                    frame.bytes.data(), frame.bytes.size(), eventCycle));
+                const auto lastByteArrival = firstArrivalBase +
+                    byteCycles * frame.bytes.size();
+                const auto cycleBudget = lastByteArrival -
+                    firmwareMachine.elapsedMachineCycles() + 1u;
+                firmwareMachine.runForMachineCycles(static_cast<std::size_t>(cycleBudget));
+                assert(!firmwareMachine.cpuFaulted());
+                totalFactoryBytes += frame.bytes.size();
+            }
+            firmwareMachine.runForMachineCycles(5000000u);
+            std::printf("Real IC51 factory Performance SysEx: frames=%zu bytes=%llu "
+                        "PC=%04X packets=%zu burstWords=%zu IC51=%llu\\n",
+                        factoryFrames.size(),
+                        static_cast<unsigned long long>(totalFactoryBytes),
+                        static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
+                        firmwareMachine.soundCommandPacketCount(),
+                        firmwareMachine.sam9407BurstWordCount(),
+                        static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()));
+        }
         const std::array<std::uint8_t, 5> realRomProgramAndNote{{
             0xc0u, 0x05u, 0x90u, 0x3cu, 0x64u
         }};
