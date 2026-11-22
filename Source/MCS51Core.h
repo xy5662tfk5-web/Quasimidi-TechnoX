@@ -257,6 +257,36 @@ public:
             registers_.a ^= bus.readInternal(readRegister(bus, opcode & 1u));
         } else if (opcode >= 0x68 && opcode <= 0x6f) { // XRL A,Rn
             registers_.a ^= readRegister(bus, opcode & 7u);
+        } else if (opcode == 0x10 || opcode == 0x20 || opcode == 0x30) { // JBC/JB/JNB bit,rel
+            const auto bitAddress = fetch8(bus);
+            const auto rel = static_cast<std::int8_t>(fetch8(bus));
+            const bool bit = readBit(bus, bitAddress);
+            const bool take = opcode == 0x10 ? bit : opcode == 0x20 ? bit : !bit;
+            if (take) {
+                if (opcode == 0x10) writeBit(bus, bitAddress, false);
+                registers_.pc = static_cast<std::uint16_t>(registers_.pc + rel);
+            }
+            cycles = 2;
+        } else if (opcode == 0x72 || opcode == 0x82 ||
+                   opcode == 0xa0 || opcode == 0xb0) { // ORL/ANL C,bit or /bit
+            const bool bit = readBit(bus, fetch8(bus));
+            const bool operand = (opcode == 0xa0 || opcode == 0xb0) ? !bit : bit;
+            if (opcode == 0x72 || opcode == 0xa0)
+                registers_.psw.carry = registers_.psw.carry || operand;
+            else
+                registers_.psw.carry = registers_.psw.carry && operand;
+            cycles = 2;
+        } else if (opcode == 0x92) { // MOV bit,C
+            writeBit(bus, fetch8(bus), registers_.psw.carry);
+            cycles = 2;
+        } else if (opcode == 0xa2) { // MOV C,bit
+            registers_.psw.carry = readBit(bus, fetch8(bus));
+            cycles = 2;
+        } else if (opcode == 0xb2 || opcode == 0xc2 || opcode == 0xd2) { // CPL/CLR/SETB bit
+            const auto bitAddress = fetch8(bus);
+            const bool value = opcode == 0xb2 ? !readBit(bus, bitAddress) : opcode == 0xd2;
+            writeBit(bus, bitAddress, value);
+            cycles = 2;
         } else if (opcode == 0x12) { // LCALL addr16
             const auto high = fetch8(bus);
             const auto low = fetch8(bus);
@@ -344,6 +374,19 @@ private:
     void writeRegister(MCS51Bus& bus, std::uint8_t index, std::uint8_t value) noexcept {
         bus.writeInternal(static_cast<std::uint8_t>(
             registers_.psw.registerBankBase() + (index & 7u)), value);
+    }
+
+    bool readBit(MCS51Bus& bus, std::uint8_t bitAddress) const noexcept {
+        const auto address = bitAddressToByte(bitAddress);
+        return (bus.readInternal(address) & static_cast<std::uint8_t>(1u << bitAddressToBit(bitAddress))) != 0;
+    }
+
+    void writeBit(MCS51Bus& bus, std::uint8_t bitAddress, bool value) noexcept {
+        const auto address = bitAddressToByte(bitAddress);
+        const auto mask = static_cast<std::uint8_t>(1u << bitAddressToBit(bitAddress));
+        const auto current = bus.readInternal(address);
+        bus.writeInternal(address, value ? static_cast<std::uint8_t>(current | mask)
+                                         : static_cast<std::uint8_t>(current & static_cast<std::uint8_t>(~mask)));
     }
 
     void push(MCS51Bus& bus, std::uint8_t value) noexcept {
