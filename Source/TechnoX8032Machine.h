@@ -288,13 +288,21 @@ public:
                     aciaStatus_ = 0x02; // master reset; TDRE is masked on status reads
                     aciaReceive_ = 0;
                     aciaTransmitPending_ = false;
+                    aciaTransmitterBusy_ = false;
+                    aciaTxReadyCycle_ = 0;
                 }
                 refreshAciaInterrupt();
                 break;
             case 0xa001:
-                aciaTransmit_ = value;
-                aciaTransmitPending_ = true;
-                aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ | 0x02u);
+                if ((aciaControl_ & 0x03u) != 0x03u && !aciaTransmitterBusy_) {
+                    aciaTransmit_ = value;
+                    aciaTransmitPending_ = true;
+                    aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ & ~0x02u); // clear TDRE
+                    aciaTransmitterBusy_ = true;
+                    const auto bitCycles = std::max<std::uint64_t>(
+                        1u, midiByteMachineCycles() / 10u);
+                    aciaTxReadyCycle_ = elapsedMachineCycles_ + bitCycles;
+                }
                 break;
             case 0xb000: lcdInstruction_ = value; break;
             case 0xb001: lcdData_ = value; break;
@@ -306,6 +314,11 @@ public:
         for (unsigned cycle = 0; cycle < cycles; ++cycle) {
             ++elapsedMachineCycles_;
             deliverScheduledAciaBytes();
+            if (aciaTransmitterBusy_ && elapsedMachineCycles_ >= aciaTxReadyCycle_) {
+                aciaTransmitterBusy_ = false;
+                aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ | 0x02u); // TDRE
+                refreshAciaInterrupt();
+            }
             timers_.advanceMachineCycles(*this, 1);
         }
     }
@@ -424,13 +437,20 @@ private:
     }
 
     void refreshAciaInterrupt() noexcept {
-        // ACIA IRQ is wired to the 8032 INT1 input in the published MAME map.
-        const bool irqActive = (aciaControl_ & 0x03u) != 0x03u &&
-            (aciaControl_ & 0x80u) != 0 && (aciaStatus_ & 0x01u) != 0;
-        if (irqActive)
+        // MC6850 status bit 7 and the 8032 INT1 pin share the same IRQ state.
+        const bool active = (aciaControl_ & 0x03u) != 0x03u;
+        const bool receiveIrq = (aciaControl_ & 0x80u) != 0 &&
+            (aciaStatus_ & 0x01u) != 0;
+        const bool transmitIrq = (aciaControl_ & 0x18u) == 0x08u &&
+            (aciaStatus_ & 0x02u) != 0;
+        const bool irqActive = active && (receiveIrq || transmitIrq);
+        if (irqActive) {
+            aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ | 0x80u);
             portPins_[3] = static_cast<std::uint8_t>(portPins_[3] & ~0x08u); // INT1 active low
-        else
+        } else {
+            aciaStatus_ = static_cast<std::uint8_t>(aciaStatus_ & ~0x80u);
             portPins_[3] = static_cast<std::uint8_t>(portPins_[3] | 0x08u);
+        }
     }
 
     std::uint32_t oscillatorHz_ = kAssumedOscillatorHz;
@@ -456,6 +476,8 @@ private:
     std::size_t scheduledAciaCount_ = 0;
     std::uint64_t nextAciaReceiveCycle_ = 0;
     bool aciaTransmitPending_ = false;
+    bool aciaTransmitterBusy_ = false;
+    std::uint64_t aciaTxReadyCycle_ = 0;
     std::uint8_t lcdStatus_ = 0;
     std::uint8_t lcdData_ = 0;
     std::uint8_t lcdInstruction_ = 0;
