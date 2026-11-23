@@ -379,6 +379,30 @@ int main(int argc, char** argv) {
         const std::vector<std::uint8_t> realRom(romBegin, romEnd);
         assert(realRom.size() == TechnoX8032Machine::kIC4RomSize);
 
+        // Execute the real IC4 FX selector helper at 0x7FF2 directly. The
+        // 0x7BFE input is supplied through the explicit test overlay because
+        // its physical source device/memory map is not identified yet.
+        struct FXClampVector {
+            std::uint8_t input;
+            std::uint8_t expected;
+        };
+        constexpr std::array<FXClampVector, 6> fxClampVectors{{
+            {0x00u, 0x00u}, {0x01u, 0x01u}, {0x13u, 0x13u},
+            {0x14u, 0x14u}, {0x15u, 0x14u}, {0x7fu, 0x14u}
+        }};
+        for (const auto& vector : fxClampVectors) {
+            TechnoX8032Machine fxIndexProbe;
+            assert(fxIndexProbe.loadIC4Rom(realRom.data(), realRom.size()));
+            fxIndexProbe.reset();
+            fxIndexProbe.enableTestExternalRamWindow7000(0x00u);
+            fxIndexProbe.setTestExternalRamByte(0x7bfeu, vector.input);
+            fxIndexProbe.cpuForTesting().registersForTesting().pc = 0x7ff2u;
+            const auto executed = fxIndexProbe.runUntilProgramCounter(0x8004u, 32u);
+            assert(executed > 0u);
+            assert(fxIndexProbe.cpu().registers().pc == 0x8004u);
+            assert(fxIndexProbe.readExternal(0x3098u) == vector.expected);
+        }
+
         std::vector<std::uint8_t> realIC51;
         if (argc > 2) {
             std::ifstream ic51File(argv[2], std::ios::binary);
