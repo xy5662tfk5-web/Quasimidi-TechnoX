@@ -1146,6 +1146,42 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.ic51ReadsByBank(0) == 13651u); // 4-byte header + payload
         assert(firmwareMachine.ic51ReadsByBank(1) == 64u);    // descriptor-table reads
         assert(firmwareMachine.xdataByteForTesting(0xf5b2) == 0xd2u); // final uploaded byte
+
+        // Independently reconstruct the complete 16-KiB external sound-memory
+        // image from IC51 bank 0, startup header 0x48 and the IC4 map at 0xADDD.
+        // Compare every byte against the memory produced by executing IC4.
+        if (!realIC51.empty()) {
+            technox::MASSResourceROM imageROM;
+            assert(imageROM.load(realIC51.data(), realIC51.size()));
+            std::array<std::uint8_t, TechnoX8032Machine::kCodeSpaceSize>
+                imageFirmwareCode{};
+            for (std::size_t address = 0; address < imageFirmwareCode.size(); ++address)
+                imageFirmwareCode[address] = firmwareMachine.readCode(
+                    static_cast<std::uint16_t>(address));
+
+            technox::MASSIC51ExternalSoundMemoryImage externalImage;
+            assert(externalImage.load(
+                imageROM, imageFirmwareCode.data(), imageFirmwareCode.size()));
+            assert(externalImage.isLoaded());
+            assert(externalImage.baseAddress() == 0xc000u);
+            assert(externalImage.endAddress() == 0xffffu);
+            assert(externalImage.size() == 0x4000u);
+            assert(externalImage.sourceBank() == technox::MASSResourceBank::bank0);
+            assert(externalImage.sourceHeader().sourceAddress == 0x3c64u);
+            assert(externalImage.sourceHeader().firmwareByteCount() == 13647u);
+            assert(externalImage.loadedByteCount() == 13647u);
+            assert(externalImage.lastPhysicalAddress() == 0xf5b2u);
+            assert(externalImage.byteAt(0xbfffu) == 0xffu);
+            assert(externalImage.byteAt(0x10000u) == 0xffu);
+            for (std::uint32_t address = 0xc000u; address <= 0xffffu; ++address) {
+                const auto actual = firmwareMachine.xdataByteForTesting(
+                    static_cast<std::uint16_t>(address));
+                const auto reconstructed = externalImage.byteAt(
+                    static_cast<std::uint16_t>(address));
+                assert(reconstructed == actual);
+            }
+        }
+
         // Optional raw snapshot of the firmware-loaded external sound-memory window.
         // This is the physical XDATA image after the IC51 block transfer and address permutation.
         if (argc > 4) {
