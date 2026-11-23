@@ -559,8 +559,8 @@ int main(int argc, char** argv) {
                 for (int fxIndex = 0; fxIndex < 21; ++fxIndex) {
                     const auto* resolved = fxCatalog.find(bankIndex, fxIndex);
                     assert(resolved != nullptr);
-                    assert(resolved->firstResource.terminated);
-                    assert(resolved->secondResource.terminated);
+                    assert(resolved->fx1Resource.terminated);
+                    assert(resolved->fx2Resource.terminated);
                     assert(resolved->directoryEntry.index == fxIndex);
                 }
             }
@@ -569,9 +569,9 @@ int main(int argc, char** argv) {
             assert(fxCatalog.find(2, 0) == nullptr);
             const auto* roomBank0 = fxCatalog.find(0, 0);
             assert(roomBank0 != nullptr);
-            assert(roomBank0->firstResource.blocks.size() == 2u);
-            assert(roomBank0->secondResource.blocks.size() == 1u);
-            assert(fxCatalog.find(1, 0)->firstResource.blocks.size() > 0u);
+            assert(roomBank0->fx1Resource.blocks.size() == 2u);
+            assert(roomBank0->fx2Resource.blocks.size() == 1u);
+            assert(fxCatalog.find(1, 0)->fx1Resource.blocks.size() > 0u);
 
             // The real-time backend receives the immutable catalog on initial
             // attachment and again when replaced, just like the program catalog.
