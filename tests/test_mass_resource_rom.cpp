@@ -432,6 +432,31 @@ void testMASS1EDDFullParameterPipeline() {
         0x40, 0x01, 0x80, 0x00, result));
     assert(result.slotCoefficient.slotOpcodeScaleApplied);
     assert(result.slotCoefficient.modulationApplied);
+
+    // Full pipeline with R7!=0: the caller-provided byte is passed through
+    // the 0x2381 address stage and 0x1848 arithmetic before the modulation
+    // coefficient branch consumes the updated coefficient.
+    MASS1EDDFullParameterPipelineResult externalResult{};
+    assert(MASS1EDDFullParameterPipeline::process(
+        view, 0x41, 0x35, 0x40, 0x21, 0x00, 0x00,
+        0x1200, 0x02, 0x20, 0x40, 0x80,
+        0x00, 0x00, 0x80, 0x00, externalResult));
+    MASS1EDDParameterPipelineResult externalBase{};
+    assert(MASS1EDDParameterPipeline::process(
+        view, 0x41, 0x35, 0x40, 0x21, 0x00, 0x00,
+        0x1200, 0x02, 0x20, 0x40, 0x80, externalBase));
+    assert(externalBase.externalReadRequired);
+    assert(externalBase.externalAddress ==
+           MASS2381AddressBuilder::resolve(0x1200, 0x02, 0x20).address);
+    assert(externalBase.externalTransformApplied);
+    MASS1EDDSlotCoefficientResult externalSlot{};
+    assert(MASS1EDDSlotCoefficientStage::apply(
+        view, 0x41, externalBase.coefficientB,
+        0x00, 0x00, 0x80, 0x00, externalSlot));
+    assert(externalResult.nonlinearAndExternal.coefficientB ==
+           externalBase.coefficientB);
+    assert(externalResult.slotCoefficient.coefficientB ==
+           externalSlot.coefficientB);
 }
 
 void testMASS1EDDSlotCoefficientStage() {
