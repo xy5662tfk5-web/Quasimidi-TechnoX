@@ -79,6 +79,11 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
                 resourceROM, firmwareCode.data(), firmwareCode.size())) {
             massEngine.setFX1ResourceCatalog(&resourceFX1Catalog);
         }
+
+        if (resourceFX2Catalog.load(
+                resourceROM, firmwareCode.data(), firmwareCode.size())) {
+            massEngine.setFX2ResourceCatalog(&resourceFX2Catalog);
+        }
     }
 
     initialisePartStates();
