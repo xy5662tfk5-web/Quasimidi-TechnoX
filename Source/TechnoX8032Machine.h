@@ -145,6 +145,18 @@ public:
         std::uint16_t stackReturnPC = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct SoundDevicePortWriteEvent {
+        std::uint16_t address = 0xff10u;
+        std::uint8_t value = 0xffu;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool soundDeviceResetReleased = true;
+        std::uint64_t machineCycle = 0;
+    };
     struct XdataWatchEvent {
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
@@ -308,6 +320,8 @@ public:
         soundHostExpectedRegister_ = 0;
         soundHostTransactionBytes_.fill(0);
         soundHostTransactionContext_.fill(SoundHostBusContext{});
+        soundDevicePortWriteTrace_.fill(SoundDevicePortWriteEvent{});
+        soundDevicePortWriteCount_ = 0;
         soundHostBurstWordCount_ = 0;
         soundHostBurstWordTrace_.fill(SoundHostBurstWordEvent{});
         soundHostBurstLowPending_ = false;
@@ -850,6 +864,18 @@ public:
         }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
             soundDeviceWrite_ = value; // status-port traffic outside RAM mode
+            auto& event = soundDevicePortWriteTrace_[
+                soundDevicePortWriteCount_ % soundDevicePortWriteTrace_.size()];
+            event.value = value;
+            event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+            event.stackReturnPC = currentStackReturnPC();
+            event.port2 = portPins_[2];
+            event.port3 = portPins_[3];
+            event.soundBusMode = internal_[0x8e];
+            event.ic51Selected = ic51Selected;
+            event.soundDeviceResetReleased = soundDeviceResetReleased_;
+            event.machineCycle = elapsedMachineCycles_;
+            ++soundDevicePortWriteCount_;
             return;
         }
         if (isXdataRam(address)) {
@@ -1191,6 +1217,12 @@ public:
     }
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
+    std::size_t soundDevicePortWriteCount() const noexcept {
+        return soundDevicePortWriteCount_;
+    }
+    const SoundDevicePortWriteEvent& soundDevicePortWriteAt(std::size_t index) const noexcept {
+        return soundDevicePortWriteTrace_[index % soundDevicePortWriteTrace_.size()];
+    }
     std::uint64_t soundMemoryReadCount() const noexcept { return soundMemoryReadCount_; }
     std::size_t soundMemoryReadTraceCount() const noexcept { return soundMemoryReadTraceCount_; }
     const SoundMemoryReadEvent& soundMemoryReadTraceAt(std::size_t index) const noexcept {
@@ -1429,6 +1461,8 @@ private:
     std::uint64_t elapsedMachineCycles_ = 0;
     bool soundDeviceResetReleased_ = true;
     std::uint8_t soundDeviceWrite_ = 0;
+    std::array<SoundDevicePortWriteEvent, 4096> soundDevicePortWriteTrace_{};
+    std::size_t soundDevicePortWriteCount_ = 0;
     std::uint8_t soundDeviceResponse_ = 0xff;
     bool testExternalRam7000Enabled_ = false;
     std::array<std::uint8_t, 0x1000> testExternalRam7000_{};
