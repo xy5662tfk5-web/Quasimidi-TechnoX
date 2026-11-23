@@ -756,6 +756,18 @@ int main(int argc, char** argv) {
                              static_cast<unsigned>(fx2Runtime.readPortLatch(0xa0u)),
                              static_cast<unsigned>(fx2Runtime.readPortLatch(0xb0u)),
                              static_cast<unsigned>(fx2Runtime.readInternal(0x23u)));
+                std::fprintf(stderr, "  selectorOverride=%02X storedIndex=%02X\\n",
+                             static_cast<unsigned>(fx2Runtime.readExternal(0x7c06u)),
+                             static_cast<unsigned>(fx2Runtime.xdataByteForTesting(0x30b9u)));
+                for (std::size_t i = 0; i < fx2Runtime.ic51ReadTraceCount(); ++i) {
+                    const auto& event = fx2Runtime.ic51ReadTraceAt(i);
+                    std::fprintf(stderr, "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X P3=%02X\\n",
+                                 i, static_cast<unsigned>(event.bank),
+                                 static_cast<unsigned>(event.address),
+                                 static_cast<unsigned>(event.value),
+                                 static_cast<unsigned>(event.instructionPC),
+                                 static_cast<unsigned>(event.port3));
+                }
                 for (std::size_t i = 0; i < std::min<std::size_t>(
                          fx2Runtime.ff10WriteCount(), 12u); ++i) {
                     const auto& event = fx2Runtime.ff10WriteAt(i);
