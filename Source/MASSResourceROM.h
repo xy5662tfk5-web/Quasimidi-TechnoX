@@ -85,6 +85,55 @@ private:
     std::size_t imageSize_ = 0;
 };
 
+struct MASSCommandHandlerDispatchResult {
+    std::uint8_t opcodeGroup = 0;
+    std::uint8_t tableOffset = 0;
+    std::uint16_t handlerAddress = 0;
+    bool preDispatchFiller = false;
+};
+
+// IC4's resource-command jump table at 0x1BC3 is indexed by
+// (opcode & 0x38) rotated right once at 0x19BD. Each four-byte table slot
+// begins with LJMP (0x02) and a 16-bit handler address. Group 0x38 is
+// intercepted at 0x19A4 as a filler slot before JMP @A+DPTR, although its
+// table slot still contains the single-byte-advance handler.
+class MASSCommandHandlerDispatchTable {
+public:
+    static constexpr std::uint16_t kTableAddress = 0x1bc3u;
+    static constexpr std::uint8_t kOpcodeGroupMask = 0x38u;
+    static constexpr std::uint8_t kEntryStride = 4u;
+    static constexpr std::size_t kEntryCount = 8u;
+
+    static bool resolve(const MASSFirmwareROMView& firmware,
+                        std::uint8_t opcode,
+                        MASSCommandHandlerDispatchResult& result) noexcept {
+        MASSCommandHandlerDispatchResult decoded{};
+        decoded.opcodeGroup = static_cast<std::uint8_t>(
+            opcode & kOpcodeGroupMask);
+        decoded.tableOffset = static_cast<std::uint8_t>(
+            decoded.opcodeGroup >> 1u);
+        decoded.preDispatchFiller = decoded.opcodeGroup == 0x38u;
+
+        std::uint8_t jumpOpcode = 0;
+        std::uint8_t targetHigh = 0;
+        std::uint8_t targetLow = 0;
+        const auto entryAddress = static_cast<std::uint16_t>(
+            kTableAddress + decoded.tableOffset);
+        if (!firmware.readCodeByte(entryAddress, jumpOpcode) ||
+            !firmware.readCodeByte(
+                static_cast<std::uint16_t>(entryAddress + 1u), targetHigh) ||
+            !firmware.readCodeByte(
+                static_cast<std::uint16_t>(entryAddress + 2u), targetLow) ||
+            jumpOpcode != 0x02u)
+            return false;
+
+        decoded.handlerAddress = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(targetHigh) << 8u) | targetLow);
+        result = decoded;
+        return true;
+    }
+};
+
 struct MASS1C61SecondaryTableAddress {
     std::uint16_t address = 0;
     std::uint8_t normalizedIndex = 0;
