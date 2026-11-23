@@ -40,7 +40,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     if (resourceData != nullptr &&
         resourceROM.load(reinterpret_cast<const std::uint8_t*>(resourceData),
                          static_cast<std::size_t>(resourceRomSize)) &&
-        resourceProgramCatalog.load(resourceROM)) {
+        resourceProgramCatalog.loadBothFirmwareFlagVariants(resourceROM)) {
         // The catalog is immutable after construction. Every voice backend can
         // resolve its captured bank/program pair without parsing or allocating
         // on the audio thread.
