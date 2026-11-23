@@ -1785,16 +1785,33 @@ int main(int argc, char** argv) {
         firmwareMachine.clearIC51ReadTraceForTesting();
         firmwareMachine.clearInstructionWatchForTesting();
         const auto secondNotePacketStart = firmwareMachine.soundCommandPacketCount();
+        const auto secondNote1848CallStart = firmwareMachine.watchedCallCount(0x1848u);
         runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
                          secondNoteOn.data(), secondNoteOn.size());
         const auto secondNotePacketCount =
             firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
         assert(secondNotePacketCount == 549u);
-        assert(firmwareMachine.instructionWatchCountForTesting() > 0u);
-        const auto secondNoteInstructionWatch =
-            firmwareMachine.instructionWatchAtForTesting(
-                firmwareMachine.instructionWatchCountForTesting() - 1u);
-        assert(secondNoteInstructionWatch.instructionPC == 0x210fu);
+        const auto secondNote1848Calls =
+            firmwareMachine.watchedCallCount(0x1848u) - secondNote1848CallStart;
+        assert(secondNote1848Calls == 2u);
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            secondNote1848Inputs{};
+        std::size_t secondNote1848InputCount = 0;
+        TechnoX8032Machine::InstructionWatchEvent secondNoteInstructionWatch{};
+        bool foundSecondNotePacketBuilder = false;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x1848u) {
+                assert(secondNote1848InputCount < secondNote1848Inputs.size());
+                secondNote1848Inputs[secondNote1848InputCount++] = event;
+            } else if (event.instructionPC == 0x210fu) {
+                secondNoteInstructionWatch = event;
+                foundSecondNotePacketBuilder = true;
+            }
+        }
+        assert(secondNote1848InputCount == 2u);
+        assert(foundSecondNotePacketBuilder);
 
         // Pin the five per-note resource/voice transactions observed before
         // the firmware's repeated 544-command SoundHost initialization sweep.
@@ -2036,20 +2053,54 @@ int main(int argc, char** argv) {
             referenceVelocityPackets[i] =
                 firmwareMachine.soundCommandPacketAt(secondNotePacketStart + i).bytes;
         const auto lowerVelocityPacketStart = firmwareMachine.soundCommandPacketCount();
+        const auto lowerVelocity1848CallStart = firmwareMachine.watchedCallCount(0x1848u);
         firmwareMachine.clearInstructionWatchForTesting();
         runRealMidiStage("Same note 64 with lower velocity 50",
                          sameNoteLowerVelocity.data(), sameNoteLowerVelocity.size());
         const auto lowerVelocityPacketCount =
             firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
         assert(lowerVelocityPacketCount == 549u);
-        assert(firmwareMachine.instructionWatchCountForTesting() > 0u);
-        const auto lowerVelocityInstructionWatch =
-            firmwareMachine.instructionWatchAtForTesting(
-                firmwareMachine.instructionWatchCountForTesting() - 1u);
-        assert(lowerVelocityInstructionWatch.instructionPC == 0x210fu);
+        const auto lowerVelocity1848Calls =
+            firmwareMachine.watchedCallCount(0x1848u) - lowerVelocity1848CallStart;
+        assert(lowerVelocity1848Calls == 2u);
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            lowerVelocity1848Inputs{};
+        std::size_t lowerVelocity1848InputCount = 0;
+        TechnoX8032Machine::InstructionWatchEvent lowerVelocityInstructionWatch{};
+        bool foundLowerVelocityPacketBuilder = false;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x1848u) {
+                assert(lowerVelocity1848InputCount < lowerVelocity1848Inputs.size());
+                lowerVelocity1848Inputs[lowerVelocity1848InputCount++] = event;
+            } else if (event.instructionPC == 0x210fu) {
+                lowerVelocityInstructionWatch = event;
+                foundLowerVelocityPacketBuilder = true;
+            }
+        }
+        assert(lowerVelocity1848InputCount == 2u);
+        assert(foundLowerVelocityPacketBuilder);
         std::printf("MASS velocity differential: reference=note64/vel100 "
                     "comparison=note64/vel50 packets=%zu\\n",
                     lowerVelocityPacketCount);
+        for (std::size_t i = 0; i < secondNote1848Inputs.size(); ++i) {
+            const auto& high = secondNote1848Inputs[i];
+            const auto& low = lowerVelocity1848Inputs[i];
+            std::printf("  MASS-1848[%zu] vel100 A=%02X B=%02X R2=%02X R3=%02X R4=%02X "
+                        "vel50 A=%02X B=%02X R2=%02X R3=%02X R4=%02X\\n",
+                        i,
+                        static_cast<unsigned>(high.accumulator),
+                        static_cast<unsigned>(high.b),
+                        static_cast<unsigned>(high.registers[2]),
+                        static_cast<unsigned>(high.registers[3]),
+                        static_cast<unsigned>(high.registers[4]),
+                        static_cast<unsigned>(low.accumulator),
+                        static_cast<unsigned>(low.b),
+                        static_cast<unsigned>(low.registers[2]),
+                        static_cast<unsigned>(low.registers[3]),
+                        static_cast<unsigned>(low.registers[4]));
+        }
         const auto comparableVelocityPackets =
             std::min<std::size_t>(referenceVelocityPackets.size(), lowerVelocityPacketCount);
         assert(comparableVelocityPackets == referenceVelocityPackets.size());
