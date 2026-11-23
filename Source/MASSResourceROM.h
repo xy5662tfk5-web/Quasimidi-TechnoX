@@ -1226,13 +1226,9 @@ enum class MASSIC51PortStreamFormat : std::uint8_t {
     rotatedHeaderThreeBytePreambleAndPayload
 };
 
-// A decoded resource block that firmware streams byte-by-byte to XDATA
-// offset 0xFF10. The format describes transport framing only; it does not
-// assign musical or PCM meaning to the payload.
+// One block within an IC4-controlled stream sent byte-by-byte to XDATA
+// offset 0xFF10. A resource consists of multiple blocks and a zero terminator.
 struct MASSIC51PortStreamBlock {
-    MASSIC51PortStreamFormat format =
-        MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
-    std::uint8_t resourceIndex = 0;
     std::uint16_t dataAddress = 0;
     std::uint8_t sourceCount = 0;
     std::uint8_t wireHeader = 0;
@@ -1240,65 +1236,56 @@ struct MASSIC51PortStreamBlock {
     std::vector<std::uint8_t> payload;
     std::size_t sourceBytesConsumed = 0;
     std::size_t portWriteByteCount = 0;
-    bool empty = false;
+};
+
+struct MASSIC51PortStreamResource {
+    MASSIC51PortStreamFormat format =
+        MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
+    std::uint8_t resourceIndex = 0;
+    std::uint16_t dataAddress = 0;
+    std::vector<MASSIC51PortStreamBlock> blocks;
+    std::uint16_t terminatorAddress = 0;
+    std::size_t sourceBytesConsumed = 0; // Includes the zero terminator byte.
+    std::size_t portWriteByteCount = 0;  // Excludes the zero terminator.
+    bool terminated = false;
 };
 
 class MASSIC51PortStreamResolver {
 public:
-    // Firmware path through IC4 0xAF93:
+    // Firmware path through IC4 0xAF93 repeats:
     //   [count] [two one-time preamble bytes] [count * 3 payload bytes].
-    // A zero count exits without writing anything to the host port.
+    // A zero count ends the resource without a host-port write.
     static bool resolveTripletStream(
         const MASSResourceROM& rom,
         MASSResourceBank bank,
         std::uint8_t resourceIndex,
-        MASSIC51PortStreamBlock& result) {
-        std::uint16_t address = 0;
-        if (!rom.readResourceDescriptorAddress(bank, resourceIndex, address))
-            return false;
-        const auto* bankData = rom.dataForBank(bank);
-        if (bankData == nullptr || address >= MASSResourceROM::kBankSize)
-            return false;
-
-        MASSIC51PortStreamBlock decoded{};
-        decoded.format =
-            MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
-        decoded.resourceIndex = resourceIndex;
-        decoded.dataAddress = address;
-        decoded.sourceCount = bankData[address];
-        if (decoded.sourceCount == 0) {
-            decoded.sourceBytesConsumed = 1;
-            decoded.empty = true;
-            result = std::move(decoded);
-            return true;
-        }
-
-        const auto payloadSize = static_cast<std::size_t>(decoded.sourceCount) * 3u;
-        const auto totalSourceSize = 3u + payloadSize;
-        if (static_cast<std::size_t>(address) + totalSourceSize >
-            MASSResourceROM::kBankSize)
-            return false;
-
-        decoded.wireHeader = decoded.sourceCount;
-        decoded.preamble[0] = bankData[address + 1u];
-        decoded.preamble[1] = bankData[address + 2u];
-        decoded.payload.assign(bankData + address + 3u,
-                               bankData + address + totalSourceSize);
-        decoded.sourceBytesConsumed = totalSourceSize;
-        decoded.portWriteByteCount = totalSourceSize;
-        result = std::move(decoded);
-        return true;
+        MASSIC51PortStreamResource& result) {
+        return resolve(rom, bank, resourceIndex,
+            MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets,
+            result);
     }
 
-    // Firmware path through IC4 0xB015:
+    // Firmware path through IC4 0xB015 repeats:
     //   [count] [three fixed preamble bytes] [count payload bytes].
     // The header is sent with 8051 RR A (circular rotate-right), not a shift.
-    // A zero count exits before any host-port write.
+    // A zero count ends the resource without a host-port write.
     static bool resolveRotatedHeaderStream(
         const MASSResourceROM& rom,
         MASSResourceBank bank,
         std::uint8_t resourceIndex,
-        MASSIC51PortStreamBlock& result) {
+        MASSIC51PortStreamResource& result) {
+        return resolve(rom, bank, resourceIndex,
+            MASSIC51PortStreamFormat::rotatedHeaderThreeBytePreambleAndPayload,
+            result);
+    }
+
+private:
+    static bool resolve(
+        const MASSResourceROM& rom,
+        MASSResourceBank bank,
+        std::uint8_t resourceIndex,
+        MASSIC51PortStreamFormat format,
+        MASSIC51PortStreamResource& result) {
         std::uint16_t address = 0;
         if (!rom.readResourceDescriptorAddress(bank, resourceIndex, address))
             return false;
@@ -1306,39 +1293,64 @@ public:
         if (bankData == nullptr || address >= MASSResourceROM::kBankSize)
             return false;
 
-        MASSIC51PortStreamBlock decoded{};
-        decoded.format =
-            MASSIC51PortStreamFormat::rotatedHeaderThreeBytePreambleAndPayload;
+        MASSIC51PortStreamResource decoded{};
+        decoded.format = format;
         decoded.resourceIndex = resourceIndex;
         decoded.dataAddress = address;
-        decoded.sourceCount = bankData[address];
-        if (decoded.sourceCount == 0) {
-            decoded.sourceBytesConsumed = 1;
-            decoded.empty = true;
-            result = std::move(decoded);
-            return true;
+        std::size_t cursor = address;
+
+        while (cursor < MASSResourceROM::kBankSize) {
+            const auto count = bankData[cursor];
+            if (count == 0) {
+                decoded.terminatorAddress = static_cast<std::uint16_t>(cursor);
+                decoded.sourceBytesConsumed = cursor - address + 1u;
+                decoded.terminated = true;
+                result = std::move(decoded);
+                return true;
+            }
+
+            MASSIC51PortStreamBlock block{};
+            block.dataAddress = static_cast<std::uint16_t>(cursor);
+            block.sourceCount = count;
+            std::size_t totalSourceSize = 0;
+            std::size_t payloadSize = 0;
+
+            if (format ==
+                MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets) {
+                payloadSize = static_cast<std::size_t>(count) * 3u;
+                totalSourceSize = 3u + payloadSize;
+                if (cursor + totalSourceSize > MASSResourceROM::kBankSize)
+                    return false;
+                block.wireHeader = count;
+                block.preamble[0] = bankData[cursor + 1u];
+                block.preamble[1] = bankData[cursor + 2u];
+                block.payload.assign(bankData + cursor + 3u,
+                                     bankData + cursor + totalSourceSize);
+            } else {
+                payloadSize = count;
+                totalSourceSize = 4u + payloadSize;
+                if (cursor + totalSourceSize > MASSResourceROM::kBankSize)
+                    return false;
+                block.wireHeader = static_cast<std::uint8_t>(
+                    (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
+                block.preamble = {
+                    bankData[cursor + 1u],
+                    bankData[cursor + 2u],
+                    bankData[cursor + 3u]
+                };
+                block.payload.assign(bankData + cursor + 4u,
+                                     bankData + cursor + totalSourceSize);
+            }
+
+            block.sourceBytesConsumed = totalSourceSize;
+            block.portWriteByteCount = totalSourceSize;
+            decoded.portWriteByteCount += block.portWriteByteCount;
+            decoded.blocks.push_back(std::move(block));
+            cursor += totalSourceSize;
         }
 
-        const auto payloadSize = static_cast<std::size_t>(decoded.sourceCount);
-        const auto totalSourceSize = 4u + payloadSize;
-        if (static_cast<std::size_t>(address) + totalSourceSize >
-            MASSResourceROM::kBankSize)
-            return false;
-
-        const auto count = decoded.sourceCount;
-        decoded.wireHeader = static_cast<std::uint8_t>(
-            (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
-        decoded.preamble = {
-            bankData[address + 1u],
-            bankData[address + 2u],
-            bankData[address + 3u]
-        };
-        decoded.payload.assign(bankData + address + 4u,
-                               bankData + address + totalSourceSize);
-        decoded.sourceBytesConsumed = totalSourceSize;
-        decoded.portWriteByteCount = totalSourceSize;
-        result = std::move(decoded);
-        return true;
+        // The firmware's loader returns only after a zero-count terminator.
+        return false;
     }
 };
 
