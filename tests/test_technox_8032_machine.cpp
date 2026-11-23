@@ -727,6 +727,10 @@ int main(int argc, char** argv) {
                 assert(fx2Runtime.loadIC51Rom(realIC51.data(), realIC51.size()));
                 fx2Runtime.reset();
                 fx2Runtime.setTestExternalReadOverride(0x7c06u, 5u); // Phaser1
+                // Firmware bit 0x1B gates the XDATA write phase in AF93/B015.
+                // Set it explicitly so this isolated entry-point test exercises
+                // the actual IC51-to-FF10 sound-memory transfer branch.
+                fx2Runtime.writeInternal(0x23u, 0x08u);
                 fx2Runtime.cpuForTesting().registersForTesting().pc = 0x88d1u;
                 const auto executed = fx2Runtime.runUntilProgramCounter(0x8926u, 100000u);
                 assert(executed > 0u);
@@ -745,13 +749,13 @@ int main(int argc, char** argv) {
                             executed,
                             static_cast<unsigned>(fx2Runtime.cpu().registers().pc),
                             static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
-                            fx2Runtime.soundDevicePortWriteCount(), expectedPortBytes,
+                            fx2Runtime.ff10WriteCount(), expectedPortBytes,
                             static_cast<unsigned>(fx2Runtime.lastSoundDeviceWrite()),
                             static_cast<unsigned>(fx2Runtime.readPortLatch(0xa0u)),
                             static_cast<unsigned>(fx2Runtime.readPortLatch(0xb0u)));
                 for (std::size_t i = 0; i < std::min<std::size_t>(
-                         fx2Runtime.soundDevicePortWriteCount(), 12u); ++i) {
-                    const auto& event = fx2Runtime.soundDevicePortWriteAt(i);
+                         fx2Runtime.ff10WriteCount(), 12u); ++i) {
+                    const auto& event = fx2Runtime.ff10WriteAt(i);
                     std::printf("  FF10[%zu]=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
                                 i, static_cast<unsigned>(event.value),
                                 static_cast<unsigned>(event.instructionPC),
@@ -759,24 +763,24 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned>(event.port2),
                                 static_cast<unsigned>(event.port3));
                 }
-                assert(fx2Runtime.soundDevicePortWriteCount() == expectedPortBytes);
+                assert(fx2Runtime.ff10WriteCount() == expectedPortBytes);
 
                 std::size_t portOffset = 0;
-                const auto& headerWrite = fx2Runtime.soundDevicePortWriteAt(portOffset++);
+                const auto& headerWrite = fx2Runtime.ff10WriteAt(portOffset++);
                 assert(headerWrite.value == block.wireHeader);
                 for (const auto expected : block.preamble) {
-                    const auto& event = fx2Runtime.soundDevicePortWriteAt(portOffset++);
+                    const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
                     assert(event.value == expected);
                 }
                 for (const auto expected : block.payload) {
-                    const auto& event = fx2Runtime.soundDevicePortWriteAt(portOffset++);
+                    const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
                     assert(event.value == expected);
                 }
                 assert(portOffset == expectedPortBytes);
                 for (std::size_t i = 0; i < expectedPortBytes; ++i) {
-                    const auto& event = fx2Runtime.soundDevicePortWriteAt(i);
+                    const auto& event = fx2Runtime.ff10WriteAt(i);
                     assert(event.port2 == 0xffu);
-                    assert(event.soundBusMode != 0x02u);
+                    assert(event.soundBusMode == 0x02u);
                 }
             }
 
