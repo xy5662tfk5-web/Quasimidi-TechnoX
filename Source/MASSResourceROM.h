@@ -1152,6 +1152,189 @@ private:
     bool loaded_ = false;
 };
 
+
+// IC4 v1.05's 21 fixed FX records at 0x8423. The firmware reads the two
+// IC51 resource selectors from record offsets +0x0B and +0x0C. The remaining
+// bytes are retained verbatim; their DSP meanings are not assigned here.
+struct MASSFXProgramRecord {
+    std::uint8_t index = 0;
+    std::array<char, 11> name{};
+    std::uint8_t firstResourceIndex = 0;
+    std::uint8_t secondResourceIndex = 0;
+    std::uint8_t modeByte = 0;
+    std::array<std::uint8_t, 18> opaqueTail{};
+};
+
+class MASSFXProgramDirectory {
+public:
+    static constexpr std::uint16_t kTableAddress = 0x8423u;
+    static constexpr std::size_t kEntryCount = 21u;
+    static constexpr std::size_t kEntryStride = 0x20u;
+    static constexpr std::size_t kNameBytes = 10u;
+    static constexpr std::size_t kFirstResourceOffset = 0x0bu;
+    static constexpr std::size_t kSecondResourceOffset = 0x0cu;
+    static constexpr std::size_t kModeOffset = 0x0du;
+    static constexpr std::size_t kTableEnd =
+        static_cast<std::size_t>(kTableAddress) + kEntryCount * kEntryStride;
+
+    bool load(const std::uint8_t* firmwareCode, std::size_t codeSize) noexcept {
+        if (firmwareCode == nullptr || codeSize < kTableEnd)
+            return false;
+
+        std::array<MASSFXProgramRecord, kEntryCount> parsed{};
+        for (std::size_t index = 0; index < kEntryCount; ++index) {
+            const auto* source = firmwareCode + kTableAddress + index * kEntryStride;
+            auto& record = parsed[index];
+            record.index = static_cast<std::uint8_t>(index);
+            for (std::size_t i = 0; i < kNameBytes; ++i) {
+                const auto value = source[i];
+                record.name[i] = value == 0 ? '\\0' : static_cast<char>(value);
+            }
+            record.name[kNameBytes] = '\\0';
+            record.firstResourceIndex = source[kFirstResourceOffset];
+            record.secondResourceIndex = source[kSecondResourceOffset];
+            record.modeByte = source[kModeOffset];
+            std::copy_n(source + 0x0eu, record.opaqueTail.size(),
+                        record.opaqueTail.begin());
+        }
+
+        records_ = parsed;
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+
+    const MASSFXProgramRecord* find(int fxIndex) const noexcept {
+        if (!loaded_ || fxIndex < 0 ||
+            fxIndex >= static_cast<int>(kEntryCount))
+            return nullptr;
+        return &records_[static_cast<std::size_t>(fxIndex)];
+    }
+
+    const std::array<MASSFXProgramRecord, kEntryCount>& records() const noexcept {
+        return records_;
+    }
+
+private:
+    std::array<MASSFXProgramRecord, kEntryCount> records_{};
+    bool loaded_ = false;
+};
+
+enum class MASSIC51PortStreamFormat : std::uint8_t {
+    headerAndTwoBytePreambleAndTriplets,
+    rotatedHeaderAndQuadruplets
+};
+
+// A decoded resource block that firmware streams byte-by-byte to XDATA
+// offset 0xFF10. The format describes transport framing only; it does not
+// assign musical or PCM meaning to the payload.
+struct MASSIC51PortStreamBlock {
+    MASSIC51PortStreamFormat format =
+        MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
+    std::uint8_t resourceIndex = 0;
+    std::uint16_t dataAddress = 0;
+    std::uint8_t sourceCount = 0;
+    std::uint8_t wireHeader = 0;
+    std::array<std::uint8_t, 2> preamble{};
+    std::vector<std::uint8_t> payload;
+    std::size_t sourceBytesConsumed = 0;
+    std::size_t portWriteByteCount = 0;
+    bool empty = false;
+};
+
+class MASSIC51PortStreamResolver {
+public:
+    // Firmware path through IC4 0xAF93:
+    //   [count] [two one-time preamble bytes] [count * 3 payload bytes].
+    // A zero count exits without writing anything to the host port.
+    static bool resolveTripletStream(
+        const MASSResourceROM& rom,
+        MASSResourceBank bank,
+        std::uint8_t resourceIndex,
+        MASSIC51PortStreamBlock& result) {
+        std::uint16_t address = 0;
+        if (!rom.readResourceDescriptorAddress(bank, resourceIndex, address))
+            return false;
+        const auto* bankData = rom.dataForBank(bank);
+        if (bankData == nullptr || address >= MASSResourceROM::kBankSize)
+            return false;
+
+        MASSIC51PortStreamBlock decoded{};
+        decoded.format =
+            MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
+        decoded.resourceIndex = resourceIndex;
+        decoded.dataAddress = address;
+        decoded.sourceCount = bankData[address];
+        if (decoded.sourceCount == 0) {
+            decoded.sourceBytesConsumed = 1;
+            decoded.empty = true;
+            result = std::move(decoded);
+            return true;
+        }
+
+        const auto payloadSize = static_cast<std::size_t>(decoded.sourceCount) * 3u;
+        const auto totalSourceSize = 3u + payloadSize;
+        if (static_cast<std::size_t>(address) + totalSourceSize >
+            MASSResourceROM::kBankSize)
+            return false;
+
+        decoded.wireHeader = decoded.sourceCount;
+        decoded.preamble = {bankData[address + 1u], bankData[address + 2u]};
+        decoded.payload.assign(bankData + address + 3u,
+                               bankData + address + totalSourceSize);
+        decoded.sourceBytesConsumed = totalSourceSize;
+        decoded.portWriteByteCount = 1u + 2u + payloadSize;
+        result = std::move(decoded);
+        return true;
+    }
+
+    // Firmware path through IC4 0xB015:
+    //   [count] [count * 4 payload bytes].
+    // The header is sent with the 8051 RR A operation (circular rotate),
+    // not a logical right shift. A zero count exits before the port write.
+    static bool resolveQuadrupletStream(
+        const MASSResourceROM& rom,
+        MASSResourceBank bank,
+        std::uint8_t resourceIndex,
+        MASSIC51PortStreamBlock& result) {
+        std::uint16_t address = 0;
+        if (!rom.readResourceDescriptorAddress(bank, resourceIndex, address))
+            return false;
+        const auto* bankData = rom.dataForBank(bank);
+        if (bankData == nullptr || address >= MASSResourceROM::kBankSize)
+            return false;
+
+        MASSIC51PortStreamBlock decoded{};
+        decoded.format = MASSIC51PortStreamFormat::rotatedHeaderAndQuadruplets;
+        decoded.resourceIndex = resourceIndex;
+        decoded.dataAddress = address;
+        decoded.sourceCount = bankData[address];
+        if (decoded.sourceCount == 0) {
+            decoded.sourceBytesConsumed = 1;
+            decoded.empty = true;
+            result = std::move(decoded);
+            return true;
+        }
+
+        const auto payloadSize = static_cast<std::size_t>(decoded.sourceCount) * 4u;
+        const auto totalSourceSize = 1u + payloadSize;
+        if (static_cast<std::size_t>(address) + totalSourceSize >
+            MASSResourceROM::kBankSize)
+            return false;
+
+        const auto count = decoded.sourceCount;
+        decoded.wireHeader = static_cast<std::uint8_t>(
+            (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
+        decoded.payload.assign(bankData + address + 1u,
+                               bankData + address + totalSourceSize);
+        decoded.sourceBytesConsumed = totalSourceSize;
+        decoded.portWriteByteCount = totalSourceSize;
+        result = std::move(decoded);
+        return true;
+    }
+};
+
 // Firmware XDATA addressing for MOVX @R0: P2 selects the page and R0 is
 // the eight-bit offset. Incrementing R0 wraps within the selected page.
 struct MASSXDataAddress {
