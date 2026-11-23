@@ -14,9 +14,9 @@
 #include <vector>
 
 
-class FXCatalogProbeBackend final : public technox::IMASSVoiceBackend {
+class FX1CatalogProbeBackend final : public technox::IMASSVoiceBackend {
 public:
-    void setFXResourceCatalog(const technox::MASSFXResourceCatalog* catalog) noexcept override {
+    void setFXResourceCatalog(const technox::MASSFX1ResourceCatalog* catalog) noexcept override {
         receivedCatalog = catalog;
     }
     void prepare(double, int) override {}
@@ -34,23 +34,22 @@ public:
                 const technox::MASSDrumParameterStore&) noexcept override {
         selectedFX1 = common.get(technox::MASSCommonControl::fx1Type);
         selectedFX2 = common.get(technox::MASSCommonControl::fx2Type);
+
+        // This 21-entry ROM directory is the FX1 Room/Reverb family only.
+        // FX2 is a different 21-algorithm processor and must not resolve here.
         const auto* fx1 = receivedCatalog != nullptr && selectedFX1 >= 0
             ? receivedCatalog->find(0, selectedFX1) : nullptr;
-        const auto* fx2 = receivedCatalog != nullptr && selectedFX2 >= 0
-            ? receivedCatalog->find(0, selectedFX2) : nullptr;
-        resolvedFX1 = fx1 != nullptr;
-        resolvedFX2 = fx2 != nullptr;
-        fx1FirstBlockCount = resolvedFX1 ? fx1->fx1Resource.blocks.size() : 0u;
-        fx2SecondBlockCount = resolvedFX2 ? fx2->fx2Resource.blocks.size() : 0u;
+        fx1Resolved = fx1 != nullptr;
+        fx1StreamABlockCount = fx1Resolved ? fx1->streamAResource.blocks.size() : 0u;
+        fx1StreamBBlockCount = fx1Resolved ? fx1->streamBResource.blocks.size() : 0u;
     }
 
-    const technox::MASSFXResourceCatalog* receivedCatalog = nullptr;
+    const technox::MASSFX1ResourceCatalog* receivedCatalog = nullptr;
     int selectedFX1 = -1;
     int selectedFX2 = -1;
-    bool resolvedFX1 = false;
-    bool resolvedFX2 = false;
-    std::size_t fx1FirstBlockCount = 0;
-    std::size_t fx2SecondBlockCount = 0;
+    bool fx1Resolved = false;
+    std::size_t fx1StreamABlockCount = 0;
+    std::size_t fx1StreamBBlockCount = 0;
 };
 
 int main(int argc, char** argv) {
@@ -526,7 +525,7 @@ int main(int argc, char** argv) {
                 firmwareCode[address] = firmwareMachine.readCode(
                     static_cast<std::uint16_t>(address));
 
-            technox::MASSFXProgramDirectory fxDirectory;
+            technox::MASSFX1ProgramDirectory fxDirectory;
             assert(fxDirectory.load(firmwareCode.data(), firmwareCode.size()));
             struct ExpectedFX {
                 const char* name;
@@ -534,7 +533,7 @@ int main(int argc, char** argv) {
                 std::uint8_t secondResource;
                 std::uint8_t mode;
             };
-            const std::array<ExpectedFX, technox::MASSFXProgramDirectory::kEntryCount>
+            const std::array<ExpectedFX, technox::MASSFX1ProgramDirectory::kEntryCount>
                 expectedFX{{
                     {"Room",        0x00, 0x01, 0x03},
                     {"SmallRoom",   0x04, 0x05, 0x03},
@@ -563,17 +562,17 @@ int main(int argc, char** argv) {
                 const auto* record = fxDirectory.find(static_cast<int>(index));
                 assert(record != nullptr);
                 assert(record->index == index);
-                assert(record->fx1ResourceIndex == expectedFX[index].firstResource);
-                assert(record->fx2ResourceIndex == expectedFX[index].secondResource);
+                assert(record->streamAResourceIndex == expectedFX[index].firstResource);
+                assert(record->streamBResourceIndex == expectedFX[index].secondResource);
                 assert(record->modeByte == expectedFX[index].mode);
                 std::size_t nameLength = 0;
                 while (expectedFX[index].name[nameLength] != '\0') {
                     assert(record->name[nameLength] == expectedFX[index].name[nameLength]);
                     ++nameLength;
                 }
-                for (std::size_t j = nameLength; j < technox::MASSFXProgramDirectory::kNameBytes; ++j)
+                for (std::size_t j = nameLength; j < technox::MASSFX1ProgramDirectory::kNameBytes; ++j)
                     assert(record->name[j] == '\0' || record->name[j] == ' ');
-                assert(record->name[technox::MASSFXProgramDirectory::kNameBytes] == '\0');
+                assert(record->name[technox::MASSFX1ProgramDirectory::kNameBytes] == '\0');
             }
             assert(fxDirectory.find(-1) == nullptr);
             assert(fxDirectory.find(21) == nullptr);
@@ -581,89 +580,85 @@ int main(int argc, char** argv) {
             technox::MASSResourceROM fxResources;
             assert(fxResources.load(realIC51.data(), realIC51.size()));
 
-            technox::MASSFXResourceCatalog fxCatalog;
-            assert(fxCatalog.load(
+            technox::MASSFX1ResourceCatalog fx1Catalog;
+            assert(fx1Catalog.load(
                 fxResources, firmwareCode.data(), firmwareCode.size()));
-            assert(fxCatalog.isLoaded());
+            assert(fx1Catalog.isLoaded());
             for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
                 for (int fxIndex = 0; fxIndex < 21; ++fxIndex) {
-                    const auto* resolved = fxCatalog.find(bankIndex, fxIndex);
+                    const auto* resolved = fx1Catalog.find(bankIndex, fxIndex);
                     assert(resolved != nullptr);
-                    assert(resolved->fx1Resource.terminated);
-                    assert(resolved->fx2Resource.terminated);
+                    assert(resolved->streamAResource.terminated);
+                    assert(resolved->streamBResource.terminated);
                     assert(resolved->directoryEntry.index == fxIndex);
                 }
             }
-            assert(fxCatalog.find(-1, 0) == nullptr);
-            assert(fxCatalog.find(0, 21) == nullptr);
-            assert(fxCatalog.find(2, 0) == nullptr);
-            const auto* roomBank0 = fxCatalog.find(0, 0);
+            assert(fx1Catalog.find(-1, 0) == nullptr);
+            assert(fx1Catalog.find(0, 21) == nullptr);
+            assert(fx1Catalog.find(2, 0) == nullptr);
+            const auto* roomBank0 = fx1Catalog.find(0, 0);
             assert(roomBank0 != nullptr);
-            assert(roomBank0->fx1Resource.blocks.size() == 2u);
-            assert(roomBank0->fx2Resource.blocks.size() == 1u);
-            assert(fxCatalog.find(1, 0)->fx1Resource.blocks.size() > 0u);
+            assert(roomBank0->streamAResource.blocks.size() == 2u);
+            assert(roomBank0->streamBResource.blocks.size() == 1u);
+            assert(fx1Catalog.find(1, 0)->streamAResource.blocks.size() > 0u);
 
             // The real-time backend receives the immutable catalog on initial
             // attachment and again when replaced, just like the program catalog.
-            FXCatalogProbeBackend originalFXBackend;
-            FXCatalogProbeBackend replacementFXBackend;
-            technox::MASSAudioEngine fxCatalogEngine(&originalFXBackend);
-            fxCatalogEngine.setFXResourceCatalog(&fxCatalog);
-            assert(fxCatalogEngine.fxResourceCatalog() == &fxCatalog);
-            assert(originalFXBackend.receivedCatalog == &fxCatalog);
-            fxCatalogEngine.setBackend(&replacementFXBackend);
-            assert(replacementFXBackend.receivedCatalog == &fxCatalog);
-            assert(fxCatalogEngine.setCommonControl(
+            FX1CatalogProbeBackend originalFX1Backend;
+            FX1CatalogProbeBackend replacementFX1Backend;
+            technox::MASSAudioEngine fx1CatalogEngine(&originalFX1Backend);
+            fx1CatalogEngine.setFXResourceCatalog(&fx1Catalog);
+            assert(fx1CatalogEngine.fxResourceCatalog() == &fx1Catalog);
+            assert(originalFX1Backend.receivedCatalog == &fx1Catalog);
+            fx1CatalogEngine.setBackend(&replacementFX1Backend);
+            assert(replacementFX1Backend.receivedCatalog == &fx1Catalog);
+            assert(fx1CatalogEngine.setCommonControl(
                 technox::MASSCommonControl::fx1Type, 0));
-            assert(fxCatalogEngine.setCommonControl(
+            assert(fx1CatalogEngine.setCommonControl(
                 technox::MASSCommonControl::fx2Type, 5));
             float fxProbeSample = 0.0f;
             float* fxProbeChannels[] = {&fxProbeSample};
-            fxCatalogEngine.render(fxProbeChannels, 1, 1);
-            assert(replacementFXBackend.selectedFX1 == 0);
-            assert(replacementFXBackend.selectedFX2 == 5);
-            assert(replacementFXBackend.resolvedFX1);
-            assert(replacementFXBackend.resolvedFX2);
-            assert(replacementFXBackend.fx1FirstBlockCount == 2u);
-            assert(replacementFXBackend.fx2SecondBlockCount > 0u);
+            fx1CatalogEngine.render(fxProbeChannels, 1, 1);
+            assert(replacementFX1Backend.selectedFX1 == 0);
+            assert(replacementFX1Backend.selectedFX2 == 5);
+            assert(replacementFX1Backend.fx1Resolved);
+            assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
+            assert(replacementFX1Backend.fx1StreamBBlockCount == 1u);
 
-            // The 50 factory Performance Common blocks store FX1 and FX2 as
-            // direct indices into the 21-entry IC4 directory (not 1-based IDs).
-            // Verify every factory selector resolves in both candidate IC51 banks.
+            // The factory stores independent FX1 and FX2 selectors. Only the
+            // FX1 selector maps to the 21-entry directory at IC4 0x8423.
+            // FX2 has a separate algorithm family and is not resolved here.
             assert(factoryFrames.size() == 300u);
-            std::array<bool, technox::MASSFXProgramDirectory::kEntryCount> usedFX{};
+            std::array<bool, technox::MASSFX1ProgramDirectory::kEntryCount> usedFX1{};
             for (std::size_t performance = 0; performance < 50u; ++performance) {
                 const auto& commonFrame = factoryFrames[performance * 6u + 1u].bytes;
                 assert(commonFrame.size() == 74u);
-                assert(commonFrame[6] == 0x00u); // Common block selector
+                assert(commonFrame[6] == 0x00u);
                 const auto fx1Index = commonFrame[8u + 0x2au];
                 const auto fx2Index = commonFrame[8u + 0x32u];
-                assert(fx1Index < technox::MASSFXProgramDirectory::kEntryCount);
-                assert(fx2Index < technox::MASSFXProgramDirectory::kEntryCount);
-                usedFX[fx1Index] = true;
-                usedFX[fx2Index] = true;
-                for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
-                    assert(fxCatalog.find(bankIndex, fx1Index) != nullptr);
-                    assert(fxCatalog.find(bankIndex, fx2Index) != nullptr);
-                }
+                assert(fx1Index < technox::MASSFX1ProgramDirectory::kEntryCount);
+                assert(fx2Index < technox::MASSFX1ProgramDirectory::kEntryCount);
+                usedFX1[fx1Index] = true;
+                for (int bankIndex = 0; bankIndex < 2; ++bankIndex)
+                    assert(fx1Catalog.find(bankIndex, fx1Index) != nullptr);
             }
-            // Exact set of indices used by the 50 factory Performances.
-            // Some directory entries are deliberately not selected by this bank.
-            constexpr std::array<bool, technox::MASSFXProgramDirectory::kEntryCount>
-                expectedFactoryFX{{
+
+            // Exact FX1 algorithm indices used by the 50 factory Performances.
+            constexpr std::array<bool, technox::MASSFX1ProgramDirectory::kEntryCount>
+                expectedFactoryFX1{{
                     true, true, true, true, true, true, true,
                     true, true, true, true, true, true, true,
                     false, true, false, false, true, true, false
                 }};
-            assert(usedFX == expectedFactoryFX);
+            assert(usedFX1 == expectedFactoryFX1);
 
-            // Performance 6 ("Fantasy") carries direct FX indices 0 and 5.
+            // Factory Performance 6 ("Fantasy"): FX1 Room (index 0),
+            // FX2 Phaser 1 (index 5). These are distinct processor families.
             const auto& fantasyCommon = factoryFrames[1u * 6u + 1u].bytes;
             assert(fantasyCommon[5] == 6u);
             assert(fantasyCommon[8u + 0x2au] == 0u);
             assert(fantasyCommon[8u + 0x32u] == 5u);
-            assert(fxDirectory.find(fantasyCommon[8u + 0x2au])->index == 0u);
-            assert(fxDirectory.find(fantasyCommon[8u + 0x32u])->index == 5u);
+
             for (int bankNumber = 0; bankNumber < 2; ++bankNumber) {
                 const auto bank = bankNumber == 0
                     ? technox::MASSResourceBank::bank0
@@ -673,9 +668,9 @@ int main(int argc, char** argv) {
                     technox::MASSIC51PortStreamResource triplets{};
                     technox::MASSIC51PortStreamResource rotatedStream{};
                     assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
-                        fxResources, bank, record->fx1ResourceIndex, triplets));
+                        fxResources, bank, record->streamAResourceIndex, triplets));
                     assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
-                        fxResources, bank, record->fx2ResourceIndex, rotatedStream));
+                        fxResources, bank, record->streamBResourceIndex, rotatedStream));
                     assert(triplets.terminated && rotatedStream.terminated);
                     assert(triplets.sourceBytesConsumed ==
                            triplets.portWriteByteCount + 1u);
