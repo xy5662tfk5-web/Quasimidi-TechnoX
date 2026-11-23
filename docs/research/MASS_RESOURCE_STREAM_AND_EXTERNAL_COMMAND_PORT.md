@@ -249,7 +249,17 @@ For the already tested table entry R7=`0x48`, the source/count headers resolve t
 | 0 | `0x3C64` | 13,647 bytes (`0x354F`) |
 | 1 | `0x295C` | 9,588 bytes (`0x2574`) |
 
-**Still unknown:** what physical IC or logic owns the `0xC000` XDATA window, whether the copied bytes are PCM, compressed samples, wavetable data, or another representation, and how the `0xAC` completion marker is generated. The reachable IC4 disassembly contains two direct call sites for this routine: `0x37A1` (after `MOV R7,#0x48` at `0x379F`) and `0x38F1` (after `MOV R7,#0x48` at `0x38EF`). No other direct call to `0xAF1A` appears in the current reachable disassembly. Both calls therefore use the same observed IC51 transfer selector, `R7=0x48`. The C++ regression test reconstructs the bank-0 transfer's 13,647 bytes through the ROM-derived address permutation and compares them byte-for-byte with the IC51 source block; the separate header test confirms the bank-1 counterpart (9,588 bytes). This proves the two observed call-site operands, source headers, and bank-0 copy mapping—not a 256-entry bulk-transfer directory, receiver identity, or audio encoding. The next target is to determine what the copied payload represents and how the receiving device consumes it.
+**Still unknown:** what physical IC or logic owns the `0xC000` XDATA window, whether the copied bytes are PCM, compressed samples, wavetable data, or another representation, and how the `0xAC` completion marker is generated.
+
+ 
+### Reconstructed external sound-memory image is now a first-class engine resource
+
+`MASSIC51ExternalSoundMemoryImage` builds the full 16-KiB C000-FFFF image from the observed IC51 bank-0 transfer selected by R7=`0x48`. It reads the four-byte header at IC51 offset `0x0090` (source `0x3C64`, length `0x354F`), applies the 256-byte IC4 remap table at `0xADDD` to each logical page, and retains the resulting physical memory image as an immutable byte array. The final populated address is `0xF5B2`; unpopulated bytes in the 16-KiB window remain zero.
+
+The startup processor builds this image before audio processing and passes a read-only pointer to `MASSAudioEngine` and its active `IMASSVoiceBackend`. Replacing the backend forwards the same pointer. The integration regression compares all 16,384 reconstructed bytes against the XDATA image left by executing the original IC4 boot path; the comparison is byte-for-byte.
+
+This closes the ROM-to-external-memory reconstruction and backend hand-off. It still does not identify the physical receiver or decode the stored bytes as PCM, ADPCM, wavetable entries, or any other audio format.
+ The reachable IC4 disassembly contains two direct call sites for this routine: `0x37A1` (after `MOV R7,#0x48` at `0x379F`) and `0x38F1` (after `MOV R7,#0x48` at `0x38EF`). No other direct call to `0xAF1A` appears in the current reachable disassembly. Both calls therefore use the same observed IC51 transfer selector, `R7=0x48`. The C++ regression test reconstructs the bank-0 transfer's 13,647 bytes through the ROM-derived address permutation and compares them byte-for-byte with the IC51 source block; the separate header test confirms the bank-1 counterpart (9,588 bytes). This proves the two observed call-site operands, source headers, and bank-0 copy mapping—not a 256-entry bulk-transfer directory, receiver identity, or audio encoding. The next target is to determine what the copied payload represents and how the receiving device consumes it.
 
  
 ## 10. Runtime FX selector normalization (IC4 0x7FF2)
