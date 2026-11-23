@@ -965,27 +965,6 @@ int main(int argc, char** argv) {
                         peripheralTraceAfter - peripheralTraceBefore,
                         peripheralTraceAfter - firstStagePeripheral,
                         firstStagePeripheral - peripheralTraceBefore);
-            std::size_t stage7CxxEvents = 0;
-            for (std::size_t i = firstStagePeripheral; i < peripheralTraceAfter; ++i) {
-                const auto& event = firmwareMachine.unmappedBusTraceAt(i);
-                if (event.address < 0x7c00u || event.address > 0x7fffu) continue;
-                if (stage7CxxEvents == 0u)
-                    std::printf("  Unknown 7Cxx bus traffic (read/write, caller and bus state):\\n");
-                ++stage7CxxEvents;
-                std::printf("    %c %04X=%02X pc=%04X ret=%04X P3=%02X mode=%u overlay=%u cycle=%llu\\n",
-                            event.write ? 'W' : 'R',
-                            static_cast<unsigned>(event.address),
-                            static_cast<unsigned>(event.value),
-                            static_cast<unsigned>(event.instructionPC),
-                            static_cast<unsigned>(event.stackReturnPC),
-                            static_cast<unsigned>(event.port3),
-                            static_cast<unsigned>(event.soundBusMode),
-                            static_cast<unsigned>(event.syntheticTestOverlay),
-                            static_cast<unsigned long long>(event.machineCycle));
-            }
-            if (stage7CxxEvents == 0u)
-                std::printf("  Unknown 7Cxx bus traffic: no retained accesses in this MIDI stage.\\n");
-
             const auto firstTrace = peripheralTraceAfter > 4096u
                 ? peripheralTraceAfter - 4096u : 0u;
             for (std::size_t i = std::max(firstTrace, peripheralTraceBefore);
