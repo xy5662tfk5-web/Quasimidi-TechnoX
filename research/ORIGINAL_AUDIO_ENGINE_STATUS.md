@@ -24,6 +24,12 @@ Branch: `research/original-technox-audio-engine`
 - SoundHost write events now retain the matching per-write context as well: selected device index, instruction/caller PCs, P2/P3, bus mode, IC51-select, reset state, and cycle. The MIDI-stage report prints these writes alongside response reads, enabling transaction-level comparison without assigning undocumented register meanings.
 - This is additional observability only. It does not change the open-bus model or claim that the returned bytes represent real DSP responses.
 
+## MIDI-stage write classification
+
+- Each stage's retained SoundHost write window is summarized by register index and selected device index, in addition to the raw chronological event list.
+- Register-3 writes of `0x40` and `0xC0` are counted separately as the two already-observed handshake-strobe values. The report does not infer meanings for other values or for the device-index latch.
+- The summary is a comparison aid for Program Change, Note On, and Note Off traffic; it is not a decoded command protocol.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
