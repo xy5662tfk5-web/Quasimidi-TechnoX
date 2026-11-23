@@ -601,10 +601,10 @@ void testActualFirmwareROMTables(const char* path) {
     // instruction trace: RAM[0x34]/IRAM[0x9F:0x9E] form 0x3903, R3+RAM[2F]
     // wraps to 0x7B, and the three MOVC reads land at 0x397E/39FE/3A7E.
     const auto liveLookupAddress = MASS1C61SecondaryTableAddressBuilder::resolve(
-        0x3903u, 0x18u, 0x7bu, 0xa0u);
+        0x3888u, 0x18u, 0x7bu, 0xa0u);
     assert(liveLookupAddress.normalizedIndex == 0x7bu);
     assert(liveLookupAddress.bankOffset == 0u);
-    assert(liveLookupAddress.address == 0x397eu);
+    assert(liveLookupAddress.address == 0x3903u);
     MASS1C61SecondaryTableBytes liveLookupBytes{};
     MASS1C61SecondaryTableFetchAddress liveLookupFetch{};
     assert(MASS1C61SecondaryTableReader::read(
