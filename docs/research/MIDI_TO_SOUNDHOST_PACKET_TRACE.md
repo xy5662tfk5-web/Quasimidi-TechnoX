@@ -141,3 +141,26 @@ Static disassembly around the caller return PC confirms the packet's register as
 
 Thus this call site emits `[XDATA/RAM[0x2B], 0x00, R3, (R4 & 0x07)]`; `R3` is inherited from the preceding firmware calculation. For the velocity-only probe, the observed packet is `[0x0A, 0x00, 0x78, 0x00]` at velocity 100 and `[0x0A, 0x00, 0x98, 0x02]` at velocity 50. The next reverse-engineering target is now the producer of `R3` and `R4` before address `0x210F`, not the generic packet writer. This still does not establish whether those fields represent amplitude, envelope, a sample address, or another voice parameter.
 
+
+
+## Fixed-point return values confirmed for the velocity differential
+
+The regression now compares the live IC4 return state at both callers with the instruction-level `MASS1848Arithmetic` model. This confirms the arithmetic result at the two call boundaries, not merely the input snapshots:
+
+| Caller return PC | Velocity 100: input R2 -> A | Velocity 50: input R2 -> A | Live/model agreement |
+|---|---|---|---|
+| `0x1FC9` | `0x11 -> 0x10` | `0x63 -> 0x59` | exact for both |
+| `0x2027` | `0x0F -> 0x0F` | `0x53 -> 0x53` | exact for both |
+
+At `0x1FC9`, B also changes from `0xEA` (velocity 100) to `0xE2` (velocity 50), while the carry/overflow flags match the C++ arithmetic model. At `0x2027`, B is `0x00` in both runs. These are register-level arithmetic facts; the semantic units of the values remain unknown.
+
+The second helper result is therefore not itself the velocity-sensitive packet byte: its output A is `0x0F` / `0x53`, while the later packet builder at `0x210F` sees R3/R4 = `0x78/0x78` or `0x98/0x9A`. The remaining task is to capture the instruction stream and register state between each helper return and the next consumer, including writes to R3, R4, RAM[0x2B], and any indirect/XDATA operands. Do not infer a direct A-to-packet mapping.
+
+### Next instrumentation slice
+
+1. Add a bounded instruction trace for the two dynamic return addresses captured at `0x1848`, starting at each return PC (`0x1FC9` and `0x2027`) and ending at the next relevant consumer / `0x210F` packet builder.
+2. For each instruction record PC, opcode bytes, A/B/PSW, active R0-R7 bank, DPTR, P2/P3, current stack return PC, and the values of RAM[0x2B], RAM[0x30..0x37]. Record XDATA reads/writes in the same cycle window.
+3. Run the same-note velocity 100/50 pair and compare the two traces instruction-by-instruction. The first divergent input or write should identify where the velocity-dependent path is introduced or transformed.
+4. Repeat with a second pitch and a second Part before assigning a field name. Then classify the first five Note On commands separately from the 544-command configuration sweep.
+
+The current fixture still uses a synthetic ready response. These traces establish firmware behavior only; they do not identify the external processor or prove audible sample playback.
