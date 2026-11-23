@@ -72,3 +72,32 @@ Inspection of the regression assertions narrows the interpretation further:
 - The fixture asserts packet count and selected packet boundaries/shapes, not the complete semantic mapping of all 553 packets and not a voice-start/voice-stop event. Its own comment says full MIDI-to-voice dispatch is not asserted until the SoundHost path is modeled.
 
 The immediate experiment must therefore use four separately booted, identically initialized machines (or a deterministic snapshot facility): (a) Program Change only, (b) Note On only after the same program is already selected, (c) Note Off only after a note-on baseline, and (d) velocity/note substitutions. Compare full packet streams, not only counts. Keep the synthetic ready response labelled as a test fixture in every result.
+
+
+## Latest differential probe: a second Note On after setup
+
+A follow-up probe now sends a second, distinct event (`90 40 64`, note 64, velocity 100) after the first Note On has passed the test-only ready/queue-drain handshake. The existing synthetic read override remains active; this second stage does not inject a new status value.
+
+Observed second-stage deltas:
+
+- 549 complete four-byte SoundHost transactions and 549 burst words.
+- 2 additional calls each to firmware routines `0x4256`, `0x5671`, `0x1494`, `0xAC00`, and `0x189D`.
+- 549 calls to the packet writer `0x0DB7`.
+- 14,522 additional IC51 reads.
+- The stage completes at PC `0x32DB`; no CPU fault is reported by the regression.
+
+The first five packets of this second stage are:
+
+| Order | Packet bytes (`R5 R2 R3 R4`) | Recorded return PC | Writer call |
+|---:|---|---|---|
+| 1 | `00 A9 E4 01` | `0x0A52` | `0x0A4F` |
+| 2 | `02 01 00 00` | `0x0A52` | `0x0A4F` |
+| 3 | `05 FB D0 03` | `0x22FB` | `0x22F8` |
+| 4 | `0A 00 78 00` | `0x2122` | `0x211F` |
+| 5 | `0F 00 00 00` | `0x236E` | `0x236B` |
+
+The firmware helper at `0x0DB7` writes these four bytes in the order R5, R2, R3, R4 to offsets `0x8000–0x8003`. This byte order and the five observed packet values are directly traceable. The meanings of the three payload bytes and the first-byte selector are still unknown.
+
+The remaining 544 packets form a repeated configuration sweep: 512 transactions return through `0x0E6A`, followed by 32 transactions returning through `0x0E1D`. This is a firmware-observed reconfiguration burst after the five initial note-associated transactions. It is not proof that all 544 writes are voice data or that the five preceding packets alone start audible playback.
+
+The regression now asserts the 549-packet delta and the exact five leading packet byte arrays and return PCs. This turns the observation into a repeatable guard against accidental changes in the emulated firmware bus path. It does not validate an external chip response, sample decoder, or audible output.
