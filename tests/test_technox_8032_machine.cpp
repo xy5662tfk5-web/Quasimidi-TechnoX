@@ -1221,6 +1221,20 @@ int main(int argc, char** argv) {
             for (std::size_t i = std::max(firstXdataTrace, xdataTraceBefore);
                  i < xdataTraceAfter; ++i) {
                 const auto& event = firmwareMachine.xdataWatchTraceAt(i);
+                if (event.address == 0x3098u) {
+                    std::printf("  FX-SELECT %c 3098=%02X pc=%04X stackRet=%04X "
+                                "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\\n",
+                                event.write ? 'W' : 'R',
+                                static_cast<unsigned>(event.value),
+                                static_cast<unsigned>(event.instructionPC),
+                                static_cast<unsigned>(event.stackReturnPC),
+                                static_cast<unsigned>(event.port2),
+                                static_cast<unsigned>(event.port3),
+                                static_cast<unsigned>(event.soundBusMode),
+                                static_cast<unsigned>(event.ic51Selected),
+                                static_cast<unsigned>(event.writeAccepted),
+                                static_cast<unsigned long long>(event.machineCycle));
+                }
                 std::printf("  MIDI-XDATA %c %04X=%02X pc=%04X stackRet=%04X "
                             "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\\n",
                             event.write ? 'W' : 'R',
