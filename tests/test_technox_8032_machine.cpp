@@ -488,6 +488,19 @@ int main(int argc, char** argv) {
             assert(firmwareMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         assert(firmwareMachine.readCode(0x0000) == 0x02); // LJMP reset vector
 
+        // Pin the only two direct AF1A bulk-loader callsites found in the
+        // reachable firmware disassembly. Both must load R7=0x48 first.
+        const auto assertObservedBulkLoadCall = [&](std::uint16_t callPC) {
+            assert(firmwareMachine.readCode(static_cast<std::uint16_t>(callPC - 2u)) == 0x7fu);
+            assert(firmwareMachine.readCode(static_cast<std::uint16_t>(callPC - 1u)) ==
+                   technox::MASSIC51BulkBlockHeader::kObservedStartupTransferIndex);
+            assert(firmwareMachine.readCode(callPC) == 0x12u); // LCALL
+            assert(firmwareMachine.readCode(static_cast<std::uint16_t>(callPC + 1u)) == 0xafu);
+            assert(firmwareMachine.readCode(static_cast<std::uint16_t>(callPC + 2u)) == 0x1au);
+        };
+        assertObservedBulkLoadCall(0x37a1u);
+        assertObservedBulkLoadCall(0x38f1u);
+
         // Recover the fixed FX-name/resource table from the descrambled IC4
         // image, then resolve both actual IC51 upload-stream formats.
         if (!realIC51.empty()) {
