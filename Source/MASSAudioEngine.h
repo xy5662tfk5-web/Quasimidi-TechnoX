@@ -60,6 +60,7 @@ enum class MASSCommonControl : std::size_t { performanceMode = 0, fx1Type, fx2Ty
 class MASSCommonControlStore {
 public:
     static constexpr std::size_t kControlCount = 5;
+    static constexpr int kFXTypeMaximumIndex = 20; // IC4 0x7FF2 clamps values >= 21 to 0x14.
     static constexpr std::size_t kModulationSourceCount = 4;
     static constexpr std::size_t kModulationDestinationCount = 8;
     MASSCommonControlStore() {
@@ -69,8 +70,14 @@ public:
     }
     bool set(MASSCommonControl control, int value) noexcept {
         const auto index = static_cast<std::size_t>(control);
-        constexpr int maxima[kControlCount] = {3, 21, 21, 3, 127};
-        if (index >= kControlCount || value < 0 || value > maxima[index]) return false;
+        constexpr int maxima[kControlCount] = {3, kFXTypeMaximumIndex,
+            kFXTypeMaximumIndex, 3, 127};
+        if (index >= kControlCount || value < 0) return false;
+        if (index == static_cast<std::size_t>(MASSCommonControl::fx1Type) ||
+            index == static_cast<std::size_t>(MASSCommonControl::fx2Type))
+            value = std::min(value, kFXTypeMaximumIndex);
+        else if (value > maxima[index])
+            return false;
         values_[index].store(value, std::memory_order_release);
         return true;
     }
