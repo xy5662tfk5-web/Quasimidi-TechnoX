@@ -280,6 +280,11 @@ public:
     const IC51ReadEvent& ic51ReadTraceAt(std::size_t index) const noexcept {
         return ic51ReadTrace_[index % ic51ReadTrace_.size()];
     }
+    // Test-only trace reset: leave CPU, ROM, bus state and cumulative counters untouched.
+    void clearIC51ReadTraceForTesting() noexcept {
+        ic51ReadTrace_.fill(IC51ReadEvent{});
+        ic51ReadTraceCount_ = 0;
+    }
     std::uint8_t ic51RomByteForTesting(std::size_t bank, std::uint16_t address) const noexcept {
         return bank < 2u ? ic51Rom_[bank * 0x10000u + address] : 0xffu;
     }
@@ -1431,7 +1436,8 @@ private:
     std::uint64_t ic51ReadCount_ = 0;
     std::array<std::uint64_t, 2> ic51ReadsByBank_{};
     std::uint16_t lastIC51ReadAddress_ = 0;
-    std::array<IC51ReadEvent, 512> ic51ReadTrace_{};
+    // Retain a complete single MIDI-event IC51 trace (about 14.5k reads in the regression).
+    std::array<IC51ReadEvent, 16384> ic51ReadTrace_{};
     std::size_t ic51ReadTraceCount_ = 0;
     std::array<InternalFlagWriteEvent, 256> internalFlagWriteTrace_{};
     std::size_t internalFlagWriteTraceCount_ = 0;
