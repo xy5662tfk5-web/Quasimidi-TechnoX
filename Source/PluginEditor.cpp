@@ -97,7 +97,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
     dragTarget = DragTarget::none;
     const auto p = e.position;
     const auto insideKnob = [&p](float cx, float cy, float radius) {
-        return p.getDistance(juce::Point<float>(cx, cy)) <= radius;
+        return p.getDistanceFrom(juce::Point<float>(cx, cy)) <= radius;
     };
 
     // Use the visible circular knob faces rather than broad rectangular zones.
