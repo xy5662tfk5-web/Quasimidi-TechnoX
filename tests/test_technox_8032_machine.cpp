@@ -3348,7 +3348,7 @@ int main(int argc, char** argv) {
 
         // Decode the three actual MOVC bytes from the loaded IC4 image and
         // compare the unpacked fields with the live register bank at 0x1DC8.
-        MASS1C61SecondaryTableBytes pitchTableBytes{};
+        technox::MASS1C61SecondaryTableBytes pitchTableBytes{};
         pitchTableBytes.bytes = {{
             firmwareMachine.readCode(pitchTableAddress.address),
             firmwareMachine.readCode(static_cast<std::uint16_t>(
