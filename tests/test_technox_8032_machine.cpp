@@ -439,6 +439,128 @@ int main(int argc, char** argv) {
         if (!realIC51.empty())
             assert(firmwareMachine.loadIC51Rom(realIC51.data(), realIC51.size()));
         assert(firmwareMachine.readCode(0x0000) == 0x02); // LJMP reset vector
+
+        // Recover the fixed FX-name/resource table from the descrambled IC4
+        // image, then resolve both actual IC51 upload-stream formats.
+        if (!realIC51.empty()) {
+            std::array<std::uint8_t, TechnoX8032Machine::kCodeSpaceSize> firmwareCode{};
+            for (std::size_t address = 0; address < firmwareCode.size(); ++address)
+                firmwareCode[address] = firmwareMachine.readCode(
+                    static_cast<std::uint16_t>(address));
+
+            technox::MASSFXProgramDirectory fxDirectory;
+            assert(fxDirectory.load(firmwareCode.data(), firmwareCode.size()));
+            struct ExpectedFX {
+                const char* name;
+                std::uint8_t firstResource;
+                std::uint8_t secondResource;
+                std::uint8_t mode;
+            };
+            const std::array<ExpectedFX, technox::MASSFXProgramDirectory::kEntryCount>
+                expectedFX{{
+                    {"Room",        0x00, 0x01, 0x03},
+                    {"SmallRoom",   0x04, 0x05, 0x03},
+                    {"WarmRoom",    0x02, 0x03, 0x03},
+                    {"Chamber1",    0x06, 0x07, 0x03},
+                    {"Chamber2",    0x08, 0x09, 0x03},
+                    {"Plate1",      0x0a, 0x0b, 0x03},
+                    {"Plate2",      0x0c, 0x0d, 0x03},
+                    {"Hall",        0x0e, 0x0f, 0x03},
+                    {"LargeHall",   0x10, 0x11, 0x03},
+                    {"Cathedral",   0x12, 0x13, 0x03},
+                    {"GatedRev1",   0x00, 0x01, 0x06},
+                    {"GatedRev2",   0x02, 0x03, 0x06},
+                    {"GatedRev3",   0x0a, 0x0b, 0x06},
+                    {"EarlyRfl1",   0x16, 0x17, 0x03},
+                    {"EarlyRfl2",   0x18, 0x19, 0x03},
+                    {"EarlyRfl3",   0x1a, 0x1b, 0x03},
+                    {"EarlyRfl4",   0x1c, 0x1d, 0x03},
+                    {"RainDrops",   0x14, 0x15, 0x03},
+                    {"HQ-Delay",    0x20, 0x21, 0x04},
+                    {"LongDelay",   0x1e, 0x1f, 0x04},
+                    {"no Effect",   0x22, 0x23, 0x00}
+                }};
+
+            for (std::size_t index = 0; index < expectedFX.size(); ++index) {
+                const auto* record = fxDirectory.find(static_cast<int>(index));
+                assert(record != nullptr);
+                assert(record->index == index);
+                assert(record->firstResourceIndex == expectedFX[index].firstResource);
+                assert(record->secondResourceIndex == expectedFX[index].secondResource);
+                assert(record->modeByte == expectedFX[index].mode);
+                std::size_t nameLength = 0;
+                while (expectedFX[index].name[nameLength] != '\0') {
+                    assert(record->name[nameLength] == expectedFX[index].name[nameLength]);
+                    ++nameLength;
+                }
+                for (std::size_t j = nameLength; j < technox::MASSFXProgramDirectory::kNameBytes; ++j)
+                    assert(record->name[j] == '\0' || record->name[j] == ' ');
+                assert(record->name[technox::MASSFXProgramDirectory::kNameBytes] == '\0');
+            }
+            assert(fxDirectory.find(-1) == nullptr);
+            assert(fxDirectory.find(21) == nullptr);
+
+            technox::MASSResourceROM fxResources;
+            assert(fxResources.load(realIC51.data(), realIC51.size()));
+            for (int bankNumber = 0; bankNumber < 2; ++bankNumber) {
+                const auto bank = bankNumber == 0
+                    ? technox::MASSResourceBank::bank0
+                    : technox::MASSResourceBank::bank1;
+                for (std::size_t index = 0; index < expectedFX.size(); ++index) {
+                    const auto* record = fxDirectory.find(static_cast<int>(index));
+                    technox::MASSIC51PortStreamBlock triplets{};
+                    technox::MASSIC51PortStreamBlock quadruplets{};
+                    assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
+                        fxResources, bank, record->firstResourceIndex, triplets));
+                    assert(technox::MASSIC51PortStreamResolver::resolveQuadrupletStream(
+                        fxResources, bank, record->secondResourceIndex, quadruplets));
+
+                    if (triplets.empty) {
+                        assert(triplets.sourceCount == 0);
+                        assert(triplets.payload.empty());
+                        assert(triplets.portWriteByteCount == 0);
+                        assert(triplets.sourceBytesConsumed == 1);
+                    } else {
+                        assert(triplets.payload.size() ==
+                               static_cast<std::size_t>(triplets.sourceCount) * 3u);
+                        assert(triplets.portWriteByteCount == triplets.payload.size() + 3u);
+                        assert(triplets.sourceBytesConsumed == triplets.portWriteByteCount);
+                    }
+
+                    if (quadruplets.empty) {
+                        assert(quadruplets.sourceCount == 0);
+                        assert(quadruplets.payload.empty());
+                        assert(quadruplets.portWriteByteCount == 0);
+                        assert(quadruplets.sourceBytesConsumed == 1);
+                    } else {
+                        assert(quadruplets.payload.size() ==
+                               static_cast<std::size_t>(quadruplets.sourceCount) * 4u);
+                        assert(quadruplets.portWriteByteCount == quadruplets.payload.size() + 1u);
+                        const auto count = quadruplets.sourceCount;
+                        const auto expectedWireHeader = static_cast<std::uint8_t>(
+                            (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
+                        assert(quadruplets.wireHeader == expectedWireHeader);
+                    }
+                }
+            }
+
+            technox::MASSIC51PortStreamBlock roomTriplets{};
+            technox::MASSIC51PortStreamBlock roomQuadruplets{};
+            assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
+                fxResources, technox::MASSResourceBank::bank0, 0x00, roomTriplets));
+            assert(roomTriplets.dataAddress == 0x24d4u);
+            assert(roomTriplets.sourceCount == 0x19u);
+            assert(roomTriplets.preamble[0] == 0x00u && roomTriplets.preamble[1] == 0xcfu);
+            assert(roomTriplets.payload.size() == 75u);
+            assert(roomTriplets.portWriteByteCount == 78u);
+            assert(technox::MASSIC51PortStreamResolver::resolveQuadrupletStream(
+                fxResources, technox::MASSResourceBank::bank0, 0x01, roomQuadruplets));
+            assert(roomQuadruplets.dataAddress == 0x2851u);
+            assert(roomQuadruplets.sourceCount == 0x7fu);
+            assert(roomQuadruplets.wireHeader == 0xbfu); // RR A, not SHR A
+            assert(roomQuadruplets.payload.size() == 508u);
+            assert(roomQuadruplets.portWriteByteCount == 509u);
+        }
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
         assert(firmwareMachine.readCode(0x0002) == 0x32);
 
