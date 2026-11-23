@@ -709,8 +709,11 @@ int main(int argc, char** argv) {
             assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
             assert(replacementFX1Backend.fx1StreamBBlockCount == 1u);
             assert(replacementFX1Backend.fx2Resolved);
-            assert(replacementFX1Backend.fx2StreamABlockCount > 0u);
-            assert(replacementFX1Backend.fx2StreamBBlockCount > 0u);
+            // FX2 Phaser1 uses an empty Stream A in IC51 bank 0: resource
+            // 0x26 resolves to a zero-count terminator at 0x52F8. Stream B
+            // resource 0x27 contains exactly one block at 0x57FE.
+            assert(replacementFX1Backend.fx2StreamABlockCount == 0u);
+            assert(replacementFX1Backend.fx2StreamBBlockCount == 1u);
 
             // The factory stores independent FX1 and FX2 selectors. Only the
             // FX1 selector maps to the 21-entry directory at IC4 0x8423.
