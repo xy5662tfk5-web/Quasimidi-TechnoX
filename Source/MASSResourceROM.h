@@ -999,7 +999,7 @@ struct MASSIC51BulkBlockHeader {
         const auto count = header.firmwareByteCount();
         if (bankData == nullptr || bankSize < 0x10000u ||
             logicalToPhysical == nullptr || xdataWindow == nullptr ||
-            xdataBaseAddress < 0xc000u || xdataBaseAddress > 0xffffu ||
+            xdataBaseAddress < 0xc000u ||
             xdataWindowSize > 0x10000u - xdataBaseAddress)
             return false;
         const auto pageCount = (count + 0xffu) / 0x100u;
