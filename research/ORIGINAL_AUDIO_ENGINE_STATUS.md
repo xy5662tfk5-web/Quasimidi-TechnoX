@@ -62,7 +62,7 @@ Branch: `research/original-technox-audio-engine`
 ## FX resource and host-stream layer
 
 - Recovered the 21-entry IC4 FX directory at `0x8423` (32-byte records), including the exact first/second IC51 resource selectors used by firmware calls at `0xAF93` and `0xB015`.
-- Added startup/offline parsers for the two byte-stream formats sent through XDATA `0xFF10`: count + two-byte preamble + `count*3` bytes, and circularly-rotated count + `count*4` bytes. Zero-count blocks are represented as no-write resources.
+- Added startup/offline parsers for the two byte-stream formats sent through XDATA `0xFF10`: count + two-byte preamble + `count*3` bytes, and circularly-rotated count + three fixed preamble bytes + `count` payload bytes. Zero-count blocks are represented as no-write resources.
 - Regression tests compare every FX label and resource pair with the real descrambled IC4 ROM, then resolve both resource formats for every effect in both IC51 banks.
 - This gives a second verified IC51 path beyond the descriptor/command-stream catalog. It is resource transport metadata only; no FX algorithm, PCM format, or physical DSP has been identified.
 
