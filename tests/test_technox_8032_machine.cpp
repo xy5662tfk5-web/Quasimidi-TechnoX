@@ -3180,6 +3180,54 @@ int main(int argc, char** argv) {
                 std::printf("\\n");
             }
         }
+        for (std::size_t i = 0; i < pitchPathInstructions.size(); ++i) {
+            const auto& event = pitchPathInstructions[i];
+            std::printf(
+                "  PITCH-STEP[%03zu] WIN=%04X PC=%04X op=%02X %02X %02X "
+                "RET=%04X SP=%02X A=%02X B=%02X PSW=%02X DPTR=%04X "
+                "R0=%02X R1=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X "
+                "2B=%02X 30-37=",
+                i, static_cast<unsigned>(event.windowStartPC),
+                static_cast<unsigned>(event.instructionPC),
+                static_cast<unsigned>(event.opcodeBytes[0]),
+                static_cast<unsigned>(event.opcodeBytes[1]),
+                static_cast<unsigned>(event.opcodeBytes[2]),
+                static_cast<unsigned>(event.stackReturnPC),
+                static_cast<unsigned>(event.stackPointer),
+                static_cast<unsigned>(event.accumulator),
+                static_cast<unsigned>(event.b),
+                static_cast<unsigned>(event.psw),
+                static_cast<unsigned>(event.dptr),
+                static_cast<unsigned>(event.registers[0]),
+                static_cast<unsigned>(event.registers[1]),
+                static_cast<unsigned>(event.registers[2]),
+                static_cast<unsigned>(event.registers[3]),
+                static_cast<unsigned>(event.registers[4]),
+                static_cast<unsigned>(event.registers[5]),
+                static_cast<unsigned>(event.registers[6]),
+                static_cast<unsigned>(event.registers[7]),
+                static_cast<unsigned>(event.ram2BAnd30To37[0]));
+            for (std::size_t byte = 1; byte < event.ram2BAnd30To37.size(); ++byte)
+                std::printf(" %02X",
+                            static_cast<unsigned>(event.ram2BAnd30To37[byte]));
+            std::printf(
+                " DIRECT(2F,34,40,05,06,07,3F)="
+                "%02X %02X %02X %02X %02X %02X %02X "
+                "IND(9E,9F)=%02X %02X DATA=%llu P2=%02X P3=%02X 8E=%02X\\n",
+                static_cast<unsigned>(event.selectedDirectRam[0]),
+                static_cast<unsigned>(event.selectedDirectRam[1]),
+                static_cast<unsigned>(event.selectedDirectRam[2]),
+                static_cast<unsigned>(event.selectedDirectRam[3]),
+                static_cast<unsigned>(event.selectedDirectRam[4]),
+                static_cast<unsigned>(event.selectedDirectRam[5]),
+                static_cast<unsigned>(event.selectedDirectRam[6]),
+                static_cast<unsigned>(event.indirectRam9E),
+                static_cast<unsigned>(event.indirectRam9F),
+                static_cast<unsigned long long>(event.dataAccessCount),
+                static_cast<unsigned>(event.port2),
+                static_cast<unsigned>(event.port3),
+                static_cast<unsigned>(event.soundBusMode));
+        }
         for (const auto& event : pitchPathData) {
             std::printf("  PITCH-XDATA PC=%04X RET=%04X %c %04X=%02X "
                         "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
