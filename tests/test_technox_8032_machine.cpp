@@ -1778,6 +1778,9 @@ int main(int argc, char** argv) {
         // Send a second, different note after the first resource/voice setup so
         // its incremental SoundHost writes can be separated from initialization.
         const std::array<std::uint8_t, 3> secondNoteOn{{0x90u, 0x40u, 0x64u}};
+        // Preserve all IC51 reads from this second event instead of only the
+        // last 512 reads from factory boot and the preceding note.
+        firmwareMachine.clearIC51ReadTraceForTesting();
         const auto secondNotePacketStart = firmwareMachine.soundCommandPacketCount();
         runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
                          secondNoteOn.data(), secondNoteOn.size());
@@ -1811,6 +1814,62 @@ int main(int argc, char** argv) {
         // stream tail that led to the observed SoundHost packets.
         const auto ic51TraceEnd = firmwareMachine.ic51ReadTraceCount();
         const auto ic51TraceBegin = ic51TraceEnd > 64u ? ic51TraceEnd - 64u : 0u;
+        struct IC51ReadGroup {
+            bool used = false;
+            std::uint16_t returnPC = 0;
+            std::uint8_t bank = 0;
+            std::size_t count = 0;
+            std::uint16_t minAddress = 0xffffu;
+            std::uint16_t maxAddress = 0;
+            std::uint16_t firstAddress = 0;
+            std::uint16_t lastAddress = 0;
+            std::uint16_t firstInstructionPC = 0;
+            std::uint16_t lastInstructionPC = 0;
+        };
+        std::array<IC51ReadGroup, 256> ic51ReadGroups{};
+        std::size_t ic51ReadGroupCount = 0;
+        for (std::size_t i = 0; i < ic51TraceEnd; ++i) {
+            const auto& event = firmwareMachine.ic51ReadTraceAt(i);
+            auto group = std::find_if(ic51ReadGroups.begin(),
+                                      ic51ReadGroups.begin() + ic51ReadGroupCount,
+                [&](const IC51ReadGroup& candidate) {
+                    return candidate.used && candidate.bank == event.bank &&
+                           candidate.returnPC == event.returnPC;
+                });
+            if (group == ic51ReadGroups.begin() + ic51ReadGroupCount) {
+                assert(ic51ReadGroupCount < ic51ReadGroups.size());
+                group = ic51ReadGroups.begin() + ic51ReadGroupCount++;
+                group->used = true;
+                group->bank = event.bank;
+                group->returnPC = event.returnPC;
+                group->firstAddress = event.address;
+                group->firstInstructionPC = event.instructionPC;
+            }
+            ++group->count;
+            group->minAddress = std::min(group->minAddress, event.address);
+            group->maxAddress = std::max(group->maxAddress, event.address);
+            group->lastAddress = event.address;
+            group->lastInstructionPC = event.instructionPC;
+        }
+        std::sort(ic51ReadGroups.begin(),
+                  ic51ReadGroups.begin() + ic51ReadGroupCount,
+                  [](const IC51ReadGroup& lhs, const IC51ReadGroup& rhs) {
+                      return lhs.count > rhs.count;
+                  });
+        std::printf("Second Note On IC51 read groups (%zu reads, %zu caller groups):\\n",
+                    ic51TraceEnd, ic51ReadGroupCount);
+        for (std::size_t i = 0; i < ic51ReadGroupCount; ++i) {
+            const auto& group = ic51ReadGroups[i];
+            std::printf("  IC51-GROUP bank=%u ret=%04X count=%zu range=%04X-%04X first=%04X@%04X last=%04X@%04X\\n",
+                        static_cast<unsigned>(group.bank),
+                        static_cast<unsigned>(group.returnPC), group.count,
+                        static_cast<unsigned>(group.minAddress),
+                        static_cast<unsigned>(group.maxAddress),
+                        static_cast<unsigned>(group.firstAddress),
+                        static_cast<unsigned>(group.firstInstructionPC),
+                        static_cast<unsigned>(group.lastAddress),
+                        static_cast<unsigned>(group.lastInstructionPC));
+        }
         std::printf("Second Note On IC51 read tail (%zu entries):\\n",
                     ic51TraceEnd - ic51TraceBegin);
         for (std::size_t i = ic51TraceBegin; i < ic51TraceEnd; ++i) {
