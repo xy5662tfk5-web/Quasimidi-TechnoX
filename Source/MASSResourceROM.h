@@ -1188,9 +1188,9 @@ public:
             record.index = static_cast<std::uint8_t>(index);
             for (std::size_t i = 0; i < kNameBytes; ++i) {
                 const auto value = source[i];
-                record.name[i] = value == 0 ? '\\0' : static_cast<char>(value);
+                record.name[i] = value == 0 ? '\0' : static_cast<char>(value);
             }
-            record.name[kNameBytes] = '\\0';
+            record.name[kNameBytes] = '\0';
             record.firstResourceIndex = source[kFirstResourceOffset];
             record.secondResourceIndex = source[kSecondResourceOffset];
             record.modeByte = source[kModeOffset];
