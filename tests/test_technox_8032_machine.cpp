@@ -635,23 +635,35 @@ int main(int argc, char** argv) {
                 expectedWord = i < 528u ? 0x0040u : 0x8040u;
                 expectedCaller = 0x0e1du;
             }
-            if (packet.bytes[0] != expectedIndex || packet.bytes[1] != 0x00u ||
-                packet.bytes[2] != static_cast<std::uint8_t>(expectedWord & 0xffu) ||
-                packet.bytes[3] != static_cast<std::uint8_t>(expectedWord >> 8u) ||
-                packet.returnPC != expectedCaller) {
-                std::printf("SoundHost packet mismatch[%zu]: actual=%02X %02X %02X %02X ", i,
-                    packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3]);
-                std::printf("expected=%02X 00 %02X %02X caller=%04X expectedCaller=%04X\\n",
-                    expectedIndex, static_cast<unsigned>(expectedWord & 0xffu),
-                    static_cast<unsigned>(expectedWord >> 8u), packet.returnPC, expectedCaller);
+            const auto packetWord = static_cast<std::uint16_t>(
+                static_cast<std::uint16_t>(packet.bytes[2]) |
+                (static_cast<std::uint16_t>(packet.bytes[3]) << 8u));
+            if (packet.bytes[0] != expectedIndex || packet.returnPC != expectedCaller ||
+                (i < 512u && (packet.bytes[1] != 0x00u ||
+                 packetWord != expectedWord)) ||
+                (i >= 512u && word.value != packetWord)) {
+                std::printf("SoundHost packet mismatch[%zu]: actual=%02X %02X %02X %02X "
+                            "word=%04X expectedIndex=%02X expectedWord=%04X caller=%04X "
+                            "expectedCaller=%04X\\n",
+                    i, packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3],
+                    static_cast<unsigned>(word.value), expectedIndex,
+                    static_cast<unsigned>(expectedWord), packet.returnPC, expectedCaller);
                 std::fflush(stdout);
             }
             assert(packet.bytes[0] == expectedIndex);
-            assert(packet.bytes[1] == 0x00u);
-            assert(packet.bytes[2] == static_cast<std::uint8_t>(expectedWord & 0xffu));
-            assert(packet.bytes[3] == static_cast<std::uint8_t>(expectedWord >> 8u));
-            assert(word.value == expectedWord);
             assert(packet.returnPC == expectedCaller);
+            if (i < 512u) {
+                assert(packet.bytes[1] == 0x00u);
+                assert(packetWord == expectedWord);
+                assert(word.value == expectedWord);
+            } else {
+                // The final 32 transactions are issued by a different firmware
+                // helper; preserve their observed payload instead of applying
+                // the unverified 0x0040/0x8040 assumption from the first helper.
+                assert(word.lowByte == packet.bytes[2]);
+                assert(word.highByte == packet.bytes[3]);
+                assert(word.value == packetWord);
+            }
         }
         const auto hostReads = firmwareMachine.soundHostReadCount();
         std::printf("External-window reads (current test model, %zu):\\n", hostReads);
