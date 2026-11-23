@@ -136,13 +136,12 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
  
 ## IC51 bulk-loader call-site audit
 
-- The reachable IC4 disassembly currently shows two direct calls to `0xAF1A`: at `0x37A1` and `0x38F1`. Both are immediately preceded by `MOV R7,#0x48`.
-- The routine reads four consecutive bytes at `DPTR=2*R7`. For the observed selector `0x48`, bank 0 yields source `0x3C64` and length `0x354F` (13,647 bytes); bank 1 yields source `0x295C` and length `0x2574` (9,588 bytes).
-- The previous 256-window candidate catalog has been removed. Those positions were overlapping four-byte windows, not 256 independently observed transfer descriptors; their aggregated lengths/wrap counts were not evidence of unique sample storage or runtime loader calls.
-- The real-ROM 8032 fixture verifies the bank-0 transfer byte-for-byte through the firmware-derived XDATA address permutation. The bank-1 source header and length are separately checked.
-- The receiving device, payload format (PCM/compressed/wavetable/code/other), and playback role remain unresolved.
+- The current reachable IC4 disassembly has exactly two direct callers of `0xAF1A`: `0x37A1` (preceded by `R7=0x48` at `0x379F`) and `0x38F1` (preceded at `0x38EF`). Both select the same bank-0 bulk block.
+- `0x37A1` is embedded in the separate `0x367F` diagnostic/status path; it brackets the loader with bit `0x95) changes and continues into further status waits. `0x38F1` is in the `0x381C` initialization routine, called from `0x326A), and sets bit `0xAF` after the transfer.
+- Added runtime entry tracing records call PC, selector R7, P2/P3, external bus mode `0x8E`, bit `0x1B`, and IE.EA at the instant `LCALL 0xAF1A` executes.
+- The cold-boot regression now asserts exactly one executed transfer entry, from `0x38F1`, with R7=`0x48`. The 37A1 path is verified in the ROM image but is not claimed to execute during this normal boot.
+- Existing byte-exact checks remain: IC51 bank 0 source `0x3C64), length `0x354F` (13,647 bytes), destination remapped through `0xADDD` to last address `0xF5B2`, plus full 16-KiB C000–FFFF memory-image comparison. This is an external-memory upload, not yet a decoded audio waveform or DSP implementation.
 
- 
 ## Firmware FX selector paths
 
 - The FX1 type helper at `0x7FF2` reads XDATA `0x7BFE`, writes the selected value to `0x3098`, and clamps values >= `0x15` to `0x14` before the 21-entry FX1 directory path. The current XDATA watch fixture exposes `0x7BFE=0x00` only under an explicit synthetic test overlay, so its upstream population is not yet validated against physical hardware.
