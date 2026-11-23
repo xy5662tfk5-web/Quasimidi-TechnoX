@@ -112,3 +112,11 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 - The lookup positions are sliding windows, not independent four-byte records: adjacent positions overlap by two bytes. The catalog deliberately calls their aggregate lengths a *candidate byte-count sum*, not unique sample storage.
 - Regression anchors for the real v1.05 image: bank 0 candidate sum 7,484,183 bytes with 111 source-address wraps; bank 1 candidate sum 4,574,119 bytes with no wraps. Entry `0x48` remains the independently traced startup transfer: bank 0 `0x3C64 / 0x354F`, bank 1 `0x295C / 0x2574`.
 - This expands the audit surface for the 0xAF1A loader. It does not prove that all 256 indices are invoked, that the candidate lengths describe unique payloads, or that the copied data is PCM / ADPCM.
+
+ 
+## FX selector range now matches IC4 firmware
+
+- Disassembled the helper at `0x7FF2`: it reads `0x7BFE`, writes `0x3098`, and clamps values `>= 0x15` to `0x14` before the FX directory lookup at `0x8004`.
+- The 21-entry directory is therefore indexed 0..20; 20 is `no Effect`. `MASSCommonControlStore`, Performance-bank loading, controller updates and saved-state restoration now normalize FX1/FX2 to this range.
+- Regression coverage verifies both the endpoint 20 and clamping of 21 / 127 to 20.
+- The current trace reads `0x7BFE=0x00` from an explicit synthetic test RAM overlay. This validates the firmware branch mechanics, not the real-world source mapping from Performance FX fields. Runtime FX selection and DSP effects are not yet implemented.
