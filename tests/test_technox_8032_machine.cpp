@@ -17,7 +17,10 @@
 class FX1CatalogProbeBackend final : public technox::IMASSVoiceBackend {
 public:
     void setFX1ResourceCatalog(const technox::MASSFX1ResourceCatalog* catalog) noexcept override {
-        receivedCatalog = catalog;
+        receivedFX1Catalog = catalog;
+    }
+    void setFX2ResourceCatalog(const technox::MASSFX2ResourceCatalog* catalog) noexcept override {
+        receivedFX2Catalog = catalog;
     }
     void prepare(double, int) override {}
     void noteOn(int, const technox::VoiceSlot&) noexcept override {}
@@ -35,21 +38,28 @@ public:
         selectedFX1 = common.get(technox::MASSCommonControl::fx1Type);
         selectedFX2 = common.get(technox::MASSCommonControl::fx2Type);
 
-        // This 21-entry ROM directory is the FX1 Room/Reverb family only.
-        // FX2 is a different 21-algorithm processor and must not resolve here.
-        const auto* fx1 = receivedCatalog != nullptr && selectedFX1 >= 0
-            ? receivedCatalog->find(0, selectedFX1) : nullptr;
+        const auto* fx1 = receivedFX1Catalog != nullptr && selectedFX1 >= 0
+            ? receivedFX1Catalog->find(0, selectedFX1) : nullptr;
+        const auto* fx2 = receivedFX2Catalog != nullptr && selectedFX2 >= 0
+            ? receivedFX2Catalog->find(0, selectedFX2) : nullptr;
         fx1Resolved = fx1 != nullptr;
+        fx2Resolved = fx2 != nullptr;
         fx1StreamABlockCount = fx1Resolved ? fx1->streamAResource.blocks.size() : 0u;
         fx1StreamBBlockCount = fx1Resolved ? fx1->streamBResource.blocks.size() : 0u;
+        fx2StreamABlockCount = fx2Resolved ? fx2->streamAResource.blocks.size() : 0u;
+        fx2StreamBBlockCount = fx2Resolved ? fx2->streamBResource.blocks.size() : 0u;
     }
 
-    const technox::MASSFX1ResourceCatalog* receivedCatalog = nullptr;
+    const technox::MASSFX1ResourceCatalog* receivedFX1Catalog = nullptr;
+    const technox::MASSFX2ResourceCatalog* receivedFX2Catalog = nullptr;
     int selectedFX1 = -1;
     int selectedFX2 = -1;
     bool fx1Resolved = false;
+    bool fx2Resolved = false;
     std::size_t fx1StreamABlockCount = 0;
     std::size_t fx1StreamBBlockCount = 0;
+    std::size_t fx2StreamABlockCount = 0;
+    std::size_t fx2StreamBBlockCount = 0;
 };
 
 int main(int argc, char** argv) {
