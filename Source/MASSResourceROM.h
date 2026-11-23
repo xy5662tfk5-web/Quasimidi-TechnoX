@@ -1253,7 +1253,7 @@ struct MASSIC51PortStreamResource {
 class MASSIC51PortStreamResolver {
 public:
     // Firmware path through IC4 0xAF93 repeats:
-    //   [count] [two one-time preamble bytes] [count * 3 payload bytes].
+    //   [count] [three one-time preamble bytes] [count * 3 payload bytes].
     // A zero count ends the resource without a host-port write.
     static bool resolveTripletStream(
         const MASSResourceROM& rom,
@@ -1318,13 +1318,14 @@ private:
             if (format ==
                 MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets) {
                 payloadSize = static_cast<std::size_t>(count) * 3u;
-                totalSourceSize = 3u + payloadSize;
+                totalSourceSize = 4u + payloadSize;
                 if (cursor + totalSourceSize > MASSResourceROM::kBankSize)
                     return false;
                 block.wireHeader = count;
                 block.preamble[0] = bankData[cursor + 1u];
                 block.preamble[1] = bankData[cursor + 2u];
-                block.payload.assign(bankData + cursor + 3u,
+                block.preamble[2] = bankData[cursor + 3u];
+                block.payload.assign(bankData + cursor + 4u,
                                      bankData + cursor + totalSourceSize);
             } else {
                 payloadSize = count;
