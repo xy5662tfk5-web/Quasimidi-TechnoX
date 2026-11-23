@@ -602,6 +602,28 @@ void testActualFirmwareROMTables(const char* path) {
     assert(image.size() == 0x20000);
     MASSFirmwareROMView view;
     assert(view.attach(image.data(), image.size()));
+
+    // Resolve all eight firmware opcode groups through the real 0x1BC3
+    // LJMP table. The 0x38 slot exists in the table but is intercepted by
+    // the interpreter as a filler record before JMP @A+DPTR executes.
+    constexpr std::array<std::uint8_t, 8> commandGroups{{
+        0x00u, 0x08u, 0x10u, 0x18u, 0x20u, 0x28u, 0x30u, 0x38u
+    }};
+    constexpr std::array<std::uint16_t, 8> commandHandlers{{
+        0x1c2bu, 0x1c61u, 0x1eddu, 0x224cu,
+        0x2301u, 0x2374u, 0x2374u, 0x2374u
+    }};
+    for (std::size_t i = 0; i < commandGroups.size(); ++i) {
+        MASSCommandHandlerDispatchResult dispatch{};
+        assert(MASSCommandHandlerDispatchTable::resolve(
+            view, static_cast<std::uint8_t>(commandGroups[i] | 0x05u),
+            dispatch));
+        assert(dispatch.opcodeGroup == commandGroups[i]);
+        assert(dispatch.tableOffset == static_cast<std::uint8_t>(
+            commandGroups[i] >> 1u));
+        assert(dispatch.handlerAddress == commandHandlers[i]);
+        assert(dispatch.preDispatchFiller == (commandGroups[i] == 0x38u));
+    }
     std::uint8_t value = 0;
     assert(view.read(MASSFirmwareLookupTable::modulationScale11E0, 0, value) && value == 0x80);
     assert(view.read(MASSFirmwareLookupTable::modulationScale11E0, 7, value) && value == 0xf0);
