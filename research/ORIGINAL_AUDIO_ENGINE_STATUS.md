@@ -95,6 +95,14 @@ Branch: `research/original-technox-audio-engine`
 - The real-ROM integration test compares the reconstructed image against every byte of the XDATA window after executing IC4 boot. The resource test also verifies image bounds, transfer metadata, mapped source bytes and backend hand-off.
 - This is an exact ROM-to-memory reconstruction, not sample decoding: the receiver identity and format of the 16-KiB contents remain unknown, and the generic oscillator is still not the original DSP.
 
+ 
+## Complete 1EDD parameter stages are now composed
+
+- Added `MASS1EDDFullParameterPipeline` to chain the reconstructed nonlinear `0x1288/0x1308` lookup and optional `0x2381/0x1848` external-byte transform with the subsequent `0x1FCB..0x2005` slot coefficient stage.
+- The coefficient stage includes the opcode-bit-1 two-MUL scale and the four `opcode & 0x41` modes: `0x00` bypass, `0x01` and `0x40` alternate `0x1890` arithmetic, and `0x41` table-driven `0x11E0/0x11E8` modulation scale.
+- The composed API returns the intermediate nonlinear/external results and the final slot coefficient. The caller must still supply the byte read from the P3-selected external bus; the physical source and complete slot-to-DSP packet-state mapping are not claimed.
+- Regression tests cover all four dispatch modes, the two-MUL scale, and a full nonzero-R7 path through the external-address/byte/1848 sequence.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
