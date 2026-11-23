@@ -70,3 +70,11 @@ Branch: `research/original-technox-audio-engine`
 ## Regression anchors
 
 The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fixture and packet-shape assertions. The current `tests/test_mass_resource_rom.cpp` contains the IC51 directory, descriptor, command-stream and firmware arithmetic tests. Run the full CTest suite after every change to the CPU, bus, ROM mapping, or resource decoder.
+
+## Paged IC51-to-XDATA transfer model
+
+- Added `MASSIC51BulkBlockHeader::copyPayloadToPagedXdata`, which models the firmware's two address stages separately: IC51 source bytes advance linearly, while logical R0 is translated through a caller-supplied 256-byte logical-to-physical map before each XDATA write.
+- A logical R0 wrap advances to the next 256-byte XDATA page, matching the observed P2 increment in the `0xAF05` helper.
+- The exact lookup bytes at IC4 address `0xADDD` are deliberately supplied by the caller; the implementation does not invent the permutation.
+- Added regression coverage for a synthetic non-identity map, page-boundary rollover, final physical address, and undersized destination rejection.
+- This models the firmware transfer mechanism. It does not identify the receiver, decode the copied data format, or establish PCM playback.
