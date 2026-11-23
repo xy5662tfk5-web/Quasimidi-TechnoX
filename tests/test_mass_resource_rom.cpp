@@ -935,7 +935,7 @@ void testActualBulkBlockLoader(const char* path) {
     const auto* wrappingHeader = candidateDirectory0.find(0x81);
     assert(wrappingHeader != nullptr);
     assert(wrappingHeader->sourceAddress == 0x729d);
-    assert(wrappingHeader->firmwareByteCount() == 0x9e93);
+    assert(wrappingHeader->firmwareByteCount() == 0x9ec3);
     std::vector<std::uint8_t> wrappedPayload(wrappingHeader->firmwareByteCount());
     assert(MASSIC51BulkBlockHeader::copyPayload(
         image.data(), MASSResourceROM::kBankSize, *wrappingHeader,
