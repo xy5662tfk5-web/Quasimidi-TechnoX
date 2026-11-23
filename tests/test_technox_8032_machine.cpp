@@ -857,9 +857,17 @@ int main(int argc, char** argv) {
         const std::array<std::uint8_t, 2> realProgramChange{{0xc0u, 0x05u}};
         const std::array<std::uint8_t, 3> realNoteOn{{0x90u, 0x3cu, 0x64u}};
         const std::array<std::uint8_t, 3> realNoteOff{{0x80u, 0x3cu, 0x40u}};
-        runRealMidiStage("Program Change only", realProgramChange.data(), realProgramChange.size());
-        runRealMidiStage("Note On only", realNoteOn.data(), realNoteOn.size());
-        runRealMidiStage("Note Off only", realNoteOff.data(), realNoteOff.size());
+        runRealMidiStage("Program Change with 7D95=00", realProgramChange.data(), realProgramChange.size());
+        // 0x2895 branches away from the event path when the external 0x7D95
+        // status byte is zero. Inject a minimal nonzero value only as a
+        // diagnostic fixture; this is not a hardware-confirmed status value.
+        firmwareMachine.setTestExternalRamByte(0x7d95u, 0x01u);
+        runRealMidiStage("Program Change with synthetic 7D95=01",
+                         realProgramChange.data(), realProgramChange.size());
+        runRealMidiStage("Note On with synthetic 7D95=01",
+                         realNoteOn.data(), realNoteOn.size());
+        runRealMidiStage("Note Off with synthetic 7D95=01",
+                         realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
