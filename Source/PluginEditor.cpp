@@ -6,7 +6,7 @@
 namespace {
 constexpr float kParameterX = 568.0f;
 constexpr float kValueX = 674.0f;
-constexpr float kVolumeX = 1012.0f;
+constexpr float kVolumeX = 964.0f;
 constexpr float kKnobY = 68.0f;
 constexpr int kPartFirstParameter = 0;
 }
@@ -68,7 +68,7 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(8.5f, juce::Font::bold));
     g.drawText(editMode ? "EDIT" : "PLAY", 740, 56, 32, 10, juce::Justification::centred);
     g.drawText(juce::String(static_cast<int>(std::lround(audioProcessor.getOutputGain() * 100.0f))) + "%",
-               988, 91, 48, 11, juce::Justification::centred);
+               940, 91, 48, 11, juce::Justification::centred);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::selectNextParameter(int delta)
