@@ -717,96 +717,60 @@ int main(int argc, char** argv) {
                 fxResources, firmwareCode.data(), firmwareCode.size()));
             assert(fx2Catalog.isLoaded());
 
-            // Execute the original FX2 firmware loader at 0x88D1 with a
-            // controlled selector input. The IC51 banks remain real ROM data;
-            // only the still-unmapped selector source at XDATA 0x7C06 is
-            // injected by the test fixture.
+            // Execute the original FX2 firmware loader at 0x88D1 using the
+            // factory Equalizr1 algorithm (index 14). Bank-0 Stream A has two
+            // real IC51 blocks; Stream B demonstrates B015's skipped prefix
+            // followed by a zero-count terminator.
             {
                 TechnoX8032Machine fx2Runtime;
                 assert(fx2Runtime.loadIC4Rom(realRom.data(), realRom.size()));
                 assert(fx2Runtime.loadIC51Rom(realIC51.data(), realIC51.size()));
                 fx2Runtime.reset();
-                fx2Runtime.setTestExternalReadOverride(0x7c06u, 5u); // Phaser1
-                // Firmware bit 0x1B gates the XDATA write phase in AF93/B015.
-                // Set it explicitly so this isolated entry-point test exercises
-                // the actual IC51-to-FF10 sound-memory transfer branch.
+                fx2Runtime.setTestExternalReadOverride(0x7c06u, 14u); // Equalizr1
+                // Firmware bit 0x1B enables the IC51-to-FF10 write phase.
                 fx2Runtime.writeInternal(0x23u, 0x08u);
                 assert((fx2Runtime.readInternal(0x23u) & 0x08u) != 0u);
                 fx2Runtime.cpuForTesting().registersForTesting().pc = 0x88d1u;
                 const auto executed = fx2Runtime.runUntilProgramCounter(0x8926u, 100000u);
                 assert(executed > 0u);
                 assert(fx2Runtime.cpu().registers().pc == 0x8926u);
-                assert(fx2Runtime.ic51ReadCount() > 0u);
+                assert(!fx2Runtime.cpuFaulted());
 
-                const auto* phaser1 = fx2Catalog.find(0, 5);
-                assert(phaser1 != nullptr);
-                assert(phaser1->streamAResource.blocks.empty());
-                assert(phaser1->streamBResource.blocks.size() == 1u);
-                const auto& block = phaser1->streamBResource.blocks.front();
-                const auto expectedPortBytes = block.portWriteByteCount;
-                assert(expectedPortBytes == block.payload.size() + 4u);
-                std::fprintf(stderr,
-                             "FX2 ROM loader Phaser1: executed=%zu PC=%04X IC51=%llu "
-                             "FF10-writes=%zu expected=%zu last=%02X P2=%02X P3=%02X bit23=%02X\\n",
-                             executed,
-                             static_cast<unsigned>(fx2Runtime.cpu().registers().pc),
-                             static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
-                             fx2Runtime.ff10WriteCount(), expectedPortBytes,
-                             static_cast<unsigned>(fx2Runtime.lastSoundDeviceWrite()),
-                             static_cast<unsigned>(fx2Runtime.readPortLatch(0xa0u)),
-                             static_cast<unsigned>(fx2Runtime.readPortLatch(0xb0u)),
-                             static_cast<unsigned>(fx2Runtime.readInternal(0x23u)));
-                std::fprintf(stderr, "  selectorOverride=%02X storedIndex=%02X\\n",
-                             static_cast<unsigned>(fx2Runtime.readExternal(0x7c06u)),
-                             static_cast<unsigned>(fx2Runtime.xdataByteForTesting(0x30b9u)));
-                for (std::size_t i = 0; i < fx2Runtime.ic51ReadTraceCount(); ++i) {
-                    const auto& event = fx2Runtime.ic51ReadTraceAt(i);
-                    std::fprintf(stderr, "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X\\n",
-                                 i, static_cast<unsigned>(event.bank),
-                                 static_cast<unsigned>(event.address),
-                                 static_cast<unsigned>(event.value),
-                                 static_cast<unsigned>(event.instructionPC));
-                }
-                for (std::size_t i = 0; i < std::min<std::size_t>(
-                         fx2Runtime.ff10WriteCount(), 12u); ++i) {
-                    const auto& event = fx2Runtime.ff10WriteAt(i);
-                    std::fprintf(stderr, "  FF10[%zu]=%02X mode=%u pc=%04X ret=%04X P2=%02X P3=%02X\\n",
-                                 i, static_cast<unsigned>(event.value),
-                                 static_cast<unsigned>(event.soundBusMode),
-                                 static_cast<unsigned>(event.instructionPC),
-                                 static_cast<unsigned>(event.stackReturnPC),
-                                 static_cast<unsigned>(event.port2),
-                                 static_cast<unsigned>(event.port3));
-                }
-                for (std::size_t i = 0; i < std::min<std::size_t>(
-                         fx2Runtime.ff10WriteCount(), 12u); ++i) {
-                    const auto& event = fx2Runtime.ff10WriteAt(i);
-                    std::printf("  FF10[%zu]=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
-                                i, static_cast<unsigned>(event.value),
-                                static_cast<unsigned>(event.instructionPC),
-                                static_cast<unsigned>(event.stackReturnPC),
-                                static_cast<unsigned>(event.port2),
-                                static_cast<unsigned>(event.port3));
-                }
+                const auto* equalizr1 = fx2Catalog.find(0, 14);
+                assert(equalizr1 != nullptr);
+                assert(equalizr1->streamAResource.blocks.size() == 2u);
+                assert(equalizr1->streamBResource.blocks.empty());
+                assert(equalizr1->streamBResource.skippedLeadingByte);
+                assert(equalizr1->streamBResource.leadingByteValue == 0x74u);
+                assert(equalizr1->streamBResource.terminatorAddress == 0x4d6du);
+
+                const auto expectedPortBytes =
+                    equalizr1->streamAResource.portWriteByteCount +
+                    equalizr1->streamBResource.portWriteByteCount;
+                assert(expectedPortBytes > 0u);
                 assert(fx2Runtime.ff10WriteCount() == expectedPortBytes);
+                assert(fx2Runtime.ic51ReadCount() > 6u);
 
                 std::size_t portOffset = 0;
-                const auto& headerWrite = fx2Runtime.ff10WriteAt(portOffset++);
-                assert(headerWrite.value == block.wireHeader);
-                for (const auto expected : block.preamble) {
-                    const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
-                    assert(event.value == expected);
-                }
-                for (const auto expected : block.payload) {
-                    const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
-                    assert(event.value == expected);
+                for (const auto& block : equalizr1->streamAResource.blocks) {
+                    const auto& header = fx2Runtime.ff10WriteAt(portOffset++);
+                    assert(header.value == block.sourceCount);
+                    assert(header.soundBusMode == 0x02u);
+                    assert(header.port2 == 0xffu);
+                    for (const auto expected : block.preamble) {
+                        const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
+                        assert(event.value == expected);
+                        assert(event.soundBusMode == 0x02u);
+                        assert(event.port2 == 0xffu);
+                    }
+                    for (const auto expected : block.payload) {
+                        const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
+                        assert(event.value == expected);
+                        assert(event.soundBusMode == 0x02u);
+                        assert(event.port2 == 0xffu);
+                    }
                 }
                 assert(portOffset == expectedPortBytes);
-                for (std::size_t i = 0; i < expectedPortBytes; ++i) {
-                    const auto& event = fx2Runtime.ff10WriteAt(i);
-                    assert(event.port2 == 0xffu);
-                    assert(event.soundBusMode == 0x02u);
-                }
             }
 
             for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
