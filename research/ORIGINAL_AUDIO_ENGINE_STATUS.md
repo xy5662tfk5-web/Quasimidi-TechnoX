@@ -91,7 +91,7 @@ Branch: `research/original-technox-audio-engine`
 
 - Added `MASSIC51ExternalSoundMemoryImage`, a startup-time reconstruction of the C000-FFFF image written by the original IC4 bulk loader.
 - The image uses the observed IC51 bank-0 table entry R7=`0x48`: source address `0x3C64`, 13,647 bytes (`0x354F`), and the exact IC4 logical-to-physical map at code address `0xADDD`. The final written byte is at `0xF5B2`; the array retains all 16,384 bytes and leaves unwritten locations zero.
-- The processor builds the immutable image once at startup and passes it to `MASSAudioEngine` / `IMASSVoiceBackend`. The engine forwards the same image pointer when a backend is replaced; no ROM parsing, permutation or allocation occurs in the audio callback.
+- The processor builds the immutable image once at startup and passes it to `MASSAudioEngine` / `IMASSVoiceBackend`. Firmware order is confirmed: IC4 first tests C000-FFFF at `0xB34D`, then the startup caller sets R7=`0x48` at `0x379F` and calls the IC51 bulk loader at `0x37A1` / `0xAF1A`. The engine forwards the same image pointer when a backend is replaced; no ROM parsing, permutation or allocation occurs in the audio callback.
 - The real-ROM integration test compares the reconstructed image against every byte of the XDATA window after executing IC4 boot. The resource test also verifies image bounds, transfer metadata, mapped source bytes and backend hand-off.
 - This is an exact ROM-to-memory reconstruction, not sample decoding: the receiver identity and format of the 16-KiB contents remain unknown, and the generic oscillator is still not the original DSP.
 
