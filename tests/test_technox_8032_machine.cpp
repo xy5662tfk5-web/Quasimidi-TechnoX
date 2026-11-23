@@ -1796,7 +1796,10 @@ int main(int argc, char** argv) {
         assert(secondNote1848Calls == 2u);
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
             secondNote1848Inputs{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            secondNote1848Returns{};
         std::size_t secondNote1848InputCount = 0;
+        std::size_t secondNote1848ReturnCount = 0;
         TechnoX8032Machine::InstructionWatchEvent secondNoteInstructionWatch{};
         bool foundSecondNotePacketBuilder = false;
         for (std::size_t i = 0;
@@ -1805,12 +1808,17 @@ int main(int argc, char** argv) {
             if (event.instructionPC == 0x1848u) {
                 assert(secondNote1848InputCount < secondNote1848Inputs.size());
                 secondNote1848Inputs[secondNote1848InputCount++] = event;
+            } else if (event.instructionPC == 0x1fc9u ||
+                       event.instructionPC == 0x2027u) {
+                assert(secondNote1848ReturnCount < secondNote1848Returns.size());
+                secondNote1848Returns[secondNote1848ReturnCount++] = event;
             } else if (event.instructionPC == 0x210fu) {
                 secondNoteInstructionWatch = event;
                 foundSecondNotePacketBuilder = true;
             }
         }
         assert(secondNote1848InputCount == 2u);
+        assert(secondNote1848ReturnCount == 2u);
         assert(foundSecondNotePacketBuilder);
 
         // Pin the five per-note resource/voice transactions observed before
@@ -2065,7 +2073,10 @@ int main(int argc, char** argv) {
         assert(lowerVelocity1848Calls == 2u);
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
             lowerVelocity1848Inputs{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            lowerVelocity1848Returns{};
         std::size_t lowerVelocity1848InputCount = 0;
+        std::size_t lowerVelocity1848ReturnCount = 0;
         TechnoX8032Machine::InstructionWatchEvent lowerVelocityInstructionWatch{};
         bool foundLowerVelocityPacketBuilder = false;
         for (std::size_t i = 0;
@@ -2074,12 +2085,17 @@ int main(int argc, char** argv) {
             if (event.instructionPC == 0x1848u) {
                 assert(lowerVelocity1848InputCount < lowerVelocity1848Inputs.size());
                 lowerVelocity1848Inputs[lowerVelocity1848InputCount++] = event;
+            } else if (event.instructionPC == 0x1fc9u ||
+                       event.instructionPC == 0x2027u) {
+                assert(lowerVelocity1848ReturnCount < lowerVelocity1848Returns.size());
+                lowerVelocity1848Returns[lowerVelocity1848ReturnCount++] = event;
             } else if (event.instructionPC == 0x210fu) {
                 lowerVelocityInstructionWatch = event;
                 foundLowerVelocityPacketBuilder = true;
             }
         }
         assert(lowerVelocity1848InputCount == 2u);
+        assert(lowerVelocity1848ReturnCount == 2u);
         assert(foundLowerVelocityPacketBuilder);
         std::printf("MASS velocity differential: reference=note64/vel100 "
                     "comparison=note64/vel50 packets=%zu\\n",
@@ -2107,6 +2123,23 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(low.registers[2]),
                         static_cast<unsigned>(low.registers[3]),
                         static_cast<unsigned>(low.registers[4]));
+        }
+        for (std::size_t i = 0; i < secondNote1848Returns.size(); ++i) {
+            const auto& high = secondNote1848Returns[i];
+            const auto& low = lowerVelocity1848Returns[i];
+            assert(high.instructionPC == low.instructionPC);
+            std::printf("  MASS-1848-OUT[%zu] pc=%04X vel100 A=%02X B=%02X R2=%02X PSW=%02X "
+                        "vel50 A=%02X B=%02X R2=%02X PSW=%02X\\n",
+                        i,
+                        static_cast<unsigned>(high.instructionPC),
+                        static_cast<unsigned>(high.accumulator),
+                        static_cast<unsigned>(high.b),
+                        static_cast<unsigned>(high.registers[2]),
+                        static_cast<unsigned>(high.psw),
+                        static_cast<unsigned>(low.accumulator),
+                        static_cast<unsigned>(low.b),
+                        static_cast<unsigned>(low.registers[2]),
+                        static_cast<unsigned>(low.psw));
         }
         const auto comparableVelocityPackets =
             std::min<std::size_t>(referenceVelocityPackets.size(), lowerVelocityPacketCount);
