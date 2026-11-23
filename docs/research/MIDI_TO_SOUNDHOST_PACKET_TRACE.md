@@ -178,3 +178,11 @@ This is instrumentation and a regression comparison, not yet a decoded trace res
 The current fixture still uses a synthetic ready response. These traces establish firmware behavior only; they do not identify the external processor or prove audible sample playback.
 5. Obtain and inspect the CI execution trace for the two velocity runs; use the first divergent PC/state/XDATA operand to trace the producer of R3/R4.
 6. Repeat with another pitch and a second Part, then classify all five Note On-associated commands independently from the 544-command configuration sweep.
+
+
+## Shared caller confirmed for the two 0x0A4F pitch packets
+
+The live 8032 instruction-watch trace now records the outer stack return address at the two executions of the `0x0A4F` writer callsite. Both snapshots report `0x1E6A`. The hardware packet trace independently records `0x0A52` as the return from the immediate `LCALL 0x0DB7` writer routine; these are two different stack levels and must not be conflated.
+
+The regression now asserts that both `0x0A4F` snapshots have the same outer return PC `0x1E6A`. This rejects the earlier unverified theory that the two packets came from separate callers. The evidence instead places both writes under the same `0x1E67` / `0x09B9` pitch-handler call path, with the same static callsite being reached twice during the note processing. The two packet bytes remain individually asserted, and their payload meanings remain unassigned.
+
