@@ -784,6 +784,8 @@ int main(int argc, char** argv) {
             const auto helper0e8eBefore = firmwareMachine.watchedCallCount(0x0e8eu);
             const auto helper1456Before = firmwareMachine.watchedCallCount(0x1456u);
             const auto helper1742Before = firmwareMachine.watchedCallCount(0x1742u);
+            const auto statusGateBefore = firmwareMachine.watchedCallCount(0x4803u);
+            const auto pitchTableBefore = firmwareMachine.watchedCallCount(0x02d1u);
             const auto ic51Before = firmwareMachine.ic51ReadCount();
             const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceBefore = firmwareMachine.xdataWatchTraceCount();
@@ -798,8 +800,8 @@ int main(int argc, char** argv) {
                         "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu "
                         "1494=+%llu AC00=+%llu AC88=+%llu B34D=+%llu "
                         "16C3=+%llu 189D=+%llu 1009=+%llu 018D=+%llu "
-                        "1780=+%llu 17D4=+%llu 0E8E=+%llu 1456=+%llu 1742=+%llu] "
-                        "IC51=+%llu\\n",
+                        "1780=+%llu 17D4=+%llu 0E8E=+%llu 1456=+%llu 1742=+%llu "
+                        "4803=+%llu 02D1=+%llu] IC51=+%llu\\n",
                         label, instructions, drain,
                         static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                         packetAfter - packetBefore,
@@ -822,6 +824,8 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e8eu) - helper0e8eBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1456u) - helper1456Before),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1742u) - helper1742Before),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4803u) - statusGateBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x02d1u) - pitchTableBefore),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
             const auto firstTrace = peripheralTraceAfter > 4096u
                 ? peripheralTraceAfter - 4096u : 0u;
@@ -893,6 +897,12 @@ int main(int argc, char** argv) {
                          temporaryPart1.data(), temporaryPart1.size());
         runRealMidiStage("Note On Part 1 in Multi mode",
                          realNoteOn.data(), realNoteOn.size());
+        // Diagnostic only: 0x4803 requires both 0x3703 and 0x7D95 nonzero.
+        // 0x3703 is firmware-set; override 0x7D95 as a synthetic DSP-ready
+        // response to reveal the downstream parameter/voice initialization.
+        firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
+        runRealMidiStage("Note On Part 1 with synthetic 7D95-ready response",
+                         realNoteOn.data(), realNoteOn.size());
         runRealMidiStage("Note Off Part 1 in Multi mode",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
@@ -922,8 +932,14 @@ int main(int argc, char** argv) {
             0x2b98u, 0x2b99u, 0x2b9au, 0x2b9bu, 0x2b9cu, 0x2b9du,
             0x2b9eu, 0x2b9fu, 0x2d60u, 0x2d61u, 0x2d62u, 0x2df8u,
             0x2df9u, 0x2dfau, 0x2dfbu, 0x2dfcu, 0x2dfdu, 0x2dfeu,
-            0x2dffu, 0x2fd7u, 0x2fa2u, 0x7c15u, 0x7c16u, 0x7c17u,
-            0x7c18u, 0x7c19u, 0x7c1au, 0x7c1bu, 0x7c1cu, 0x7c26u, 0x7bd5u
+            0x2dffu, 0x2fd7u, 0x2fa2u, 0x2000u, 0x2001u, 0x2020u,
+            0x2021u, 0x2022u, 0x2023u, 0x2050u, 0x20a0u, 0x20f0u,
+            0x2140u, 0x2190u, 0x21e0u, 0x2230u, 0x2280u, 0x22d0u,
+            0x2320u, 0x2370u, 0x3700u, 0x3701u, 0x3702u, 0x3703u,
+            0x3704u, 0x3705u, 0x3706u, 0x3707u, 0x3708u, 0x3709u,
+            0x370au, 0x370bu, 0x370cu, 0x370du, 0x370eu, 0x370fu,
+            0x7c15u, 0x7c16u, 0x7c17u, 0x7c18u, 0x7c19u, 0x7c1au,
+            0x7c1bu, 0x7c1cu, 0x7c26u, 0x7bd5u, 0x7d95u
         };
         std::printf("Real IC51 MIDI RAM:");
         for (const auto address : midiWatchAddresses) {
@@ -933,8 +949,9 @@ int main(int argc, char** argv) {
             std::printf(" %04X=%02X", static_cast<unsigned>(address),
                         static_cast<unsigned>(value));
         }
-        std::printf(" effective7BD5=%02X\\n",
-                    static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)));
+        std::printf(" effective7BD5=%02X effective7D95=%02X\\n",
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)));
         assert(!firmwareMachine.cpuFaulted());
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
