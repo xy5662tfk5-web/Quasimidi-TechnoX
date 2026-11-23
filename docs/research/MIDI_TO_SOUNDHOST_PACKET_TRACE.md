@@ -125,3 +125,19 @@ Both events produce 549 SoundHost transactions and 549 burst words. Comparing th
 This is a controlled firmware-level correlation: with Part, program and note held constant, changing only MIDI velocity changes the third and fourth bytes of the packet emitted from the `0x2122` call site. It identifies a promising velocity-sensitive command field, but the hardware meaning, scaling, and whether it directly controls amplitude remain unverified.
 
 The probe is asserted/reported by the regression test in `tests/test_technox_8032_machine.cpp`. As before, the DSP-ready response is synthetic; this proves how IC4 constructs the packet, not how the external sound processor reacts to it.
+
+Static disassembly around the caller return PC confirms the packet's register assembly:
+
+```asm
+210F  MOV R2, #0x00
+2111  MOV R5, 0x2B
+2113  MOV A, R4
+2114  ANL A, #0x07
+211B  MOV R4, A
+211C  MOV P2, #0x80
+211F  LCALL 0x0DB7
+2122  MOV P2, 0x2D
+```
+
+Thus this call site emits `[XDATA/RAM[0x2B], 0x00, R3, (R4 & 0x07)]`; `R3` is inherited from the preceding firmware calculation. For the velocity-only probe, the observed packet is `[0x0A, 0x00, 0x78, 0x00]` at velocity 100 and `[0x0A, 0x00, 0x98, 0x02]` at velocity 50. The next reverse-engineering target is now the producer of `R3` and `R4` before address `0x210F`, not the generic packet writer. This still does not establish whether those fields represent amplitude, envelope, a sample address, or another voice parameter.
+
