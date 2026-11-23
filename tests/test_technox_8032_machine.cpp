@@ -1091,6 +1091,34 @@ int main(int argc, char** argv) {
         // The stage hook sets 0x7D95 only after resource loading has entered.
         runRealMidiStage("Note On Part 1 with synthetic queue-drain handshake",
                          realNoteOn.data(), realNoteOn.size(), true);
+
+        // Capture the firmware's 16-slot resource staging page. The page is
+        // selected dynamically through internal RAM[0x2D], so do not assume
+        // an XDATA address or hard-code a bank.
+        const auto massSlotPage = firmwareMachine.readInternal(0x2du);
+        const auto readMassSlotByte = [&](std::uint8_t offset) {
+            const auto address = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(massSlotPage) << 8) | offset);
+            return address >= 0x7000u && address <= 0x7fffu
+                ? firmwareMachine.testExternalRamByteForTesting(address)
+                : firmwareMachine.xdataByteForTesting(address);
+        };
+        std::printf("MASS 16-slot staging page=%02X\\n",
+                    static_cast<unsigned>(massSlotPage));
+        for (unsigned slot = 0; slot < 16u; ++slot) {
+            const auto slotId = readMassSlotByte(
+                static_cast<std::uint8_t>(0x70u + slot));
+            std::printf("  MASS-SLOT[%02u] id=%02X data=",
+                        slot, static_cast<unsigned>(slotId));
+            for (unsigned byte = 0; byte < 8u; ++byte) {
+                const auto value = readMassSlotByte(static_cast<std::uint8_t>(
+                    0x80u + slot * 8u + byte));
+                std::printf("%02X%s", static_cast<unsigned>(value),
+                            byte == 7u ? "" : " ");
+            }
+            std::printf("\\n");
+        }
+
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
