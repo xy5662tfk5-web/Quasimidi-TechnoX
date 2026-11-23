@@ -534,6 +534,7 @@ public:
             const auto value = ic51Rom_[bank * 0x10000u + address];
             if ((address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
+                (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu)) {
@@ -607,6 +608,7 @@ public:
             const auto value = xdata_[address];
             if ((address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
+                (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) ||
@@ -726,6 +728,7 @@ public:
             if ((address >= 0x2000u && address <= 0x23ffu) ||
                 (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
+                (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu)) {
@@ -754,6 +757,7 @@ public:
             if ((address >= 0x2000u && address <= 0x23ffu) ||
                 (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
+                (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) ||
