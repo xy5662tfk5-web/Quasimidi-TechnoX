@@ -1020,6 +1020,13 @@ void testBankProgramResolver(const char* path) {
     assert(probeBackend.descriptorAddress == performanceOnePart13->descriptorAddress);
     assert(probeBackend.commandCount == performanceOnePart13->stream.commands.size());
 
+    // Replacing the backend while stopped must preserve the same catalog handoff.
+    ResourceCatalogProbeBackend replacementBackend;
+    resourceAwareEngine.setBackend(&replacementBackend);
+    resourceAwareEngine.noteOn(12, 1, 61, 100);
+    assert(replacementBackend.resolvedOnNote);
+    assert(replacementBackend.descriptorAddress == performanceOnePart13->descriptorAddress);
+
     // Performance 1 in TECHNOX.MID uses Part 13 = bank 2 / sound 10 and
     // Part 14 = bank 1 / sound 93. Keep their real IC51 descriptors and
     // command streams visible as the first concrete firmware playback cases.
