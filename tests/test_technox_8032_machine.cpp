@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     assert(capturedCommand.deviceIndex == 0x11u);
     assert(capturedCommand.port2 == 0x12u);
     assert(capturedCommand.port3 == 0x34u);
-    assert(capturedCommand.soundBusMode == 0u);
+    assert(capturedCommand.soundBusMode == 1u);
     assert(!capturedCommand.ic51Selected);
     assert(capturedCommand.soundDeviceResetReleased);
     assert(machine.soundHostBurstWordCount() == 1u);
