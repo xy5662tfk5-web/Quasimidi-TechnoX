@@ -640,7 +640,7 @@ int main(int argc, char** argv) {
             assert(fx2Directory.find(21) == nullptr);
             const auto* phaser1 = fx2Directory.find(5);
             assert(phaser1 != nullptr);
-            assert(phaser1->name[0] == 'P' && phaser1->name[5] == '1');
+            assert(phaser1->name[0] == 'P' && phaser1->name[6] == '1');
 
             technox::MASSResourceROM fxResources;
             assert(fxResources.load(realIC51.data(), realIC51.size()));
