@@ -75,6 +75,7 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 
 - Added `MASSIC51BulkBlockHeader::copyPayloadToPagedXdata`, which models the firmware's two address stages separately: IC51 source bytes advance linearly, while logical R0 is translated through a caller-supplied 256-byte logical-to-physical map before each XDATA write.
 - A logical R0 wrap advances to the next 256-byte XDATA page, matching the observed P2 increment in the `0xAF05` helper.
-- The exact lookup bytes at IC4 address `0xADDD` are deliberately supplied by the caller; the implementation does not invent the permutation.
-- Added regression coverage for a synthetic non-identity map, page-boundary rollover, final physical address, and undersized destination rejection.
-- This models the firmware transfer mechanism. It does not identify the receiver, decode the copied data format, or establish PCM playback.
+- The 256-byte lookup at IC4 address `0xADDD` is recovered from the **descrambled** v1.05 program ROM. All 256 bytes match `TechnoX8032Machine::mapSoundMemoryLowAddress`; the map is a bijection over all 256 low-byte addresses.
+- The real-ROM 8032 integration test now executes the actual IC51 bank-0 transfer, verifies all 13,647 destination bytes against the IC51 source block after address permutation, and checks the final physical write at `0xF5B2`.
+- The independent C++ paging helper still has synthetic-map tests for page rollover and invalid destination sizes; the machine-level test covers the recovered firmware map and real transfer.
+- This confirms the firmware's staged memory image and address mapping. It does not identify the receiver, decode the copied data format, or establish PCM playback.
