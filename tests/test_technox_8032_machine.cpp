@@ -1816,7 +1816,8 @@ int main(int argc, char** argv) {
             assert(event.opcodeBytes[0] ==
                    firmwareMachine.readCode(event.instructionPC));
         }
-        assert(secondNoteTraceSaw1FC9 || secondNoteTraceSaw2027);
+        assert(secondNoteTraceSaw1FC9);
+        assert(secondNoteTraceSaw2027);
         assert(secondNoteTraceSaw210F);
         const auto secondNoteExecutionDataCount =
             firmwareMachine.executionDataAccessTraceCountForTesting();
@@ -2128,6 +2129,8 @@ int main(int argc, char** argv) {
             lowerVelocityExecutionTrace;
         lowerVelocityExecutionTrace.reserve(lowerVelocityExecutionTraceRetained);
         bool lowerVelocityTraceSawPacketBuilder = false;
+        bool lowerVelocityTraceSaw1FC9 = false;
+        bool lowerVelocityTraceSaw2027 = false;
         for (std::size_t absolute = lowerVelocityExecutionTraceCount -
                  lowerVelocityExecutionTraceRetained;
              absolute < lowerVelocityExecutionTraceCount; ++absolute) {
@@ -2136,10 +2139,16 @@ int main(int argc, char** argv) {
             lowerVelocityExecutionTrace.push_back(event);
             lowerVelocityTraceSawPacketBuilder = lowerVelocityTraceSawPacketBuilder ||
                 event.instructionPC == 0x210fu;
+            lowerVelocityTraceSaw1FC9 = lowerVelocityTraceSaw1FC9 ||
+                event.instructionPC == 0x1fc9u;
+            lowerVelocityTraceSaw2027 = lowerVelocityTraceSaw2027 ||
+                event.instructionPC == 0x2027u;
             assert(event.opcodeBytes[0] ==
                    firmwareMachine.readCode(event.instructionPC));
         }
         assert(lowerVelocityTraceSawPacketBuilder);
+        assert(lowerVelocityTraceSaw1FC9);
+        assert(lowerVelocityTraceSaw2027);
         const auto lowerVelocityExecutionDataCount =
             firmwareMachine.executionDataAccessTraceCountForTesting();
         const auto lowerVelocityExecutionDataRetained =
@@ -2220,6 +2229,7 @@ int main(int argc, char** argv) {
                 break;
             }
             const bool stateDiffers =
+                high.stackReturnPC != low.stackReturnPC ||
                 high.accumulator != low.accumulator || high.b != low.b ||
                 high.psw != low.psw || high.dptr != low.dptr ||
                 high.registers != low.registers ||
@@ -2231,7 +2241,7 @@ int main(int argc, char** argv) {
             if (stateDiffers) {
                 std::printf("8032 FIRST STATE DIVERGENCE[%zu] PC=%04X: "
                             "A=%02X/%02X B=%02X/%02X PSW=%02X/%02X "
-                            "DPTR=%04X/%04X R2=%02X/%02X RAM2B=%02X/%02X "
+                            "RET=%04X/%04X DPTR=%04X/%04X R2=%02X/%02X RAM2B=%02X/%02X "
                             "RAM30=%02X/%02X RAM31=%02X/%02X\\n",
                             i, static_cast<unsigned>(high.instructionPC),
                             static_cast<unsigned>(high.accumulator),
@@ -2240,6 +2250,8 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(low.b),
                             static_cast<unsigned>(high.psw),
                             static_cast<unsigned>(low.psw),
+                            static_cast<unsigned>(high.stackReturnPC),
+                            static_cast<unsigned>(low.stackReturnPC),
                             static_cast<unsigned>(high.dptr),
                             static_cast<unsigned>(low.dptr),
                             static_cast<unsigned>(high.registers[2]),
