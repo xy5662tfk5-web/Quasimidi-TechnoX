@@ -92,15 +92,38 @@ endif()
 
 # Intel 8032 bus and IC4 ROM-loader tests are dependency-free.
 if (BUILD_TESTING)
+    # The 8032 integration test also verifies the factory Performance SysEx
+    # selectors. Generate its lossless timed fixture from the checked-in MIDI
+    # dump instead of silently omitting the third test argument.
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    set(TECHNOX_FACTORY_STREAM "${CMAKE_CURRENT_BINARY_DIR}/technox_factory_ram_bank.txsb")
+    add_custom_command(
+        OUTPUT "${TECHNOX_FACTORY_STREAM}"
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/parse_technox_mid.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/TECHNOX.MID"
+            --serial-stream-output "${TECHNOX_FACTORY_STREAM}"
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/TECHNOX.MID"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/parse_technox_mid.py"
+        COMMENT "Extracting timed factory Performance SysEx fixture"
+        VERBATIM
+    )
+    add_custom_target(technox_factory_stream_fixture
+        DEPENDS "${TECHNOX_FACTORY_STREAM}"
+    )
+
     add_executable(technox_8032_machine_tests
         tests/test_technox_8032_machine.cpp
     )
+    add_dependencies(technox_8032_machine_tests technox_factory_stream_fixture)
     target_compile_features(technox_8032_machine_tests PRIVATE cxx_std_17)
     target_compile_options(technox_8032_machine_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_8032_machine_tests
         COMMAND technox_8032_machine_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC51_nm27c010_v105.bin"
+            "${TECHNOX_FACTORY_STREAM}"
     )
 endif()
 
