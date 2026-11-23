@@ -754,52 +754,73 @@ int main(int argc, char** argv) {
                         firmwareMachine.soundHostBurstWordCount(),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()));
         }
-        const std::array<std::uint8_t, 5> realRomProgramAndNote{{
-            0xc0u, 0x05u, 0x90u, 0x3cu, 0x64u
-        }};
-        const auto realMidiStart = firmwareMachine.elapsedMachineCycles();
         const auto realPacketBaseline = firmwareMachine.soundCommandPacketCount();
         const auto realBurstBaseline = firmwareMachine.soundHostBurstWordCount();
-        const auto realHostWriteBaseline = firmwareMachine.soundHostWriteCount();
-        const auto realWriterBaseline = firmwareMachine.watchedCallCount(0x0db7u);
-        const auto realAC00Baseline = firmwareMachine.watchedCallCount(0xac00u);
-        const auto realAC88Baseline = firmwareMachine.watchedCallCount(0xac88u);
-        const auto real4256Baseline = firmwareMachine.watchedCallCount(0x4256u);
-        const auto real1494Baseline = firmwareMachine.watchedCallCount(0x1494u);
-        const auto real57A8Baseline = firmwareMachine.watchedCallCount(0x57a8u);
-        const auto real5671Baseline = firmwareMachine.watchedCallCount(0x5671u);
-        const auto realIC51Baseline = firmwareMachine.ic51ReadCount();
-        assert(firmwareMachine.scheduleAciaMidiBytes(
-            realRomProgramAndNote.data(), realRomProgramAndNote.size(), realMidiStart));
-        const auto realMidiInstructions = firmwareMachine.runForMachineCycles(2000000u);
-        const auto realMidiDrain = firmwareMachine.runForMachineCycles(5000000u);
-        std::printf("Real IC51 MIDI probe: instructions=%zu drain=%zu PC=%04X "
-                    "newPackets=%zu newBurstWords=%zu newHostWrites=%zu "
-                    "calls[0DB7=%llu AC00=%llu AC88=%llu 4256=%llu 1494=%llu 57A8=%llu 5671=%llu] "
-                    "newIC51=%llu validACIA=%llu lastRX=%02X\\n",
-                    realMidiInstructions, realMidiDrain,
-                    static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
-                    firmwareMachine.soundCommandPacketCount() - realPacketBaseline,
-                    firmwareMachine.soundHostBurstWordCount() - realBurstBaseline,
-                    firmwareMachine.soundHostWriteCount() - realHostWriteBaseline,
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0x0db7u) - realWriterBaseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0xac00u) - realAC00Baseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0xac88u) - realAC88Baseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0x4256u) - real4256Baseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0x1494u) - real1494Baseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0x57a8u) - real57A8Baseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.watchedCallCount(0x5671u) - real5671Baseline),
-                    static_cast<unsigned long long>(
-                        firmwareMachine.ic51ReadCount() - realIC51Baseline),
-                    static_cast<unsigned long long>(firmwareMachine.aciaValidReceiveReadCount()),
-                    static_cast<unsigned>(firmwareMachine.lastValidAciaReceiveRead()));
+
+        // Differentially isolate the three MIDI voice events. Each stage is
+        // delivered through the emulated ACIA after the same prior state, so
+        // Program Change setup is no longer conflated with Note On traffic.
+        const auto runRealMidiStage = [&](const char* label,
+                                          const std::uint8_t* bytes,
+                                          std::size_t byteCount) {
+            const auto startCycle = firmwareMachine.elapsedMachineCycles();
+            const auto packetBefore = firmwareMachine.soundCommandPacketCount();
+            const auto burstBefore = firmwareMachine.soundHostBurstWordCount();
+            const auto hostWriteBefore = firmwareMachine.soundHostWriteCount();
+            const auto writerBefore = firmwareMachine.watchedCallCount(0x0db7u);
+            const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
+            const auto eventBefore = firmwareMachine.watchedCallCount(0x5671u);
+            const auto midiBefore = firmwareMachine.watchedCallCount(0x57a8u);
+            const auto ic51Before = firmwareMachine.ic51ReadCount();
+            const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
+            assert(firmwareMachine.scheduleAciaMidiBytes(bytes, byteCount, startCycle));
+            const auto instructions = firmwareMachine.runForMachineCycles(2000000u);
+            const auto drain = firmwareMachine.runForMachineCycles(5000000u);
+            const auto packetAfter = firmwareMachine.soundCommandPacketCount();
+            const auto peripheralTraceAfter = firmwareMachine.unmappedBusTraceCount();
+            std::printf("Real IC51 MIDI %s: instructions=%zu drain=%zu PC=%04X "
+                        "packets=+%zu burstWords=+%zu hostWrites=+%zu "
+                        "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu] "
+                        "IC51=+%llu\\n",
+                        label, instructions, drain,
+                        static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
+                        packetAfter - packetBefore,
+                        firmwareMachine.soundHostBurstWordCount() - burstBefore,
+                        firmwareMachine.soundHostWriteCount() - hostWriteBefore,
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0db7u) - writerBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4256u) - partBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x5671u) - eventBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x57a8u) - midiBefore),
+                        static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
+            const auto firstTrace = peripheralTraceAfter > 4096u
+                ? peripheralTraceAfter - 4096u : 0u;
+            for (std::size_t i = std::max(firstTrace, peripheralTraceBefore);
+                 i < peripheralTraceAfter; ++i) {
+                const auto& event = firmwareMachine.unmappedBusTraceAt(i);
+                if (event.address < 0x7c00u || event.address > 0x7fffu) continue;
+                std::printf("  MIDI-7C %c %04X=%02X pc=%04X stackRet=%04X "
+                            "P3=%02X 8E=%02X overlay=%u cycle=%llu\\n",
+                            event.write ? 'W' : 'R',
+                            static_cast<unsigned>(event.address),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned>(event.syntheticTestOverlay),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
+            assert(!firmwareMachine.cpuFaulted());
+        };
+
+        const std::array<std::uint8_t, 2> realProgramChange{{0xc0u, 0x05u}};
+        const std::array<std::uint8_t, 3> realNoteOn{{0x90u, 0x3cu, 0x64u}};
+        const std::array<std::uint8_t, 3> realNoteOff{{0x80u, 0x3cu, 0x40u}};
+        runRealMidiStage("Program Change only", realProgramChange.data(), realProgramChange.size());
+        runRealMidiStage("Note On only", realNoteOn.data(), realNoteOn.size());
+        runRealMidiStage("Note Off only", realNoteOff.data(), realNoteOff.size());
+        const auto realPackets = firmwareMachine.soundCommandPacketCount();
+        const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
         std::printf("REAL-ROM sound-memory reads after MIDI: total=%llu traced=%zu\\n",
                     static_cast<unsigned long long>(firmwareMachine.soundMemoryReadCount()),
