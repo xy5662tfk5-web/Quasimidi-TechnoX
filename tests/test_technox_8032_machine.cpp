@@ -3413,12 +3413,21 @@ int main(int argc, char** argv) {
             });
         assert(pitchPointerLowRead != pitchSourceData.end());
         assert(pitchPointerHighRead != pitchSourceData.end());
-        assert(pitchPointerLowRead->value == 0x0cu);
+        // R7=0x0C at 0x1607 is the resource selector in the live register
+        // context; it is not the low byte read by MOVX. The actual pointer is
+        // loaded little-endian from XDATA 0x54E5/0x54E6 as 0x00/0x16 -> 0x1600.
+        assert(pitchPointerLowRead->value == 0x00u);
         assert(pitchPointerHighRead->value == 0x16u);
         assert(pitchPointerHighRead->address ==
                static_cast<std::uint16_t>(pitchPointerLowRead->address + 1u));
-        assert(pitchDescriptorPointerLow.dptr == pitchPointerLowRead->address);
-        assert(pitchDescriptorPointerHigh.dptr == pitchPointerHighRead->address);
+        assert(pitchPointerLowRead->address == pitchDescriptorPointerLow.dptr);
+        assert(pitchPointerHighRead->address == pitchDescriptorPointerHigh.dptr);
+        assert(pitchPointerLowRead->address == 0x54e5u);
+        assert(pitchPointerHighRead->address == 0x54e6u);
+        const auto pitchDescriptorAddress = static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(pitchPointerHighRead->value) << 8u |
+            pitchPointerLowRead->value);
+        assert(pitchDescriptorAddress == 0x1600u);
 
         const auto sawPitchSourceAccess = [&](std::uint16_t pc,
                                                std::uint16_t address,
