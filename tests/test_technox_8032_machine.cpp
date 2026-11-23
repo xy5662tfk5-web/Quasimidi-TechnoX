@@ -517,8 +517,8 @@ int main(int argc, char** argv) {
         assertObservedBulkLoadCall(0x37a1u);
         assertObservedBulkLoadCall(0x38f1u);
 
-        // Recover the fixed FX-name/resource table from the descrambled IC4
-        // image, then resolve both actual IC51 upload-stream formats.
+        // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
+        // then resolve the two IC51 upload-stream formats associated with each FX1 entry.
         if (!realIC51.empty()) {
             std::array<std::uint8_t, TechnoX8032Machine::kCodeSpaceSize> firmwareCode{};
             for (std::size_t address = 0; address < firmwareCode.size(); ++address)
@@ -529,8 +529,8 @@ int main(int argc, char** argv) {
             assert(fx1Directory.load(firmwareCode.data(), firmwareCode.size()));
             struct ExpectedFX {
                 const char* name;
-                std::uint8_t firstResource;
-                std::uint8_t secondResource;
+                std::uint8_t streamAResource;
+                std::uint8_t streamBResource;
                 std::uint8_t mode;
             };
             const std::array<ExpectedFX, technox::MASSFX1ProgramDirectory::kEntryCount>
@@ -562,8 +562,8 @@ int main(int argc, char** argv) {
                 const auto* record = fx1Directory.find(static_cast<int>(index));
                 assert(record != nullptr);
                 assert(record->index == index);
-                assert(record->streamAResourceIndex == expectedFX1[index].firstResource);
-                assert(record->streamBResourceIndex == expectedFX1[index].secondResource);
+                assert(record->streamAResourceIndex == expectedFX1[index].streamAResource);
+                assert(record->streamBResourceIndex == expectedFX1[index].streamBResource);
                 assert(record->modeByte == expectedFX1[index].mode);
                 std::size_t nameLength = 0;
                 while (expectedFX1[index].name[nameLength] != '\0') {
@@ -602,7 +602,7 @@ int main(int argc, char** argv) {
             assert(roomBank0->streamBResource.blocks.size() == 1u);
             assert(fx1Catalog.find(1, 0)->streamAResource.blocks.size() > 0u);
 
-            // The real-time backend receives the immutable catalog on initial
+            // The real-time backend receives the immutable FX1 catalog on initial
             // attachment and again when replaced, just like the program catalog.
             FX1CatalogProbeBackend originalFX1Backend;
             FX1CatalogProbeBackend replacementFX1Backend;
@@ -637,7 +637,7 @@ int main(int argc, char** argv) {
                 const auto fx1Index = commonFrame[8u + 0x2au];
                 const auto fx2Index = commonFrame[8u + 0x32u];
                 assert(fx1Index < technox::MASSFX1ProgramDirectory::kEntryCount);
-                assert(fx2Index < technox::MASSFX1ProgramDirectory::kEntryCount);
+                assert(fx2Index <= 21u);
                 usedFX1[fx1Index] = true;
                 for (int bankIndex = 0; bankIndex < 2; ++bankIndex)
                     assert(fx1Catalog.find(bankIndex, fx1Index) != nullptr);
