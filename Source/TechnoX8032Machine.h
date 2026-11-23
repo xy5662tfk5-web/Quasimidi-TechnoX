@@ -528,7 +528,8 @@ public:
             ++ic51ReadsByBank_[bank];
             lastIC51ReadAddress_ = address;
             const auto value = ic51Rom_[bank * 0x10000u + address];
-            if (address >= 0x2d00u && address <= 0x2dffu) {
+            if ((address >= 0x2900u && address <= 0x2bffu) ||
+                (address >= 0x2d00u && address <= 0x2dffu)) {
                 auto& watch = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 watch.address = address;
                 watch.value = value;
@@ -695,7 +696,8 @@ public:
         const bool ic51Selected = isIC51Selected();
         if (ic51Selected && !isDedicatedPeripheralAddress(address) &&
             !(ramMode && isXdataRam(address))) {
-            if (address >= 0x2d00u && address <= 0x2dffu) {
+            if ((address >= 0x2900u && address <= 0x2bffu) ||
+                (address >= 0x2d00u && address <= 0x2dffu)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
                 event.value = value;
