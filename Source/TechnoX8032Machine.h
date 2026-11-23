@@ -1072,7 +1072,7 @@ private:
     std::size_t ic51ReadTraceCount_ = 0;
     std::array<XdataWatchEvent, 512> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
-    std::array<UnmappedBusEvent, 512> unmappedBusTrace_{};
+    std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
     std::size_t unmappedBusTraceCount_ = 0;
     std::array<std::uint64_t, 0x1000> unmappedReadCounts7xxx_{};
     std::array<std::uint64_t, 0x1000> unmappedWriteCounts7xxx_{};
