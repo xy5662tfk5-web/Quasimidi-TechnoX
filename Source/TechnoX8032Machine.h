@@ -1219,7 +1219,7 @@ private:
     std::uint16_t lastIC51ReadAddress_ = 0;
     std::array<IC51ReadEvent, 512> ic51ReadTrace_{};
     std::size_t ic51ReadTraceCount_ = 0;
-    std::array<XdataWatchEvent, 4096> xdataWatchTrace_{};
+    std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
     std::size_t unmappedBusTraceCount_ = 0;
