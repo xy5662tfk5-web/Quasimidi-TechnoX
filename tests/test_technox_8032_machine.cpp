@@ -838,7 +838,7 @@ int main(int argc, char** argv) {
                  i < xdataTraceAfter; ++i) {
                 const auto& event = firmwareMachine.xdataWatchTraceAt(i);
                 std::printf("  MIDI-XDATA %c %04X=%02X pc=%04X stackRet=%04X "
-                            "P2=%02X P3=%02X 8E=%02X cycle=%llu\\n",
+                            "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\\n",
                             event.write ? 'W' : 'R',
                             static_cast<unsigned>(event.address),
                             static_cast<unsigned>(event.value),
@@ -847,6 +847,8 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.port2),
                             static_cast<unsigned>(event.port3),
                             static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned>(event.ic51Selected),
+                            static_cast<unsigned>(event.writeAccepted),
                             static_cast<unsigned long long>(event.machineCycle));
             }
             assert(!firmwareMachine.cpuFaulted());
