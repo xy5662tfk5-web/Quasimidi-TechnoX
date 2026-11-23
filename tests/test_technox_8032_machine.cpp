@@ -864,7 +864,12 @@ int main(int argc, char** argv) {
         firmwareMachine.setTestExternalRamByte(0x7d95u, 0x01u);
         runRealMidiStage("Program Change with synthetic 7D95=01",
                          realProgramChange.data(), realProgramChange.size());
-        runRealMidiStage("Note On with synthetic 7D95=01",
+        // Channel 1 is routed by this fixture to Part index 12. In the
+        // firmware's 24-byte Part window, 0x7C17 + 12*0x18 = 0x7D37.
+        // Seed only this nonzero gate to see whether the downstream
+        // descriptor/voice path becomes reachable; this is synthetic state.
+        firmwareMachine.setTestExternalRamByte(0x7d37u, 0x01u);
+        runRealMidiStage("Note On with synthetic 7D95=01 and Part12 marker",
                          realNoteOn.data(), realNoteOn.size());
         runRealMidiStage("Note Off with synthetic 7D95=01",
                          realNoteOff.data(), realNoteOff.size());
