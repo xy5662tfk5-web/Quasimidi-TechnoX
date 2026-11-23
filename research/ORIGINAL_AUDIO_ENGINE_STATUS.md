@@ -66,6 +66,15 @@ Branch: `research/original-technox-audio-engine`
 - Regression tests compare every FX label and resource pair with the real descrambled IC4 ROM, then resolve both resource formats for every effect in both IC51 banks.
 - This gives a second verified IC51 path beyond the descriptor/command-stream catalog. It is resource transport metadata only; no FX algorithm, PCM format, or physical DSP has been identified.
 
+ 
+## FX resource catalog reaches the voice backend
+
+- Added an immutable `MASSFXResourceCatalog` that loads the fixed 21-entry IC4 FX directory and resolves both referenced IC51 stream resources for every FX type in both IC51 banks.
+- Both transport formats are parsed as complete resource sequences: each nonzero block is retained in order, while the terminating zero-count byte is recorded as an end marker and is not sent to the host port.
+- The processor constructs this catalog once at startup from the descrambled IC4 code and validated IC51 image. It passes the read-only catalog to `MASSAudioEngine` and the active voice backend; backend replacement reattaches the same pointer.
+- Tests verify all 42 bank/type pairs, both stream terminators, representative Room block data, and catalog forwarding across backend replacement.
+- This is FX resource data plumbing only. The runtime FX type-to-directory index mapping, DSP command meaning, FX algorithms and physical receiver are still unresolved; the generic oscillator is still not the original sound engine.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
