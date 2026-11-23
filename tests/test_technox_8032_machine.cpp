@@ -2032,11 +2032,13 @@ int main(int argc, char** argv) {
                          sameNoteLowerVelocity.data(), sameNoteLowerVelocity.size());
         const auto lowerVelocityPacketCount =
             firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
+        assert(lowerVelocityPacketCount == 549u);
         std::printf("MASS velocity differential: reference=note64/vel100 "
                     "comparison=note64/vel50 packets=%zu\\n",
                     lowerVelocityPacketCount);
         const auto comparableVelocityPackets =
             std::min<std::size_t>(referenceVelocityPackets.size(), lowerVelocityPacketCount);
+        assert(comparableVelocityPackets == referenceVelocityPackets.size());
         for (std::size_t i = 0; i < comparableVelocityPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(
                 lowerVelocityPacketStart + i);
@@ -2044,6 +2046,16 @@ int main(int argc, char** argv) {
             for (std::size_t byte = 0; byte < packet.bytes.size(); ++byte) {
                 if (packet.bytes[byte] != referenceVelocityPackets[i][byte])
                     changedMask |= static_cast<std::uint8_t>(1u << byte);
+            }
+            // Only the third/fourth packet bytes change for this velocity-only
+            // substitution. The call site at 0x211F emits [RAM[2B], 0, R3, R4&7].
+            assert(changedMask == (i == 3u ? 0x0cu : 0x00u));
+            if (i == 3u) {
+                constexpr std::array<std::uint8_t, 4> expectedVelocityPacket{{
+                    0x0au, 0x00u, 0x98u, 0x02u
+                }};
+                assert(packet.bytes == expectedVelocityPacket);
+                assert(packet.returnPC == 0x2122u);
             }
             std::printf("  VELOCITY-CMD[%zu] ref=%02X %02X %02X %02X "
                         "low=%02X %02X %02X %02X changed-bytes=%X "
