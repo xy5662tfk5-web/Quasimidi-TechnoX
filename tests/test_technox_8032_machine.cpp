@@ -3321,8 +3321,55 @@ int main(int argc, char** argv) {
             findPitchSourceStep(0x160bu);
         assert(pitchDescriptorPointerLow.stackReturnPC ==
                pitchDescriptorPointerHigh.stackReturnPC);
+        const auto& pitchAddressBuilderEntry =
+            findPitchSourceStep(0x1d2fu);
+        const auto& pitchAddressNormalized =
+            findPitchSourceStep(0x1d46u);
+        const auto& pitchBasePointerLoaded =
+            findPitchSourceStep(0x1d83u);
+        const auto& pitchTableFetch =
+            findPitchSourceStep(0x1d9du);
+        const auto pitchSecondaryBase = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(pitchAddressBuilderEntry.indirectRam9F) << 8u) |
+            pitchAddressBuilderEntry.indirectRam9E);
+        assert(pitchSecondaryBase == 0x3903u);
+        const auto pitchTableAddress =
+            MASS1C61SecondaryTableAddressBuilder::resolve(
+                pitchSecondaryBase,
+                pitchAddressBuilderEntry.registers[3],
+                pitchAddressBuilderEntry.selectedDirectRam[0],
+                pitchAddressBuilderEntry.registers[4]);
+        assert(pitchTableAddress.normalizedIndex == 0x7bu);
+        assert(pitchAddressNormalized.registers[7] ==
+               pitchTableAddress.normalizedIndex);
+        assert(pitchBasePointerLoaded.dptr == pitchSecondaryBase);
+        assert(pitchTableAddress.address == 0x397eu);
+        assert(pitchTableFetch.dptr == pitchTableAddress.address);
+
+        // Decode the three actual MOVC bytes from the loaded IC4 image and
+        // compare the unpacked fields with the live register bank at 0x1DC8.
+        MASS1C61SecondaryTableBytes pitchTableBytes{};
+        pitchTableBytes.bytes = {{
+            firmwareMachine.readCode(pitchTableAddress.address),
+            firmwareMachine.readCode(static_cast<std::uint16_t>(
+                pitchTableAddress.address + 0x80u)),
+            firmwareMachine.readCode(static_cast<std::uint16_t>(
+                pitchTableAddress.address + 0x100u))
+        }};
+        const auto pitchTableFields =
+            MASS1C61PackedLookupDecoder::decode(pitchTableBytes);
         const auto& pitchSecondaryLookup =
             findPitchSourceStep(0x1dc8u);
+        assert(pitchTableFields.r3 == 0x60u);
+        assert(pitchTableFields.r4 == 0x48u);
+        assert(pitchTableFields.r5 == 0x05u);
+        assert(pitchTableFields.r6 == 0x43u);
+        assert(pitchTableFields.r7 == 0x02u);
+        assert(pitchTableFields.r3 == pitchSecondaryLookup.registers[3]);
+        assert(pitchTableFields.r4 == pitchSecondaryLookup.registers[4]);
+        assert(pitchTableFields.r5 == pitchSecondaryLookup.registers[5]);
+        assert(pitchTableFields.r6 == pitchSecondaryLookup.registers[6]);
+        assert(pitchTableFields.r7 == pitchSecondaryLookup.registers[7]);
         assert(pitchSecondaryLookup.registers[2] == 0x80u);
         assert(pitchSecondaryLookup.registers[3] == 0x60u);
         assert(pitchSecondaryLookup.registers[4] == 0x48u);
