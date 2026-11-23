@@ -178,6 +178,12 @@ public:
         std::array<std::uint8_t, 8> registers{};
         // [0] is direct IRAM 0x2B; [1..8] are direct IRAM 0x30..0x37.
         std::array<std::uint8_t, 9> ram2BAnd30To37{};
+        // Selected state used by the recovered 0x1C61 interpolation path:
+        // [0]=direct 0x2F, [1]=0x34, [2]=0x40, [3..5]=0x05..0x07,
+        // [6]=0x3F. 0x9E/0x9F are upper IRAM indirect reads, not SFRs.
+        std::array<std::uint8_t, 7> selectedDirectRam{};
+        std::uint8_t indirectRam9E = 0;
+        std::uint8_t indirectRam9F = 0;
         std::uint8_t accumulator = 0;
         std::uint8_t b = 0;
         std::uint8_t psw = 0;
@@ -622,6 +628,13 @@ public:
             for (std::size_t index = 0; index < 8; ++index)
                 event.ram2BAnd30To37[index + 1u] = readInternal(
                     static_cast<std::uint8_t>(0x30u + index));
+            constexpr std::array<std::uint8_t, 7> selectedAddresses{{
+                0x2fu, 0x34u, 0x40u, 0x05u, 0x06u, 0x07u, 0x3fu
+            }};
+            for (std::size_t index = 0; index < selectedAddresses.size(); ++index)
+                event.selectedDirectRam[index] = readInternal(selectedAddresses[index]);
+            event.indirectRam9E = readIndirect(0x9eu);
+            event.indirectRam9F = readIndirect(0x9fu);
             ++executionInstructionTraceCount_;
             if (pc == executionTraceEndPC_) {
                 executionTraceActive_ = false;
