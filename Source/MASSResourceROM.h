@@ -1189,6 +1189,75 @@ enum class MASSIC51PortStreamFormat : std::uint8_t {
 
 // One block within an IC4-controlled stream sent byte-by-byte to XDATA
 // offset 0xFF10. A resource consists of multiple blocks and a zero terminator.
+ 
+// IC4 v1.05's separate 21-entry FX2 algorithm directory. The 0x88EA loader
+// starts from 0x8F99 and advances by 0x2A bytes per algorithm. Its stream
+// selectors at +0x0B/+0x0C use the same two firmware upload routines as FX1.
+struct MASSFX2ProgramRecord {
+    std::uint8_t index = 0;
+    std::array<char, 10> name{};
+    std::uint8_t streamAResourceIndex = 0;
+    std::uint8_t streamBResourceIndex = 0;
+    std::uint8_t modeByte = 0;
+    std::array<std::uint8_t, 28> opaqueTail{};
+};
+
+class MASSFX2ProgramDirectory {
+public:
+    static constexpr std::uint16_t kTableAddress = 0x8f99u;
+    static constexpr std::size_t kEntryCount = 21u;
+    static constexpr std::size_t kEntryStride = 0x2au;
+    static constexpr std::size_t kNameBytes = 9u;
+    static constexpr std::size_t kStreamAResourceOffset = 0x0bu;
+    static constexpr std::size_t kStreamBResourceOffset = 0x0cu;
+    static constexpr std::size_t kModeOffset = 0x0du;
+    static constexpr std::size_t kTableEnd =
+        static_cast<std::size_t>(kTableAddress) + kEntryCount * kEntryStride;
+
+    bool load(const std::uint8_t* firmwareCode, std::size_t codeSize) noexcept {
+        if (firmwareCode == nullptr || codeSize < kTableEnd)
+            return false;
+
+        std::array<MASSFX2ProgramRecord, kEntryCount> parsed{};
+        for (std::size_t index = 0; index < kEntryCount; ++index) {
+            const auto* source = firmwareCode + kTableAddress + index * kEntryStride;
+            auto& record = parsed[index];
+            record.index = static_cast<std::uint8_t>(index);
+            for (std::size_t i = 0; i < kNameBytes; ++i) {
+                const auto value = source[i];
+                record.name[i] = value == 0 ? '\\0' : static_cast<char>(value);
+            }
+            record.name[kNameBytes] = '\\0';
+            record.streamAResourceIndex = source[kStreamAResourceOffset];
+            record.streamBResourceIndex = source[kStreamBResourceOffset];
+            record.modeByte = source[kModeOffset];
+            std::copy_n(source + 0x0eu, record.opaqueTail.size(),
+                        record.opaqueTail.begin());
+        }
+
+        records_ = parsed;
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+
+    const MASSFX2ProgramRecord* find(int fxIndex) const noexcept {
+        if (!loaded_ || fxIndex < 0 ||
+            fxIndex >= static_cast<int>(kEntryCount))
+            return nullptr;
+        return &records_[static_cast<std::size_t>(fxIndex)];
+    }
+
+    const std::array<MASSFX2ProgramRecord, kEntryCount>& records() const noexcept {
+        return records_;
+    }
+
+private:
+    std::array<MASSFX2ProgramRecord, kEntryCount> records_{};
+    bool loaded_ = false;
+};
+
 struct MASSIC51PortStreamBlock {
     std::uint16_t dataAddress = 0;
     std::uint8_t sourceCount = 0;
@@ -1392,6 +1461,83 @@ public:
 private:
     MASSFX1ProgramDirectory directory_{};
     std::array<std::array<MASSFX1ResolvedProgram, kProgramCount>, kBankCount> programs_{};
+    bool loaded_ = false;
+};
+
+ 
+// Immutable startup-decoded FX2 metadata and its two IC51 upload streams.
+// FX2 is kept separate from FX1 so selectors can never cross-resolve.
+struct MASSFX2ResolvedProgram {
+    MASSFX2ProgramRecord directoryEntry{};
+    MASSIC51PortStreamResource streamAResource{};
+    MASSIC51PortStreamResource streamBResource{};
+};
+
+class MASSFX2ResourceCatalog {
+public:
+    static constexpr std::size_t kBankCount = 2u;
+    static constexpr std::size_t kProgramCount = MASSFX2ProgramDirectory::kEntryCount;
+
+    bool load(const MASSResourceROM& rom,
+              const std::uint8_t* firmwareCode,
+              std::size_t firmwareCodeSize) {
+        if (!rom.isLoaded())
+            return false;
+
+        MASSFX2ProgramDirectory directory;
+        if (!directory.load(firmwareCode, firmwareCodeSize))
+            return false;
+
+        std::array<std::array<MASSFX2ResolvedProgram, kProgramCount>, kBankCount> parsed{};
+        for (std::size_t bankIndex = 0; bankIndex < kBankCount; ++bankIndex) {
+            const auto bank = bankIndex == 0
+                ? MASSResourceBank::bank0 : MASSResourceBank::bank1;
+            for (std::size_t fxIndex = 0; fxIndex < kProgramCount; ++fxIndex) {
+                const auto* entry = directory.find(static_cast<int>(fxIndex));
+                if (entry == nullptr)
+                    return false;
+
+                auto& destination = parsed[bankIndex][fxIndex];
+                destination.directoryEntry = *entry;
+                if (!MASSIC51PortStreamResolver::resolveTripletStream(
+                        rom, bank, entry->streamAResourceIndex,
+                        destination.streamAResource) ||
+                    !MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
+                        rom, bank, entry->streamBResourceIndex,
+                        destination.streamBResource) ||
+                    !destination.streamAResource.terminated ||
+                    !destination.streamBResource.terminated)
+                    return false;
+            }
+        }
+
+        directory_ = directory;
+        programs_ = std::move(parsed);
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+
+    const MASSFX2ResolvedProgram* find(int bank, int fxIndex) const noexcept {
+        if (!loaded_ || bank < 0 || bank >= static_cast<int>(kBankCount) ||
+            fxIndex < 0 || fxIndex >= static_cast<int>(kProgramCount))
+            return nullptr;
+        return &programs_[static_cast<std::size_t>(bank)]
+                         [static_cast<std::size_t>(fxIndex)];
+    }
+
+    const MASSFX2ProgramDirectory& directory() const noexcept { return directory_; }
+
+    void clear() noexcept {
+        directory_ = {};
+        programs_ = {};
+        loaded_ = false;
+    }
+
+private:
+    MASSFX2ProgramDirectory directory_{};
+    std::array<std::array<MASSFX2ResolvedProgram, kProgramCount>, kBankCount> programs_{};
     bool loaded_ = false;
 };
 
