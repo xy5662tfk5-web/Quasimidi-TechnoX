@@ -1781,12 +1781,18 @@ int main(int argc, char** argv) {
         // Preserve all IC51 reads from this second event instead of only the
         // last 512 reads from factory boot and the preceding note.
         firmwareMachine.clearIC51ReadTraceForTesting();
+        firmwareMachine.clearInstructionWatchForTesting();
         const auto secondNotePacketStart = firmwareMachine.soundCommandPacketCount();
         runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
                          secondNoteOn.data(), secondNoteOn.size());
         const auto secondNotePacketCount =
             firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
         assert(secondNotePacketCount == 549u);
+        assert(firmwareMachine.instructionWatchCountForTesting() > 0u);
+        const auto secondNoteInstructionWatch =
+            firmwareMachine.instructionWatchAtForTesting(
+                firmwareMachine.instructionWatchCountForTesting() - 1u);
+        assert(secondNoteInstructionWatch.instructionPC == 0x210fu);
 
         // Pin the five per-note resource/voice transactions observed before
         // the firmware's repeated 544-command SoundHost initialization sweep.
@@ -2028,11 +2034,17 @@ int main(int argc, char** argv) {
             referenceVelocityPackets[i] =
                 firmwareMachine.soundCommandPacketAt(secondNotePacketStart + i).bytes;
         const auto lowerVelocityPacketStart = firmwareMachine.soundCommandPacketCount();
+        firmwareMachine.clearInstructionWatchForTesting();
         runRealMidiStage("Same note 64 with lower velocity 50",
                          sameNoteLowerVelocity.data(), sameNoteLowerVelocity.size());
         const auto lowerVelocityPacketCount =
             firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
         assert(lowerVelocityPacketCount == 549u);
+        assert(firmwareMachine.instructionWatchCountForTesting() > 0u);
+        const auto lowerVelocityInstructionWatch =
+            firmwareMachine.instructionWatchAtForTesting(
+                firmwareMachine.instructionWatchCountForTesting() - 1u);
+        assert(lowerVelocityInstructionWatch.instructionPC == 0x210fu);
         std::printf("MASS velocity differential: reference=note64/vel100 "
                     "comparison=note64/vel50 packets=%zu\\n",
                     lowerVelocityPacketCount);
@@ -2056,6 +2068,22 @@ int main(int argc, char** argv) {
                 }};
                 assert(packet.bytes == expectedVelocityPacket);
                 assert(packet.returnPC == 0x2122u);
+                // Snapshot at PC 0x210F is taken before the packet builder.
+                // It must already contain the R3/R4 values that the writer emits.
+                assert(secondNoteInstructionWatch.registers[3] == 0x78u);
+                assert((secondNoteInstructionWatch.registers[4] & 0x07u) == 0x00u);
+                assert(secondNoteInstructionWatch.directRam2B == 0x0au);
+                assert(lowerVelocityInstructionWatch.registers[3] == 0x98u);
+                assert((lowerVelocityInstructionWatch.registers[4] & 0x07u) == 0x02u);
+                assert(lowerVelocityInstructionWatch.directRam2B == 0x0au);
+                std::printf("MASS 0x210F inputs: vel100 R3=%02X R4=%02X RAM2B=%02X; "
+                            "vel50 R3=%02X R4=%02X RAM2B=%02X\\n",
+                            static_cast<unsigned>(secondNoteInstructionWatch.registers[3]),
+                            static_cast<unsigned>(secondNoteInstructionWatch.registers[4]),
+                            static_cast<unsigned>(secondNoteInstructionWatch.directRam2B),
+                            static_cast<unsigned>(lowerVelocityInstructionWatch.registers[3]),
+                            static_cast<unsigned>(lowerVelocityInstructionWatch.registers[4]),
+                            static_cast<unsigned>(lowerVelocityInstructionWatch.directRam2B));
             }
             std::printf("  VELOCITY-CMD[%zu] ref=%02X %02X %02X %02X "
                         "low=%02X %02X %02X %02X changed-bytes=%X "
