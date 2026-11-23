@@ -748,6 +748,34 @@ int main(int argc, char** argv) {
                     equalizr1->streamAResource.portWriteByteCount +
                     equalizr1->streamBResource.portWriteByteCount;
                 assert(expectedPortBytes > 0u);
+                if (fx2Runtime.ff10WriteCount() != expectedPortBytes) {
+                    std::fprintf(stderr,
+                        "FX2 Equalizr1 FF10 mismatch: actual=%zu expected=%zu IC51=%llu PC=%04X\\n",
+                        fx2Runtime.ff10WriteCount(), expectedPortBytes,
+                        static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
+                        static_cast<unsigned>(fx2Runtime.cpu().registers().pc));
+                    for (std::size_t i = 0; i < fx2Runtime.ff10WriteCount(); ++i) {
+                        const auto& event = fx2Runtime.ff10WriteAt(i);
+                        std::fprintf(stderr,
+                            "  FF10[%zu]=%02X mode=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
+                            i, static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.port2),
+                            static_cast<unsigned>(event.port3));
+                    }
+                    for (std::size_t i = 0; i < fx2Runtime.ic51ReadTraceCount(); ++i) {
+                        const auto& event = fx2Runtime.ic51ReadTraceAt(i);
+                        std::fprintf(stderr,
+                            "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X P3=%02X\\n",
+                            i, static_cast<unsigned>(event.bank),
+                            static_cast<unsigned>(event.address),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.p3));
+                    }
+                }
                 assert(fx2Runtime.ff10WriteCount() == expectedPortBytes);
                 assert(fx2Runtime.ic51ReadCount() > 6u);
 
@@ -903,7 +931,8 @@ int main(int argc, char** argv) {
                            streamAResource.portWriteByteCount + 1u);
                     assert(streamBResource.skippedLeadingByte);
                     assert(streamBResource.sourceBytesConsumed ==
-                           streamBResource.portWriteByteCount + 2u);
+                           streamBResource.portWriteByteCount +
+                               2u + streamBResource.blocks.size());
 
                     for (const auto& block : streamAResource.blocks) {
                         assert(block.payload.size() ==
@@ -917,6 +946,7 @@ int main(int argc, char** argv) {
                                static_cast<std::size_t>(block.sourceCount));
                         assert(block.portWriteByteCount == block.payload.size() + 4u);
                         assert(block.sourceBytesConsumed == block.portWriteByteCount);
+                        assert(block.skippedFollowingByte);
                         const auto count = block.sourceCount;
                         const auto expectedWireHeader = static_cast<std::uint8_t>(
                             (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
