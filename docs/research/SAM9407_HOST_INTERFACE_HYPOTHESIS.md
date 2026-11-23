@@ -21,7 +21,7 @@ Corroborating product references:
 ## Comparison with current firmware evidence
 
 - IC4 exposes an undocumented four-byte external register window at 0x8000-0x8003. The project currently records sequential writes as neutral bytes and paired 16-bit words; it does not assign SAM9407 register meanings.
-- The firmware trace captures 544 four-byte transactions / paired words: 512 from caller 0x0E6A and 32 from caller 0x0E1D. The first 512 contain two 256-entry sweeps, with 16-bit values 0x0000 and 0x8000. The final 32 target indices 0x0F, 0x1F, ... 0xFF; their first 16 words are 0x07FF, the next 16 are 0x87FF.
+- The firmware trace captures 544 four-byte transactions / paired words: 512 from caller 0x0E6A and 32 from caller 0x0E1D. The first 512 contain two 256-entry sweeps, with 16-bit values 0x0000 and 0x8000. The final 32 target indices 0x0F, 0x1F, ... 0xFF; in the current open-bus fixture (readback defaults to 0xFF), the first 16 words are 0x07FF and the next 16 are 0x87FF. These 32 values are not confirmed physical-device responses.
 - All 544 transactions share the same observed context: P2=0x80, P3=0xFA, SFR 0x8E=0x00, and IC51 deselected. The trace's soundDeviceResetReleased=false flag is derived from P3.2 being low; the physical connection and function of P3.2 are not established.
 - This sequence is not yet a proven match for the SAM9407's documented 256-word bootstrap.
 - IC4 also copies a 13,647-byte IC51 block into paged XDATA starting at 0xC000. The physical write mapping is now verified byte-for-byte. The role of this block is unknown: it could be code, tables, parameters, or another resource. It must not be labelled PCM without evidence.
