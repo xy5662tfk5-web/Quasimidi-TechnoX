@@ -1027,6 +1027,16 @@ void testBankProgramResolver(const char* path) {
     assert(replacementBackend.resolvedOnNote);
     assert(replacementBackend.descriptorAddress == performanceOnePart13->descriptorAddress);
 
+    // A later Part program change must resolve a different catalog entry.
+    const auto* performanceOnePart14 = catalog.find(1, 93);
+    assert(performanceOnePart14 != nullptr);
+    assert(resourceAwareEngine.setPartParameter(12, PartParameter::bankNumber, 1));
+    assert(resourceAwareEngine.setPartParameter(12, PartParameter::soundNumber, 93));
+    resourceAwareEngine.noteOn(12, 1, 62, 100);
+    assert(replacementBackend.resolvedOnNote);
+    assert(replacementBackend.descriptorAddress == performanceOnePart14->descriptorAddress);
+    assert(replacementBackend.commandCount == performanceOnePart14->stream.commands.size());
+
     // Performance 1 in TECHNOX.MID uses Part 13 = bank 2 / sound 10 and
     // Part 14 = bank 1 / sound 93. Keep their real IC51 descriptors and
     // command streams visible as the first concrete firmware playback cases.
