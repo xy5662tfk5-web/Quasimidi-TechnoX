@@ -10,6 +10,8 @@
 
 namespace technox {
 
+class MASSResourceProgramCatalog;
+
 class MASSPartParameterStore {
 public:
     static constexpr std::size_t kPartCount = 16;
@@ -371,6 +373,7 @@ private:
 class IMASSVoiceBackend {
 public:
     virtual ~IMASSVoiceBackend() = default;
+    virtual void setProgramCatalog(const MASSResourceProgramCatalog*) noexcept {}
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
@@ -422,12 +425,20 @@ public:
                 backend_->resetVoice(static_cast<int>(i), voices_.voices()[i]);
         voices_.reset();
         backend_ = backend != nullptr ? backend : &nullBackend_;
+        backend_->setProgramCatalog(programCatalog_);
         if (prepared_)
             backend_->prepare(preparedSampleRate_, preparedMaximumBlockSize_);
     }
 
     IMASSVoiceBackend* backend() noexcept { return backend_; }
     const IMASSVoiceBackend* backend() const noexcept { return backend_; }
+
+    // Immutable, startup-decoded IC51 catalog; safe for backend read-only lookup.
+    void setProgramCatalog(const MASSResourceProgramCatalog* catalog) noexcept {
+        programCatalog_ = catalog;
+        backend_->setProgramCatalog(programCatalog_);
+    }
+    const MASSResourceProgramCatalog* programCatalog() const noexcept { return programCatalog_; }
 
     void prepare(double sampleRate, int maximumBlockSize) {
         preparedSampleRate_ = sampleRate;
@@ -791,6 +802,7 @@ private:
 
     NullMASSVoiceBackend nullBackend_;
     IMASSVoiceBackend* backend_;
+    const MASSResourceProgramCatalog* programCatalog_ = nullptr;
     double preparedSampleRate_ = 44100.0;
     int preparedMaximumBlockSize_ = 0;
     bool prepared_ = false;
