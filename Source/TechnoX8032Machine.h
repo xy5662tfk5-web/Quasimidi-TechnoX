@@ -599,6 +599,48 @@ public:
         }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
             return soundDeviceResponse_; // status port outside RAM mode
+        for (std::size_t i = 0; i < testExternalReadOverrideEnabled_.size(); ++i) {
+            if (!testExternalReadOverrideEnabled_[i] ||
+                address != testExternalReadOverrideAddresses_[i])
+                continue;
+            const auto value = testExternalReadOverrideValues_[i];
+            if (address >= 0xc000u) {
+                ++soundMemoryReadCount_;
+                const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
+                ++soundMemoryReadsByMode_[mode];
+                auto& soundEvent = soundMemoryReadTrace_[
+                    soundMemoryReadTraceCount_ % soundMemoryReadTrace_.size()];
+                soundEvent.address = address;
+                soundEvent.instructionPC = cpu_.registers().pc;
+                soundEvent.returnPC = currentStackReturnPC();
+                soundEvent.value = value;
+                soundEvent.mode = static_cast<std::uint8_t>(mode);
+                soundEvent.machineCycle = elapsedMachineCycles_;
+                ++soundMemoryReadTraceCount_;
+            }
+            if (address >= 0x7c00u && address <= 0x7fffu) {
+                auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.instructionPC = cpu_.registers().pc;
+                event.stackReturnPC = currentStackReturnPC();
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
+                event.syntheticTestOverlay = true;
+                event.machineCycle = elapsedMachineCycles_;
+                ++unmappedBusTraceCount_;
+            }
+            if (address >= 0x7bd0u && address <= 0x7bd7u) {
+                auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.machineCycle = elapsedMachineCycles_;
+                ++externalWindowTraceCount_;
+            }
+            return value;
+        }
         if (isXdataRam(address)) {
             if (address >= 0xc000u) {
                 ++soundMemoryReadCount_;
@@ -643,48 +685,6 @@ public:
             return value;
         }
 
-        for (std::size_t i = 0; i < testExternalReadOverrideEnabled_.size(); ++i) {
-            if (!testExternalReadOverrideEnabled_[i] ||
-                address != testExternalReadOverrideAddresses_[i])
-                continue;
-            const auto value = testExternalReadOverrideValues_[i];
-            if (address >= 0xc000u) {
-                ++soundMemoryReadCount_;
-                const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
-                ++soundMemoryReadsByMode_[mode];
-                auto& soundEvent = soundMemoryReadTrace_[
-                    soundMemoryReadTraceCount_ % soundMemoryReadTrace_.size()];
-                soundEvent.address = address;
-                soundEvent.instructionPC = cpu_.registers().pc;
-                soundEvent.returnPC = currentStackReturnPC();
-                soundEvent.value = value;
-                soundEvent.mode = static_cast<std::uint8_t>(mode);
-                soundEvent.machineCycle = elapsedMachineCycles_;
-                ++soundMemoryReadTraceCount_;
-            }
-            if (address >= 0x7c00u && address <= 0x7fffu) {
-                auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
-                event.address = address;
-                event.value = value;
-                event.write = false;
-                event.instructionPC = cpu_.registers().pc;
-                event.stackReturnPC = currentStackReturnPC();
-                event.port3 = portPins_[3];
-                event.soundBusMode = internal_[0x8e];
-                event.syntheticTestOverlay = true;
-                event.machineCycle = elapsedMachineCycles_;
-                ++unmappedBusTraceCount_;
-            }
-            if (address >= 0x7bd0u && address <= 0x7bd7u) {
-                auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
-                event.address = address;
-                event.value = value;
-                event.write = false;
-                event.machineCycle = elapsedMachineCycles_;
-                ++externalWindowTraceCount_;
-            }
-            return value;
-        }
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
             const auto value = testExternalRam7000_[address - 0x7000u];
             if (address >= 0x7c00u) {
