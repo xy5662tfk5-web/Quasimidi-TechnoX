@@ -253,6 +253,14 @@ For the already tested table entry R7=`0x48`, the source/count headers resolve t
 **Still unknown:** what physical IC or logic owns the `0xC000` XDATA window, whether the copied bytes are PCM, compressed samples, wavetable data, or another representation, and how the `0xAC` completion marker is generated. The C++ regression test now reconstructs all 13,647 transferred bytes through the ROM-derived address permutation and compares them byte-for-byte with the IC51 source block; it also verifies the final physical write at `0xF5B2`. The disassembly and test prove the copy protocol and memory mapping, not the receiving chip identity or audio encoding. The next implementation target is therefore an accurate paged external-XDATA model for this transfer protocol, with the handshake represented explicitly; audio decoding must wait until the stored data format is identified.
 
  
+## 11. FX1 / FX2 pair semantics confirmed by the owner manual
+
+The owner manual's effect table gives both processors 21 parallel menu positions, but their algorithms differ by processor. FX1 positions 1..21 are Room, Small Room, Warm Room, Chamber 1/2, Plate 1/2, Hall, Large Hall, Cathedral, Gated Reverb 1/2/3, Early Reflection 1..4, Raindrops, HQ-Delay, LongDelay and no Effect. FX2 positions 1..21 are Chorus 1/2/3, Flanger 1/2, Phaser 1/2, Panning, Short-Delay, Long-Delay, HQ-Delay, Ping-Pong, Gated-Delay, Special FX, Equalizer 1/2, Wah Wah + Overdrive, Auto Wah Wah, Warm Overdrive, Distortion and no Effect.
+
+The IC4 directory at `0x8423` stores one record for each shared index. Routine `0x8004` reads the first resource selector at record offset `+0x0B` and calls `0xAF93`, then reads the second selector at `+0x0C` and calls `0xB015`. The manual's matching FX1/FX2 menu-position tables support interpreting these as paired FX1 and FX2 resource streams. The code model now names them `fx1ResourceIndex/fx2ResourceIndex` and `fx1Resource/fx2Resource` rather than generic first/second resources.
+
+Menu labels are one-based (1..21); the firmware's table index is zero-based (0..20). Thus index 0 is FX1 Room / FX2 Chorus 1, and index 20 is no Effect for both. Values at or above 21 are clamped to 20 by IC4 at `0x7FF2`.
+
 ## 10. Runtime FX selector normalization (IC4 0x7FF2)
 
 The FX table uses direct zero-based indexes 0..20. The firmware helper beginning at `0x7FF2` reads the selected byte from XDATA `0x7BFE`, writes it to `0x3098`, then executes `CLR C; SUBB A,#0x15`. Inputs below `0x15` are retained; inputs `0x15` and above are replaced with `0x14`. The later lookup at `0x8004` multiplies `0x3098` by `0x20` and indexes the 21-entry table at `0x8423`.
