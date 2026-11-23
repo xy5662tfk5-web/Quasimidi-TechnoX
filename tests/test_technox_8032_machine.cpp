@@ -1,5 +1,6 @@
 #include "../Source/TechnoX8032Machine.h"
 #include "../Source/MASSResourceROM.h"
+#include "../Source/MASSAudioEngine.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -11,6 +12,29 @@
 #include <iterator>
 #include <utility>
 #include <vector>
+
+
+class FXCatalogProbeBackend final : public technox::IMASSVoiceBackend {
+public:
+    void setFXResourceCatalog(const technox::MASSFXResourceCatalog* catalog) noexcept override {
+        receivedCatalog = catalog;
+    }
+    void prepare(double, int) override {}
+    void noteOn(int, const technox::VoiceSlot&) noexcept override {}
+    void noteOff(int, const technox::VoiceSlot&) noexcept override {}
+    void resetVoice(int, const technox::VoiceSlot&) noexcept override {}
+    bool isVoiceFinished(int) const noexcept override { return true; }
+    void render(float* const*, int, int,
+                const technox::VoiceManager&, const technox::ModulationMatrix&,
+                const technox::MASSPartParameterStore&,
+                const technox::MASSModulationSourceStore&,
+                const technox::MASSPartRuntimeControlStore&,
+                const technox::MASSCommonControlStore&,
+                const technox::MASSPerformanceImageStore&,
+                const technox::MASSDrumParameterStore&) noexcept override {}
+
+    const technox::MASSFXResourceCatalog* receivedCatalog = nullptr;
+};
 
 int main(int argc, char** argv) {
     using technox::TechnoX8032Machine;
@@ -502,6 +526,39 @@ int main(int argc, char** argv) {
 
             technox::MASSResourceROM fxResources;
             assert(fxResources.load(realIC51.data(), realIC51.size()));
+
+            technox::MASSFXResourceCatalog fxCatalog;
+            assert(fxCatalog.load(
+                fxResources, firmwareCode.data(), firmwareCode.size()));
+            assert(fxCatalog.isLoaded());
+            for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
+                for (int fxIndex = 0; fxIndex < 21; ++fxIndex) {
+                    const auto* resolved = fxCatalog.find(bankIndex, fxIndex);
+                    assert(resolved != nullptr);
+                    assert(resolved->firstResource.terminated);
+                    assert(resolved->secondResource.terminated);
+                    assert(resolved->directoryEntry.index == fxIndex);
+                }
+            }
+            assert(fxCatalog.find(-1, 0) == nullptr);
+            assert(fxCatalog.find(0, 21) == nullptr);
+            assert(fxCatalog.find(2, 0) == nullptr);
+            const auto* roomBank0 = fxCatalog.find(0, 0);
+            assert(roomBank0 != nullptr);
+            assert(roomBank0->firstResource.blocks.size() == 2u);
+            assert(roomBank0->secondResource.blocks.size() == 1u);
+            assert(fxCatalog.find(1, 0)->firstResource.blocks.size() > 0u);
+
+            // The real-time backend receives the immutable catalog on initial
+            // attachment and again when replaced, just like the program catalog.
+            FXCatalogProbeBackend originalFXBackend;
+            FXCatalogProbeBackend replacementFXBackend;
+            technox::MASSAudioEngine fxCatalogEngine(&originalFXBackend);
+            fxCatalogEngine.setFXResourceCatalog(&fxCatalog);
+            assert(fxCatalogEngine.fxResourceCatalog() == &fxCatalog);
+            assert(originalFXBackend.receivedCatalog == &fxCatalog);
+            fxCatalogEngine.setBackend(&replacementFXBackend);
+            assert(replacementFXBackend.receivedCatalog == &fxCatalog);
             for (int bankNumber = 0; bankNumber < 2; ++bankNumber) {
                 const auto bank = bankNumber == 0
                     ? technox::MASSResourceBank::bank0
