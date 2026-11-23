@@ -3,7 +3,7 @@ name: macOS Intel build
 
 on:
   push:
-    branches: [ main, feature/part-editor-midi-mass-foundation, feature/basic-mass-synth-midi-audio, research/original-technox-audio-engine ]
+    branches: [ main, feature/part-editor-midi-mass-foundation, feature/basic-mass-synth-midi-audio, research/original-technox-audio-engine, research/pitch-parameter-packet-trace ]
   pull_request:
     branches: [ main, feature/performance-manager, research/part-parameter-model-final, feature/part-editor-midi-mass-foundation, research/original-technox-audio-engine ]
   workflow_dispatch:
