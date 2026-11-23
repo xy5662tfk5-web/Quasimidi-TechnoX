@@ -135,6 +135,16 @@ public:
         std::uint8_t bank = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct InternalFlagWriteEvent {
+        std::uint8_t bitAddress = 0x0a;
+        std::uint8_t byteValue = 0;
+        std::uint8_t opcode = 0;
+        bool previousValue = false;
+        bool currentValue = false;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct XdataWatchEvent {
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
@@ -250,6 +260,12 @@ public:
     std::uint8_t ic51RomByteForTesting(std::size_t bank, std::uint16_t address) const noexcept {
         return bank < 2u ? ic51Rom_[bank * 0x10000u + address] : 0xffu;
     }
+    std::size_t internalFlagWriteTraceCount() const noexcept {
+        return internalFlagWriteTraceCount_;
+    }
+    const InternalFlagWriteEvent& internalFlagWriteTraceAt(std::size_t index) const noexcept {
+        return internalFlagWriteTrace_[index % internalFlagWriteTrace_.size()];
+    }
     std::size_t xdataWatchTraceCount() const noexcept { return xdataWatchTraceCount_; }
     const XdataWatchEvent& xdataWatchTraceAt(std::size_t index) const noexcept {
         return xdataWatchTrace_[index % xdataWatchTrace_.size()];
@@ -306,6 +322,8 @@ public:
         ic51ReadTraceCount_ = 0;
         xdataWatchTrace_.fill(XdataWatchEvent{});
         xdataWatchTraceCount_ = 0;
+        internalFlagWriteTrace_.fill(InternalFlagWriteEvent{});
+        internalFlagWriteTraceCount_ = 0;
         unmappedBusTrace_.fill(UnmappedBusEvent{});
         unmappedBusTraceCount_ = 0;
         unmappedReadCounts7xxx_.fill(0);
@@ -527,7 +545,28 @@ public:
                     soundDeviceResetReleased_ = true;
             }
         } else {
+            const auto previousValue = internal_[address];
             internal_[address] = value;
+            if (address == 0x21u && ((previousValue ^ value) & 0x04u) != 0) {
+                const auto pcAfterFetch = cpu_.registers().pc;
+                const auto candidatePC = static_cast<std::uint16_t>(pcAfterFetch - 2u);
+                const auto candidateOpcode = readCode(candidatePC);
+                const auto candidateOperand = readCode(static_cast<std::uint16_t>(candidatePC + 1u));
+                const bool isFlag0AInstruction =
+                    (candidateOpcode == 0xb2u || candidateOpcode == 0xc2u ||
+                     candidateOpcode == 0xd2u) && candidateOperand == 0x0au;
+                auto& event = internalFlagWriteTrace_[
+                    internalFlagWriteTraceCount_ % internalFlagWriteTrace_.size()];
+                event.byteValue = value;
+                event.opcode = isFlag0AInstruction ? candidateOpcode : 0;
+                event.previousValue = (previousValue & 0x04u) != 0;
+                event.currentValue = (value & 0x04u) != 0;
+                event.instructionPC = isFlag0AInstruction
+                    ? candidatePC : static_cast<std::uint16_t>(pcAfterFetch - 1u);
+                event.stackReturnPC = currentStackReturnPC();
+                event.machineCycle = elapsedMachineCycles_;
+                ++internalFlagWriteTraceCount_;
+            }
             if (address == 0x8eu)
                 ++soundBusModeWriteCount_;
         }
@@ -1322,6 +1361,8 @@ private:
     std::uint16_t lastIC51ReadAddress_ = 0;
     std::array<IC51ReadEvent, 512> ic51ReadTrace_{};
     std::size_t ic51ReadTraceCount_ = 0;
+    std::array<InternalFlagWriteEvent, 256> internalFlagWriteTrace_{};
+    std::size_t internalFlagWriteTraceCount_ = 0;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
