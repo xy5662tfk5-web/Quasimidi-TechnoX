@@ -67,13 +67,16 @@ Branch: `research/original-technox-audio-engine`
 - This gives a second verified IC51 path beyond the descriptor/command-stream catalog. It is resource transport metadata only; no FX algorithm, PCM format, or physical DSP has been identified.
 
  
-## FX1 resource catalogue reaches the voice backend
+## Separate FX1 and FX2 directories reach the voice backend
 
-- Recovered the 21-entry IC4 directory at `0x8423`. Its names and order match the manual's FX1 Room/Reverb family.
-- Each FX1 directory entry selects two IC51 upload streams at record offsets `+0x0B` and `+0x0C`. These are now named neutral stream A/B; they are not FX1 and FX2 processor type IDs.
-- `MASSFX1ResourceCatalog` predecodes all 21 FX1 types in both IC51 banks and passes the immutable catalogue to the backend at startup. Backend replacement preserves the catalogue pointer.
-- Regression tests check the 42 bank/type entries, both upload-stream framing formats, complete zero-terminated block sequences and representative Room data. The backend probe resolves FX1 type selection from the Common-control store.
-- FX2 is a separate processor with its own 21-algorithm family (Chorus, Flanger, Phaser, delay, EQ, drive, etc.). Its type byte is preserved in Performance data, but an FX2-specific ROM directory and upload path have not yet been established. The FX1 catalogue is deliberately not used to resolve FX2.
+- FX1 is the 21-entry Room/Reverb/Delay family in the IC4 directory at `0x8423`, with a `0x20`-byte entry stride.
+- FX2 is a separate 21-entry Chorus/Flanger/Phaser/Panning/Delay/EQ/Drive family in the IC4 directory at `0x8F99`, with a `0x2A`-byte entry stride. Directory classes and resource catalogs remain separate; FX1 selectors never resolve against the FX2 table.
+- Both directory families provide two IC51 upload-stream selectors at offsets `+0x0B` and `+0x0C`. The neutral names `streamA` and `streamB` describe the two firmware upload calls, not processor type IDs.
+- `MASSFX1ResourceCatalog` and `MASSFX2ResourceCatalog` predecode all 21 types in both IC51 banks. The processor loads both catalogs at startup and passes immutable pointers to the active backend; backend replacement preserves both pointers.
+- The FX2 loader around `0x88EA` reads its selector from XDATA `0x7C06`, clamps values >= `0x15` to `0x14`, selects the record at `0x8F99 + index * 0x2A`, then sends the two stream selectors through `0xAF93` and `0xB015`. Regression checks pin those instructions against the real IC4 ROM.
+- Tests compare all 21 FX1 and all 21 FX2 directory names/resource selectors against the real descrambled IC4 image, resolve every entry in both IC51 banks, and verify the backend receives both catalogs and resolves the independent FX1/FX2 controls during render.
+- The 50 factory Performance SysEx frames use FX1 indices `{0,1,2,3,7,8,10,11,12,18,19}` and FX2 indices `{0,4,5,6,7,9,10,11,13,15,18}`. CI checks the exact per-index histograms rather than an earlier incorrect assumed list.
+- This confirms directory selection and resource upload framing only. No FX DSP algorithm, real-time effect processing, physical receiver identity, or audio response is implemented by these catalogs.
 
 ## Program catalog now caches both command-stream flag outcomes
 
@@ -123,15 +126,15 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 - The receiving device, payload format (PCM/compressed/wavetable/code/other), and playback role remain unresolved.
 
  
-## FX selector range now matches IC4 firmware
+## Firmware FX selector paths
 
-- Disassembled the helper at `0x7FF2`: it reads `0x7BFE`, writes `0x3098`, and clamps values `>= 0x15` to `0x14` before the FX directory lookup at `0x8004`.
-- The 21-entry directory is therefore indexed 0..20; 20 is `no Effect`. `MASSCommonControlStore`, Performance-bank loading, controller updates and saved-state restoration now normalize FX1/FX2 to this range.
-- Regression coverage verifies both the endpoint 20 and clamping of 21 / 127 to 20.
-- The current trace reads `0x7BFE=0x00` from an explicit synthetic test RAM overlay. This validates the firmware branch mechanics, not the real-world source mapping from Performance FX fields. Runtime FX selection and DSP effects are not yet implemented.
+- The FX1 type helper at `0x7FF2` reads XDATA `0x7BFE`, writes the selected value to `0x3098`, and clamps values >= `0x15` to `0x14` before the 21-entry FX1 directory path. The current XDATA watch fixture exposes `0x7BFE=0x00` only under an explicit synthetic test overlay, so its upstream population is not yet validated against physical hardware.
+- The independent FX2 loader around `0x88EA` reads XDATA `0x7C06`, clamps values >= `0x15` to `0x14`, uses the 21-entry directory at `0x8F99` with `0x2A` stride, and calls `0xAF93` / `0xB015` for the two resource streams. The firmware bytes for its selector, clamp, table base, selector offsets and both calls are regression-checked against the real IC4 ROM.
+- Both selectors are zero-based 0..20; 20 is `no Effect`. Factory MIDI/SysEx Common blocks store separate FX1 and FX2 selector bytes, and the exact frequency of each index across all 50 factory Performances is asserted in CI.
+- `MASSCommonControlStore`, Performance-bank loading, controller updates and saved-state restoration normalize both controls to 0..20. The JUCE processor publishes the two controls independently, and the backend interface receives separate immutable FX1 and FX2 catalogs.
+- The upstream mapping from Performance/Common values into the two XDATA selector locations, hardware response and DSP processing remain to be verified. Catalog resolution is implemented; original FX audio is not.
 
-## FX1 / FX2 resources now use explicit processor names
+## Effect menu indexing
 
-- The owner's manual confirms paired 21-position effect menus: FX1 is the reverb/room/delay family, while FX2 is the chorus/flanger/phaser/panning/short-delay and special-effects family.
-- IC4 `0x8004` reads the record's first selector and calls `0xAF93`, then reads the second selector and calls `0xB015`. The catalog fields and tests now identify these as FX1 and FX2 resources.
-- Effect menu labels are one-based 1..21, whereas firmware uses zero-based table indices 0..20; both processor index 0 is the first menu type and index 20 is no Effect.
+- The manual's menu labels are one-based 1..21, while firmware directory indices are zero-based 0..20. Index 0 represents the first named algorithm; index 20 is `no Effect`.
+- FX1 and FX2 share the numeric range, but their directory contents, stream selectors and catalog pointers must remain separate.
