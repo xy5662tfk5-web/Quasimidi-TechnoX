@@ -75,9 +75,9 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
             firmwareCode[address] = firmwareMachine->readCode(
                 static_cast<std::uint16_t>(address));
 
-        if (resourceFXCatalog.load(
+        if (resourceFX1Catalog.load(
                 resourceROM, firmwareCode.data(), firmwareCode.size())) {
-            massEngine.setFXResourceCatalog(&resourceFXCatalog);
+            massEngine.setFX1ResourceCatalog(&resourceFX1Catalog);
         }
     }
 
