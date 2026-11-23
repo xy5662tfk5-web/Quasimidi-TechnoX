@@ -808,8 +808,10 @@ int main(int argc, char** argv) {
                     firmwareMachine.watchedCallCount(0x1742u) > helper1742Before;
                 if (statusInjected) {
                     firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
-                    // 0x1780 calls 0x1009 only when XDATA[0x00FB].3 is set
-                    // and bits 5/6 are clear. Synthetic DSP queue-ready response.
+                    // 0x1742 enters 0x1780 only when XDATA[0x00E8] is nonzero.
+                    // 0x1780 then calls 0x1009 only when XDATA[0x00FB].3 is set
+                    // and bits 5/6 are clear. These are synthetic DSP responses.
+                    firmwareMachine.setTestExternalReadOverride(0x00e8u, 0x01u);
                     firmwareMachine.setTestExternalReadOverride(0x00fbu, 0x08u);
                 }
                 drain = firmwareMachine.runForMachineCycles(7000000u - preCycles);
@@ -982,9 +984,10 @@ int main(int argc, char** argv) {
             std::printf(" %04X=%02X", static_cast<unsigned>(address),
                         static_cast<unsigned>(value));
         }
-        std::printf(" effective7BD5=%02X effective7D95=%02X effective00FB=%02X\\n",
+        std::printf(" effective7BD5=%02X effective7D95=%02X effective00E8=%02X effective00FB=%02X\\n",
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)),
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x00e8u)),
                     static_cast<unsigned>(firmwareMachine.readExternal(0x00fbu)));
         assert(!firmwareMachine.cpuFaulted());
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
