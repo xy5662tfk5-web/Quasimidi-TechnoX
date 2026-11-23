@@ -111,6 +111,10 @@ public:
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
         bool write = false;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
         std::uint64_t machineCycle = 0;
     };
     struct ExternalWindowEvent {
@@ -611,6 +615,10 @@ public:
                     event.address = address;
                     event.value = 0xff;
                     event.write = false;
+                    event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                    event.stackReturnPC = currentStackReturnPC();
+                    event.port3 = portPins_[3];
+                    event.soundBusMode = internal_[0x8e];
                     event.machineCycle = elapsedMachineCycles_;
                     ++unmappedBusTraceCount_;
                     if (address >= 0x7000u && address <= 0x7fffu)
@@ -802,6 +810,10 @@ public:
                     event.address = address;
                     event.value = value;
                     event.write = true;
+                    event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                    event.stackReturnPC = currentStackReturnPC();
+                    event.port3 = portPins_[3];
+                    event.soundBusMode = internal_[0x8e];
                     event.machineCycle = elapsedMachineCycles_;
                     ++unmappedBusTraceCount_;
                     if (address >= 0x7000u && address <= 0x7fffu)
@@ -977,6 +989,14 @@ public:
     }
 
 private:
+    std::uint16_t currentStackReturnPC() const noexcept {
+        const auto stackPointer = cpu_.registers().sp;
+        const auto returnHigh = readIndirect(stackPointer);
+        const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+        return static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
+    }
+
     static constexpr int portIndex(std::uint8_t address) noexcept {
         return address == 0x80u ? 0 : address == 0x90u ? 1 :
                address == 0xa0u ? 2 : address == 0xb0u ? 3 : -1;
