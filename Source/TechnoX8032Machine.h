@@ -341,6 +341,8 @@ public:
             case 0x0e8e: return watchedCallCounts_[14];
             case 0x1456: return watchedCallCounts_[15];
             case 0x1742: return watchedCallCounts_[16];
+            case 0x4803: return watchedCallCounts_[17];
+            case 0x02d1: return watchedCallCounts_[18];
             default: return 0;
         }
     }
@@ -369,6 +371,8 @@ public:
                 case 0x0e8e: ++watchedCallCounts_[14]; break;
                 case 0x1456: ++watchedCallCounts_[15]; break;
                 case 0x1742: ++watchedCallCounts_[16]; break;
+                case 0x4803: ++watchedCallCounts_[17]; break;
+                case 0x02d1: ++watchedCallCounts_[18]; break;
                 default: break;
             }
         }
@@ -528,9 +532,11 @@ public:
             ++ic51ReadsByBank_[bank];
             lastIC51ReadAddress_ = address;
             const auto value = ic51Rom_[bank * 0x10000u + address];
-            if ((address >= 0x2900u && address <= 0x2bffu &&
+            if ((address >= 0x2000u && address <= 0x23ffu) ||
+                (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
-                (address >= 0x2d00u && address <= 0x2dffu)) {
+                (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x3700u && address <= 0x370fu)) {
                 auto& watch = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 watch.address = address;
                 watch.value = value;
@@ -599,9 +605,11 @@ public:
                 ++soundMemoryReadTraceCount_;
             }
             const auto value = xdata_[address];
-            if ((address >= 0x2900u && address <= 0x2bffu &&
+            if ((address >= 0x2000u && address <= 0x23ffu) ||
+                (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
@@ -620,8 +628,26 @@ public:
             return value;
         }
 
-        if (testExternalReadOverrideEnabled_ && address == testExternalReadOverrideAddress_) {
-            const auto value = testExternalReadOverrideValue_;
+        for (std::size_t i = 0; i < testExternalReadOverrideEnabled_.size(); ++i) {
+            if (!testExternalReadOverrideEnabled_[i] ||
+                address != testExternalReadOverrideAddresses_[i])
+                continue;
+            const auto value = testExternalReadOverrideValues_[i];
+            if (address >= 0x7c00u && address <= 0x7fffu) {
+                auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.instructionPC = cpu_.registers().pc;
+                event.stackReturnPC = currentStackReturnPC();
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
+                event.ic51Selected = ic51Selected;
+                event.writeAccepted = false;
+                event.machineCycle = elapsedMachineCycles_;
+                ++unmappedBusTraceCount_;
+            }
             if (address >= 0x7bd0u && address <= 0x7bd7u) {
                 auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
                 event.address = address;
@@ -699,9 +725,11 @@ public:
         const bool ic51Selected = isIC51Selected();
         if (ic51Selected && !isDedicatedPeripheralAddress(address) &&
             !(ramMode && isXdataRam(address))) {
-            if ((address >= 0x2900u && address <= 0x2bffu &&
+            if ((address >= 0x2000u && address <= 0x23ffu) ||
+                (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
-                (address >= 0x2d00u && address <= 0x2dffu)) {
+                (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x3700u && address <= 0x370fu)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
                 event.value = value;
@@ -724,9 +752,11 @@ public:
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
-            if ((address >= 0x2900u && address <= 0x2bffu &&
+            if ((address >= 0x2000u && address <= 0x23ffu) ||
+                (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
@@ -1079,9 +1109,22 @@ public:
             ? testExternalRam7000_[address - 0x7000u] : 0xffu;
     }
     void setTestExternalReadOverride(std::uint16_t address, std::uint8_t value) noexcept {
-        testExternalReadOverrideAddress_ = address;
-        testExternalReadOverrideValue_ = value;
-        testExternalReadOverrideEnabled_ = true;
+        std::size_t freeSlot = testExternalReadOverrideEnabled_.size();
+        for (std::size_t i = 0; i < testExternalReadOverrideEnabled_.size(); ++i) {
+            if (testExternalReadOverrideEnabled_[i] &&
+                testExternalReadOverrideAddresses_[i] == address) {
+                testExternalReadOverrideValues_[i] = value;
+                return;
+            }
+            if (!testExternalReadOverrideEnabled_[i] &&
+                freeSlot == testExternalReadOverrideEnabled_.size())
+                freeSlot = i;
+        }
+        if (freeSlot == testExternalReadOverrideEnabled_.size())
+            freeSlot = 0;
+        testExternalReadOverrideAddresses_[freeSlot] = address;
+        testExternalReadOverrideValues_[freeSlot] = value;
+        testExternalReadOverrideEnabled_[freeSlot] = true;
     }
     std::size_t externalWindowTraceCount() const noexcept { return externalWindowTraceCount_; }
     const ExternalWindowEvent& externalWindowTraceAt(std::size_t index) const noexcept {
@@ -1220,7 +1263,7 @@ private:
     std::size_t portWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
     mutable std::size_t portReadCount_ = 0;
-    std::array<std::uint64_t, 17> watchedCallCounts_{};
+    std::array<std::uint64_t, 19> watchedCallCounts_{};
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
@@ -1248,9 +1291,9 @@ private:
     std::array<std::uint8_t, 0x1000> testExternalRam7000_{};
     std::array<ExternalWindowEvent, 1024> externalWindowTrace_{};
     std::size_t externalWindowTraceCount_ = 0;
-    bool testExternalReadOverrideEnabled_ = false;
-    std::uint16_t testExternalReadOverrideAddress_ = 0;
-    std::uint8_t testExternalReadOverrideValue_ = 0xff;
+    std::array<bool, 4> testExternalReadOverrideEnabled_{};
+    std::array<std::uint16_t, 4> testExternalReadOverrideAddresses_{};
+    std::array<std::uint8_t, 4> testExternalReadOverrideValues_{{0xffu, 0xffu, 0xffu, 0xffu}};
     std::uint64_t soundMemoryReadCount_ = 0;
     std::uint64_t soundMemoryWriteCount_ = 0;
     std::uint64_t soundBusModeWriteCount_ = 0;
