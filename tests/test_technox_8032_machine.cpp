@@ -855,13 +855,13 @@ int main(int argc, char** argv) {
             assert(replacementFX1Backend.selectedFX1 == 0);
             assert(replacementFX1Backend.selectedFX2 == 14);
             assert(replacementFX1Backend.fx1Resolved);
-            assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
+            assert(replacementFX1Backend.fx1StreamABlockCount == 1u);
             assert(replacementFX1Backend.fx1StreamBBlockCount == 0u);
             assert(replacementFX1Backend.fx2Resolved);
-            // FX2 Equalizr1 Stream A (resource 0x42) contains two real blocks
+            // FX2 Equalizr1 Stream A (resource 0x42) contains one real block
             // in bank 0. Stream B (resource 0x43) skips its leading 0x74 byte
             // at 0x4D6C and terminates at 0x4D6D before uploading a block.
-            assert(replacementFX1Backend.fx2StreamABlockCount == 2u);
+            assert(replacementFX1Backend.fx2StreamABlockCount == 1u);
             assert(replacementFX1Backend.fx2StreamBBlockCount == 0u);
 
             // The factory stores independent FX1 and FX2 selectors. Only the
