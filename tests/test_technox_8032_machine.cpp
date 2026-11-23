@@ -1824,6 +1824,23 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(event.machineCycle));
         }
 
+        // Pair the IC51 source tail with the actual data bytes sent through
+        // the separate FF10 peripheral port by firmware loader 0xAF93.
+        const auto ff10TraceEnd = firmwareMachine.ff10WriteCount();
+        const auto ff10TraceBegin = ff10TraceEnd > 64u ? ff10TraceEnd - 64u : 0u;
+        std::printf("Second Note On FF10 write tail (%zu entries):\\n",
+                    ff10TraceEnd - ff10TraceBegin);
+        for (std::size_t i = ff10TraceBegin; i < ff10TraceEnd; ++i) {
+            const auto& event = firmwareMachine.ff10WriteAt(i);
+            std::printf("  FF10[%zu]=%02X mode=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
+                        i, static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.soundBusMode),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.stackReturnPC),
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.port3));
+        }
+
         // Capture the firmware's 16-slot resource staging page. The page is
         // selected dynamically through internal RAM[0x2D], so do not assume
         // an XDATA address or hard-code a bank.
