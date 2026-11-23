@@ -1822,6 +1822,15 @@ int main(int argc, char** argv) {
             firmwareMachine.executionDataAccessTraceCountForTesting();
         const auto secondNoteExecutionDataRetained =
             firmwareMachine.executionDataAccessTraceRetainedCountForTesting();
+        std::vector<TechnoX8032Machine::ExecutionDataAccessEvent>
+            secondNoteDataTrace;
+        secondNoteDataTrace.reserve(secondNoteExecutionDataRetained);
+        for (std::size_t absolute = secondNoteExecutionDataCount -
+                 secondNoteExecutionDataRetained;
+             absolute < secondNoteExecutionDataCount; ++absolute) {
+            secondNoteDataTrace.push_back(
+                firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
+        }
         std::printf("8032 EXEC-TRACE vel100: instructions=%zu retained=%zu "
                     "xdata-accesses=%zu retained-xdata=%zu firstPC=%04X "
                     "saw1FC9=%u saw2027=%u saw210F=%u\\n",
@@ -2135,6 +2144,15 @@ int main(int argc, char** argv) {
             firmwareMachine.executionDataAccessTraceCountForTesting();
         const auto lowerVelocityExecutionDataRetained =
             firmwareMachine.executionDataAccessTraceRetainedCountForTesting();
+        std::vector<TechnoX8032Machine::ExecutionDataAccessEvent>
+            lowerVelocityDataTrace;
+        lowerVelocityDataTrace.reserve(lowerVelocityExecutionDataRetained);
+        for (std::size_t absolute = lowerVelocityExecutionDataCount -
+                 lowerVelocityExecutionDataRetained;
+             absolute < lowerVelocityExecutionDataCount; ++absolute) {
+            lowerVelocityDataTrace.push_back(
+                firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
+        }
         std::printf("8032 EXEC-TRACE vel50: instructions=%zu retained=%zu "
                     "xdata-accesses=%zu retained-xdata=%zu firstPC=%04X "
                     "saw210F=%u\\n",
@@ -2205,7 +2223,11 @@ int main(int argc, char** argv) {
                 high.accumulator != low.accumulator || high.b != low.b ||
                 high.psw != low.psw || high.dptr != low.dptr ||
                 high.registers != low.registers ||
-                high.ram2BAnd30To37 != low.ram2BAnd30To37;
+                high.ram2BAnd30To37 != low.ram2BAnd30To37 ||
+                high.registerBankBase != low.registerBankBase ||
+                high.stackPointer != low.stackPointer ||
+                high.port2 != low.port2 || high.port3 != low.port3 ||
+                high.soundBusMode != low.soundBusMode;
             if (stateDiffers) {
                 std::printf("8032 FIRST STATE DIVERGENCE[%zu] PC=%04X: "
                             "A=%02X/%02X B=%02X/%02X PSW=%02X/%02X "
@@ -2237,6 +2259,40 @@ int main(int argc, char** argv) {
                         "vel100=%zu vel50=%zu\\n",
                         comparedInstructionCount, secondNoteExecutionTrace.size(),
                         lowerVelocityExecutionTrace.size());
+        }
+        const auto comparedDataAccessCount = std::min(
+            secondNoteDataTrace.size(), lowerVelocityDataTrace.size());
+        bool firstDataDifferenceReported = false;
+        for (std::size_t i = 0; i < comparedDataAccessCount; ++i) {
+            const auto& high = secondNoteDataTrace[i];
+            const auto& low = lowerVelocityDataTrace[i];
+            if (high.instructionPC != low.instructionPC ||
+                high.address != low.address || high.write != low.write ||
+                high.value != low.value || high.port2 != low.port2 ||
+                high.port3 != low.port3 ||
+                high.soundBusMode != low.soundBusMode ||
+                high.ic51Selected != low.ic51Selected) {
+                std::printf("8032 FIRST XDATA DIVERGENCE[%zu]: "
+                            "vel100 PC=%04X %c %04X=%02X; "
+                            "vel50 PC=%04X %c %04X=%02X\\n",
+                            i,
+                            static_cast<unsigned>(high.instructionPC),
+                            high.write ? 'W' : 'R',
+                            static_cast<unsigned>(high.address),
+                            static_cast<unsigned>(high.value),
+                            static_cast<unsigned>(low.instructionPC),
+                            low.write ? 'W' : 'R',
+                            static_cast<unsigned>(low.address),
+                            static_cast<unsigned>(low.value));
+                firstDataDifferenceReported = true;
+                break;
+            }
+        }
+        if (!firstDataDifferenceReported) {
+            std::printf("8032 XDATA trace prefix identical: compared=%zu "
+                        "vel100=%zu vel50=%zu\\n",
+                        comparedDataAccessCount, secondNoteDataTrace.size(),
+                        lowerVelocityDataTrace.size());
         }
         std::printf("8032 XDATA trace totals: vel100=%zu (retained %zu), "
                     "vel50=%zu (retained %zu)\\n",
