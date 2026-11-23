@@ -889,6 +889,35 @@ void testActualBulkBlockLoader(const char* path) {
         bank1, payload1.data(), payload1.size()));
     assert(payload0.size() == 13647u && payload1.size() == 9588u);
     assert(payload0.front() == 0x00 && payload1.front() == 0x18);
+
+    // Exercise the firmware's logical-R0 -> physical-byte permutation and
+    // page increment independently of the still-unrecovered IC4 lookup bytes.
+    std::array<std::uint8_t, 256> addressMap{};
+    for (std::size_t i = 0; i < addressMap.size(); ++i)
+        addressMap[i] = static_cast<std::uint8_t>(i);
+    std::swap(addressMap[0], addressMap[0x7f]);
+    std::swap(addressMap[1], addressMap[0x42]);
+    MASSIC51BulkBlockHeader syntheticHeader{};
+    syntheticHeader.sourceAddress = 0x0200;
+    syntheticHeader.countHigh = 0x01;
+    syntheticHeader.countLow = 0x01; // 257 bytes: crosses one R0 page boundary.
+    std::vector<std::uint8_t> syntheticBank(MASSResourceROM::kBankSize);
+    for (std::size_t i = 0; i < syntheticBank.size(); ++i)
+        syntheticBank[i] = static_cast<std::uint8_t>((i * 13u) & 0xffu);
+    std::array<std::uint8_t, 512> xdata{};
+    xdata.fill(0xee);
+    std::uint16_t lastPhysicalAddress = 0;
+    assert(MASSIC51BulkBlockHeader::copyPayloadToPagedXdata(
+        syntheticBank.data(), syntheticBank.size(), syntheticHeader,
+        addressMap.data(), xdata.data(), xdata.size(), 0xc000,
+        &lastPhysicalAddress));
+    assert(xdata[0x7f] == syntheticBank[0x0200]);
+    assert(xdata[0x42] == syntheticBank[0x0201]);
+    assert(xdata[0x100 + 0x7f] == syntheticBank[0x0300]);
+    assert(lastPhysicalAddress == 0xc17f);
+    assert(!MASSIC51BulkBlockHeader::copyPayloadToPagedXdata(
+        syntheticBank.data(), syntheticBank.size(), syntheticHeader,
+        addressMap.data(), xdata.data(), 256));
 }
 
 void testBankProgramResolver(const char* path) {
