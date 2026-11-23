@@ -85,6 +85,39 @@ void testMASS1C61AccumulatorTransform() {
            result.r3 == 0x56 && result.r4 == 0x67);
 }
 
+void testMASS09B9SlotInterpolationArithmetic() {
+    // Live Note 65 pass 1:
+    // slot bytes 57 01 A2 are treated as 24-bit 0x020157 (top byte & 07).
+    // The normalized step at 0x09DA is 0x000D:
+    // floor(0x020157 * 13 / 65536) = 0x1A, then add to the slot value.
+    auto result = MASS09B9SlotInterpolationArithmetic::apply(
+        0x57u, 0x01u, 0xa2u, 0x000du, false);
+    assert(result.inputValue24 == 0x020157u);
+    assert(result.incrementMagnitude24 == 0x00001au);
+    assert(result.outputValue24 == 0x020171u);
+    assert(!result.negativeStep && !result.overflow24 && !result.underflow24);
+
+    // Live Note 65 pass 2: 0x48 is masked to zero by the firmware's ANL #07.
+    result = MASS09B9SlotInterpolationArithmetic::apply(
+        0x01u, 0x00u, 0x48u, 0x000du, false);
+    assert(result.inputValue24 == 0x000001u);
+    assert(result.incrementMagnitude24 == 0x000000u);
+    assert(result.outputValue24 == 0x000001u);
+
+    // The negative branch subtracts the same fixed-point increment.
+    result = MASS09B9SlotInterpolationArithmetic::apply(
+        0x57u, 0x01u, 0xa2u, 0x000du, true);
+    assert(result.inputValue24 == 0x020157u);
+    assert(result.incrementMagnitude24 == 0x00001au);
+    assert(result.outputValue24 == 0x02013du);
+    assert(result.negativeStep && !result.overflow24 && !result.underflow24);
+
+    result = MASS09B9SlotInterpolationArithmetic::apply(
+        0x57u, 0x01u, 0xa2u, 0x0000u, false);
+    assert(result.incrementMagnitude24 == 0u);
+    assert(result.outputValue24 == 0x020157u);
+}
+
 void testMASS1C61SecondaryTableAddress() {
     const auto normal = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0x30, 0x20, 0x00);
@@ -1428,6 +1461,7 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASS09B9SlotInterpolationArithmetic();
     testMASS1C61SecondaryTableAddress();
     testMASS1C61AccumulatorTransform();
     testMASS1C61InterpolationLookup();
