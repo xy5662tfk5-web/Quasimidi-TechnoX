@@ -13,8 +13,8 @@ int main() {
     for (std::uint8_t selector = 1; selector <= 4; ++selector) {
         frame[6] = selector;
         const PartEditModel mapped(frame);
-        assert(mapped.partNumber() == 12 + selector);
-        assert(mapped.runtimeEventId() == 11 + selector);
+        assert(mapped.partNumber() == static_cast<std::size_t>(12u + selector));
+        assert(mapped.runtimeEventId() == static_cast<std::size_t>(11u + selector));
     }
     frame[6] = 1;
     assert(model.setParameterValue(PartParameter::bankNumber, 3));
