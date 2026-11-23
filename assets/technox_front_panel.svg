@@ -1,56 +1,109 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 132" width="1200" height="132">
-<defs>
-<style>
-.logo-quasimidi{font-family:'Arial Black',sans-serif;font-size:16px;font-weight:900;letter-spacing:2px;fill:#151719}
-.sub-title{font-family:'Arial Narrow',Arial,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1.1px;fill:#181a1c}
-.panel-label{font-family:'Arial Narrow',Arial,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.5px;fill:#181a1c}
-.panel-label-sm{font-family:'Arial Narrow',Arial,sans-serif;font-size:8.5px;font-weight:700;letter-spacing:.4px;fill:#181a1c}
-.circle-text{font-family:'Arial Narrow',Arial,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:1.4px;fill:#181a1c}
-</style>
-<linearGradient id="brushedMetal" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#f0f2f4"/><stop offset="20%" stop-color="#e1e4e8"/><stop offset="55%" stop-color="#d5d8dd"/><stop offset="85%" stop-color="#c8ccd2"/><stop offset="100%" stop-color="#b4b9c0"/></linearGradient>
-<radialGradient id="knobGrad" cx="42%" cy="38%" r="62%"><stop offset="0%" stop-color="#4e5156"/><stop offset="75%" stop-color="#222427"/><stop offset="100%" stop-color="#111214"/></radialGradient>
-<linearGradient id="lcdGlow" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#65b849"/><stop offset="50%" stop-color="#75cc56"/><stop offset="100%" stop-color="#58a33e"/></linearGradient>
-<path id="technoCirclePath" d="M852,70 A42,42 0 1,1 852,70.1"/>
-<filter id="dropShadow" x="-10%" y="-10%" width="130%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-color="#000" flood-opacity=".4"/></filter>
-</defs>
-<rect x="0" y="0" width="1200" height="132" rx="4" fill="url(#brushedMetal)" stroke="#8c9199" stroke-width="1.5"/>
-<g id="rack-ears">
-<rect x="10" y="16" width="16" height="10" rx="5" fill="#1e2022"/><rect x="10" y="106" width="16" height="10" rx="5" fill="#1e2022"/>
-<circle cx="62" cy="21" r="7.5" fill="#232528" stroke="#8b9096"/><circle cx="62" cy="111" r="7.5" fill="#232528" stroke="#8b9096"/>
-<rect x="1174" y="16" width="16" height="10" rx="5" fill="#1e2022"/><rect x="1174" y="106" width="16" height="10" rx="5" fill="#1e2022"/>
-<circle cx="1138" cy="21" r="7.5" fill="#232528" stroke="#8b9096"/><circle cx="1138" cy="111" r="7.5" fill="#232528" stroke="#8b9096"/>
-</g>
-<g id="zigzag-wave" stroke="#181a1c" stroke-width="2.6" fill="none" stroke-linejoin="round" stroke-linecap="round">
-<line x1="0" y1="68" x2="108" y2="68"/>
-<polyline points="168,68 178,61 190,75 202,61 214,75 224,68"/>
-<polyline points="484,68 494,61 506,75 518,61 530,75 540,68"/>
-<polyline points="596,68 605,61 616,75 627,61 638,75 646,68"/>
-<polyline points="702,68 710,61 720,75 730,61 738,68"/>
-<polyline points="814,68 824,61 836,75 848,61 860,75 872,61 884,75 896,61 908,75 920,61 932,75 944,61 956,75 968,61 980,75 992,61 1004,75 1016,61 1028,75 1040,61 1052,75 1064,61 1076,75 1088,61 1100,75 1112,61 1124,75 1136,61 1148,75 1160,61 1172,75 1184,61 1200,68"/>
-</g>
-<text x="54" y="62" class="panel-label-sm" text-anchor="middle">MADE IN GERMANY</text>
-<g id="power-section"><text x="138" y="34" class="panel-label" text-anchor="middle">POWER</text>
-<rect x="114" y="42" width="48" height="54" rx="2" fill="#232528" stroke="#4d5157" stroke-width="1.5"/>
-<rect id="power-switch" x="120" y="48" width="36" height="42" rx="1.5" fill="#181a1c" filter="url(#dropShadow)"/>
-<line x1="121" y1="69" x2="155" y2="69" stroke="#36393f" stroke-width="1.5"/><line x1="138" y1="54" x2="138" y2="61" stroke="#e1e4e8" stroke-width="1.8"/><circle cx="138" cy="79" r="3.5" fill="none" stroke="#e1e4e8" stroke-width="1.6"/></g>
-<g id="display-section">
-<text x="305" y="30" class="logo-quasimidi" text-anchor="middle" transform="scale(1.1,.92)" transform-origin="305 30">QUASIMIDI</text>
-<rect x="224" y="38" width="260" height="60" rx="28" fill="#191b1e" stroke="#454950" stroke-width="1.5"/>
-<rect x="266" y="47" width="176" height="42" rx="3" fill="url(#lcdGlow)" stroke="#0e1012" stroke-width="2"/>
-<text id="lcd-line1" x="354" y="64" font-family="Courier New,monospace" font-size="20" letter-spacing="1.4" fill="#142605" text-anchor="middle">TECHNOX</text>
-<text id="lcd-line2" x="354" y="82" font-family="Courier New,monospace" font-size="20" letter-spacing="1.4" fill="#142605" text-anchor="middle">001 TechnoBass</text>
-<text x="354" y="115" class="sub-title" text-anchor="middle">16 PART MULTITIMBRAL SYNTHESIZER</text></g>
-<g id="knob-parameter"><text x="568" y="30" class="panel-label" text-anchor="middle">PARAMETER</text><circle cx="568" cy="68" r="26" fill="url(#knobGrad)" stroke="#111" stroke-width="1.5" filter="url(#dropShadow)"/><circle cx="568" cy="68" r="21" fill="none" stroke="#3c4046" stroke-width="1.2" stroke-dasharray="3 3"/><line x1="568" y1="45" x2="568" y2="57" stroke="#f0f2f5" stroke-width="2.5" stroke-linecap="round"/><text x="568" y="114" class="panel-label" text-anchor="middle">SOUNDGROUP</text></g>
-<g id="knob-value"><text x="674" y="30" class="panel-label" text-anchor="middle">VALUE</text><circle cx="674" cy="68" r="26" fill="url(#knobGrad)" stroke="#111" stroke-width="1.5" filter="url(#dropShadow)"/><circle cx="674" cy="68" r="21" fill="none" stroke="#3c4046" stroke-width="1.2" stroke-dasharray="3 3"/><line x1="674" y1="45" x2="674" y2="57" stroke="#f0f2f5" stroke-width="2.5" stroke-linecap="round"/><text x="674" y="114" class="panel-label" text-anchor="middle">SOUND</text></g>
-<g id="control-buttons-matrix">
-<g id="btn-edit-ok"><text x="756" y="34" class="panel-label-sm" text-anchor="middle">EDIT / OK</text><rect x="744" y="40" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#dropShadow)"/></g>
-<g id="btn-exit"><text x="794" y="34" class="panel-label-sm" text-anchor="middle">EXIT</text><rect x="782" y="40" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#dropShadow)"/></g>
-<g id="btn-part-prev"><polygon points="739,87 732,91 739,95" fill="#181a1c"/><rect x="744" y="84" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#dropShadow)"/></g>
-<g id="btn-part-next"><rect x="782" y="84" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#dropShadow)"/><polygon points="811,87 818,91 811,95" fill="#181a1c"/></g>
-<text x="775" y="114" class="panel-label-sm" text-anchor="middle">PART / BANK</text></g>
-<g id="circular-slogan"><text class="circle-text"><textPath href="#technoCirclePath" startOffset="3%">TECHNO  •  RAVE  •  ELECTRONIC  •</textPath></text></g>
-<g id="output-section"><text x="1012" y="30" class="panel-label" text-anchor="middle">VOLUME</text><polygon points="996,42 1028,35 1028,42" fill="#181a1c"/>
-<circle id="knob-volume" cx="1012" cy="68" r="18" fill="url(#knobGrad)" stroke="#111" stroke-width="1.2" filter="url(#dropShadow)"/><line x1="1012" y1="52" x2="1012" y2="61" stroke="#f0f2f5" stroke-width="2" stroke-linecap="round"/>
-<text x="1064" y="30" class="panel-label" text-anchor="middle">HEADPH.</text><path d="M1058 46 V41 A6 6 0 0 1 1070 41 V46" fill="none" stroke="#181a1c" stroke-width="1.5"/><rect x="1056" y="43" width="3" height="5" rx="1" fill="#181a1c"/><rect x="1069" y="43" width="3" height="5" rx="1" fill="#181a1c"/>
-<g id="headphone-jack"><circle cx="1064" cy="68" r="11" fill="#1b1d20" stroke="#7d828a" stroke-width="1.5" filter="url(#dropShadow)"/><circle cx="1064" cy="68" r="7.5" fill="#9ea3aa" stroke="#454950"/><circle cx="1064" cy="68" r="5.2" fill="#0e0f11"/></g></g>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 132" width="1200" height="132">
+  <defs>
+    <style type="text/css"><![CDATA[
+      .logo-q { font: 900 16px 'Arial Black', sans-serif; letter-spacing: 3px; fill: #151719; }
+      .sub { font: 900 8px 'Arial Black', sans-serif; letter-spacing: 1px; fill: #181a1c; }
+      .lbl { font: 900 7.5px 'Arial Black', sans-serif; letter-spacing: 0.5px; fill: #181a1c; }
+      .lbl-sm { font: 900 6.8px 'Arial Black', sans-serif; letter-spacing: 0.4px; fill: #181a1c; }
+      .circ { font: 900 8px 'Arial Black', sans-serif; letter-spacing: 1.6px; fill: #181a1c; }
+      .lcd { font: 700 17px 'Courier New', monospace; letter-spacing: 1px; fill: #142605; }
+    ]]></style>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0f2f4"/><stop offset="50%" stop-color="#d5d8dd"/><stop offset="100%" stop-color="#b4b9c0"/>
+    </linearGradient>
+    <radialGradient id="knob" cx="42%" cy="38%" r="62%">
+      <stop offset="0%" stop-color="#4e5156"/><stop offset="75%" stop-color="#222427"/><stop offset="100%" stop-color="#111214"/>
+    </radialGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#65b849"/><stop offset="50%" stop-color="#75cc56"/><stop offset="100%" stop-color="#58a33e"/>
+    </linearGradient>
+    <path id="arcTop" d="M 836,62 A 40,40 0 1,1 916,62"/>
+    <path id="arcBot" d="M 916,74 A 40,40 0 1,1 836,74"/>
+    <filter id="sh" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="132" rx="4" fill="url(#metal)" stroke="#8c9199" stroke-width="1.5"/>
+  <g fill="#1e2022">
+    <rect x="10" y="16" width="16" height="10" rx="5"/><rect x="10" y="106" width="16" height="10" rx="5"/>
+    <rect x="1174" y="16" width="16" height="10" rx="5"/><rect x="1174" y="106" width="16" height="10" rx="5"/>
+  </g>
+  <g fill="#232528" stroke="#8b9096">
+    <circle cx="62" cy="21" r="7.5"/><circle cx="62" cy="111" r="7.5"/>
+    <circle cx="1138" cy="21" r="7.5"/><circle cx="1138" cy="111" r="7.5"/>
+  </g>
+  <g stroke="#181a1c" stroke-width="2.6" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <line x1="0" y1="68" x2="108" y2="68"/>
+    <polyline points="168,68 178,61 190,75 202,61 214,75 224,68"/>
+    <polyline points="484,68 494,61 506,75 518,61 530,75 540,68"/>
+    <polyline points="596,68 605,61 616,75 627,61 638,75 646,68"/>
+    <polyline points="702,68 710,61 720,75 730,61 738,68"/>
+    <polyline points="814,68 824,61 836,75 848,61 860,75 872,61 884,75 896,61 908,75 920,61 932,75 942,68"/>
+    <line x1="984" y1="68" x2="1014" y2="68"/><line x1="1048" y1="68" x2="1200" y2="68"/>
+  </g>
+  <text x="56" y="81" class="lbl-sm" text-anchor="middle">MADE IN GERMANY</text>
+  <g id="power">
+    <text x="138" y="34" class="lbl" text-anchor="middle">POWER</text>
+    <rect x="114" y="42" width="48" height="54" rx="2" fill="#232528" stroke="#4d5157" stroke-width="1.5"/>
+    <rect x="120" y="48" width="36" height="42" rx="1.5" fill="#181a1c" filter="url(#sh)"/>
+    <line x1="121" y1="69" x2="155" y2="69" stroke="#36393f" stroke-width="1.5"/>
+    <line x1="138" y1="54" x2="138" y2="61" stroke="#e1e4e8" stroke-width="1.8"/>
+    <circle cx="138" cy="79" r="3.5" fill="none" stroke="#e1e4e8" stroke-width="1.6"/>
+  </g>
+  <g id="display">
+    <g transform="translate(354,29) scale(1.25,0.85)"><text class="logo-q" text-anchor="middle">QUASIMIDI</text></g>
+    <rect x="224" y="38" width="260" height="60" rx="28" fill="#191b1e" stroke="#454950" stroke-width="1.5"/>
+    <rect x="266" y="47" width="176" height="42" rx="3" fill="url(#glow)" stroke="#0e1012" stroke-width="2"/>
+    <text x="354" y="64" class="lcd" text-anchor="middle">TECHNOX</text>
+    <text x="354" y="82" class="lcd" text-anchor="middle">001 TECHNOBASS</text>
+    <g transform="translate(354,115) scale(1.12,0.85)"><text class="sub" text-anchor="middle">16 PART MULTITIMBRAL SYNTHESIZER</text></g>
+  </g>
+  <g id="enc-param">
+    <text x="568" y="30" class="lbl" text-anchor="middle">PARAMETER</text>
+    <circle cx="568" cy="68" r="26" fill="url(#knob)" stroke="#111" stroke-width="1.5" filter="url(#sh)"/>
+    <circle cx="568" cy="68" r="21" fill="none" stroke="#3c4046" stroke-width="1.2" stroke-dasharray="3 3"/>
+    <line x1="568" y1="45" x2="568" y2="57" stroke="#f0f2f5" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="568" y="114" class="lbl" text-anchor="middle">SOUNDGROUP</text>
+  </g>
+  <g id="enc-val">
+    <text x="674" y="30" class="lbl" text-anchor="middle">VALUE</text>
+    <circle cx="674" cy="68" r="26" fill="url(#knob)" stroke="#111" stroke-width="1.5" filter="url(#sh)"/>
+    <circle cx="674" cy="68" r="21" fill="none" stroke="#3c4046" stroke-width="1.2" stroke-dasharray="3 3"/>
+    <line x1="674" y1="45" x2="674" y2="57" stroke="#f0f2f5" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="674" y="114" class="lbl" text-anchor="middle">SOUND</text>
+  </g>
+  <g id="buttons">
+    <text x="756" y="34" class="lbl-sm" text-anchor="middle">EDIT / OK</text>
+    <rect x="744" y="40" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#sh)"/>
+    <circle cx="775" cy="44" r="1.8" fill="#9e1b1b"/><circle cx="775" cy="51" r="1.8" fill="#9e1b1b"/>
+    <text x="794" y="34" class="lbl-sm" text-anchor="middle">EXIT</text>
+    <rect x="782" y="40" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#sh)"/>
+    <polygon points="739,87 732,91 739,95" fill="#181a1c"/>
+    <rect x="744" y="84" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#sh)"/>
+    <rect x="782" y="84" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#sh)"/>
+    <polygon points="811,87 818,91 811,95" fill="#181a1c"/>
+    <text x="775" y="112" class="lbl-sm" text-anchor="middle">PART / BANK</text>
+  </g>
+  <g id="right">
+    <text class="circ"><textPath href="#arcTop" xlink:href="#arcTop" startOffset="50%" text-anchor="middle">TECHNO - RAVE</textPath></text>
+    <text class="circ"><textPath href="#arcBot" xlink:href="#arcBot" startOffset="50%" text-anchor="middle">ELECTRONIC</textPath></text>
+    <text x="964" y="21" class="lbl" text-anchor="middle">VOLUME</text>
+    <polygon points="946,35 982,27 982,35" fill="#181a1c"/>
+    <circle cx="964" cy="68" r="18" fill="url(#knob)" stroke="#111" stroke-width="1.5" filter="url(#sh)"/>
+    <line x1="964" y1="52" x2="964" y2="60" stroke="#f0f2f5" stroke-width="2" stroke-linecap="round"/>
+    <text x="1031" y="21" class="lbl" text-anchor="middle">HEADPH.</text>
+    <path d="M1025,40 A6,6 0 0,1 1037,40" fill="none" stroke="#181a1c" stroke-width="1.5"/>
+    <rect x="1023.5" y="39" width="2.5" height="5" rx="1" fill="#181a1c"/><rect x="1036" y="39" width="2.5" height="5" rx="1" fill="#181a1c"/>
+    <circle cx="1031" cy="68" r="15" fill="#c0c4ca" stroke="#5a5e66" stroke-width="1.5"/>
+    <circle cx="1031" cy="68" r="11" fill="#1b1d20" stroke="#3c4046"/><circle cx="1031" cy="68" r="6" fill="#0d0e10"/>
+    <g transform="translate(925,100)" fill="#151719">
+      <path d="M0,0 H22 V3.5 H13.5 V16 H8.5 V3.5 H0 Z"/>
+      <path d="M25,3 A3,3 0 0,1 28,0 H45 V3.5 H30 V6.5 H42 V9.5 H30 V12.5 H45 V16 H28 A3,3 0 0,1 25,13 Z"/>
+      <path d="M48,3 A3,3 0 0,1 51,0 H68 V3.5 H53 V12.5 H68 V16 H51 A3,3 0 0,1 48,13 Z"/>
+      <path d="M71,0 H76 V6.5 H86 V0 H91 V16 H86 V9.5 H76 V16 H71 Z"/>
+      <path d="M95,0 H100 L110,10.5 V0 H115 V16 H110 L100,5.5 V16 H95 Z"/>
+      <path d="M119,3 A3,3 0 0,1 122,0 H138 A3,3 0 0,1 141,3 V13 A3,3 0 0,1 138,16 H122 A3,3 0 0,1 119,13 Z M124,3.5 V12.5 H136 V3.5 Z" fill-rule="evenodd"/>
+      <path d="M144,-1 H150 L158,6.5 L167,-1 H173 L161.5,8.5 L175,20 H168.5 L158,11 L147.5,20 H141.5 L154.5,8.5 Z"/>
+    </g>
+  </g>
 </svg>
