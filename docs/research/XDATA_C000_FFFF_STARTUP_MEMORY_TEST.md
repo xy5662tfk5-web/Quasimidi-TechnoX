@@ -44,7 +44,17 @@ Not established:
 - Whether any part of this region contains sample data, voice state, descriptors, or working memory during normal operation.
 - Whether MAME's partial map of `0xC000–0xC0FF` and `0xFF10` reflects only known accesses rather than the complete hardware decode.
 
-## 4. Why this matters for the hardware reconstruction
+## 4. Confirmed ordering: RAM test precedes the IC51 upload
+
+The reachable IC4 startup disassembly establishes the order:
+
+1. Startup caller at `0x378C` calls `0xB34D`.
+2. `0xB34D` sets SFR `0x8E=0x02`, writes `0xAA` to every MOVX address from `0xC000` through `0xFFFF`, immediately reads each address back, and does not return until the final address has matched. It restores `0x8E=0x01` before returning.
+3. Back in the caller, `0x379F` loads `R7=0x48`; `0x37A1` calls `0xAF1A`. That routine parses the selected four-byte IC51 header and copies the selected payload to the same C000-FFFF storage window through the IC4 map at `0xADDD`.
+
+Therefore the memory test is a storage self-test **before** the resource upload. The 13,647-byte IC51 transfer is a post-test RAM image copied into this storage region. It is not the contents of a ROM directly mapped at C000, and the address range's existence alone does not prove that its contents are waveform samples. The actual receiver and post-upload use remain to be established.
+
+## 5. Why this matters for the hardware reconstruction
 
 The external data map should now be treated as several distinct interfaces, not one presumed DSP register bank:
 
@@ -58,7 +68,7 @@ The external data map should now be treated as several distinct interfaces, not 
 
 The 16 KiB test makes `0xC000–0xFFFF` a high-priority area for future cross-reference analysis. Search for normal-operation reads/writes in this region before assigning it a role. Do not assume it is the missing 6 MB sample memory: its tested capacity is only 16 KiB.
 
-## 5. Next steps
+## 6. Next steps
 
 1. Find every reachable instruction sequence that accesses DPTR addresses `0xC000–0xFFFF` after startup.
 2. Separate the startup destructive test from subsequent application use.
