@@ -101,6 +101,16 @@ int main(int argc, char** argv) {
     assert(machine.readExternal(0x8001) == 0x22);
     assert(machine.readExternal(0x8002) == 0x33);
     assert(machine.readExternal(0x8003) == 0x44);
+    assert(machine.soundHostReadCount() == 7u);
+    const auto& responseRead = machine.soundHostReadAt(4);
+    assert(responseRead.registerIndex == 1u);
+    assert(responseRead.value == 0x22u);
+    assert(responseRead.deviceIndex == 0x11u);
+    assert(responseRead.port2 == 0x15u);
+    assert(responseRead.port3 == 0x37u);
+    assert(responseRead.soundBusMode == 1u);
+    assert(!responseRead.ic51Selected);
+    assert(responseRead.soundDeviceResetReleased);
     assert(machine.soundCommandPacketCount() == 1u);
     const auto& capturedCommand = machine.soundCommandPacketAt(0);
     assert(capturedCommand.bytes == command);
