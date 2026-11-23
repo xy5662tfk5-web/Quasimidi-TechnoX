@@ -1824,22 +1824,38 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(event.machineCycle));
         }
 
-        // Pair the IC51 source tail with the actual data bytes sent through
-        // the separate FF10 peripheral port by firmware loader 0xAF93.
+        // Filter the FF10 ring buffer for the actual MOVX data stores in
+        // the IC51 block-stream loaders. AFxx emits one header byte followed
+        // by three-byte records; B015 emits a separate four-byte record form.
+        // Do not confuse these payload stores with B0FC/B1xx control messages.
         const auto ff10TraceEnd = firmwareMachine.ff10WriteCount();
-        const auto ff10TraceBegin = ff10TraceEnd > 64u ? ff10TraceEnd - 64u : 0u;
-        std::printf("Second Note On FF10 write tail (%zu entries):\\n",
-                    ff10TraceEnd - ff10TraceBegin);
+        constexpr std::size_t ff10TraceCapacity = 4096u;
+        const auto ff10TraceBegin = ff10TraceEnd > ff10TraceCapacity
+            ? ff10TraceEnd - ff10TraceCapacity : 0u;
+        std::size_t afPayloadWrites = 0;
+        std::size_t b0PayloadWrites = 0;
         for (std::size_t i = ff10TraceBegin; i < ff10TraceEnd; ++i) {
             const auto& event = firmwareMachine.ff10WriteAt(i);
-            std::printf("  FF10[%zu]=%02X mode=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
-                        i, static_cast<unsigned>(event.value),
-                        static_cast<unsigned>(event.soundBusMode),
-                        static_cast<unsigned>(event.instructionPC),
-                        static_cast<unsigned>(event.stackReturnPC),
-                        static_cast<unsigned>(event.port2),
-                        static_cast<unsigned>(event.port3));
+            const auto pc = event.instructionPC;
+            if (pc == 0xafc0u || pc == 0xafd8u || pc == 0xafebu || pc == 0xaffeu) {
+                ++afPayloadWrites;
+                std::printf("  IC51-AF93 FF10[%zu]=%02X pc=%04X ret=%04X mode=%02X cycle=%llu\\n",
+                            i, static_cast<unsigned>(event.value), static_cast<unsigned>(pc),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned long long>(event.machineCycle));
+            } else if (pc == 0xb045u || pc == 0xb058u ||
+                       pc == 0xb06bu || pc == 0xb07eu) {
+                ++b0PayloadWrites;
+                std::printf("  IC51-B015 FF10[%zu]=%02X pc=%04X ret=%04X mode=%02X cycle=%llu\\n",
+                            i, static_cast<unsigned>(event.value), static_cast<unsigned>(pc),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
         }
+        std::printf("Second Note On filtered FF10 payload writes: AF93=%zu B015=%zu scanned=%zu\\n",
+                    afPayloadWrites, b0PayloadWrites, ff10TraceEnd - ff10TraceBegin);
 
         // Capture the firmware's 16-slot resource staging page. The page is
         // selected dynamically through internal RAM[0x2D], so do not assume
