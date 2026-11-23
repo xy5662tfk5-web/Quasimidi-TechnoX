@@ -873,24 +873,24 @@ int main(int argc, char** argv) {
         runRealMidiStage("Note Off in Performance mode",
                          realNoteOff.data(), realNoteOff.size());
 
-        // TECHNOX.MID contains Performance 1 / Part 13 as bank 2, sound 10.
-        // Re-address that real 24-byte Part payload to Multisetup 1 / Part 1
-        // (address 0x37 0x01 0x00) using the documented dump-data format.
-        // This avoids testing an empty multisetup whose 7Cxx part table is zero.
-        const std::array<std::uint8_t, 33> multiSetup1Part1{{
-            0xf0u, 0x3fu, 0x00u, 0x22u, 0x44u, 0x37u, 0x01u, 0x00u,
-            0x02u, 0x0au, 0x01u, 0x64u, 0x10u, 0x3fu, 0x3fu, 0x18u,
-            0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u,
-            0x40u, 0x00u, 0x01u, 0x4cu, 0x1au, 0x40u, 0x13u, 0x00u, 0xf7u
-        }};
-        runRealMidiStage("SysEx load Multisetup 1 Part 1 from Performance 1 Part 13",
-                         multiSetup1Part1.data(), multiSetup1Part1.size());
         // System parameter address 00 00 03: Multi mode = 1.
         const std::array<std::uint8_t, 10> enableMultiMode{{
             0xf0u, 0x3fu, 0x00u, 0x22u, 0x44u, 0x00u, 0x00u, 0x03u, 0x01u, 0xf7u
         }};
         runRealMidiStage("SysEx set Multi mode=1",
                          enableMultiMode.data(), enableMultiMode.size());
+
+        // Performance 1 / Part 13 in TECHNOX.MID is bank 2, sound 10.
+        // Re-address its actual 24-byte parameter block to 01 01 00, the
+        // documented temporary Part 1 parameter area used by Multi mode.
+        const std::array<std::uint8_t, 33> temporaryPart1{{
+            0xf0u, 0x3fu, 0x00u, 0x22u, 0x44u, 0x01u, 0x01u, 0x00u,
+            0x02u, 0x0au, 0x01u, 0x64u, 0x10u, 0x3fu, 0x3fu, 0x18u,
+            0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u,
+            0x40u, 0x00u, 0x01u, 0x4cu, 0x1au, 0x40u, 0x13u, 0x00u, 0xf7u
+        }};
+        runRealMidiStage("SysEx load temporary Part 1 from Performance 1 Part 13",
+                         temporaryPart1.data(), temporaryPart1.size());
         runRealMidiStage("Note On Part 1 in Multi mode",
                          realNoteOn.data(), realNoteOn.size());
         runRealMidiStage("Note Off Part 1 in Multi mode",
