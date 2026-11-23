@@ -867,8 +867,8 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.syntheticTestOverlay),
                             static_cast<unsigned long long>(event.machineCycle));
             }
-            const auto firstXdataTrace = xdataTraceAfter > 4096u
-                ? xdataTraceAfter - 4096u : 0u;
+            const auto firstXdataTrace = xdataTraceAfter > 8192u
+                ? xdataTraceAfter - 8192u : 0u;
             for (std::size_t i = std::max(firstXdataTrace, xdataTraceBefore);
                  i < xdataTraceAfter; ++i) {
                 const auto& event = firmwareMachine.xdataWatchTraceAt(i);
