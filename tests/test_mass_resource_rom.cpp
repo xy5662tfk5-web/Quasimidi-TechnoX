@@ -596,6 +596,36 @@ void testActualFirmwareROMTables(const char* path) {
     }
     for (std::size_t index = 0; index < 128; ++index)
         assert(view.lookupNonlinearScale(static_cast<std::uint8_t>(index), value));
+
+    // Reproduce the live IC4 1C61 secondary-table lookup seen in the Note 66
+    // instruction trace: RAM[0x34]/IRAM[0x9F:0x9E] form 0x3903, R3+RAM[2F]
+    // wraps to 0x7B, and the three MOVC reads land at 0x397E/39FE/3A7E.
+    const auto liveLookupAddress = MASS1C61SecondaryTableAddressBuilder::resolve(
+        0x3903u, 0x18u, 0x7bu, 0xa0u);
+    assert(liveLookupAddress.normalizedIndex == 0x7bu);
+    assert(liveLookupAddress.bankOffset == 0u);
+    assert(liveLookupAddress.address == 0x397eu);
+    MASS1C61SecondaryTableBytes liveLookupBytes{};
+    MASS1C61SecondaryTableFetchAddress liveLookupFetch{};
+    assert(MASS1C61SecondaryTableReader::read(
+        view, liveLookupAddress, 0x7bu, liveLookupBytes, &liveLookupFetch));
+    assert(liveLookupFetch.address == 0x397eu && !liveLookupFetch.pageCarry);
+    assert((liveLookupBytes.bytes ==
+            std::array<std::uint8_t, 3>{{0x05u, 0x43u, 0x02u}}));
+    const auto liveLookupFields = MASS1C61PackedLookupDecoder::decode(liveLookupBytes);
+    assert(liveLookupFields.r3 == 0x60u && liveLookupFields.r4 == 0x48u);
+    assert(liveLookupFields.r5 == 0x05u && liveLookupFields.r6 == 0x43u &&
+           liveLookupFields.r7 == 0x02u);
+
+    const auto liveAccumulator = MASS1C61AccumulatorTransform::apply(
+        0x80u,
+        liveLookupFields.r3, liveLookupFields.r4,
+        liveLookupFields.r5, liveLookupFields.r6, liveLookupFields.r7,
+        0x05u, 0x43u, 0x7bu);
+    assert(liveAccumulator.negativeInput && !liveAccumulator.zeroInputBypass);
+    assert(liveAccumulator.r2 == 0xd5u);
+    assert(liveAccumulator.r3 == 0x1eu);
+    assert(liveAccumulator.r4 == 0x02u);
 }
 
 void testPointerTableAndPartMapping() {
