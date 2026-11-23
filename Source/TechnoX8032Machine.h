@@ -135,6 +135,17 @@ public:
         std::uint8_t bank = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct BulkTransferEntryEvent {
+        std::uint16_t callPC = 0;
+        std::uint16_t target = 0;
+        std::uint8_t selectorR7 = 0;
+        std::uint8_t p2 = 0xff;
+        std::uint8_t p3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        std::uint8_t flagByte1B = 0;
+        std::uint8_t flagByteAF = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct InternalFlagWriteEvent {
         std::uint8_t bitAddress = 0x0a;
         std::uint8_t byteValue = 0;
@@ -338,6 +349,8 @@ public:
         xdataWatchTraceCount_ = 0;
         internalFlagWriteTrace_.fill(InternalFlagWriteEvent{});
         internalFlagWriteTraceCount_ = 0;
+        bulkTransferEntryTrace_.fill(BulkTransferEntryEvent{});
+        bulkTransferEntryCount_ = 0;
         unmappedBusTrace_.fill(UnmappedBusEvent{});
         unmappedBusTraceCount_ = 0;
         unmappedReadCounts7xxx_.fill(0);
@@ -389,6 +402,13 @@ public:
     MCS51Core& cpuForTesting() noexcept { return cpu_; }
     std::uint64_t elapsedMachineCycles() const noexcept { return elapsedMachineCycles_; }
 
+    std::size_t bulkTransferEntryCount() const noexcept {
+        return bulkTransferEntryCount_;
+    }
+    const BulkTransferEntryEvent& bulkTransferEntryAt(std::size_t index) const noexcept {
+        return bulkTransferEntryTrace_[index % bulkTransferEntryTrace_.size()];
+    }
+
     std::uint64_t watchedCallCount(std::uint16_t target) const noexcept {
         switch (target) {
             case 0x57a8: return watchedCallCounts_[0];
@@ -421,6 +441,22 @@ public:
                 (static_cast<std::uint16_t>(code_[static_cast<std::uint16_t>(pc + 1u)]) << 8) |
                 code_[static_cast<std::uint16_t>(pc + 2u)]);
             switch (target) {
+                case 0xaf1a: {
+                    auto& event = bulkTransferEntryTrace_[
+                        bulkTransferEntryCount_ % bulkTransferEntryTrace_.size()];
+                    const auto registerBank = cpu_.registers().psw.registerBankBase();
+                    event.callPC = pc;
+                    event.target = target;
+                    event.selectorR7 = readInternal(static_cast<std::uint8_t>(registerBank + 7u));
+                    event.p2 = portLatch_[2];
+                    event.p3 = portLatch_[3];
+                    event.soundBusMode = internal_[0x8e];
+                    event.flagByte1B = internal_[0x1b];
+                    event.flagByteAF = readBitValue(0xafu);
+                    event.machineCycle = elapsedMachineCycles_;
+                    ++bulkTransferEntryCount_;
+                    break;
+                }
                 case 0x57a8: ++watchedCallCounts_[0]; break;
                 case 0x5671: ++watchedCallCounts_[1]; break;
                 case 0x4256: ++watchedCallCounts_[2]; break;
@@ -1399,6 +1435,8 @@ private:
     std::size_t ic51ReadTraceCount_ = 0;
     std::array<InternalFlagWriteEvent, 256> internalFlagWriteTrace_{};
     std::size_t internalFlagWriteTraceCount_ = 0;
+    std::array<BulkTransferEntryEvent, 16> bulkTransferEntryTrace_{};
+    std::size_t bulkTransferEntryCount_ = 0;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
