@@ -533,8 +533,8 @@ int main(int argc, char** argv) {
                 const auto* record = fxDirectory.find(static_cast<int>(index));
                 assert(record != nullptr);
                 assert(record->index == index);
-                assert(record->firstResourceIndex == expectedFX[index].firstResource);
-                assert(record->secondResourceIndex == expectedFX[index].secondResource);
+                assert(record->fx1ResourceIndex == expectedFX[index].fx1Resource);
+                assert(record->fx2ResourceIndex == expectedFX[index].fx2Resource);
                 assert(record->modeByte == expectedFX[index].mode);
                 std::size_t nameLength = 0;
                 while (expectedFX[index].name[nameLength] != '\0') {
@@ -592,9 +592,9 @@ int main(int argc, char** argv) {
                     technox::MASSIC51PortStreamResource triplets{};
                     technox::MASSIC51PortStreamResource rotatedStream{};
                     assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
-                        fxResources, bank, record->firstResourceIndex, triplets));
+                        fxResources, bank, record->fx1ResourceIndex, triplets));
                     assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
-                        fxResources, bank, record->secondResourceIndex, rotatedStream));
+                        fxResources, bank, record->fx2ResourceIndex, rotatedStream));
                     assert(triplets.terminated && rotatedStream.terminated);
                     assert(triplets.sourceBytesConsumed ==
                            triplets.portWriteByteCount + 1u);
