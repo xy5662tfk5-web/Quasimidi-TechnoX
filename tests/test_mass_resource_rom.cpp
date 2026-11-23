@@ -908,6 +908,28 @@ void testActualBulkBlockLoader(const char* path) {
     assert(bank1.countHigh == 0x25 && bank1.countLow == 0x74);
     assert(bank1.firmwareByteCount() == 0x2574);
 
+    // Audit all 256 candidate lookup positions in both IC51 banks. These
+    // are sliding four-byte windows at DPTR=2*R7, not independent 4-byte
+    // records: neighboring positions overlap by two bytes. Totals therefore
+    // describe candidate windows, not unique PCM/sample storage.
+    MASSIC51BulkBlockDirectory candidateDirectory0;
+    MASSIC51BulkBlockDirectory candidateDirectory1;
+    assert(candidateDirectory0.load(image.data(), MASSResourceROM::kBankSize));
+    assert(candidateDirectory1.load(
+        image.data() + MASSResourceROM::kBankSize, MASSResourceROM::kBankSize));
+    assert(candidateDirectory0.isLoaded() && candidateDirectory1.isLoaded());
+    assert(candidateDirectory0.find(0) != nullptr);
+    assert(candidateDirectory0.find(255) != nullptr);
+    assert(candidateDirectory0.find(256) == nullptr);
+    assert(candidateDirectory0.find(0x48)->sourceAddress == 0x3c64);
+    assert(candidateDirectory0.find(0x48)->firmwareByteCount() == 0x354f);
+    assert(candidateDirectory1.find(0x48)->sourceAddress == 0x295c);
+    assert(candidateDirectory1.find(0x48)->firmwareByteCount() == 0x2574);
+    assert(candidateDirectory0.candidateByteCountSum() == 7484183u);
+    assert(candidateDirectory1.candidateByteCountSum() == 4574119u);
+    assert(candidateDirectory0.sourceWrapCount() == 111u);
+    assert(candidateDirectory1.sourceWrapCount() == 0u);
+
     std::vector<std::uint8_t> payload0(bank0.firmwareByteCount());
     std::vector<std::uint8_t> payload1(bank1.firmwareByteCount());
     assert(MASSIC51BulkBlockHeader::copyPayload(
