@@ -299,7 +299,7 @@ The firmware then performs a distinct correction step from `0x1E05` through `0x1
 
 The `0x1E67` entry snapshot is therefore `R2=D5, R3=1F, R4=06, R5=00, R6=43, R7=02`. The following `0x09B9` handler consumes the staged record and produces the two initial packets through `0x0A4F`.
 
-The regression now asserts the seven IC51 input bytes and addresses, the decoded register tuple at `0x1DC8`, the arithmetic tuple at `0x1E05`, the final tuple at `0x1E67`, and the exact XDATA writeback bytes `D5 1F A2`. The resource-model test independently verifies the real IC4 ROM table lookup and first accumulator result. This closes the byte-to-table-to-arithmetic-to-slot-writeback path for this tested event; it does not yet assign a musical unit or physical sound-engine meaning to the resulting three-byte vector.
+The regression now also runs `MASSResourceCommandFieldDecoder::decodePitchParameter` on the seven bytes read from IC51 and compares the decoded R2/R3/R4/R7/R6/R5 fields with the live register bank at PC `0x1C9A`. It then asserts the decoded secondary-table tuple at `0x1DC8`, the arithmetic-model output at `0x1E05`, the final tuple at `0x1E67`, and the exact XDATA writeback bytes `D5 1F A2`. The secondary-table reader and packed decoder consume the three actual MOVC bytes from the same descrambled IC4 image used by the emulator. This closes the byte-to-register-to-table-to-arithmetic-to-slot-writeback path for this tested event; it does not assign a musical unit or physical sound-engine meaning to the resulting three-byte vector.
 
 **Packet-byte correction:** the second pitch-handler packet observed for the Note 65 probe is `02 01 00 00` (not `02 00 00 00`). The regression assertion and the earlier CI writer trace both use `02 01 00 00`.
 
