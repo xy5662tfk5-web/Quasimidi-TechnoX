@@ -716,6 +716,51 @@ int main(int argc, char** argv) {
             assert(fx2Catalog.load(
                 fxResources, firmwareCode.data(), firmwareCode.size()));
             assert(fx2Catalog.isLoaded());
+
+            // Execute the original FX2 firmware loader at 0x88D1 with a
+            // controlled selector input. The IC51 banks remain real ROM data;
+            // only the still-unmapped selector source at XDATA 0x7C06 is
+            // injected by the test fixture.
+            {
+                TechnoX8032Machine fx2Runtime;
+                assert(fx2Runtime.loadIC4Rom(realRom.data(), realRom.size()));
+                assert(fx2Runtime.loadIC51Rom(realIC51.data(), realIC51.size()));
+                fx2Runtime.reset();
+                fx2Runtime.setTestExternalReadOverride(0x7c06u, 5u); // Phaser1
+                fx2Runtime.cpuForTesting().registersForTesting().pc = 0x88d1u;
+                const auto executed = fx2Runtime.runUntilProgramCounter(0x8926u, 100000u);
+                assert(executed > 0u);
+                assert(fx2Runtime.cpu().registers().pc == 0x8926u);
+                assert(fx2Runtime.ic51ReadCount() > 0u);
+
+                const auto* phaser1 = fx2Catalog.find(0, 5);
+                assert(phaser1 != nullptr);
+                assert(phaser1->streamAResource.blocks.empty());
+                assert(phaser1->streamBResource.blocks.size() == 1u);
+                const auto& block = phaser1->streamBResource.blocks.front();
+                const auto expectedPortBytes = block.portWriteByteCount;
+                assert(expectedPortBytes == block.payload.size() + 4u);
+                assert(fx2Runtime.soundDevicePortWriteCount() == expectedPortBytes);
+
+                std::size_t portOffset = 0;
+                const auto& headerWrite = fx2Runtime.soundDevicePortWriteAt(portOffset++);
+                assert(headerWrite.value == block.wireHeader);
+                for (const auto expected : block.preamble) {
+                    const auto& event = fx2Runtime.soundDevicePortWriteAt(portOffset++);
+                    assert(event.value == expected);
+                }
+                for (const auto expected : block.payload) {
+                    const auto& event = fx2Runtime.soundDevicePortWriteAt(portOffset++);
+                    assert(event.value == expected);
+                }
+                assert(portOffset == expectedPortBytes);
+                for (std::size_t i = 0; i < expectedPortBytes; ++i) {
+                    const auto& event = fx2Runtime.soundDevicePortWriteAt(i);
+                    assert(event.port2 == 0xffu);
+                    assert(event.soundBusMode != 0x02u);
+                }
+            }
+
             for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
                 for (int fxIndex = 0; fxIndex < 21; ++fxIndex) {
                     const auto* resolved = fx1Catalog.find(bankIndex, fxIndex);
