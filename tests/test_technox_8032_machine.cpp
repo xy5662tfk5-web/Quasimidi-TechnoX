@@ -889,6 +889,24 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4803u) - statusGateBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x02d1u) - pitchTableBefore),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
+            const auto hostWriteAfter = firmwareMachine.soundHostWriteCount();
+            std::printf("  SoundHost writes=+%zu\\n", hostWriteAfter - hostWriteBefore);
+            for (std::size_t i = hostWriteBefore; i < hostWriteAfter; ++i) {
+                const auto& event = firmwareMachine.soundHostWriteAt(i);
+                std::printf("    W%u=%02X dev=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
+                            "mode=%u IC51=%u reset=%u cycle=%llu\\n",
+                            static_cast<unsigned>(event.registerIndex),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.deviceIndex),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.returnPC),
+                            static_cast<unsigned>(event.port2),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned>(event.ic51Selected),
+                            static_cast<unsigned>(event.soundDeviceResetReleased),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
             std::printf("  SoundHost reads=+%zu\\n", hostReadAfter - hostReadBefore);
             for (std::size_t i = hostReadBefore; i < hostReadAfter; ++i) {
                 const auto& event = firmwareMachine.soundHostReadAt(i);
