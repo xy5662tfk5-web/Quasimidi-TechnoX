@@ -533,8 +533,8 @@ int main(int argc, char** argv) {
                 const auto* record = fxDirectory.find(static_cast<int>(index));
                 assert(record != nullptr);
                 assert(record->index == index);
-                assert(record->fx1ResourceIndex == expectedFX[index].fx1Resource);
-                assert(record->fx2ResourceIndex == expectedFX[index].fx2Resource);
+                assert(record->fx1ResourceIndex == expectedFX[index].firstResource);
+                assert(record->fx2ResourceIndex == expectedFX[index].secondResource);
                 assert(record->modeByte == expectedFX[index].mode);
                 std::size_t nameLength = 0;
                 while (expectedFX[index].name[nameLength] != '\0') {
