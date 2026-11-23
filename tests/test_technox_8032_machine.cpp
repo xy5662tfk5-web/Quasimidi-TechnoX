@@ -1119,6 +1119,27 @@ int main(int argc, char** argv) {
         std::fflush(stdout);
         assert(peripheralInit > 0);
         std::fflush(stdout);
+        // The normal 0x326A -> 0x381C startup path must enter the IC51
+        // bulk loader exactly once. 0x37A1 is a separate diagnostic/fallback
+        // callsite inside 0x367F; it is not the path used in this cold boot.
+        const auto bulkEntryCount = firmwareMachine.bulkTransferEntryCount();
+        assert(bulkEntryCount == 1u);
+        const auto& bulkEntry = firmwareMachine.bulkTransferEntryAt(0);
+        assert(bulkEntry.callPC == 0x38f1u);
+        assert(bulkEntry.target == 0xaf1au);
+        assert(bulkEntry.selectorR7 ==
+               technox::MASSIC51BulkBlockHeader::kObservedStartupTransferIndex);
+        std::printf("IC51 AF1A startup entry: callPC=%04X selector=%02X "
+                    "P2=%02X P3=%02X mode8E=%02X flag1B=%u globalEA=%u "
+                    "cycle=%llu\\n",
+                    static_cast<unsigned>(bulkEntry.callPC),
+                    static_cast<unsigned>(bulkEntry.selectorR7),
+                    static_cast<unsigned>(bulkEntry.p2),
+                    static_cast<unsigned>(bulkEntry.p3),
+                    static_cast<unsigned>(bulkEntry.soundBusMode),
+                    static_cast<unsigned>(bulkEntry.flagBit1B),
+                    static_cast<unsigned>(bulkEntry.globalInterruptEnabled),
+                    static_cast<unsigned long long>(bulkEntry.machineCycle));
         // Diagnostic run: keep the observed transfer count visible while the
         // IC51 P3 decode is being reconciled with the firmware's port toggles.
         assert(firmwareMachine.soundMemoryWriteCount() == 13647u);
