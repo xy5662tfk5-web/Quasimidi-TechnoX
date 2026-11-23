@@ -57,6 +57,17 @@ The interpreter consumes the selected descriptor's byte stream and dispatches re
 
 The interpreter is a meaningful software-side stage between resource selection and the external command writer. It does not, by itself, decode IC51 bytes into PCM or identify the audio hardware.
 
+### 0x0A is transient interpreter state, not a Part/Performance parameter
+
+The reachable IC4 disassembly shows several distinct producers/consumers of this bit:
+
+- `0x018D` selects the current XDATA page from RAM[0x2D] and calls `0x0211`. `0x0211` reads page offset `0xFB`; if ACC.5 is set, it executes `SETB 0x0A`, then enters `0x0DF7`. This is part of page/slot initialization.
+- `0x0F25` calls `0x047E` when the prior E7 state is clear. `0x047E` first clears `0x0A`, then reads offset `0xFB`; it sets `0x0A` again when ACC.5 is set. This is a separate synchronization path from the selected page's FB.5.
+- `0x1494` clears `0x0A` on entry to per-resource selection/preparation.
+- In the descriptor-table path, `0x24A1` sets `0x0A` immediately before calling the middle entry `0x192D` of the resource-stream interpreter; `0x24E5` clears it immediately after that call returns.
+
+The bit is therefore not established as a persistent setting attached to a sound, Part, or Performance. It changes with page-status handling and is temporarily scoped around a specific descriptor/interpreter call. The two cached streams below preserve both parser outcomes, but selecting one whole-program variant for every operation would be premature. The correct choice must follow the matching firmware call context, not a guessed MIDI or Part parameter.
+
 ## 4. Endpoint scan at 0x1009
 
 The earlier trace of 0x1009 shows it selecting page 0x2D and scanning offsets 0x80 through 0xF8 in steps of eight:
