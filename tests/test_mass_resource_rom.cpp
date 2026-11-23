@@ -1,11 +1,14 @@
 #include "../Source/MASSResourceROM.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <utility>
 #include <vector>
 
 using namespace technox;
