@@ -763,7 +763,7 @@ int main(int argc, char** argv) {
             assert(fantasyCommon[8u + 0x32u] == 5u);
             assert(fx2Catalog.find(0, 5) != nullptr);
             assert(fx2Catalog.find(0, 5)->directoryEntry.name[0] == 'P');
-            assert(fx2Catalog.find(0, 5)->directoryEntry.name[5] == '1');
+            assert(fx2Catalog.find(0, 5)->directoryEntry.name[6] == '1');
 
             for (int bankNumber = 0; bankNumber < 2; ++bankNumber) {
                 const auto bank = bankNumber == 0
