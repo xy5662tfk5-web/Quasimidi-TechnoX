@@ -214,6 +214,24 @@ IC51 is therefore a structured resource directory, not a flat PCM stream. The C+
 
 Identify the memory bank selected by descriptor byte `+10`, locate the external descriptor/command-stream backing memory, and correlate the extracted 24-bit values and hardware command IDs with sample address, pitch, envelope, and modulation behavior.
 
+ 
+## 9. FX type directory and two IC51 port-stream formats
+
+The descrambled IC4 code image contains a fixed 21-entry FX directory at `0x8423`. Each entry is `0x20` bytes. The first ten bytes are an ASCII name; offsets `+0x0B` and `+0x0C` are two IC51 resource indices consumed by separate loader calls, and offset `+0x0D` is retained as an opaque mode byte. The names in index order are:
+
+`Room`, `SmallRoom`, `WarmRoom`, `Chamber1`, `Chamber2`, `Plate1`, `Plate2`, `Hall`, `LargeHall`, `Cathedral`, `GatedRev1`, `GatedRev2`, `GatedRev3`, `EarlyRfl1`, `EarlyRfl2`, `EarlyRfl3`, `EarlyRfl4`, `RainDrops`, `HQ-Delay`, `LongDelay`, `no Effect`.
+
+The loader at `0x8004` scales the selected FX index by `0x20`, adds `0x8423`, reads the first resource index at `+0x0B`, and calls `0xAF93`. It then reads the second at `+0x0C` and calls `0xB015`. Both routines use the same IC51 pointer-table rule: `DPTR = 2 * R7`, followed by a big-endian 16-bit data address from the selected IC51 bank.
+
+The receiving port is the `P2=0xFF, R0=0x10` XDATA location, written byte-by-byte:
+
+- `0xAF93` reads a count byte. Zero returns without port writes. Otherwise it sends the count unchanged, sends two following preamble bytes, then sends `count * 3` additional bytes. The count multiplication and loop bounds are directly visible in the firmware.
+- `0xB015` also exits without port writes when the count is zero. Otherwise it sends `RR A(count)`—a circular rotate-right, not a logical shift—then sends `count * 4` following bytes.
+
+`MASSFXProgramDirectory` and `MASSIC51PortStreamResolver` now parse this fixed table and both stream layouts. Tests compare all 21 table names/resource pairs with the real descrambled IC4 image and resolve both formats for every referenced resource in both IC51 banks. A Room example resolves bank-0 resources 0 and 1 to data addresses `0x24D4` and `0x2851`; the first stream has count `0x19` plus a two-byte preamble and 75 payload bytes, while the second sends a rotated header `0xBF` and 508 payload bytes.
+
+This is an exact reconstruction of resource selection and port framing, not an effect-DSP implementation. The meaning of the opaque mode byte, the semantics of the stream payloads, the receiving IC, and the actual reverberation/delay algorithms remain unverified. These bytes must not be labelled PCM merely because they are uploaded to the sound device.
+
 ## 8. Firmware bulk-transfer path into external XDATA (newly confirmed)
 
 A second, distinct path connects the IC51 resource image to an external memory window. The reachable IC4 disassembly at `0xAF1A` shows this directly; this is not inferred from the four-byte command port:
