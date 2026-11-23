@@ -3348,14 +3348,16 @@ int main(int argc, char** argv) {
 
         // Decode the three actual MOVC bytes from the loaded IC4 image and
         // compare the unpacked fields with the live register bank at 0x1DC8.
+        std::vector<std::uint8_t> pitchFirmwareCode(0x10000u);
+        for (std::size_t address = 0; address < pitchFirmwareCode.size(); ++address)
+            pitchFirmwareCode[address] = firmwareMachine.readCode(
+                static_cast<std::uint16_t>(address));
+        technox::MASSFirmwareROMView pitchFirmwareView;
+        assert(pitchFirmwareView.attach(
+            pitchFirmwareCode.data(), pitchFirmwareCode.size()));
         technox::MASS1C61SecondaryTableBytes pitchTableBytes{};
-        pitchTableBytes.bytes = {{
-            firmwareMachine.readCode(pitchTableAddress.address),
-            firmwareMachine.readCode(static_cast<std::uint16_t>(
-                pitchTableAddress.address + 0x80u)),
-            firmwareMachine.readCode(static_cast<std::uint16_t>(
-                pitchTableAddress.address + 0x100u))
-        }};
+        assert(technox::MASS1C61SecondaryTableReader::read(
+            pitchFirmwareView, pitchTableAddress, pitchTableBytes));
         const auto pitchTableFields =
             technox::MASS1C61PackedLookupDecoder::decode(pitchTableBytes);
         const auto& pitchSecondaryLookup =
