@@ -1857,6 +1857,34 @@ int main(int argc, char** argv) {
         std::printf("Second Note On filtered FF10 payload writes: AF93=%zu B015=%zu scanned=%zu\\n",
                     afPayloadWrites, b0PayloadWrites, ff10TraceEnd - ff10TraceBegin);
 
+        // The final 60 source reads in this event are issued by AFF5 with
+        // return PC 8031. Each must be forwarded unchanged by the following
+        // AFFE MOVX write exactly six machine cycles later.
+        std::size_t verifiedIC51ToFF10Bytes = 0;
+        for (std::size_t i = ic51TraceBegin; i < ic51TraceEnd; ++i) {
+            const auto& source = firmwareMachine.ic51ReadTraceAt(i);
+            if (source.bank != 0u || source.instructionPC != 0xaff5u ||
+                source.returnPC != 0x8031u)
+                continue;
+
+            ++verifiedIC51ToFF10Bytes;
+            bool matchedWrite = false;
+            for (std::size_t j = ff10TraceBegin; j < ff10TraceEnd; ++j) {
+                const auto& destination = firmwareMachine.ff10WriteAt(j);
+                if (destination.instructionPC == 0xaffeu &&
+                    destination.stackReturnPC == 0x8031u &&
+                    destination.machineCycle == source.machineCycle + 6u) {
+                    assert(destination.value == source.value);
+                    matchedWrite = true;
+                    break;
+                }
+            }
+            assert(matchedWrite);
+        }
+        assert(verifiedIC51ToFF10Bytes == 60u);
+        std::printf("Verified IC51 -> FF10 byte-for-byte transfers: %zu (cycle delta=6)\\n",
+                    verifiedIC51ToFF10Bytes);
+
         // Capture the firmware's 16-slot resource staging page. The page is
         // selected dynamically through internal RAM[0x2D], so do not assume
         // an XDATA address or hard-code a bank.
