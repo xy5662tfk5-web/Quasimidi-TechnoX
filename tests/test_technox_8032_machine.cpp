@@ -77,6 +77,8 @@ int main(int argc, char** argv) {
     assert(machine.readExternal(0x7c00) == 0xff);
 
     // Undocumented four-register external window is captured for later protocol analysis.
+    machine.setPortPins(0xa0u, 0x12u);
+    machine.setPortPins(0xb0u, 0x34u);
     machine.writeExternal(0x8000, 0x11);
     machine.writeExternal(0x8001, 0x22);
     machine.writeExternal(0x8002, 0x33);
@@ -96,6 +98,12 @@ int main(int argc, char** argv) {
     assert(machine.soundCommandPacketCount() == 1u);
     const auto& capturedCommand = machine.soundCommandPacketAt(0);
     assert(capturedCommand.bytes == command);
+    assert(capturedCommand.deviceIndex == 0x11u);
+    assert(capturedCommand.port2 == 0x12u);
+    assert(capturedCommand.port3 == 0x34u);
+    assert(capturedCommand.soundBusMode == 0u);
+    assert(!capturedCommand.ic51Selected);
+    assert(capturedCommand.soundDeviceResetReleased);
     assert(machine.soundHostBurstWordCount() == 1u);
     const auto& burstWord = machine.soundHostBurstWordAt(0);
     assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
