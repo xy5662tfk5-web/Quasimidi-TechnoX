@@ -1900,8 +1900,11 @@ int main(int argc, char** argv) {
         assert(secondNoteWriter236BCount == 1u);
         const auto writer0A4FReturnA = secondNoteWriter0A4F[0].returnPC;
         const auto writer0A4FReturnB = secondNoteWriter0A4F[1].returnPC;
-        std::printf("0x0A4F observed stack returns: packet0=%04X packet1=%04X "
-                    "(compare with static caller candidates 09A7/1E6A)\\n",
+        assert(writer0A4FReturnA < 0x10000u);
+        assert(writer0A4FReturnB < 0x10000u);
+        std::printf("0x0A4F stack snapshot: packet0 caller-return=%04X "
+                    "packet1 caller-return=%04X (raw firmware observations; "
+                    "caller labels pending control-flow trace)\\n",
                     static_cast<unsigned>(writer0A4FReturnA),
                     static_cast<unsigned>(writer0A4FReturnB));
 
