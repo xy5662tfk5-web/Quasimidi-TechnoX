@@ -1774,6 +1774,13 @@ int main(int argc, char** argv) {
         runRealMidiStage("Note On Part 1 with synthetic queue-drain handshake",
                          realNoteOn.data(), realNoteOn.size(), true);
 
+        // Differential probe: the synthetic ready override remains asserted.
+        // Send a second, different note after the first resource/voice setup so
+        // its incremental SoundHost writes can be separated from initialization.
+        const std::array<std::uint8_t, 3> secondNoteOn{{0x90u, 0x40u, 0x64u}};
+        runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
+                         secondNoteOn.data(), secondNoteOn.size());
+
         // Capture the firmware's 16-slot resource staging page. The page is
         // selected dynamically through internal RAM[0x2D], so do not assume
         // an XDATA address or hard-code a bank.
