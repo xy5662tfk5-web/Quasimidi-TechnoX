@@ -1152,8 +1152,64 @@ void testBankProgramResolver(const char* path) {
     assert(performanceOnePart13 != nullptr);
     assert(performanceOnePart13->bankNumber == 2);
     assert(performanceOnePart13->soundNumber == 10);
-    assert(performanceOnePart13->descriptorAddress != 0);
-    assert(performanceOnePart13->stream.commands.size() > 0);
+    assert(performanceOnePart13->descriptorAddress == 0x464du);
+    assert(performanceOnePart13->descriptor.commandStreamPointer == 0x0153u);
+    assert(performanceOnePart13->stream.bytesConsumed == 58u);
+    assert(performanceOnePart13->stream.commands.size() == 16u);
+    assert(performanceOnePart13->stream.slotsConsumed == 16u);
+    assert(performanceOnePart13->stream.outputSlotsWritten == 16u);
+    assert(!performanceOnePart13->stream.terminated);
+    assert(!performanceOnePart13->stream.endedByControlCommand);
+    assert(performanceOnePart13->stream.slotLimitReached);
+
+    struct ExpectedPart13Command {
+        std::uint16_t offset;
+        MASSResourceCommandKind kind;
+        std::uint8_t length;
+        std::array<std::uint8_t, 8> bytes;
+    };
+    constexpr std::array<ExpectedPart13Command, 16> expectedPart13Commands{{
+        {0x0153, MASSResourceCommandKind::singleByteAdvance, 1,
+         {{0x76,0,0,0,0,0,0,0}}},
+        {0x0154, MASSResourceCommandKind::singleByteAdvance, 1,
+         {{0x6f,0,0,0,0,0,0,0}}},
+        {0x0155, MASSResourceCommandKind::conditionalRecord, 4,
+         {{0xc1,0x72,0x8a,0x60,0,0,0,0}}},
+        {0x0159, MASSResourceCommandKind::multiParameter, 7,
+         {{0xd6,0x63,0x94,0x02,0x66,0x09,0x24,0}}},
+        {0x0160, MASSResourceCommandKind::multiParameter, 7,
+         {{0x52,0xa2,0x55,0xec,0x66,0xbe,0x69,0}}},
+        {0x0167, MASSResourceCommandKind::marker, 1,
+         {{0x7c,0,0,0,0,0,0,0}}},
+        {0x0168, MASSResourceCommandKind::multiParameter, 7,
+         {{0x57,0xc2,0x5a,0x80,0x6b,0xd2,0x6e,0}}},
+        {0x016f, MASSResourceCommandKind::fourByteCommand, 4,
+         {{0x9c,0x5d,0xf0,0x5f,0,0,0,0}}},
+        {0x0173, MASSResourceCommandKind::singleByteAdvance, 1,
+         {{0xae,0,0,0,0,0,0,0}}},
+        {0x0174, MASSResourceCommandKind::singleByteAdvance, 1,
+         {{0x70,0,0,0,0,0,0,0}}},
+        {0x0175, MASSResourceCommandKind::conditionalRecord, 4,
+         {{0xc5,0x73,0x8e,0x61,0,0,0,0}}},
+        {0x0179, MASSResourceCommandKind::pitchParameter, 7,
+         {{0x0e,0x64,0xcc,0x05,0x9e,0x0c,0x5c,0}}},
+        {0x0180, MASSResourceCommandKind::multiParameter, 7,
+         {{0x54,0x02,0x52,0x54,0x68,0x92,0x66,0}}},
+        {0x0187, MASSResourceCommandKind::singleByteAdvance, 1,
+         {{0x70,0,0,0,0,0,0,0}}},
+        {0x0188, MASSResourceCommandKind::fourByteCommand, 4,
+         {{0x5a,0x96,0x57,0x5e,0,0,0,0}}},
+        {0x018c, MASSResourceCommandKind::singleByteAdvance, 1,
+         {{0x6d,0,0,0,0,0,0,0}}}
+    }};
+    for (std::size_t i = 0; i < expectedPart13Commands.size(); ++i) {
+        const auto& actual = performanceOnePart13->stream.commands[i];
+        const auto& expected = expectedPart13Commands[i];
+        assert(actual.bankOffset == expected.offset);
+        assert(actual.kind == expected.kind);
+        assert(actual.length == expected.length);
+        assert(actual.bytes == expected.bytes);
+    }
     const auto* performanceOnePart13FlagSet = catalog.find(2, 10, true);
     assert(performanceOnePart13FlagSet != nullptr);
     assert(performanceOnePart13FlagSet->firmwareFlag0ASet);
@@ -1222,7 +1278,9 @@ void testBankProgramResolver(const char* path) {
                     static_cast<unsigned>(resolved.stream.fillerSlotsWritten),
                     kindCounts[0], kindCounts[1], kindCounts[2], kindCounts[3],
                     kindCounts[4], kindCounts[5], kindCounts[6], kindCounts[7]);
-        const auto previewCount = std::min<std::size_t>(8, resolved.stream.commands.size());
+        const auto previewCount = request.first == 2 && request.second == 10
+            ? resolved.stream.commands.size()
+            : std::min<std::size_t>(8, resolved.stream.commands.size());
         for (std::size_t i = 0; i < previewCount; ++i) {
             const auto& command = resolved.stream.commands[i];
             std::printf("  PERF1-CMD[%zu] offset=%04X opcode=%02X kind=%u len=%u "
