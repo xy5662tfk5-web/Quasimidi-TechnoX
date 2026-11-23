@@ -221,14 +221,14 @@ The descrambled IC4 code image contains a fixed 21-entry FX directory at `0x8423
 
 `Room`, `SmallRoom`, `WarmRoom`, `Chamber1`, `Chamber2`, `Plate1`, `Plate2`, `Hall`, `LargeHall`, `Cathedral`, `GatedRev1`, `GatedRev2`, `GatedRev3`, `EarlyRfl1`, `EarlyRfl2`, `EarlyRfl3`, `EarlyRfl4`, `RainDrops`, `HQ-Delay`, `LongDelay`, `no Effect`.
 
-The loader at `0x8004` scales the selected FX index by `0x20`, adds `0x8423`, reads the first resource index at `+0x0B`, and calls `0xAF93`. It then reads the second at `+0x0C` and calls `0xB015`. Both routines use the same IC51 pointer-table rule: `DPTR = 2 * R7`, followed by a big-endian 16-bit data address from the selected IC51 bank.
+The loader at `0x8004` scales the selected FX index by `0x20`, adds `0x8423`, reads the FX1 resource index at `+0x0B` and calls `0xAF93`. It then reads the FX2 resource index at `+0x0C` and calls `0xB015`. Both routines use the same IC51 pointer-table rule: `DPTR = 2 * R7`, followed by a big-endian 16-bit data address from the selected IC51 bank.
 
 The receiving port is the `P2=0xFF, R0=0x10` XDATA location, written byte-by-byte:
 
 - `0xAF93` repeatedly reads a count byte. A zero count terminates the resource without a port write. Each nonzero block sends the count unchanged, three fixed preamble bytes, then exactly `count * 3` additional bytes. The count multiplication and loop bounds are directly visible in the firmware.
 - `0xB015` also repeats until a zero count terminates the resource without a port write. Each nonzero block sends `RR A(count)`—a circular rotate-right, not a logical shift—then three fixed preamble bytes followed by exactly `count` further bytes. The loop begins at the fourth byte; it does not repeat all four bytes for every count.
 
-`MASSFXProgramDirectory` and `MASSIC51PortStreamResolver` now parse this fixed table and both complete stream layouts, including every repeated nonzero block through the zero-count terminator. Tests compare all 21 table names/resource pairs with the real descrambled IC4 image and resolve both formats for every referenced resource in both IC51 banks. A Room example resolves bank-0 resources 0 and 1 to data addresses `0x24D4` and `0x2851`; resource 0 has two triplet blocks (the first has count `0x19`, a three-byte preamble (`00 CF 10`) and 75 payload bytes), while resource 1 has one rotated-header block (`0xBF`, three preamble bytes and 127 payload bytes).
+`MASSFXProgramDirectory` and `MASSIC51PortStreamResolver` now parse this fixed table and both complete stream layouts, including every repeated nonzero block through the zero-count terminator. Tests compare all 21 table names/resource pairs with the real descrambled IC4 image and resolve both formats for every referenced resource in both IC51 banks. A Room example resolves bank-0 FX1 resource 0 and FX2 resource 1 to data addresses `0x24D4` and `0x2851`; FX1 resource 0 has two triplet blocks (the first has count `0x19`, a three-byte preamble (`00 CF 10`) and 75 payload bytes), while FX2 resource 1 has one rotated-header block (`0xBF`, three preamble bytes and 127 payload bytes).
 
 This is an exact reconstruction of resource selection and port framing, not an effect-DSP implementation. The meaning of the opaque mode byte, the semantics of the stream payloads, the receiving IC, and the actual reverberation/delay algorithms remain unverified. These bytes must not be labelled PCM merely because they are uploaded to the sound device.
 
@@ -253,6 +253,14 @@ For the already tested table entry R7=`0x48`, the source/count headers resolve t
 **Still unknown:** what physical IC or logic owns the `0xC000` XDATA window, whether the copied bytes are PCM, compressed samples, wavetable data, or another representation, and how the `0xAC` completion marker is generated. The C++ regression test now reconstructs all 13,647 transferred bytes through the ROM-derived address permutation and compares them byte-for-byte with the IC51 source block; it also verifies the final physical write at `0xF5B2`. The disassembly and test prove the copy protocol and memory mapping, not the receiving chip identity or audio encoding. The next implementation target is therefore an accurate paged external-XDATA model for this transfer protocol, with the handshake represented explicitly; audio decoding must wait until the stored data format is identified.
 
  
+## 10. Runtime FX selector normalization (IC4 0x7FF2)
+
+The FX table uses direct zero-based indexes 0..20. The firmware helper beginning at `0x7FF2` reads the selected byte from XDATA `0x7BFE`, writes it to `0x3098`, then executes `CLR C; SUBB A,#0x15`. Inputs below `0x15` are retained; inputs `0x15` and above are replaced with `0x14`. The later lookup at `0x8004` multiplies `0x3098` by `0x20` and indexes the 21-entry table at `0x8423`.
+
+Therefore the effective FX selector is always in the range 0..20; raw values 21..127 collapse to entry 20 (`no Effect`). The processor's Common FX1/FX2 values are now normalized to the same maximum when loaded from factory Performance data, changed through their MIDI controllers, or restored from saved plugin state. `MASSCommonControlStore` applies the same clamp at the engine boundary.
+
+**Important unresolved connection:** the current firmware fixture's `0x7BFE` read is served by an explicitly synthetic writable-RAM overlay and returned `0x00`; the trace proves the read → `0x3098` → clamp → table-index path, but it does not prove how the physical instrument sources that byte from its two Performance FX fields. The emulator must not claim that FX1/FX2 playback is active until the `0x7BFE` source path is mapped and the receiving DSP protocol is identified.
+
 ## 11. FX1 / FX2 pair semantics confirmed by the owner manual
 
 The owner manual's effect table gives both processors 21 parallel menu positions, but their algorithms differ by processor. FX1 positions 1..21 are Room, Small Room, Warm Room, Chamber 1/2, Plate 1/2, Hall, Large Hall, Cathedral, Gated Reverb 1/2/3, Early Reflection 1..4, Raindrops, HQ-Delay, LongDelay and no Effect. FX2 positions 1..21 are Chorus 1/2/3, Flanger 1/2, Phaser 1/2, Panning, Short-Delay, Long-Delay, HQ-Delay, Ping-Pong, Gated-Delay, Special FX, Equalizer 1/2, Wah Wah + Overdrive, Auto Wah Wah, Warm Overdrive, Distortion and no Effect.
@@ -261,10 +269,3 @@ The IC4 directory at `0x8423` stores one record for each shared index. Routine `
 
 Menu labels are one-based (1..21); the firmware's table index is zero-based (0..20). Thus index 0 is FX1 Room / FX2 Chorus 1, and index 20 is no Effect for both. Values at or above 21 are clamped to 20 by IC4 at `0x7FF2`.
 
-## 10. Runtime FX selector normalization (IC4 0x7FF2)
-
-The FX table uses direct zero-based indexes 0..20. The firmware helper beginning at `0x7FF2` reads the selected byte from XDATA `0x7BFE`, writes it to `0x3098`, then executes `CLR C; SUBB A,#0x15`. Inputs below `0x15` are retained; inputs `0x15` and above are replaced with `0x14`. The later lookup at `0x8004` multiplies `0x3098` by `0x20` and indexes the 21-entry table at `0x8423`.
-
-Therefore the effective FX selector is always in the range 0..20; raw values 21..127 collapse to entry 20 (`no Effect`). The processor's Common FX1/FX2 values are now normalized to the same maximum when loaded from factory Performance data, changed through their MIDI controllers, or restored from saved plugin state. `MASSCommonControlStore` applies the same clamp at the engine boundary.
-
-**Important unresolved connection:** the current firmware fixture's `0x7BFE` read is served by an explicitly synthetic writable-RAM overlay and returned `0x00`; the trace proves the read → `0x3098` → clamp → table-index path, but it does not prove how the physical instrument sources that byte from its two Performance FX fields. The emulator must not claim that FX1/FX2 playback is active until the `0x7BFE` source path is mapped and the receiving DSP protocol is identified.
