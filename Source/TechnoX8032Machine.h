@@ -30,7 +30,19 @@ static_assert(externalAudioRegisterAddress(ExternalAudioRegister::register3) == 
 
 class TechnoX8032Machine final : public MCS51Bus {
 public:
+    struct SoundHostBusContext {
+        std::uint16_t instructionPC = 0;
+        std::uint64_t machineCycle = 0;
+        std::uint8_t deviceIndex = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool soundDeviceResetReleased = true;
+    };
     struct SoundCommandPacket {
+        // Bus state sampled independently at each of the four writes.
+        std::array<SoundHostBusContext, 4> byteContext{};
         // Snapshot of sequential writes to the undocumented 0x8000-0x8003
         // external register window. The register meanings are not established.
         std::array<std::uint8_t, 4> bytes{};
@@ -265,6 +277,7 @@ public:
         soundHostTransactionActive_ = false;
         soundHostExpectedRegister_ = 0;
         soundHostTransactionBytes_.fill(0);
+        soundHostTransactionContext_.fill(SoundHostBusContext{});
         soundHostBurstWordCount_ = 0;
         soundHostBurstWordTrace_.fill(SoundHostBurstWordEvent{});
         soundHostBurstLowPending_ = false;
@@ -859,6 +872,16 @@ public:
                 }
             }
 
+            auto& byteContext = soundHostTransactionContext_[index];
+            byteContext.instructionPC = instructionPC;
+            byteContext.machineCycle = elapsedMachineCycles_;
+            byteContext.deviceIndex = soundHostCommandLatch_;
+            byteContext.port2 = portPins_[2];
+            byteContext.port3 = portPins_[3];
+            byteContext.soundBusMode = internal_[0x8e];
+            byteContext.ic51Selected = isIC51Selected();
+            byteContext.soundDeviceResetReleased = soundDeviceResetReleased_;
+
             auto& hostWrite = soundHostWriteTrace_[
                 soundHostWriteCount_ % soundHostWriteTrace_.size()];
             hostWrite.registerIndex = static_cast<std::uint8_t>(index);
@@ -899,6 +922,7 @@ public:
                     auto& packet = soundCommandTrace_[
                         soundCommandPacketCount_ % soundCommandTrace_.size()];
                     packet.bytes = soundHostTransactionBytes_;
+                    packet.byteContext = soundHostTransactionContext_;
                     packet.instructionPC = instructionPC;
                     const auto stackPointer = cpu_.registers().sp;
                     const auto returnHigh = readIndirect(stackPointer);
@@ -1294,6 +1318,7 @@ private:
     bool soundHostTransactionActive_ = false;
     std::uint8_t soundHostExpectedRegister_ = 0;
     std::array<std::uint8_t, 4> soundHostTransactionBytes_{};
+    std::array<SoundHostBusContext, 4> soundHostTransactionContext_{};
     std::array<SoundHostBurstWordEvent, 2048> soundHostBurstWordTrace_{};
     std::size_t soundHostBurstWordCount_ = 0;
     bool soundHostBurstLowPending_ = false;
