@@ -61,3 +61,14 @@ Therefore:
 ## Reproducibility
 
 The assertions and trace output are in `tests/test_technox_8032_machine.cpp`, in the section beginning with the `programAndNote` stimulus. The test records packet bytes, instruction PC, caller return PC, and machine-cycle timestamp for each command-port packet.
+
+## Additional source-level qualification
+
+Inspection of the regression assertions narrows the interpretation further:
+
+- The stimulus is a single five-byte sequence, `C0 05 90 3C 64`; Program Change and Note On are not isolated. The observed 553-packet delta therefore cannot be assigned to Note On specifically.
+- The test asserts calls to `0x57A8`, `0x5671`, and `0x4256`, plus at least one call to the four-byte writer `0x0DB7`. It does **not** assert that `0x1494` is entered by this MIDI stimulus, and explicitly notes that the IC51 helper `0x1494` is not deterministically entered.
+- The test comments identify the 32-entry section as a loop through `0x0DF7`, calling `0x0E1A`; its two groups of 16 are separated by a control-port write from `0x0DE4`. This is stronger call-site evidence than merely grouping packets by return PC, but still does not reveal what the external device does with them.
+- The fixture asserts packet count and selected packet boundaries/shapes, not the complete semantic mapping of all 553 packets and not a voice-start/voice-stop event. Its own comment says full MIDI-to-voice dispatch is not asserted until the SoundHost path is modeled.
+
+The immediate experiment must therefore use four separately booted, identically initialized machines (or a deterministic snapshot facility): (a) Program Change only, (b) Note On only after the same program is already selected, (c) Note Off only after a note-on baseline, and (d) velocity/note substitutions. Compare full packet streams, not only counts. Keep the synthetic ready response labelled as a test fixture in every result.
