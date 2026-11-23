@@ -55,14 +55,20 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     const auto drawPointer = [&g](float x, float value, float radius) {
         const float angle = juce::degreesToRadians(-135.0f + juce::jlimit(0.0f, 1.0f, value) * 270.0f);
         const juce::Point<float> c(x, kKnobY);
-        g.setColour(juce::Colour(0xffe7eaed));
-        g.drawLine(c.x, c.y, c.x + std::sin(angle) * radius,
-                   c.y - std::cos(angle) * radius, 2.5f);
+        const juce::Point<float> tip(c.x + std::sin(angle) * radius,
+                                     c.y - std::cos(angle) * radius);
+        // Dark underlay separates the indicator from the knob's highlights;
+        // the wider white stroke remains clearly visible at every angle.
+        g.setColour(juce::Colour(0xff08090a));
+        g.drawLine(c.x, c.y, tip.x, tip.y, 5.5f);
+        g.setColour(juce::Colours::white);
+        g.drawLine(c.x, c.y, tip.x, tip.y, 3.5f);
+        g.fillEllipse(tip.x - 2.0f, tip.y - 2.0f, 4.0f, 4.0f);
     };
-    drawPointer(kParameterX, static_cast<float>(selectedParameter) / 23.0f, 17.0f);
+    drawPointer(kParameterX, static_cast<float>(selectedParameter) / 23.0f, 21.0f);
     drawPointer(kValueX, descriptor != nullptr && descriptor->maximum > 0
-        ? static_cast<float>(juce::jmax(0, raw)) / static_cast<float>(descriptor->maximum) : 0.0f, 17.0f);
-    drawPointer(kVolumeX, audioProcessor.getOutputGain(), 13.0f);
+        ? static_cast<float>(juce::jmax(0, raw)) / static_cast<float>(descriptor->maximum) : 0.0f, 21.0f);
+    drawPointer(kVolumeX, audioProcessor.getOutputGain(), 14.0f);
 
     g.setColour(editMode ? juce::Colour(0xff1c7a27) : juce::Colour(0xff25282b));
     g.setFont(juce::Font(8.5f, juce::Font::bold));
