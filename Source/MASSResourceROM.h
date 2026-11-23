@@ -1673,4 +1673,45 @@ public:
     }
 };
 
+
+ // Startup-time decoded catalog. Audio-thread lookups are fixed-index and do
+ // not parse descriptors or allocate vectors; each voice uses its captured
+ // bank/program pair to select one immutable resolved stream.
+class MASSResourceProgramCatalog {
+public:
+    static constexpr std::size_t kProgramCount = 4u * 128u;
+
+    bool load(const MASSResourceROM& rom, bool firmwareFlag0ASet = false) {
+        std::array<MASSResolvedProgramResource, kProgramCount> parsed{};
+        for (int bank = 0; bank < 4; ++bank) {
+            for (int sound = 0; sound < 128; ++sound) {
+                auto& resource = parsed[static_cast<std::size_t>(bank * 128 + sound)];
+                if (!MASSResourceProgramResolver::resolve(
+                        rom, bank, sound, resource, firmwareFlag0ASet))
+                    return false;
+            }
+        }
+        resources_ = std::move(parsed);
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+
+    const MASSResolvedProgramResource* find(int bank, int sound) const noexcept {
+        if (!loaded_ || bank < 0 || bank >= 4 || sound < 0 || sound >= 128)
+            return nullptr;
+        return &resources_[static_cast<std::size_t>(bank * 128 + sound)];
+    }
+
+    void clear() noexcept {
+        resources_ = {};
+        loaded_ = false;
+    }
+
+private:
+    std::array<MASSResolvedProgramResource, kProgramCount> resources_{};
+    bool loaded_ = false;
+};
+
 } // namespace technox
