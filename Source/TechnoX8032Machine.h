@@ -646,7 +646,8 @@ public:
         if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
             pc == 0x0a4fu || pc == 0x22f8u ||
-            pc == 0x211fu || pc == 0x236bu) {
+            pc == 0x211fu || pc == 0x236bu ||
+            pc == 0x224cu || pc == 0x2301u) {
             const auto& registers = cpu_.registers();
             auto& event = instructionWatchTrace_[
                 instructionWatchCount_ % instructionWatchTrace_.size()];
