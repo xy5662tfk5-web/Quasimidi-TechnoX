@@ -1,6 +1,15 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
+#include "TechnoXPartModel.h"
 #include <cmath>
+
+namespace {
+constexpr float kParameterX = 568.0f;
+constexpr float kValueX = 674.0f;
+constexpr float kVolumeX = 1012.0f;
+constexpr float kKnobY = 68.0f;
+constexpr int kPartFirstParameter = 0;
+}
 
 QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
     QuasimidiTechnoXAudioProcessor& processor)
@@ -11,16 +20,12 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
                                static_cast<int>(BinaryData::technox_front_panel_svgSize)));
     if (svg != nullptr)
         frontPanel = juce::Drawable::createFromSVG(*svg);
-
     setSize(1200, 132);
     setResizable(false, false);
     startTimerHz(12);
 }
 
-void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
-{
-    repaint();
-}
+void QuasimidiTechnoXAudioProcessorEditor::timerCallback() { repaint(); }
 
 void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
 {
@@ -29,74 +34,127 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         frontPanel->drawWithin(g, getLocalBounds().toFloat(),
                                juce::RectanglePlacement::stretchToFit, 1.0f);
 
-    // Dynamic LCD content replaces the artwork's placeholder text.
-    g.setColour(juce::Colour(0xff8dcc43));
+    const auto* descriptor = technox::PartEditModel::descriptor(
+        static_cast<std::size_t>(selectedParameter));
+    const int raw = audioProcessor.getPartParameterRaw(
+        audioProcessor.getCurrentProgram(), selectedPart,
+        static_cast<technox::PartParameter>(selectedParameter));
+    const int shown = raw < 0 || descriptor == nullptr ? 0 : raw + descriptor->displayOffset;
+    const auto line1 = juce::String("P") + juce::String(selectedPart + 13) +
+        (editMode ? " EDIT " : " ") + (descriptor != nullptr ? descriptor->name : "Parameter");
+    const auto line2 = raw < 0 ? juce::String("No part data") :
+        juce::String(shown) + "  " + audioProcessor.getCurrentPartSoundName(selectedPart);
+
+    g.setColour(juce::Colour(0xff75cc56));
     g.fillRoundedRectangle(266.0f, 47.0f, 176.0f, 42.0f, 2.0f);
     g.setColour(juce::Colour(0xff142605));
-    g.setFont(juce::Font("Courier New", 17.0f, juce::Font::bold));
-    g.drawText("TECHNOX", 274, 48, 160, 17, juce::Justification::centredLeft, false);
     g.setFont(juce::Font("Courier New", 13.0f, juce::Font::bold));
-    const auto programLine = juce::String(audioProcessor.getCurrentProgram() + 1)
-        .paddedLeft('0', 3) + " " + audioProcessor.getCurrentPerformanceName();
-    g.drawText(programLine.substring(0, 21), 274, 68, 160, 17,
-               juce::Justification::centredLeft, false);
+    g.drawText(line1.substring(0, 22), 272, 49, 164, 16, juce::Justification::centredLeft);
+    g.drawText(line2.substring(0, 22), 272, 68, 164, 16, juce::Justification::centredLeft);
 
-    // Draw the volume pointer from the actual processor gain, not a static SVG mark.
-    const float gain = audioProcessor.getOutputGain();
-    const float angle = juce::degreesToRadians(-135.0f + gain * 270.0f);
-    const juce::Point<float> centre(1012.0f, 68.0f);
-    const juce::Point<float> tip(centre.x + std::sin(angle) * 13.0f,
-                                 centre.y - std::cos(angle) * 13.0f);
-    g.setColour(juce::Colour(0xff202225));
-    g.fillEllipse(994.0f, 50.0f, 36.0f, 36.0f);
-    g.setColour(juce::Colour(0xffe7eaed));
-    g.drawLine(centre.x, centre.y, tip.x, tip.y, 2.6f);
-    g.setColour(juce::Colour(0xff25282b));
-    g.fillEllipse(centre.x - 2.2f, centre.y - 2.2f, 4.4f, 4.4f);
+    const auto drawPointer = [&g](float x, float value, float radius) {
+        const float angle = juce::degreesToRadians(-135.0f + juce::jlimit(0.0f, 1.0f, value) * 270.0f);
+        const juce::Point<float> c(x, kKnobY);
+        g.setColour(juce::Colour(0xffe7eaed));
+        g.drawLine(c.x, c.y, c.x + std::sin(angle) * radius,
+                   c.y - std::cos(angle) * radius, 2.5f);
+    };
+    drawPointer(kParameterX, static_cast<float>(selectedParameter) / 23.0f, 17.0f);
+    drawPointer(kValueX, descriptor != nullptr && descriptor->maximum > 0
+        ? static_cast<float>(juce::jmax(0, raw)) / static_cast<float>(descriptor->maximum) : 0.0f, 17.0f);
+    drawPointer(kVolumeX, audioProcessor.getOutputGain(), 13.0f);
 
-    g.setColour(juce::Colour(0xff181a1c));
+    g.setColour(editMode ? juce::Colour(0xff1c7a27) : juce::Colour(0xff25282b));
     g.setFont(juce::Font(8.5f, juce::Font::bold));
-    g.drawText(juce::String(static_cast<int>(std::lround(gain * 100.0f))) + "%",
-               988, 91, 48, 11, juce::Justification::centred, false);
+    g.drawText(editMode ? "EDIT" : "PLAY", 740, 56, 32, 10, juce::Justification::centred);
+    g.drawText(juce::String(static_cast<int>(std::lround(audioProcessor.getOutputGain() * 100.0f))) + "%",
+               988, 91, 48, 11, juce::Justification::centred);
 }
 
-void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+void QuasimidiTechnoXAudioProcessorEditor::selectNextParameter(int delta)
 {
-    const auto p = event.position;
-    if (p.x >= 987.0f && p.x <= 1037.0f && p.y >= 43.0f && p.y <= 94.0f) {
-        draggingVolume = true;
-        volumeAtDragStart = audioProcessor.getOutputGain();
+    selectedParameter = (selectedParameter + delta + 24) % 24;
+    repaint();
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::changeSelectedValue(int delta)
+{
+    const auto parameter = static_cast<technox::PartParameter>(selectedParameter);
+    const auto* descriptor = technox::PartEditModel::descriptor(static_cast<std::size_t>(selectedParameter));
+    if (descriptor == nullptr) return;
+    const int current = audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
+                                                            selectedPart, parameter);
+    if (current < 0) return;
+    audioProcessor.setPartParameterRaw(audioProcessor.getCurrentProgram(), selectedPart, parameter,
+        juce::jlimit(0, static_cast<int>(descriptor->maximum), current + delta));
+    repaint();
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
+{
+    const auto p = e.position;
+    if (p.x >= 986 && p.x <= 1038 && p.y >= 42 && p.y <= 96) {
+        dragTarget = DragTarget::volume;
         dragStartY = p.y;
-        audioProcessor.setOutputGain(juce::jlimit(0.0f, 1.0f,
-            1.0f - (p.y - 43.0f) / 51.0f));
-        repaint();
+        dragStartValue = audioProcessor.getOutputGain();
+        return;
+    }
+    if (p.x >= 540 && p.x <= 596 && p.y >= 40 && p.y <= 98) {
+        dragTarget = DragTarget::parameter;
+        dragStartY = p.y;
+        dragStartValue = static_cast<float>(selectedParameter);
+        return;
+    }
+    if (p.x >= 646 && p.x <= 702 && p.y >= 40 && p.y <= 98) {
+        dragTarget = DragTarget::value;
+        dragStartY = p.y;
+        const int v = audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
+            selectedPart, static_cast<technox::PartParameter>(selectedParameter));
+        dragStartValue = static_cast<float>(juce::jmax(0, v));
         return;
     }
 
-    // The two small PART/BANK keys remain usable for quick navigation.
-    if (p.y >= 80.0f && p.y <= 104.0f && p.x >= 730.0f && p.x <= 820.0f) {
-        const int direction = p.x < 776.0f ? -1 : 1;
-        const int next = juce::jlimit(0, audioProcessor.getNumPrograms() - 1,
-                                      audioProcessor.getCurrentProgram() + direction);
-        audioProcessor.setCurrentProgram(next);
+    if (p.x >= 742 && p.x <= 771 && p.y >= 38 && p.y <= 58) {
+        editMode = !editMode; // EDIT enters edit mode; OK confirms the current raw value.
+        repaint();
+        return;
+    }
+    if (p.x >= 780 && p.x <= 809 && p.y >= 38 && p.y <= 58) {
+        editMode = false; // EXIT leaves edit mode without altering stored performance data.
+        repaint();
+        return;
+    }
+    if (p.y >= 82 && p.y <= 101 && p.x >= 742 && p.x <= 809) {
+        selectedPart = juce::jlimit(0, 3, selectedPart + (p.x < 776 ? -1 : 1));
         repaint();
     }
 }
 
-void QuasimidiTechnoXAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
+void QuasimidiTechnoXAudioProcessorEditor::mouseDrag(const juce::MouseEvent& e)
 {
-    if (draggingVolume)
-        updateVolumeFromDrag(event.position.y);
+    updateFromDrag(e.position.y);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
 {
-    draggingVolume = false;
+    dragTarget = DragTarget::none;
 }
 
-void QuasimidiTechnoXAudioProcessorEditor::updateVolumeFromDrag(float y)
+void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
 {
-    const float delta = (y - dragStartY) / 100.0f;
-    audioProcessor.setOutputGain(volumeAtDragStart - delta);
+    const float delta = (dragStartY - y) / 2.5f;
+    if (dragTarget == DragTarget::volume) {
+        audioProcessor.setOutputGain(dragStartValue + delta / 100.0f);
+    } else if (dragTarget == DragTarget::parameter) {
+        selectedParameter = juce::jlimit(0, 23, static_cast<int>(std::lround(dragStartValue + delta)));
+    } else if (dragTarget == DragTarget::value && editMode) {
+        const auto* descriptor = technox::PartEditModel::descriptor(static_cast<std::size_t>(selectedParameter));
+        if (descriptor != nullptr) {
+            const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum),
+                static_cast<int>(std::lround(dragStartValue + delta)));
+            audioProcessor.setPartParameterRaw(audioProcessor.getCurrentProgram(), selectedPart,
+                static_cast<technox::PartParameter>(selectedParameter), next);
+        }
+    }
     repaint();
 }
