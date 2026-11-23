@@ -178,6 +178,12 @@ public:
         std::array<std::uint8_t, 8> registers{};
         // [0] is direct IRAM 0x2B; [1..8] are direct IRAM 0x30..0x37.
         std::array<std::uint8_t, 9> ram2BAnd30To37{};
+        // Selected state used by the recovered 0x1C61 interpolation path:
+        // [0]=direct 0x2F, [1]=0x34, [2]=0x40, [3..5]=0x05..0x07,
+        // [6]=0x3F. 0x9E/0x9F are upper IRAM indirect reads, not SFRs.
+        std::array<std::uint8_t, 7> selectedDirectRam{};
+        std::uint8_t indirectRam9E = 0;
+        std::uint8_t indirectRam9F = 0;
         std::uint8_t accumulator = 0;
         std::uint8_t b = 0;
         std::uint8_t psw = 0;
@@ -408,6 +414,11 @@ public:
         executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
         executionDataAccessTraceCount_ = 0;
         executionTraceWindowStartPC_ = 0;
+        executionTraceStartPC_ = 0;
+        executionTraceEndPC_ = 0x210fu;
+        executionTraceMaxWindows_ = 1u;
+        executionTraceCompletedWindows_ = 0u;
+        executionTraceDynamicStart_ = true;
         executionTraceArmed_ = false;
         executionTraceActive_ = false;
         ic51ReadTrace_.fill(IC51ReadEvent{});
@@ -499,6 +510,30 @@ public:
         executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
         executionDataAccessTraceCount_ = 0;
         executionTraceWindowStartPC_ = 0;
+        executionTraceStartPC_ = 0;
+        executionTraceEndPC_ = 0x210fu;
+        executionTraceMaxWindows_ = 1u;
+        executionTraceCompletedWindows_ = 0u;
+        executionTraceDynamicStart_ = true;
+        executionTraceArmed_ = true;
+        executionTraceActive_ = false;
+    }
+
+    // Arms a repeatable instruction window from an exact firmware entry PC to
+    // an exact consumer PC. The ending instruction is included in the trace.
+    void armExecutionTraceWindowForTesting(std::uint16_t startPC,
+                                           std::uint16_t endPC,
+                                           std::size_t maximumWindows = 1u) noexcept {
+        executionInstructionTrace_.fill(ExecutionInstructionEvent{});
+        executionInstructionTraceCount_ = 0;
+        executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
+        executionDataAccessTraceCount_ = 0;
+        executionTraceWindowStartPC_ = 0;
+        executionTraceStartPC_ = startPC;
+        executionTraceEndPC_ = endPC;
+        executionTraceMaxWindows_ = std::max<std::size_t>(1u, maximumWindows);
+        executionTraceCompletedWindows_ = 0u;
+        executionTraceDynamicStart_ = false;
         executionTraceArmed_ = true;
         executionTraceActive_ = false;
     }
@@ -555,8 +590,11 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
+        const bool executionTraceStartReached = executionTraceDynamicStart_
+            ? (pc == 0x1fc9u || pc == 0x2027u)
+            : pc == executionTraceStartPC_;
         if (executionTraceArmed_ && !executionTraceActive_ &&
-            (pc == 0x1fc9u || pc == 0x2027u)) {
+            executionTraceStartReached) {
             executionTraceActive_ = true;
             executionTraceWindowStartPC_ = pc;
         }
@@ -590,9 +628,20 @@ public:
             for (std::size_t index = 0; index < 8; ++index)
                 event.ram2BAnd30To37[index + 1u] = readInternal(
                     static_cast<std::uint8_t>(0x30u + index));
+            constexpr std::array<std::uint8_t, 7> selectedAddresses{{
+                0x2fu, 0x34u, 0x40u, 0x05u, 0x06u, 0x07u, 0x3fu
+            }};
+            for (std::size_t index = 0; index < selectedAddresses.size(); ++index)
+                event.selectedDirectRam[index] = readInternal(selectedAddresses[index]);
+            event.indirectRam9E = readIndirect(0x9eu);
+            event.indirectRam9F = readIndirect(0x9fu);
             ++executionInstructionTraceCount_;
-            if (pc == 0x210fu)
+            if (pc == executionTraceEndPC_) {
                 executionTraceActive_ = false;
+                ++executionTraceCompletedWindows_;
+                if (executionTraceCompletedWindows_ >= executionTraceMaxWindows_)
+                    executionTraceArmed_ = false;
+            }
         }
         if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
@@ -1664,6 +1713,11 @@ private:
     std::array<ExecutionDataAccessEvent, 8192> executionDataAccessTrace_{};
     std::size_t executionDataAccessTraceCount_ = 0;
     std::uint16_t executionTraceWindowStartPC_ = 0;
+    std::uint16_t executionTraceStartPC_ = 0;
+    std::uint16_t executionTraceEndPC_ = 0x210fu;
+    std::size_t executionTraceMaxWindows_ = 1u;
+    std::size_t executionTraceCompletedWindows_ = 0u;
+    bool executionTraceDynamicStart_ = true;
     bool executionTraceArmed_ = false;
     bool executionTraceActive_ = false;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
