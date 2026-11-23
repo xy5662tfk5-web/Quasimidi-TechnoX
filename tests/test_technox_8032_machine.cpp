@@ -617,11 +617,15 @@ int main(int argc, char** argv) {
                     assert(fxCatalog.find(bankIndex, fx2Index) != nullptr);
                 }
             }
-            // Entries 0..19 occur in the factory bank; entry 20 is the
-            // firmware's explicit "no Effect" fallback at the upper clamp.
-            for (std::size_t index = 0; index < 20u; ++index)
-                assert(usedFX[index]);
-            assert(!usedFX[20u]);
+            // Exact set of indices used by the 50 factory Performances.
+            // Some directory entries are deliberately not selected by this bank.
+            constexpr std::array<bool, technox::MASSFXProgramDirectory::kEntryCount>
+                expectedFactoryFX{{
+                    true, true, true, true, true, true, true,
+                    true, true, true, true, true, true, true,
+                    false, true, false, false, true, true, false
+                }};
+            assert(usedFX == expectedFactoryFX);
 
             // Performance 6 ("Fantasy") carries direct FX indices 0 and 5.
             const auto& fantasyCommon = factoryFrames[1u * 6u + 1u].bytes;
