@@ -115,6 +115,7 @@ public:
         std::uint16_t stackReturnPC = 0;
         std::uint8_t port3 = 0xff;
         std::uint8_t soundBusMode = 0;
+        bool syntheticTestOverlay = false;
         std::uint64_t machineCycle = 0;
     };
     struct ExternalWindowEvent {
@@ -581,6 +582,19 @@ public:
         }
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
             const auto value = testExternalRam7000_[address - 0x7000u];
+            if (address >= 0x7c00u) {
+                auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = false;
+                event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                event.stackReturnPC = currentStackReturnPC();
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
+                event.syntheticTestOverlay = true;
+                event.machineCycle = elapsedMachineCycles_;
+                ++unmappedBusTraceCount_;
+            }
             if (address >= 0x7bd0u && address <= 0x7bd7u) {
                 auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
                 event.address = address;
@@ -767,6 +781,19 @@ public:
 
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
             testExternalRam7000_[address - 0x7000u] = value;
+            if (address >= 0x7c00u) {
+                auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = true;
+                event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                event.stackReturnPC = currentStackReturnPC();
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
+                event.syntheticTestOverlay = true;
+                event.machineCycle = elapsedMachineCycles_;
+                ++unmappedBusTraceCount_;
+            }
             if (address >= 0x7bd0u && address <= 0x7bd7u) {
                 auto& event = externalWindowTrace_[externalWindowTraceCount_ % externalWindowTrace_.size()];
                 event.address = address;
