@@ -50,6 +50,14 @@ Branch: `research/original-technox-audio-engine`
 - Tests cover loading the full catalog, all 512 indexed entries, and invalid bank/program indices.
 - Together with `VoiceSlot.bankNumber/soundNumber`, this establishes the program-identity handoff needed by a resource-backed voice backend. The catalog still contains firmware resource commands, not decoded PCM waveforms.
 
+## Predecoded resource catalog now reaches the voice backend
+
+- The plugin now loads the complete 512-entry IC51 program catalog once during processor construction, after validating the raw ROM image.
+- `MASSAudioEngine` publishes a read-only catalog pointer to the active `IMASSVoiceBackend`. Replacing the backend also forwards the same catalog pointer to the new backend.
+- Each `VoiceSlot` already captures its bank/program pair at Note On. A backend can now resolve that pair directly to the firmware-parsed descriptor and command stream without parsing ROM data, allocating, or consulting editor state in the audio callback.
+- A regression probe in `test_mass_resource_rom` verifies that Part 13 bank 2 / sound 10 reaches the backend and resolves the same descriptor and command count as the catalog.
+- This is a data-path integration milestone, not synthesis: `BasicMASSVoiceBackend` remains the generic oscillator test backend, and the resource commands still do not describe decoded PCM or a proven DSP algorithm.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
