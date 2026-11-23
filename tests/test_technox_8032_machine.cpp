@@ -85,6 +85,11 @@ int main(int argc, char** argv) {
     assert(command[0] == 0x11 && command[1] == 0x22);
     assert(command[2] == 0x33 && command[3] == 0x44);
     assert(machine.readExternal(0x8000) == 0x11);
+    // The peripheral response is independent from the command just written.
+    assert(machine.readExternal(0x8001) == 0xff);
+    assert(machine.readExternal(0x8002) == 0xff);
+    assert(machine.readExternal(0x8003) == 0xff);
+    machine.setSoundHostResponseForTesting(0x11u, {{0x22u, 0x33u, 0x44u}});
     assert(machine.readExternal(0x8001) == 0x22);
     assert(machine.readExternal(0x8002) == 0x33);
     assert(machine.readExternal(0x8003) == 0x44);
@@ -95,9 +100,10 @@ int main(int argc, char** argv) {
     const auto& burstWord = machine.soundHostBurstWordAt(0);
     assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
     assert(burstWord.value == 0x4433u);
-    machine.writeExternal(0x8003u, 0x40u); // 0x0DCE handshake strobe
-    machine.writeExternal(0x8003u, 0xc0u); // opposite strobe phase
-    assert(machine.readExternal(0x8003u) == 0x44u); // payload survives strobes
+    machine.writeExternal(0x8003u, 0x40u); // control-phase write observed in 0x0DCE
+    machine.writeExternal(0x8003u, 0xc0u); // opposite control phase
+    assert(machine.readExternal(0x8003u) == 0x44u); // response is not overwritten by host writes
+    assert(machine.soundHostPayloadForTesting(0x11u)[2] == 0x44u);
     machine.writeExternal(0x8003u, 0x80u); // standalone R4 payload update
     assert(machine.soundCommandPacketCount() == 1u);
     assert(machine.soundHostBurstWordCount() == 1u);
@@ -115,7 +121,7 @@ int main(int argc, char** argv) {
     // not a fabricated 16-bit echo from only registers 2 and 3.
     assert(machine.readExternal(0x8001u) == 0x22u);
     assert(machine.readExternal(0x8002u) == 0x33u);
-    assert(machine.readExternal(0x8003u) == 0x80u);
+    assert(machine.readExternal(0x8003u) == 0x44u); // outgoing payload is never read back as device response
 
     // 8032 upper IRAM and direct SFR reads are separate address spaces.
     machine.writeIndirect(0x80, 0x5a);
