@@ -806,6 +806,7 @@ int main(int argc, char** argv) {
             const auto packetBefore = firmwareMachine.soundCommandPacketCount();
             const auto burstBefore = firmwareMachine.soundHostBurstWordCount();
             const auto hostWriteBefore = firmwareMachine.soundHostWriteCount();
+            const auto hostReadBefore = firmwareMachine.soundHostReadCount();
             const auto writerBefore = firmwareMachine.watchedCallCount(0x0db7u);
             const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
             const auto eventBefore = firmwareMachine.watchedCallCount(0x5671u);
@@ -852,6 +853,7 @@ int main(int argc, char** argv) {
                 drain = firmwareMachine.runForMachineCycles(5000000u);
             }
             const auto packetAfter = firmwareMachine.soundCommandPacketCount();
+            const auto hostReadAfter = firmwareMachine.soundHostReadCount();
             const auto peripheralTraceAfter = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceAfter = firmwareMachine.xdataWatchTraceCount();
             std::printf("Real IC51 MIDI %s: instructions=%zu drain=%zu PC=%04X "
@@ -887,6 +889,22 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4803u) - statusGateBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x02d1u) - pitchTableBefore),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
+            std::printf("  SoundHost reads=+%zu\\n", hostReadAfter - hostReadBefore);
+            for (std::size_t i = hostReadBefore; i < hostReadAfter; ++i) {
+                const auto& event = firmwareMachine.soundHostReadAt(i);
+                std::printf("    R%u=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
+                            "mode=%u IC51=%u reset=%u cycle=%llu\\n",
+                            static_cast<unsigned>(event.registerIndex),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.returnPC),
+                            static_cast<unsigned>(event.port2),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.soundBusMode),
+                            static_cast<unsigned>(event.ic51Selected),
+                            static_cast<unsigned>(event.soundDeviceResetReleased),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
             const auto firstTrace = peripheralTraceAfter > 4096u
                 ? peripheralTraceAfter - 4096u : 0u;
             for (std::size_t i = std::max(firstTrace, peripheralTraceBefore);
