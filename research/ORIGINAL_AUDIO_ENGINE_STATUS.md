@@ -43,6 +43,13 @@ Branch: `research/original-technox-audio-engine`
 - This closes a real integration gap: a future resource-backed DSP backend can now identify the exact IC51 program for each active voice without consulting UI/editor state.
 - This is program routing metadata only. The current `BasicMASSVoiceBackend` remains a generic test synthesizer; no PCM/sample playback or original DSP behavior is claimed.
 
+## Predecoded IC51 program catalog
+
+- Added `MASSResourceProgramCatalog`: startup-time resolution of all 512 bank/program pairs into a fixed-index catalog.
+- Lookup by bank and sound is bounds-checked and returns a resolved descriptor/command-stream view; it does not parse ROM data or allocate on the lookup path.
+- Tests cover loading the full catalog, all 512 indexed entries, and invalid bank/program indices.
+- Together with `VoiceSlot.bankNumber/soundNumber`, this establishes the program-identity handoff needed by a resource-backed voice backend. The catalog still contains firmware resource commands, not decoded PCM waveforms.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
