@@ -890,8 +890,9 @@ void testActualBulkBlockLoader(const char* path) {
     assert(payload0.size() == 13647u && payload1.size() == 9588u);
     assert(payload0.front() == 0x00 && payload1.front() == 0x18);
 
-    // Exercise the firmware's logical-R0 -> physical-byte permutation and
-    // page increment independently of the still-unrecovered IC4 lookup bytes.
+    // Exercise the page-boundary behavior with a synthetic map. The real
+    // IC4 table is checked byte-for-byte in test_technox_8032_machine.cpp,
+    // which also executes the firmware's actual 13,647-byte transfer.
     std::array<std::uint8_t, 256> addressMap{};
     for (std::size_t i = 0; i < addressMap.size(); ++i)
         addressMap[i] = static_cast<std::uint8_t>(i);
