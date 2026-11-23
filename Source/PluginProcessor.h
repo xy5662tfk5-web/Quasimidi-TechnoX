@@ -69,6 +69,7 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MASSResourceROM resourceROM;
+    technox::MASSResourceProgramCatalog resourceProgramCatalog;
     std::unique_ptr<technox::TechnoX8032Machine> firmwareMachine;
     mutable std::array<technox::MASSResolvedProgramResource, 4> resolvedResources{};
     mutable std::array<int, 4> resolvedResourceBanks{{-1, -1, -1, -1}};
