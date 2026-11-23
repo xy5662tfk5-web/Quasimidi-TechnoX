@@ -1,4 +1,5 @@
 #include "../Source/TechnoX8032Machine.h"
+#include "../Source/MASSResourceROM.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -456,6 +457,39 @@ int main(int argc, char** argv) {
             assert(TechnoX8032Machine::unmapSoundMemoryLowAddress(mapped) == logical);
             assert(!mappedAddressSeen[mapped]);
             mappedAddressSeen[mapped] = true;
+        }
+
+        // Replay the real IC51 bank-0 bulk block through the exact 256-byte
+        // address map recovered from the descrambled IC4 ROM. This checks the
+        // complete firmware copy, including the final physical address.
+        if (!realIC51.empty()) {
+            std::array<std::uint8_t, 256> firmwareAddressMap{};
+            for (unsigned i = 0; i < firmwareAddressMap.size(); ++i)
+                firmwareAddressMap[i] =
+                    TechnoX8032Machine::mapSoundMemoryLowAddress(
+                        static_cast<std::uint8_t>(i));
+
+            technox::MASSIC51BulkBlockHeader block{};
+            assert(technox::MASSIC51BulkBlockHeader::parse(
+                realIC51.data(), 0x10000u, 0x48, block));
+            assert(block.sourceAddress == 0x3c64u);
+            assert(block.firmwareByteCount() == 0x354fu);
+
+            std::vector<std::uint8_t> stagedXdata(0x3600u, 0xeeu);
+            std::uint16_t lastPhysicalAddress = 0;
+            assert(technox::MASSIC51BulkBlockHeader::copyPayloadToPagedXdata(
+                realIC51.data(), 0x10000u, block, firmwareAddressMap.data(),
+                stagedXdata.data(), stagedXdata.size(), 0xc000u,
+                &lastPhysicalAddress));
+            assert(lastPhysicalAddress == 0xf5b2u);
+            for (std::size_t i = 0; i < block.firmwareByteCount(); ++i) {
+                const auto physicalOffset = (i & ~std::size_t{0xffu}) +
+                    firmwareAddressMap[i & 0xffu];
+                const auto sourceAddress = static_cast<std::uint16_t>(
+                    block.sourceAddress + i);
+                assert(stagedXdata[physicalOffset] ==
+                       realIC51[sourceAddress]);
+            }
         }
         firmwareMachine.reset();
         // The reset vector is a two-machine-cycle LJMP to EB32. A budget of
