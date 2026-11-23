@@ -1119,6 +1119,53 @@ int main(int argc, char** argv) {
             std::printf("\\n");
         }
 
+        // Search all firmware-visible control pages for populated 16-slot
+        // records; the active page can change during resource interpretation.
+        for (unsigned page = 0; page <= 0x38u; ++page) {
+            unsigned nonzero = 0;
+            std::array<std::uint8_t, 144> values{};
+            for (unsigned offset = 0x70u; offset <= 0xffu; ++offset) {
+                const auto address = static_cast<std::uint16_t>(
+                    (page << 8) | offset);
+                const auto value = firmwareMachine.xdataByteForTesting(address);
+                values[offset - 0x70u] = value;
+                if (value != 0) ++nonzero;
+            }
+            if (nonzero == 0) continue;
+            std::printf("  MASS-PAGE[%02X] nonzero=%u:",
+                        page, nonzero);
+            unsigned shown = 0;
+            for (unsigned offset = 0x70u; offset <= 0xffu && shown < 24u; ++offset) {
+                const auto value = values[offset - 0x70u];
+                if (value == 0) continue;
+                std::printf(" %02X=%02X", offset, static_cast<unsigned>(value));
+                ++shown;
+            }
+            std::printf("\\n");
+        }
+        for (unsigned page = 0x70u; page <= 0x7fu; ++page) {
+            unsigned nonzero = 0;
+            std::array<std::uint8_t, 144> values{};
+            for (unsigned offset = 0x70u; offset <= 0xffu; ++offset) {
+                const auto address = static_cast<std::uint16_t>(
+                    (page << 8) | offset);
+                const auto value = firmwareMachine.testExternalRamByteForTesting(address);
+                values[offset - 0x70u] = value;
+                if (value != 0) ++nonzero;
+            }
+            if (nonzero == 0) continue;
+            std::printf("  MASS-EXT-PAGE[%02X] nonzero=%u:",
+                        page, nonzero);
+            unsigned shown = 0;
+            for (unsigned offset = 0x70u; offset <= 0xffu && shown < 24u; ++offset) {
+                const auto value = values[offset - 0x70u];
+                if (value == 0) continue;
+                std::printf(" %02X=%02X", offset, static_cast<unsigned>(value));
+                ++shown;
+            }
+            std::printf("\\n");
+        }
+
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
