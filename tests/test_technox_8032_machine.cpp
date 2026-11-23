@@ -606,8 +606,8 @@ int main(int argc, char** argv) {
             assert(roomBlock.dataAddress == 0x24d4u);
             assert(roomBlock.sourceCount == 0x19u);
             assert(roomBlock.preamble[0] == 0x00u);
-            assert(roomBlock.preamble[1] == 0x06u);
-            assert(roomBlock.preamble[2] == 0x00u);
+            assert(roomBlock.preamble[1] == 0xcfu);
+            assert(roomBlock.preamble[2] == 0x10u);
             assert(roomBlock.payload.size() == 75u);
             assert(roomBlock.portWriteByteCount == 79u);
             assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
