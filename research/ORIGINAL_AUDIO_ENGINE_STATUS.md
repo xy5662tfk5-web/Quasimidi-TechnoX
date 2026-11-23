@@ -120,3 +120,9 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 - The 21-entry directory is therefore indexed 0..20; 20 is `no Effect`. `MASSCommonControlStore`, Performance-bank loading, controller updates and saved-state restoration now normalize FX1/FX2 to this range.
 - Regression coverage verifies both the endpoint 20 and clamping of 21 / 127 to 20.
 - The current trace reads `0x7BFE=0x00` from an explicit synthetic test RAM overlay. This validates the firmware branch mechanics, not the real-world source mapping from Performance FX fields. Runtime FX selection and DSP effects are not yet implemented.
+
+## FX1 / FX2 resources now use explicit processor names
+
+- The owner's manual confirms paired 21-position effect menus: FX1 is the reverb/room/delay family, while FX2 is the chorus/flanger/phaser/panning/short-delay and special-effects family.
+- IC4 `0x8004` reads the record's first selector and calls `0xAF93`, then reads the second selector and calls `0xB015`. The catalog fields and tests now identify these as FX1 and FX2 resources.
+- Effect menu labels are one-based 1..21, whereas firmware uses zero-based table indices 0..20; both processor index 0 is the first menu type and index 20 is no Effect.
