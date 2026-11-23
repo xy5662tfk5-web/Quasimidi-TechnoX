@@ -27,8 +27,13 @@ int main() {
     assert(engine.getCommonControl(MASSCommonControl::performanceMode) == 3);
     assert(!engine.setCommonControl(MASSCommonControl::performanceMode, 4));
     assert(engine.getCommonControl(MASSCommonControl::fx1Type) == -1);
+    assert(engine.setCommonControl(MASSCommonControl::fx1Type, 20));
+    assert(engine.getCommonControl(MASSCommonControl::fx1Type) == 20);
+    // Firmware 0x7FF2 clamps every FX selector >= 0x15 to index 0x14.
     assert(engine.setCommonControl(MASSCommonControl::fx1Type, 21));
-    assert(engine.getCommonControl(MASSCommonControl::fx1Type) == 21);
+    assert(engine.getCommonControl(MASSCommonControl::fx1Type) == 20);
+    assert(engine.setCommonControl(MASSCommonControl::fx2Type, 127));
+    assert(engine.getCommonControl(MASSCommonControl::fx2Type) == 20);
     assert(engine.setCommonControl(MASSCommonControl::arpResolution, 3));
     assert(!engine.setCommonControl(MASSCommonControl::arpResolution, 4));
     engine.clearCommonControl(MASSCommonControl::fx1Type);
