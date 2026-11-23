@@ -382,7 +382,7 @@ class IMASSVoiceBackend {
 public:
     virtual ~IMASSVoiceBackend() = default;
     virtual void setProgramCatalog(const MASSResourceProgramCatalog*) noexcept {}
-    virtual void setFXResourceCatalog(const MASSFX1ResourceCatalog*) noexcept {}
+    virtual void setFX1ResourceCatalog(const MASSFX1ResourceCatalog*) noexcept {}
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
@@ -435,7 +435,7 @@ public:
         voices_.reset();
         backend_ = backend != nullptr ? backend : &nullBackend_;
         backend_->setProgramCatalog(programCatalog_);
-        backend_->setFXResourceCatalog(fxResourceCatalog_);
+        backend_->setFX1ResourceCatalog(fx1ResourceCatalog_);
         if (prepared_)
             backend_->prepare(preparedSampleRate_, preparedMaximumBlockSize_);
     }
@@ -453,12 +453,12 @@ public:
     // Immutable startup-decoded IC4/IC51 FX directory and upload streams.
     // The backend receives both banks without having to parse or allocate
     // resources in the real-time callback.
-    void setFXResourceCatalog(const MASSFX1ResourceCatalog* catalog) noexcept {
-        fxResourceCatalog_ = catalog;
-        backend_->setFXResourceCatalog(fxResourceCatalog_);
+    void setFX1ResourceCatalog(const MASSFX1ResourceCatalog* catalog) noexcept {
+        fx1ResourceCatalog_ = catalog;
+        backend_->setFX1ResourceCatalog(fx1ResourceCatalog_);
     }
-    const MASSFX1ResourceCatalog* fxResourceCatalog() const noexcept {
-        return fxResourceCatalog_;
+    const MASSFX1ResourceCatalog* fx1ResourceCatalog() const noexcept {
+        return fx1ResourceCatalog_;
     }
 
     void prepare(double sampleRate, int maximumBlockSize) {
@@ -824,7 +824,7 @@ private:
     NullMASSVoiceBackend nullBackend_;
     IMASSVoiceBackend* backend_;
     const MASSResourceProgramCatalog* programCatalog_ = nullptr;
-    const MASSFX1ResourceCatalog* fxResourceCatalog_ = nullptr;
+    const MASSFX1ResourceCatalog* fx1ResourceCatalog_ = nullptr;
     double preparedSampleRate_ = 44100.0;
     int preparedMaximumBlockSize_ = 0;
     bool prepared_ = false;
