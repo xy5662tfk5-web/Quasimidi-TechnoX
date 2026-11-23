@@ -761,12 +761,11 @@ int main(int argc, char** argv) {
                              static_cast<unsigned>(fx2Runtime.xdataByteForTesting(0x30b9u)));
                 for (std::size_t i = 0; i < fx2Runtime.ic51ReadTraceCount(); ++i) {
                     const auto& event = fx2Runtime.ic51ReadTraceAt(i);
-                    std::fprintf(stderr, "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X P3=%02X\\n",
+                    std::fprintf(stderr, "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X\\n",
                                  i, static_cast<unsigned>(event.bank),
                                  static_cast<unsigned>(event.address),
                                  static_cast<unsigned>(event.value),
-                                 static_cast<unsigned>(event.instructionPC),
-                                 static_cast<unsigned>(event.p3));
+                                 static_cast<unsigned>(event.instructionPC));
                 }
                 for (std::size_t i = 0; i < std::min<std::size_t>(
                          fx2Runtime.ff10WriteCount(), 12u); ++i) {
