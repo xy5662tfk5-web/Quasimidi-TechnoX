@@ -1114,9 +1114,9 @@ private:
 };
 
 
-// IC4 v1.05's 21 fixed FX records at 0x8423. The firmware reads the two
-// IC51 resource selectors from record offsets +0x0B and +0x0C. The remaining
-// bytes are retained verbatim; their DSP meanings are not assigned here.
+// IC4 v1.05's 21 FX1 algorithm records at 0x8423 (Room/Reverb family).
+// The firmware reads two IC51 upload-stream selectors from offsets +0x0B
+// and +0x0C. They are neutral stream A/B selectors, not FX1/FX2 processor IDs.
 struct MASSFX1ProgramRecord {
     std::uint8_t index = 0;
     std::array<char, 11> name{};
