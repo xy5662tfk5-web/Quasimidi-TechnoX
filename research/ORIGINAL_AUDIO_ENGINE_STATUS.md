@@ -155,3 +155,24 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 
 - The manual's menu labels are one-based 1..21, while firmware directory indices are zero-based 0..20. Index 0 represents the first named algorithm; index 20 is `no Effect`.
 - FX1 and FX2 share the numeric range, but their directory contents, stream selectors and catalog pointers must remain separate.
+
+
+## Latest Note On resource-transfer and velocity-register checkpoint
+
+The isolated second Note On fixture now records both the IC51 resource-upload path and the register inputs immediately before the velocity-sensitive packet builder.
+
+- The second Note On stage executes 14,522 IC51 reads and emits 549 four-byte SoundHost transactions / 549 paired burst words.
+- The filtered stream-loader trace contains 384 writes from the `0xAF93` path and 35 from the separate `0xB015` path. These are observed port writes, not yet classified as PCM samples.
+- A byte-exact sub-check covers 60 bank-0 IC51 reads made at `PC=0xAFF5`, caller `0x8031`. Each has a matching `FF10` write at `PC=0xAFFE`, the same caller, exactly six machine cycles later, and the same byte value.
+- With the same Part/program/note (note 64), changing MIDI velocity from 100 to 50 changes the fourth of the first five commands from `0A 00 78 00` to `0A 00 98 02`; the other four remain byte-identical. Both events produce 549 transactions.
+- A test-only instruction watch captures the 8032 register bank immediately before `PC=0x210F`, ahead of the `0x211F -> 0x0DB7` packet write. For velocity 100 it records `R3=0x78, R4=0x78, RAM[0x2B]=0x0A`; for velocity 50 it records `R3=0x98, R4=0x9A, RAM[0x2B]=0x0A`. The packet builder uses `R3` and `R4 & 0x07`, producing the two observed command payloads.
+
+This is now a verified register-level correlation between MIDI velocity and the IC4 command-generation path. It does **not** establish that the changed fields are amplitude, envelope, sample position, or another particular DSP parameter. The test-only DSP-ready response remains synthetic. A new watched-call counter for helper `0x1848` has been added so the next CI trace can establish whether this velocity-sensitive path invokes that reconstructed fixed-point routine.
+
+## Updated immediate investigation
+
+1. Use the new `0x1848` call count on isolated velocity 100/50 events. If entered, capture its A/B/R2 inputs and return values to see whether the changed `R3/R4` fields originate in that arithmetic path.
+2. Trace the writers of `R3`, `R4` and `RAM[0x2B]` backwards from `0x210F`, retaining caller nesting and page-selected memory reads.
+3. Continue separating resource bytes uploaded through `FF10` from the parameter/command traffic sent through `0x8000–0x8003`.
+4. Identify the external sound processor and its ready/busy/ack protocol before implementing a device-specific host model.
+5. Locate the larger waveform/sample-memory path and establish its codec, address mapping, sample rates and loop representation before replacing the generic oscillator with an original-sound backend.
