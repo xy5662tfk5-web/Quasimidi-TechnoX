@@ -923,6 +923,28 @@ void testBankProgramResolver(const char* path) {
     assert(resolvedPairs.size() == 512);
     assert(resolvedDescriptors.size() == 512);
 
+    MASSResourceProgramCatalog catalog;
+    assert(!catalog.isLoaded());
+    assert(catalog.find(2, 10) == nullptr);
+    assert(catalog.load(rom));
+    assert(catalog.isLoaded());
+    assert(catalog.find(-1, 0) == nullptr);
+    assert(catalog.find(4, 0) == nullptr);
+    assert(catalog.find(0, 128) == nullptr);
+    for (int bank = 0; bank < 4; ++bank) {
+        for (int sound = 0; sound < 128; ++sound) {
+            const auto* cached = catalog.find(bank, sound);
+            assert(cached != nullptr);
+            assert(cached->bankNumber == bank);
+            assert(cached->soundNumber == sound);
+            assert(!cached->stream.truncated);
+        }
+    }
+    const auto* performanceOnePart13 = catalog.find(2, 10);
+    assert(performanceOnePart13 != nullptr);
+    assert(performanceOnePart13->descriptorAddress ==
+           resolvedDescriptors.empty() ? 0 : performanceOnePart13->descriptorAddress);
+
     // Performance 1 in TECHNOX.MID uses Part 13 = bank 2 / sound 10 and
     // Part 14 = bank 1 / sound 93. Keep their real IC51 descriptors and
     // command streams visible as the first concrete firmware playback cases.
