@@ -2018,6 +2018,49 @@ int main(int argc, char** argv) {
             std::printf("\\n");
         }
 
+        // Differentially hold pitch/Part/program constant and change only
+        // velocity. The preceding distinct-note probe used note 64 at velocity
+        // 100; this sends note 64 again at velocity 50 with the same ready-state
+        // fixture. Keep this trace separate from the preceding IC51 read dump.
+        const std::array<std::uint8_t, 3> sameNoteLowerVelocity{{0x90u, 0x40u, 0x32u}};
+        std::array<std::array<std::uint8_t, 4>, 5> referenceVelocityPackets{};
+        for (std::size_t i = 0; i < referenceVelocityPackets.size(); ++i)
+            referenceVelocityPackets[i] =
+                firmwareMachine.soundCommandPacketAt(secondNotePacketStart + i).bytes;
+        const auto lowerVelocityPacketStart = firmwareMachine.soundCommandPacketCount();
+        runRealMidiStage("Same note 64 with lower velocity 50",
+                         sameNoteLowerVelocity.data(), sameNoteLowerVelocity.size());
+        const auto lowerVelocityPacketCount =
+            firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
+        std::printf("MASS velocity differential: reference=note64/vel100 "
+                    "comparison=note64/vel50 packets=%zu\\n",
+                    lowerVelocityPacketCount);
+        const auto comparableVelocityPackets =
+            std::min<std::size_t>(referenceVelocityPackets.size(), lowerVelocityPacketCount);
+        for (std::size_t i = 0; i < comparableVelocityPackets; ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                lowerVelocityPacketStart + i);
+            std::uint8_t changedMask = 0;
+            for (std::size_t byte = 0; byte < packet.bytes.size(); ++byte) {
+                if (packet.bytes[byte] != referenceVelocityPackets[i][byte])
+                    changedMask |= static_cast<std::uint8_t>(1u << byte);
+            }
+            std::printf("  VELOCITY-CMD[%zu] ref=%02X %02X %02X %02X "
+                        "low=%02X %02X %02X %02X changed-bytes=%X "
+                        "ret=%04X\\n",
+                        i,
+                        static_cast<unsigned>(referenceVelocityPackets[i][0]),
+                        static_cast<unsigned>(referenceVelocityPackets[i][1]),
+                        static_cast<unsigned>(referenceVelocityPackets[i][2]),
+                        static_cast<unsigned>(referenceVelocityPackets[i][3]),
+                        static_cast<unsigned>(packet.bytes[0]),
+                        static_cast<unsigned>(packet.bytes[1]),
+                        static_cast<unsigned>(packet.bytes[2]),
+                        static_cast<unsigned>(packet.bytes[3]),
+                        static_cast<unsigned>(changedMask),
+                        static_cast<unsigned>(packet.returnPC));
+        }
+
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
