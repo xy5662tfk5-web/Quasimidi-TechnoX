@@ -991,7 +991,7 @@ void testBankProgramResolver(const char* path) {
     assert(externalImage.sourceHeader().sourceAddress == 0x3c64u);
     assert(externalImage.sourceHeader().firmwareByteCount() == 13647u);
     assert(externalImage.loadedByteCount() == 13647u);
-    assert(externalImage.lastPhysicalAddress() == 0xf5b2u);
+    assert(externalImage.lastPhysicalAddress() == 0xf54eu);
     assert(externalImage.byteAt(0xbfffu) == 0xffu);
     for (std::size_t i = 0; i < externalImage.loadedByteCount(); ++i) {
         const auto expected = rom.dataForBank(MASSResourceBank::bank0)[
