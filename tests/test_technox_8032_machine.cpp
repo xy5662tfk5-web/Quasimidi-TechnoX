@@ -766,7 +766,7 @@ int main(int argc, char** argv) {
                                  static_cast<unsigned>(event.address),
                                  static_cast<unsigned>(event.value),
                                  static_cast<unsigned>(event.instructionPC),
-                                 static_cast<unsigned>(event.port3));
+                                 static_cast<unsigned>(event.p3));
                 }
                 for (std::size_t i = 0; i < std::min<std::size_t>(
                          fx2Runtime.ff10WriteCount(), 12u); ++i) {
