@@ -87,3 +87,11 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 - The real-ROM 8032 integration test now executes the actual IC51 bank-0 transfer, verifies all 13,647 destination bytes against the IC51 source block after address permutation, and checks the final physical write at `0xF5B2`.
 - The independent C++ paging helper still has synthetic-map tests for page rollover and invalid destination sizes; the machine-level test covers the recovered firmware map and real transfer.
 - This confirms the firmware's staged memory image and address mapping. It does not identify the receiver, decode the copied data format, or establish PCM playback.
+
+ 
+## IC51 bulk-loader lookup inventory
+
+- Added `MASSIC51BulkBlockDirectory` to parse all 256 candidate lookup positions for a selected IC51 bank using the firmware-observed `DPTR = 2 * R7` and four-byte read.
+- The lookup positions are sliding windows, not independent four-byte records: adjacent positions overlap by two bytes. The catalog deliberately calls their aggregate lengths a *candidate byte-count sum*, not unique sample storage.
+- Regression anchors for the real v1.05 image: bank 0 candidate sum 7,484,183 bytes with 111 source-address wraps; bank 1 candidate sum 4,574,119 bytes with no wraps. Entry `0x48` remains the independently traced startup transfer: bank 0 `0x3C64 / 0x354F`, bank 1 `0x295C / 0x2574`.
+- This expands the audit surface for the 0xAF1A loader. It does not prove that all 256 indices are invoked, that the candidate lengths describe unique payloads, or that the copied data is PCM / ADPCM.
