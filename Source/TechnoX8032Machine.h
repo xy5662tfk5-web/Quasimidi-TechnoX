@@ -652,7 +652,7 @@ public:
                 soundEvent.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryReadTraceCount_;
             }
-            if (address >= 0x7c00u && address <= 0x7fffu) {
+            if ((address >= 0x7c00u && address <= 0x7fffu) || address == 0x7bfeu) {
                 auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
                 event.address = address;
                 event.value = value;
@@ -700,7 +700,7 @@ public:
                 (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
-                (address >= 0x3700u && address <= 0x370fu) || address == 0x3098u ||
+                (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
@@ -721,7 +721,7 @@ public:
 
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
             const auto value = testExternalRam7000_[address - 0x7000u];
-            if (address >= 0x7c00u) {
+            if (address >= 0x7c00u || address == 0x7bfeu) {
                 auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
                 event.address = address;
                 event.value = value;
