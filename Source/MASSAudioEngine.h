@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include "MASSModulationMatrix.h"
 #include "MASSVoiceManager.h"
 #include "TechnoXPartModel.h"
