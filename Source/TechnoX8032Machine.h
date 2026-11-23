@@ -532,10 +532,10 @@ public:
             ++ic51ReadsByBank_[bank];
             lastIC51ReadAddress_ = address;
             const auto value = ic51Rom_[bank * 0x10000u + address];
-            if ((address >= 0x2000u && address <= 0x23ffu) ||
-                (address >= 0x2900u && address <= 0x2bffu &&
+            if ((address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu)) {
                 auto& watch = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 watch.address = address;
@@ -605,10 +605,10 @@ public:
                 ++soundMemoryReadTraceCount_;
             }
             const auto value = xdata_[address];
-            if ((address >= 0x2000u && address <= 0x23ffu) ||
-                (address >= 0x2900u && address <= 0x2bffu &&
+            if ((address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
@@ -727,6 +727,7 @@ public:
                 (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
@@ -754,6 +755,7 @@ public:
                 (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
