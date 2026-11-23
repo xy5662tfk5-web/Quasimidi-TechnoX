@@ -628,13 +628,13 @@ int main(int argc, char** argv) {
                 assert(record->streamBResourceIndex == expectedFX2[index].streamBResource);
                 assert(record->modeByte == expectedFX2[index].mode);
                 std::size_t nameLength = 0;
-                while (expectedFX2[index].name[nameLength] != '\\0') {
+                while (expectedFX2[index].name[nameLength] != '\0') {
                     assert(record->name[nameLength] == expectedFX2[index].name[nameLength]);
                     ++nameLength;
                 }
                 for (std::size_t j = nameLength; j < technox::MASSFX2ProgramDirectory::kNameBytes; ++j)
-                    assert(record->name[j] == '\\0' || record->name[j] == ' ');
-                assert(record->name[technox::MASSFX2ProgramDirectory::kNameBytes] == '\\0');
+                    assert(record->name[j] == '\0' || record->name[j] == ' ');
+                assert(record->name[technox::MASSFX2ProgramDirectory::kNameBytes] == '\0');
             }
             assert(fx2Directory.find(-1) == nullptr);
             assert(fx2Directory.find(21) == nullptr);
