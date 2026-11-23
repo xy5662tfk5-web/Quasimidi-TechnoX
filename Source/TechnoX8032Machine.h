@@ -944,12 +944,15 @@ public:
                     packet.returnPC = static_cast<std::uint16_t>(
                         (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
                     packet.machineCycle = elapsedMachineCycles_;
-                    packet.deviceIndex = soundHostCommandLatch_;
-                    packet.port2 = portPins_[2];
-                    packet.port3 = portPins_[3];
-                    packet.soundBusMode = internal_[0x8e];
-                    packet.ic51Selected = isIC51Selected();
-                    packet.soundDeviceResetReleased = soundDeviceResetReleased_;
+                    // Packet-level context is the first byte's bus state;
+                    // byteContext retains any transitions across the four writes.
+                    packet.deviceIndex = packet.byteContext[0].deviceIndex;
+                    packet.port2 = packet.byteContext[0].port2;
+                    packet.port3 = packet.byteContext[0].port3;
+                    packet.soundBusMode = packet.byteContext[0].soundBusMode;
+                    packet.ic51Selected = packet.byteContext[0].ic51Selected;
+                    packet.soundDeviceResetReleased =
+                        packet.byteContext[0].soundDeviceResetReleased;
                     ++soundCommandPacketCount_;
                     soundHostTransactionActive_ = false;
                     soundHostExpectedRegister_ = 0;
