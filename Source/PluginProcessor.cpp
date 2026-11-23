@@ -65,6 +65,22 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
             firmwareMachine.reset();
         }
     }
+    if (firmwareMachine != nullptr && resourceROM.isLoaded()) {
+        // Extract the firmware-visible, descrambled IC4 code once on startup.
+        // The FX catalog then resolves both IC51 banks and every block stream
+        // before the real-time audio thread can access it.
+        std::array<std::uint8_t, technox::TechnoX8032Machine::kCodeSpaceSize>
+            firmwareCode{};
+        for (std::size_t address = 0; address < firmwareCode.size(); ++address)
+            firmwareCode[address] = firmwareMachine->readCode(
+                static_cast<std::uint16_t>(address));
+
+        if (resourceFXCatalog.load(
+                resourceROM, firmwareCode.data(), firmwareCode.size())) {
+            massEngine.setFXResourceCatalog(&resourceFXCatalog);
+        }
+    }
+
     initialisePartStates();
     initialiseCommonControlsFromBank();
     syncCurrentPerformanceToEngine();
