@@ -1,4 +1,5 @@
 #include "../Source/MASSResourceROM.h"
+#include "../Source/MASSAudioEngine.h"
 
 #include <algorithm>
 #include <array>
@@ -14,6 +15,34 @@
 using namespace technox;
 
 namespace {
+class ResourceCatalogProbeBackend final : public IMASSVoiceBackend {
+public:
+    void setProgramCatalog(const MASSResourceProgramCatalog* catalog) noexcept override {
+        catalog_ = catalog;
+    }
+    void prepare(double, int) override {}
+    void noteOn(int, const VoiceSlot& voice) noexcept override {
+        const auto* resource = catalog_ != nullptr
+            ? catalog_->find(voice.bankNumber, voice.soundNumber) : nullptr;
+        resolvedOnNote = resource != nullptr && !resource->stream.commands.empty();
+        if (resource != nullptr) {
+            descriptorAddress = resource->descriptorAddress;
+            commandCount = resource->stream.commands.size();
+        }
+    }
+    void noteOff(int, const VoiceSlot&) noexcept override {}
+    void resetVoice(int, const VoiceSlot&) noexcept override {}
+    bool isVoiceFinished(int) const noexcept override { return false; }
+    void render(float* const*, int, int, const VoiceManager&, const ModulationMatrix&,
+                const MASSPartParameterStore&, const MASSModulationSourceStore&,
+                const MASSPartRuntimeControlStore&, const MASSCommonControlStore&,
+                const MASSPerformanceImageStore&, const MASSDrumParameterStore&) noexcept override {}
+    bool resolvedOnNote = false;
+    std::uint16_t descriptorAddress = 0;
+    std::size_t commandCount = 0;
+private:
+    const MASSResourceProgramCatalog* catalog_ = nullptr;
+};
 void writePointerBE(std::vector<std::uint8_t>& image,
                     MASSResourceBank bank,
                     std::uint8_t index,
@@ -976,6 +1005,20 @@ void testBankProgramResolver(const char* path) {
     assert(performanceOnePart13->soundNumber == 10);
     assert(performanceOnePart13->descriptorAddress != 0);
     assert(performanceOnePart13->stream.commands.size() > 0);
+
+    // The same immutable, predecoded catalog is handed to the voice backend.
+    // A note captures its Part's bank/program pair, and the backend can resolve
+    // the exact firmware command stream without parsing ROM data on the audio thread.
+    ResourceCatalogProbeBackend probeBackend;
+    MASSAudioEngine resourceAwareEngine(&probeBackend);
+    resourceAwareEngine.setProgramCatalog(&catalog);
+    assert(resourceAwareEngine.programCatalog() == &catalog);
+    assert(resourceAwareEngine.setPartParameter(12, PartParameter::bankNumber, 2));
+    assert(resourceAwareEngine.setPartParameter(12, PartParameter::soundNumber, 10));
+    resourceAwareEngine.noteOn(12, 1, 60, 100);
+    assert(probeBackend.resolvedOnNote);
+    assert(probeBackend.descriptorAddress == performanceOnePart13->descriptorAddress);
+    assert(probeBackend.commandCount == performanceOnePart13->stream.commands.size());
 
     // Performance 1 in TECHNOX.MID uses Part 13 = bank 2 / sound 10 and
     // Part 14 = bank 1 / sound 93. Keep their real IC51 descriptors and
