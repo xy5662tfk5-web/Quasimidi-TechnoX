@@ -898,8 +898,17 @@ int main(int argc, char** argv) {
                         hostWriteAfter - hostWriteBefore,
                         hostWriteAfter - firstStageHostWrite,
                         firstStageHostWrite - hostWriteBefore);
+            std::array<std::size_t, 4> writesByRegister{};
+            std::array<std::size_t, 256> writesByDevice{};
+            std::size_t observedHandshakeStrobes = 0;
             for (std::size_t i = firstStageHostWrite; i < hostWriteAfter; ++i) {
                 const auto& event = firmwareMachine.soundHostWriteAt(i);
+                if (event.registerIndex < writesByRegister.size())
+                    ++writesByRegister[event.registerIndex];
+                ++writesByDevice[event.deviceIndex];
+                if (event.registerIndex == 3u &&
+                    (event.value == 0x40u || event.value == 0xc0u))
+                    ++observedHandshakeStrobes;
                 std::printf("    W%u=%02X dev=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
                             "mode=%u IC51=%u reset=%u cycle=%llu\\n",
                             static_cast<unsigned>(event.registerIndex),
@@ -918,6 +927,17 @@ int main(int argc, char** argv) {
             const auto firstRetainedHostRead = hostReadAfter > hostReadTraceCapacity
                 ? hostReadAfter - hostReadTraceCapacity : 0u;
             const auto firstStageHostRead = std::max(hostReadBefore, firstRetainedHostRead);
+            std::printf("  Write distribution: R0=%zu R1=%zu R2=%zu R3=%zu; "
+                        "known R3 strobes(40/C0)=%zu\\n",
+                        writesByRegister[0], writesByRegister[1],
+                        writesByRegister[2], writesByRegister[3],
+                        observedHandshakeStrobes);
+            std::printf("  Device-index write counts:");
+            for (std::size_t device = 0; device < writesByDevice.size(); ++device) {
+                if (writesByDevice[device] != 0u)
+                    std::printf(" %02zX:%zu", device, writesByDevice[device]);
+            }
+            std::printf("\\n");
             std::printf("  SoundHost reads=+%zu (retained=%zu, overwritten=%zu)\\n",
                         hostReadAfter - hostReadBefore,
                         hostReadAfter - firstStageHostRead,
