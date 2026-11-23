@@ -3253,7 +3253,7 @@ int main(int argc, char** argv) {
         // stream record as IC4 copies it into the active Part slot.
         const std::array<std::uint8_t, 3> pitchSourceProbe{{0x90u, 0x42u, 0x64u}};
         const auto pitchSourcePacketStart = firmwareMachine.soundCommandPacketCount();
-        firmwareMachine.armExecutionTraceWindowForTesting(0x1c61u, 0x1e67u, 1u);
+        firmwareMachine.armExecutionTraceWindowForTesting(0x1607u, 0x1e67u, 1u);
         runRealMidiStage("Note 66 velocity 100: trace pitch record 1C61 to 1E67",
                          pitchSourceProbe.data(), pitchSourceProbe.size());
         constexpr std::array<std::array<std::uint8_t, 4>, 5>
@@ -3288,6 +3288,7 @@ int main(int argc, char** argv) {
         std::vector<TechnoX8032Machine::ExecutionInstructionEvent>
             pitchSourceInstructions;
         pitchSourceInstructions.reserve(pitchSourceInstructionRetained);
+        std::size_t pitchDescriptorPointerLoadCount = 0;
         std::size_t pitchSourceEntryCount = 0;
         std::size_t pitchSourceTailCount = 0;
         for (std::size_t absolute = pitchSourceInstructionCount -
@@ -3296,11 +3297,14 @@ int main(int argc, char** argv) {
             const auto& event =
                 firmwareMachine.executionInstructionTraceAtForTesting(absolute);
             pitchSourceInstructions.push_back(event);
+            if (event.instructionPC == 0x1607u)
+                ++pitchDescriptorPointerLoadCount;
             if (event.instructionPC == 0x1c61u) ++pitchSourceEntryCount;
             if (event.instructionPC == 0x1e67u) ++pitchSourceTailCount;
             assert(event.opcodeBytes[0] ==
                    firmwareMachine.readCode(event.instructionPC));
         }
+        assert(pitchDescriptorPointerLoadCount == 1u);
         assert(pitchSourceEntryCount == 1u);
         assert(pitchSourceTailCount == 1u);
         const auto findPitchSourceStep = [&](std::uint16_t pc)
@@ -3311,6 +3315,12 @@ int main(int argc, char** argv) {
             assert(found != pitchSourceInstructions.end());
             return *found;
         };
+        const auto& pitchDescriptorPointerLow =
+            findPitchSourceStep(0x1607u);
+        const auto& pitchDescriptorPointerHigh =
+            findPitchSourceStep(0x160bu);
+        assert(pitchDescriptorPointerLow.stackReturnPC ==
+               pitchDescriptorPointerHigh.stackReturnPC);
         const auto& pitchSecondaryLookup =
             findPitchSourceStep(0x1dc8u);
         assert(pitchSecondaryLookup.registers[2] == 0x80u);
@@ -3391,6 +3401,25 @@ int main(int argc, char** argv) {
             pitchSourceData.push_back(
                 firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
         }
+        const auto pitchPointerLowRead = std::find_if(
+            pitchSourceData.begin(), pitchSourceData.end(),
+            [](const auto& event) {
+                return event.instructionPC == 0x1607u && !event.write;
+            });
+        const auto pitchPointerHighRead = std::find_if(
+            pitchSourceData.begin(), pitchSourceData.end(),
+            [](const auto& event) {
+                return event.instructionPC == 0x160bu && !event.write;
+            });
+        assert(pitchPointerLowRead != pitchSourceData.end());
+        assert(pitchPointerHighRead != pitchSourceData.end());
+        assert(pitchPointerLowRead->value == 0x0cu);
+        assert(pitchPointerHighRead->value == 0x16u);
+        assert(pitchPointerHighRead->address ==
+               static_cast<std::uint16_t>(pitchPointerLowRead->address + 1u));
+        assert(pitchDescriptorPointerLow.dptr == pitchPointerLowRead->address);
+        assert(pitchDescriptorPointerHigh.dptr == pitchPointerHighRead->address);
+
         const auto sawPitchSourceAccess = [&](std::uint16_t pc,
                                                std::uint16_t address,
                                                std::uint8_t value,
