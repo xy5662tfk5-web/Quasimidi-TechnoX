@@ -304,3 +304,29 @@ The regression now also runs `MASSResourceCommandFieldDecoder::decodePitchParame
 **Packet-byte correction:** the second pitch-handler packet observed for the Note 65 probe is `02 01 00 00` (not `02 00 00 00`). The regression assertion and the earlier CI writer trace both use `02 01 00 00`.
 
 The current CI checks are running for the new live-trace assertions and the real-ROM model test. The DSP-ready response in the broader Note On fixture is still synthetic, so these results confirm IC4's computation and bus writes, not an external DSP response or audible playback.
+
+
+
+## 0x09B9 fixed-point slot update: arithmetic now modelled and checked live
+
+The two windows from the Note 65 / velocity 100 probe now assert all 20 XDATA operations in order, the per-window entry registers, the two 0x09DA multiplier snapshots, and the packet bytes written by the live 0x0A4F callsite. Both passes return to outer caller 0x1E6A.
+
+The disassembly shows the common arithmetic sequence:
+- compare the incoming R5:R4 pair with the cached pair at the current slot offsets +0x0E/+0x0F; return early if unchanged, otherwise update the cached pair;
+- the positive path rotates the incoming 16-bit step through carry, producing the normalized multiplier observed as R5:R4 = 00:0D at 0x09DA;
+- multiply the three-byte slot vector by that 16-bit multiplier, retain the product shifted right by 16 bits, then add the increment back to the original three-byte vector;
+- the negative branch uses the same magnitude product and two's-complement-negates the increment before the addition;
+- the emitted packet carries the slot selector from direct RAM[0x2B] followed by the resulting low, middle, and masked high bytes.
+
+The C++ model is `MASS09B9SlotInterpolationArithmetic` in `Source/MASSResourceROM.h`. It masks the input high byte to three bits, calculates `(value24 * step16) >> 16`, applies the sign branch, and returns the 24-bit updated value. It does not name a musical unit or assume a particular external chip function.
+
+For the two live passes, the same normalized step `0x000D` gives:
+
+| Slot | Input bytes | 24-bit input | Increment | Updated value | Live packet |
+|---:|---|---:|---:|---:|---|
+| 0x80 | `57 01 A2` | `0x020157` | `0x00001A` | `0x020171` | `00 71 01 02` |
+| 0x90 | `01 00 48` | `0x000001` after high-byte mask | `0x000000` | `0x000001` | `02 01 00 00` |
+
+The arithmetic helper has standalone positive, negative, high-byte-mask, and zero-step tests. The live 8032 regression independently reconstructs each input from its exact XDATA reads, obtains the 16-bit multiplier from the captured R5:R4 state at PC `0x09DA`, runs the model, and asserts that its output equals R2:R3:R4 at the corresponding packet writer. Thus the model is checked against both real slot passes, not just synthetic inputs.
+
+The test fixture still supplies a synthetic DSP-ready response. These assertions prove the firmware's slot transform and packet construction; they do not establish the external processor's semantic interpretation or audible playback.
