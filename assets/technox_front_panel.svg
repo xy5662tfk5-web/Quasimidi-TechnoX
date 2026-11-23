@@ -106,4 +106,26 @@
       <path d="M144,-1 H150 L158,6.5 L167,-1 H173 L161.5,8.5 L175,20 H168.5 L158,11 L147.5,20 H141.5 L154.5,8.5 Z"/>
     </g>
   </g>
+
+  <!-- Replacement rotary controls: opaque overlays hide the original knob artwork. -->
+  <g id="replacement-knobs">
+    <g id="replacement-parameter">
+      <circle cx="568" cy="68" r="27.5" fill="#aeb3ba" stroke="#737981" stroke-width="1.2"/>
+      <circle cx="568" cy="68" r="24.5" fill="#17191c" stroke="#555b63" stroke-width="1.2"/>
+      <circle cx="568" cy="68" r="21.5" fill="url(#knob)" stroke="#08090a" stroke-width="1"/>
+      <circle cx="568" cy="68" r="17.5" fill="none" stroke="#454a51" stroke-width="0.8"/>
+    </g>
+    <g id="replacement-value">
+      <circle cx="674" cy="68" r="27.5" fill="#aeb3ba" stroke="#737981" stroke-width="1.2"/>
+      <circle cx="674" cy="68" r="24.5" fill="#17191c" stroke="#555b63" stroke-width="1.2"/>
+      <circle cx="674" cy="68" r="21.5" fill="url(#knob)" stroke="#08090a" stroke-width="1"/>
+      <circle cx="674" cy="68" r="17.5" fill="none" stroke="#454a51" stroke-width="0.8"/>
+    </g>
+    <g id="replacement-volume">
+      <circle cx="964" cy="68" r="19.5" fill="#aeb3ba" stroke="#737981" stroke-width="1.1"/>
+      <circle cx="964" cy="68" r="17" fill="#17191c" stroke="#555b63" stroke-width="1"/>
+      <circle cx="964" cy="68" r="14.5" fill="url(#knob)" stroke="#08090a" stroke-width="1"/>
+      <circle cx="964" cy="68" r="11.5" fill="none" stroke="#454a51" stroke-width="0.7"/>
+    </g>
+  </g>
 </svg>
