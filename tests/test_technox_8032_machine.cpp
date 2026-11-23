@@ -590,6 +590,34 @@ int main(int argc, char** argv) {
             // FX2 has a separate IC4 directory at 0x8F99 (0x2A-byte stride).
             technox::MASSFX2ProgramDirectory fx2Directory;
             assert(fx2Directory.load(firmwareCode.data(), firmwareCode.size()));
+
+            // Pin the independent FX2 firmware loader to the real IC4 image:
+            // XDATA 0x7C06 supplies the type index, values >= 0x15 clamp to
+            // 0x14, records are 0x2A bytes at 0x8F99, and the two stream
+            // selectors are uploaded through AF93/B015 respectively.
+            assert(firmwareMachine.readCode(0x88d3u) == 0x90u);
+            assert(firmwareMachine.readCode(0x88d4u) == 0x7cu);
+            assert(firmwareMachine.readCode(0x88d5u) == 0x06u);
+            assert(firmwareMachine.readCode(0x88dcu) == 0x94u);
+            assert(firmwareMachine.readCode(0x88ddu) == 0x15u);
+            assert(firmwareMachine.readCode(0x88e0u) == 0x74u);
+            assert(firmwareMachine.readCode(0x88e1u) == 0x14u);
+            assert(firmwareMachine.readCode(0x88eau) == 0x90u);
+            assert(firmwareMachine.readCode(0x88ebu) == 0x8fu);
+            assert(firmwareMachine.readCode(0x88ecu) == 0x99u);
+            assert(firmwareMachine.readCode(0x88edu) == 0x12u);
+            assert(firmwareMachine.readCode(0x88eeu) == 0xedu);
+            assert(firmwareMachine.readCode(0x88efu) == 0x12u);
+            assert(firmwareMachine.readCode(0x88feu) == 0x24u);
+            assert(firmwareMachine.readCode(0x88ffu) == 0x0bu);
+            assert(firmwareMachine.readCode(0x890cu) == 0x12u);
+            assert(firmwareMachine.readCode(0x890du) == 0xafu);
+            assert(firmwareMachine.readCode(0x890eu) == 0x93u);
+            assert(firmwareMachine.readCode(0x8916u) == 0x24u);
+            assert(firmwareMachine.readCode(0x8917u) == 0x0cu);
+            assert(firmwareMachine.readCode(0x8923u) == 0x12u);
+            assert(firmwareMachine.readCode(0x8924u) == 0xb0u);
+            assert(firmwareMachine.readCode(0x8925u) == 0x15u);
             struct ExpectedFX2 {
                 const char* name;
                 std::uint8_t streamAResource;
