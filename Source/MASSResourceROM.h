@@ -1956,6 +1956,8 @@ struct MASSResolvedProgramResource {
     MASSResourceSelection selection{};
     std::uint8_t bankNumber = 0;
     std::uint8_t soundNumber = 0;
+    // Cached interpreter outcome under this transient call-context flag.
+    // This is not a Performance/Part parameter or a persistent voice setting.
     bool firmwareFlag0ASet = false;
     std::uint16_t descriptorAddress = 0;
     MASSResourceDescriptor descriptor{};
@@ -2034,9 +2036,11 @@ public:
         return true;
     }
 
-    // Predecode both reachable 0x0A branches on the startup thread. The
-    // branch changes the handling of group-0 records and the final slot-fill
-    // behavior, so a voice backend must not be forced to decode it in realtime.
+    // Predecode both reachable 0x0A interpreter outcomes on the startup thread.
+    // Firmware sets/clears this bit at multiple temporary call sites; the two
+    // variants are cache alternatives, not a persistent Part/Performance flag.
+    // A backend must select using the context of the exact firmware operation
+    // it is reproducing.
     bool loadBothFirmwareFlagVariants(const MASSResourceROM& rom) {
         std::array<std::array<MASSResolvedProgramResource, kProgramCount>,
                    kFirmwareFlagVariantCount> parsed{};
