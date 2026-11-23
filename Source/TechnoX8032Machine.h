@@ -598,7 +598,8 @@ public:
                 ++soundMemoryReadTraceCount_;
             }
             const auto value = xdata_[address];
-            if ((address >= 0x2d00u && address <= 0x2dffu) ||
+            if ((address >= 0x2900u && address <= 0x2bffu) ||
+                (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
@@ -720,7 +721,8 @@ public:
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
-            if ((address >= 0x2d00u && address <= 0x2dffu) ||
+            if ((address >= 0x2900u && address <= 0x2bffu) ||
+                (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
