@@ -920,6 +920,52 @@ void testBankProgramResolver(const char* path) {
     assert(resolvedPairs.size() == 512);
     assert(resolvedDescriptors.size() == 512);
 
+    // Performance 1 in TECHNOX.MID uses Part 13 = bank 2 / sound 10 and
+    // Part 14 = bank 1 / sound 93. Keep their real IC51 descriptors and
+    // command streams visible as the first concrete firmware playback cases.
+    for (const auto request : {std::pair<int, int>{2, 10}, {1, 93}}) {
+        MASSResolvedProgramResource resolved{};
+        assert(MASSResourceProgramResolver::resolve(
+            rom, request.first, request.second, resolved));
+        std::array<std::size_t, 8> kindCounts{};
+        for (const auto& command : resolved.stream.commands)
+            ++kindCounts[static_cast<std::size_t>(command.kind)];
+        std::printf("Performance 1 resource bank=%d sound=%d pointerBank=%u "
+                    "pointerIndex=%02X P3=%02X descriptor=%04X stream=%04X "
+                    "bytes=%zu commands=%zu slots=%u output=%u filler=%u "
+                    "kindCounts=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\\n",
+                    request.first, request.second,
+                    static_cast<unsigned>(resolved.selection.bank),
+                    static_cast<unsigned>(resolved.selection.pointerIndex),
+                    static_cast<unsigned>(resolved.selection.p3BankMask),
+                    static_cast<unsigned>(resolved.descriptorAddress),
+                    static_cast<unsigned>(resolved.descriptor.commandStreamPointer),
+                    resolved.stream.bytesConsumed, resolved.stream.commands.size(),
+                    static_cast<unsigned>(resolved.stream.slotsConsumed),
+                    static_cast<unsigned>(resolved.stream.outputSlotsWritten),
+                    static_cast<unsigned>(resolved.stream.fillerSlotsWritten),
+                    kindCounts[0], kindCounts[1], kindCounts[2], kindCounts[3],
+                    kindCounts[4], kindCounts[5], kindCounts[6], kindCounts[7]);
+        const auto previewCount = std::min<std::size_t>(8, resolved.stream.commands.size());
+        for (std::size_t i = 0; i < previewCount; ++i) {
+            const auto& command = resolved.stream.commands[i];
+            std::printf("  PERF1-CMD[%zu] offset=%04X opcode=%02X kind=%u len=%u "
+                        "bytes=%02X %02X %02X %02X %02X %02X %02X %02X\\n",
+                        i, static_cast<unsigned>(command.bankOffset),
+                        static_cast<unsigned>(command.opcode),
+                        static_cast<unsigned>(command.kind),
+                        static_cast<unsigned>(command.length),
+                        static_cast<unsigned>(command.bytes[0]),
+                        static_cast<unsigned>(command.bytes[1]),
+                        static_cast<unsigned>(command.bytes[2]),
+                        static_cast<unsigned>(command.bytes[3]),
+                        static_cast<unsigned>(command.bytes[4]),
+                        static_cast<unsigned>(command.bytes[5]),
+                        static_cast<unsigned>(command.bytes[6]),
+                        static_cast<unsigned>(command.bytes[7]));
+        }
+    }
+
     MASSResolvedProgramResource invalid{};
     assert(!MASSResourceProgramResolver::resolve(rom, -1, 0, invalid));
     assert(!MASSResourceProgramResolver::resolve(rom, 4, 0, invalid));
