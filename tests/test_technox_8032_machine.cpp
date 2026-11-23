@@ -1806,6 +1806,24 @@ int main(int argc, char** argv) {
             assert(packet.returnPC == expectedNoteCommands[i].caller);
         }
 
+        // Preserve the final IC51 reads from this isolated event. The trace is
+        // a ring buffer; the most recent 64 entries retain the descriptor and
+        // stream tail that led to the observed SoundHost packets.
+        const auto ic51TraceEnd = firmwareMachine.ic51ReadTraceCount();
+        const auto ic51TraceBegin = ic51TraceEnd > 64u ? ic51TraceEnd - 64u : 0u;
+        std::printf("Second Note On IC51 read tail (%zu entries):\\n",
+                    ic51TraceEnd - ic51TraceBegin);
+        for (std::size_t i = ic51TraceBegin; i < ic51TraceEnd; ++i) {
+            const auto& event = firmwareMachine.ic51ReadTraceAt(i);
+            std::printf("  IC51 bank=%u addr=%04X value=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                        static_cast<unsigned>(event.bank),
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
+
         // Capture the firmware's 16-slot resource staging page. The page is
         // selected dynamically through internal RAM[0x2D], so do not assume
         // an XDATA address or hard-code a bank.
