@@ -895,15 +895,17 @@ int main(int argc, char** argv) {
         }};
         runRealMidiStage("SysEx load temporary Part 1 from Performance 1 Part 13",
                          temporaryPart1.data(), temporaryPart1.size());
-        runRealMidiStage("Note On Part 1 in Multi mode",
+        runRealMidiStage("Note On Part 1 baseline in Multi mode",
                          realNoteOn.data(), realNoteOn.size());
+        runRealMidiStage("Note Off Part 1 baseline in Multi mode",
+                         realNoteOff.data(), realNoteOff.size());
         // Diagnostic only: 0x4803 requires both 0x3703 and 0x7D95 nonzero.
         // 0x3703 is firmware-set; override 0x7D95 as a synthetic DSP-ready
         // response to reveal the downstream parameter/voice initialization.
         firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
         runRealMidiStage("Note On Part 1 with synthetic 7D95-ready response",
                          realNoteOn.data(), realNoteOn.size());
-        runRealMidiStage("Note Off Part 1 in Multi mode",
+        runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
