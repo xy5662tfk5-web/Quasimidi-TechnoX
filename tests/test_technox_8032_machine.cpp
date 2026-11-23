@@ -961,6 +961,10 @@ int main(int argc, char** argv) {
             const auto firstRetainedPeripheral = peripheralTraceAfter > unmappedTraceCapacity
                 ? peripheralTraceAfter - unmappedTraceCapacity : 0u;
             const auto firstStagePeripheral = std::max(peripheralTraceBefore, firstRetainedPeripheral);
+            std::printf("  Unknown-bus trace window: total=%zu retained=%zu overwritten=%zu\\n",
+                        peripheralTraceAfter - peripheralTraceBefore,
+                        peripheralTraceAfter - firstStagePeripheral,
+                        firstStagePeripheral - peripheralTraceBefore);
             std::size_t stage7CxxEvents = 0;
             for (std::size_t i = firstStagePeripheral; i < peripheralTraceAfter; ++i) {
                 const auto& event = firmwareMachine.unmappedBusTraceAt(i);
@@ -980,7 +984,7 @@ int main(int argc, char** argv) {
                             static_cast<unsigned long long>(event.machineCycle));
             }
             if (stage7CxxEvents == 0u)
-                std::printf("  Unknown 7Cxx bus traffic: none in this MIDI stage (or overwritten).\\n");
+                std::printf("  Unknown 7Cxx bus traffic: no retained accesses in this MIDI stage.\\n");
 
             const auto firstTrace = peripheralTraceAfter > 4096u
                 ? peripheralTraceAfter - 4096u : 0u;
