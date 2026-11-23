@@ -1497,6 +1497,7 @@ int main(int argc, char** argv) {
             const auto helper1742Before = firmwareMachine.watchedCallCount(0x1742u);
             const auto statusGateBefore = firmwareMachine.watchedCallCount(0x4803u);
             const auto pitchTableBefore = firmwareMachine.watchedCallCount(0x02d1u);
+            const auto fixedPoint1848Before = firmwareMachine.watchedCallCount(0x1848u);
             const auto ic51Before = firmwareMachine.ic51ReadCount();
             const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceBefore = firmwareMachine.xdataWatchTraceCount();
@@ -1535,7 +1536,7 @@ int main(int argc, char** argv) {
                         "1494=+%llu AC00=+%llu AC88=+%llu B34D=+%llu "
                         "16C3=+%llu 189D=+%llu 1009=+%llu 018D=+%llu "
                         "1780=+%llu 17D4=+%llu 0E8E=+%llu 1456=+%llu 1742=+%llu "
-                        "4803=+%llu 02D1=+%llu] IC51=+%llu\\n",
+                        "4803=+%llu 02D1=+%llu 1848=+%llu] IC51=+%llu\\n",
                         label, instructions, drain,
                         static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                         packetAfter - packetBefore,
@@ -1561,6 +1562,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1742u) - helper1742Before),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4803u) - statusGateBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x02d1u) - pitchTableBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1848u) - fixedPoint1848Before),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
             const auto hostWriteAfter = firmwareMachine.soundHostWriteCount();
             constexpr std::size_t hostWriteTraceCapacity = 4096u;
@@ -2071,9 +2073,11 @@ int main(int argc, char** argv) {
                 // Snapshot at PC 0x210F is taken before the packet builder.
                 // It must already contain the R3/R4 values that the writer emits.
                 assert(secondNoteInstructionWatch.registers[3] == 0x78u);
+                assert(secondNoteInstructionWatch.registers[4] == 0x78u);
                 assert((secondNoteInstructionWatch.registers[4] & 0x07u) == 0x00u);
                 assert(secondNoteInstructionWatch.directRam2B == 0x0au);
                 assert(lowerVelocityInstructionWatch.registers[3] == 0x98u);
+                assert(lowerVelocityInstructionWatch.registers[4] == 0x9au);
                 assert((lowerVelocityInstructionWatch.registers[4] & 0x07u) == 0x02u);
                 assert(lowerVelocityInstructionWatch.directRam2B == 0x0au);
                 std::printf("MASS 0x210F inputs: vel100 R3=%02X R4=%02X RAM2B=%02X; "
