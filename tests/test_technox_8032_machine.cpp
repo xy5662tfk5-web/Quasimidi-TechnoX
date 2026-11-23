@@ -771,6 +771,10 @@ int main(int argc, char** argv) {
             const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
             const auto eventBefore = firmwareMachine.watchedCallCount(0x5671u);
             const auto midiBefore = firmwareMachine.watchedCallCount(0x57a8u);
+            const auto descriptorBefore = firmwareMachine.watchedCallCount(0x1494u);
+            const auto descriptorReadBefore = firmwareMachine.watchedCallCount(0xac00u);
+            const auto descriptorAltBefore = firmwareMachine.watchedCallCount(0xac88u);
+            const auto helperB34DBefore = firmwareMachine.watchedCallCount(0xb34du);
             const auto dispatchBefore = firmwareMachine.watchedCallCount(0x16c3u);
             const auto streamBefore = firmwareMachine.watchedCallCount(0x189du);
             const auto scanBefore = firmwareMachine.watchedCallCount(0x1009u);
@@ -792,6 +796,7 @@ int main(int argc, char** argv) {
             std::printf("Real IC51 MIDI %s: instructions=%zu drain=%zu PC=%04X "
                         "packets=+%zu burstWords=+%zu hostWrites=+%zu "
                         "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu "
+                        "1494=+%llu AC00=+%llu AC88=+%llu B34D=+%llu "
                         "16C3=+%llu 189D=+%llu 1009=+%llu 018D=+%llu "
                         "1780=+%llu 17D4=+%llu 0E8E=+%llu 1456=+%llu 1742=+%llu] "
                         "IC51=+%llu\\n",
@@ -804,6 +809,10 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4256u) - partBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x5671u) - eventBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x57a8u) - midiBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1494u) - descriptorBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0xac00u) - descriptorReadBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0xac88u) - descriptorAltBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0xb34du) - helperB34DBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x16c3u) - dispatchBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x189du) - streamBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1009u) - scanBefore),
