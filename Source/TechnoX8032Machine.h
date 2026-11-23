@@ -75,7 +75,14 @@ public:
         std::uint8_t registerIndex = 0;
         std::uint8_t value = 0;
         std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
+        std::uint8_t deviceIndex = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool soundDeviceResetReleased = true;
     };
     struct SoundHostBurstWordEvent {
         std::uint16_t value = 0;
@@ -901,7 +908,14 @@ public:
             hostWrite.registerIndex = static_cast<std::uint8_t>(index);
             hostWrite.value = value;
             hostWrite.instructionPC = instructionPC;
+            hostWrite.returnPC = currentStackReturnPC();
             hostWrite.machineCycle = elapsedMachineCycles_;
+            hostWrite.deviceIndex = soundHostCommandLatch_;
+            hostWrite.port2 = portPins_[2];
+            hostWrite.port3 = portPins_[3];
+            hostWrite.soundBusMode = internal_[0x8e];
+            hostWrite.ic51Selected = isIC51Selected();
+            hostWrite.soundDeviceResetReleased = soundDeviceResetReleased_;
             ++soundHostWriteCount_;
 
             // Only a contiguous 0,1,2,3 sequence is captured as a complete
