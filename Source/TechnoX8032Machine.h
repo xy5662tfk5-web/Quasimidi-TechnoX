@@ -648,7 +648,7 @@ public:
                 address != testExternalReadOverrideAddresses_[i])
                 continue;
             const auto value = testExternalReadOverrideValues_[i];
-            if (address >= 0xc000u && address <= 0xffffu) {
+            if (address >= 0xc000u) {
                 ++soundMemoryReadCount_;
                 const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
                 ++soundMemoryReadsByMode_[mode];
