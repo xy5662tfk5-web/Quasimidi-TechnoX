@@ -365,6 +365,75 @@ void testMASSModulationScaleMode41() {
     assert(!MASSModulationScaleMode41::apply(view, 0x01, 0x80, 0x80, 0x7f, result));
 }
 
+void testMASS1EDDFullParameterPipeline() {
+    std::vector<std::uint8_t> romBytes(0x20000, 0xff);
+    for (std::size_t i = 0; i < 128u; ++i)
+        romBytes[0x1288u + i] = static_cast<std::uint8_t>(i);
+    for (std::size_t i = 0; i < 256u; ++i)
+        romBytes[0x1308u + i] = static_cast<std::uint8_t>(i);
+    const std::array<std::uint8_t, 8> modulationA{{
+        0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0
+    }};
+    const std::array<std::uint8_t, 8> modulationB{{
+        0x10, 0x20, 0x38, 0x50, 0x70, 0x90, 0xc0, 0xe0
+    }};
+    std::copy(modulationA.begin(), modulationA.end(), romBytes.begin() + 0x11e0);
+    std::copy(modulationB.begin(), modulationB.end(), romBytes.begin() + 0x11e8);
+
+    MASSFirmwareROMView view;
+    assert(view.attach(romBytes.data(), romBytes.size()));
+
+    MASS1EDDFullParameterPipelineResult result{};
+
+    // R4=0 bypasses the nonlinear table/external-read stage. The complete
+    // 0x41 path then applies the 0x11E0 coefficient table to R3.
+    assert(MASS1EDDFullParameterPipeline::process(
+        view, 0x41, 0x35, 0x40, 0x00, 0x00, 0x00,
+        0x1200, 0x00, 0x80, 0x00, 0x00,
+        0x00, 0x00, 0x80, 0x00, result));
+    assert(!result.nonlinearAndExternal.nonlinearLookupPerformed);
+    assert(!result.nonlinearAndExternal.externalReadRequired);
+    assert(result.nonlinearAndExternal.coefficientB == 0x40);
+    assert(result.slotCoefficient.modulationApplied);
+    assert(result.slotCoefficient.coefficientB == 0x20);
+
+    // The 0x01 selector uses the alternate 0x1890 arithmetic on RAM[0x43].
+    assert(MASS1EDDFullParameterPipeline::process(
+        view, 0x01, 0x10, 0x40, 0x00, 0x00, 0x00,
+        0x1200, 0x00, 0x80, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x80, result));
+    assert(result.slotCoefficient.modulationApplied);
+    assert(result.slotCoefficient.coefficientB ==
+           MASS1890Arithmetic::apply(0x80, 0x40));
+
+    // The 0x40 selector takes the complementary RAM[0x41] branch.
+    assert(MASS1EDDFullParameterPipeline::process(
+        view, 0x40, 0x10, 0x40, 0x00, 0x00, 0x00,
+        0x1200, 0x00, 0x80, 0x00, 0x00,
+        0x00, 0x00, 0x80, 0x00, result));
+    assert(result.slotCoefficient.modulationApplied);
+    assert(result.slotCoefficient.coefficientB ==
+           MASS1890Arithmetic::apply(0x80, 0x40));
+
+    // Mask 0x00 bypasses both the slot scale and modulation arithmetic.
+    assert(MASS1EDDFullParameterPipeline::process(
+        view, 0x00, 0x10, 0x40, 0x00, 0x00, 0x00,
+        0x1200, 0x00, 0x80, 0x00, 0x00,
+        0x00, 0x00, 0x80, 0x80, result));
+    assert(!result.slotCoefficient.slotOpcodeScaleApplied);
+    assert(!result.slotCoefficient.modulationApplied);
+    assert(result.slotCoefficient.coefficientB == 0x40);
+
+    // Opcode bit1 selects the two-stage RL/MUL scale before the modulation
+    // dispatch; RAM[0x41] then applies the independent 0x40 alternate path.
+    assert(MASS1EDDFullParameterPipeline::process(
+        view, 0x42, 0x10, 0xff, 0x00, 0x00, 0x00,
+        0x1200, 0x00, 0x80, 0x00, 0x00,
+        0x40, 0x01, 0x80, 0x00, result));
+    assert(result.slotCoefficient.slotOpcodeScaleApplied);
+    assert(result.slotCoefficient.modulationApplied);
+}
+
 void testMASS1EDDSlotCoefficientStage() {
     std::vector<std::uint8_t> romBytes(0x20000, 0xff);
     const std::array<std::uint8_t, 8> table0{{0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0}};
@@ -1254,6 +1323,7 @@ int main(int argc, char** argv) {
     testMASS1EDDPostLookup();
     testMASS1EDDParameterPipeline();
     testMASS1EDDSlotCoefficientStage();
+    testMASS1EDDFullParameterPipeline();
     testMASS1890Arithmetic();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
