@@ -385,6 +385,8 @@ public:
     virtual void setProgramCatalog(const MASSResourceProgramCatalog*) noexcept {}
     virtual void setFX1ResourceCatalog(const MASSFX1ResourceCatalog*) noexcept {}
     virtual void setFX2ResourceCatalog(const MASSFX2ResourceCatalog*) noexcept {}
+    virtual void setExternalSoundMemoryImage(
+        const MASSIC51ExternalSoundMemoryImage*) noexcept {}
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
@@ -439,6 +441,7 @@ public:
         backend_->setProgramCatalog(programCatalog_);
         backend_->setFX1ResourceCatalog(fx1ResourceCatalog_);
         backend_->setFX2ResourceCatalog(fx2ResourceCatalog_);
+        backend_->setExternalSoundMemoryImage(externalSoundMemoryImage_);
         if (prepared_)
             backend_->prepare(preparedSampleRate_, preparedMaximumBlockSize_);
     }
@@ -471,6 +474,18 @@ public:
     }
     const MASSFX2ResourceCatalog* fx2ResourceCatalog() const noexcept {
         return fx2ResourceCatalog_;
+    }
+
+    // Immutable, firmware-reconstructed C000-FFFF image. The DSP backend
+    // receives a read-only pointer; all ROM parsing and address permutation
+    // are completed at processor startup, outside the realtime thread.
+    void setExternalSoundMemoryImage(
+        const MASSIC51ExternalSoundMemoryImage* image) noexcept {
+        externalSoundMemoryImage_ = image;
+        backend_->setExternalSoundMemoryImage(externalSoundMemoryImage_);
+    }
+    const MASSIC51ExternalSoundMemoryImage* externalSoundMemoryImage() const noexcept {
+        return externalSoundMemoryImage_;
     }
 
     void prepare(double sampleRate, int maximumBlockSize) {
@@ -838,6 +853,7 @@ private:
     const MASSResourceProgramCatalog* programCatalog_ = nullptr;
     const MASSFX1ResourceCatalog* fx1ResourceCatalog_ = nullptr;
     const MASSFX2ResourceCatalog* fx2ResourceCatalog_ = nullptr;
+    const MASSIC51ExternalSoundMemoryImage* externalSoundMemoryImage_ = nullptr;
     double preparedSampleRate_ = 44100.0;
     int preparedMaximumBlockSize_ = 0;
     bool prepared_ = false;
