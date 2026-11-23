@@ -70,7 +70,7 @@ private:
     technox::SoundCatalog soundCatalog;
     technox::MASSResourceROM resourceROM;
     technox::MASSResourceProgramCatalog resourceProgramCatalog;
-    technox::MASSFX1ResourceCatalog resourceFXCatalog;
+    technox::MASSFX1ResourceCatalog resourceFX1Catalog;
     std::unique_ptr<technox::TechnoX8032Machine> firmwareMachine;
     mutable std::array<technox::MASSResolvedProgramResource, 4> resolvedResources{};
     mutable std::array<int, 4> resolvedResourceBanks{{-1, -1, -1, -1}};
