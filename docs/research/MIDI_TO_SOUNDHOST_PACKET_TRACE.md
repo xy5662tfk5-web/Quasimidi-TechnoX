@@ -350,3 +350,25 @@ The static disassembly of the `0x224C` handler shows it reads the command opcode
 The terminal `0x2301` path fills the remaining resource-command slots as required, then builds the packet at `0x236B`: `R5 = RAM[0x2B] | 0x0F`, `R2 = direct RAM[0x07]`, `R3 = direct RAM[0x02]`, and `R4` is the terminal payload masked to three bits. The observed fifth packet `0F 00 00 00` matches those fields. This classification comes from the live writer return PC and firmware instruction sequence; the packet's external-device semantics remain unassigned.
 
 The next trace should capture the entry and dispatch state at `0x224C` and `0x2301`, plus their command-stream pointer and source bytes, to resolve packet 3's exact branch and packet 5's terminal payload provenance.
+
+
+
+## IC4 M.A.S.S. command dispatch table recovered from ROM
+
+The interpreter at IC4 PC `0x19BD–0x19C1` masks the stream opcode with `0x38`, rotates the result right once, loads DPTR=`0x1BC3`, and executes `JMP @A+DPTR`. The actual descrambled IC4 v1.05 bytes at the eight four-byte slots are LJMP stubs:
+
+| Opcode group | Dispatch-table offset | Table bytes | Target handler |
+|---:|---:|---|---:|
+| `0x00` | `0x00` | `02 1C 2B 00` | `0x1C2B` |
+| `0x08` | `0x04` | `02 1C 61 00` | `0x1C61` |
+| `0x10` | `0x08` | `02 1E DD 00` | `0x1EDD` |
+| `0x18` | `0x0C` | `02 22 4C 00` | `0x224C` |
+| `0x20` | `0x10` | `02 23 01 00` | `0x2301` |
+| `0x28` | `0x14` | `02 23 74 00` | `0x2374` |
+| `0x30` | `0x18` | `02 23 74 00` | `0x2374` |
+| `0x38` | `0x1C` | `02 23 74 00` | `0x2374` |
+
+The handler targets and their opcode-group mapping are now modelled by `MASSCommandHandlerDispatchTable` in `Source/MASSResourceROM.h`. `tests/test_mass_resource_rom.cpp` attaches the actual 64-KiB descrambled IC4 image, resolves all eight groups, and checks each target address against the real table bytes. Group `0x38` is marked as a pre-dispatch filler case because the interpreter checks it at `0x19A4` and handles it before reaching `JMP @A+DPTR`; the corresponding table slot still contains the `0x2374` stub.
+
+This gives a precise static classification: group `0x18` dispatches directly to `0x224C`, and group `0x20` dispatches directly to terminal handler `0x2301`. In addition, the group-`0x00` handler `0x1C2B` has a conditional extended-record branch at `0x1C5E` that also jumps to `0x224C`. Therefore a live hit at `0x224C` alone is not enough to distinguish those two source paths; its entry DPTR, caller context, and the stream's current opcode group must be considered together.
+
