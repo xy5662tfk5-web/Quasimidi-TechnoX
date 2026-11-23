@@ -509,11 +509,11 @@ int main(int argc, char** argv) {
                 for (std::size_t index = 0; index < expectedFX.size(); ++index) {
                     const auto* record = fxDirectory.find(static_cast<int>(index));
                     technox::MASSIC51PortStreamBlock triplets{};
-                    technox::MASSIC51PortStreamBlock quadruplets{};
+                    technox::MASSIC51PortStreamBlock rotatedStream{};
                     assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
                         fxResources, bank, record->firstResourceIndex, triplets));
-                    assert(technox::MASSIC51PortStreamResolver::resolveQuadrupletStream(
-                        fxResources, bank, record->secondResourceIndex, quadruplets));
+                    assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
+                        fxResources, bank, record->secondResourceIndex, rotatedStream));
 
                     if (triplets.empty) {
                         assert(triplets.sourceCount == 0);
@@ -527,25 +527,25 @@ int main(int argc, char** argv) {
                         assert(triplets.sourceBytesConsumed == triplets.portWriteByteCount);
                     }
 
-                    if (quadruplets.empty) {
-                        assert(quadruplets.sourceCount == 0);
-                        assert(quadruplets.payload.empty());
-                        assert(quadruplets.portWriteByteCount == 0);
-                        assert(quadruplets.sourceBytesConsumed == 1);
+                    if (rotatedStream.empty) {
+                        assert(rotatedStream.sourceCount == 0);
+                        assert(rotatedStream.payload.empty());
+                        assert(rotatedStream.portWriteByteCount == 0);
+                        assert(rotatedStream.sourceBytesConsumed == 1);
                     } else {
-                        assert(quadruplets.payload.size() ==
-                               static_cast<std::size_t>(quadruplets.sourceCount) * 4u);
-                        assert(quadruplets.portWriteByteCount == quadruplets.payload.size() + 1u);
-                        const auto count = quadruplets.sourceCount;
+                        assert(rotatedStream.payload.size() ==
+                               static_cast<std::size_t>(rotatedStream.sourceCount));
+                        assert(rotatedStream.portWriteByteCount == rotatedStream.payload.size() + 4u);
+                        const auto count = rotatedStream.sourceCount;
                         const auto expectedWireHeader = static_cast<std::uint8_t>(
                             (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
-                        assert(quadruplets.wireHeader == expectedWireHeader);
+                        assert(rotatedStream.wireHeader == expectedWireHeader);
                     }
                 }
             }
 
             technox::MASSIC51PortStreamBlock roomTriplets{};
-            technox::MASSIC51PortStreamBlock roomQuadruplets{};
+            technox::MASSIC51PortStreamBlock roomRotatedStream{};
             assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
                 fxResources, technox::MASSResourceBank::bank0, 0x00, roomTriplets));
             assert(roomTriplets.dataAddress == 0x24d4u);
@@ -553,13 +553,16 @@ int main(int argc, char** argv) {
             assert(roomTriplets.preamble[0] == 0x00u && roomTriplets.preamble[1] == 0xcfu);
             assert(roomTriplets.payload.size() == 75u);
             assert(roomTriplets.portWriteByteCount == 78u);
-            assert(technox::MASSIC51PortStreamResolver::resolveQuadrupletStream(
-                fxResources, technox::MASSResourceBank::bank0, 0x01, roomQuadruplets));
-            assert(roomQuadruplets.dataAddress == 0x2851u);
-            assert(roomQuadruplets.sourceCount == 0x7fu);
-            assert(roomQuadruplets.wireHeader == 0xbfu); // RR A, not SHR A
-            assert(roomQuadruplets.payload.size() == 508u);
-            assert(roomQuadruplets.portWriteByteCount == 509u);
+            assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
+                fxResources, technox::MASSResourceBank::bank0, 0x01, roomRotatedStream));
+            assert(roomRotatedStream.dataAddress == 0x2851u);
+            assert(roomRotatedStream.sourceCount == 0x7fu);
+            assert(roomRotatedStream.wireHeader == 0xbfu); // RR A, not SHR A
+            assert(roomRotatedStream.preamble[0] == 0x00u);
+            assert(roomRotatedStream.preamble[1] == 0xffu);
+            assert(roomRotatedStream.preamble[2] == 0x00u);
+            assert(roomRotatedStream.payload.size() == 127u);
+            assert(roomRotatedStream.portWriteByteCount == 131u);
         }
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
         assert(firmwareMachine.readCode(0x0002) == 0x32);
