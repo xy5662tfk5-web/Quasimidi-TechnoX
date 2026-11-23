@@ -1222,7 +1222,7 @@ private:
 };
 
 enum class MASSIC51PortStreamFormat : std::uint8_t {
-    headerAndTwoBytePreambleAndTriplets,
+    headerAndThreeBytePreambleAndTriplets,
     rotatedHeaderThreeBytePreambleAndPayload
 };
 
@@ -1240,7 +1240,7 @@ struct MASSIC51PortStreamBlock {
 
 struct MASSIC51PortStreamResource {
     MASSIC51PortStreamFormat format =
-        MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
+        MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets;
     std::uint8_t resourceIndex = 0;
     std::uint16_t dataAddress = 0;
     std::vector<MASSIC51PortStreamBlock> blocks;
@@ -1261,7 +1261,7 @@ public:
         std::uint8_t resourceIndex,
         MASSIC51PortStreamResource& result) {
         return resolve(rom, bank, resourceIndex,
-            MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets,
+            MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets,
             result);
     }
 
@@ -1316,7 +1316,7 @@ private:
             std::size_t payloadSize = 0;
 
             if (format ==
-                MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets) {
+                MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets) {
                 payloadSize = static_cast<std::size_t>(count) * 3u;
                 totalSourceSize = 4u + payloadSize;
                 if (cursor + totalSourceSize > MASSResourceROM::kBankSize)
