@@ -920,7 +920,9 @@ int main(int argc, char** argv) {
         // 0x1742 drains its queue when internal RAM[0x52] is zero.
         // Force that queue-empty state exactly at 0x1742 entry; 0xFB=0x08
         // permits 0x1780 to enter the 16-slot scanner. Both are synthetic probes.
-        firmwareMachine.setTestExternalReadOverride(0x00fbu, 0x08u);
+        firmwareMachine.setTestExternalReadOverride(0xfffbu, 0x08u);
+        firmwareMachine.setTestExternalReadOverride(0xff80u, 0x16u);
+        firmwareMachine.setTestExternalReadOverride(0xff88u, 0x16u);
         firmwareMachine.setTestInternalWriteOnCall(0x1742u, 0x52u, 0x00u);
         // The stage hook sets 0x7D95 only after resource loading has entered.
         runRealMidiStage("Note On Part 1 with synthetic queue-drain handshake",
@@ -964,7 +966,7 @@ int main(int argc, char** argv) {
             0x2f89u, 0x2f8au, 0x2f8bu, 0x2f8cu, 0x2f8du, 0x2f8eu,
             0x2f8fu, 0x0080u, 0x0088u, 0x0090u, 0x0098u, 0x00a0u,
             0x00a8u, 0x00b0u, 0x00b8u, 0x00c0u, 0x00c8u, 0x00d0u,
-            0x00d8u, 0x00e0u, 0x00e8u, 0x00f0u, 0x00f8u, 0x00fbu,
+            0x00d8u, 0x00e0u, 0x00e8u, 0x00f0u, 0x00f8u, 0x00fbu, 0xff80u, 0xff88u, 0xfffbu,
             0x2ff0u, 0x2fffu, 0x2fd7u, 0x2fa2u, 0x2000u, 0x2001u, 0x2020u,
             0x2021u, 0x2022u, 0x2023u, 0x2050u, 0x20a0u, 0x20f0u,
             0x2140u, 0x2190u, 0x21e0u, 0x2230u, 0x2280u, 0x22d0u,
@@ -982,11 +984,14 @@ int main(int argc, char** argv) {
             std::printf(" %04X=%02X", static_cast<unsigned>(address),
                         static_cast<unsigned>(value));
         }
-        std::printf(" effective7BD5=%02X effective7D95=%02X effective00FB=%02X "
+        std::printf(" effective7BD5=%02X effective7D95=%02X effectiveFFFB=%02X "
+                    "effectiveFF80=%02X effectiveFF88=%02X "
                     "RAM[4E]=%02X RAM[4F]=%02X RAM[50]=%02X RAM[51]=%02X RAM[52]=%02X\\n",
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)),
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)),
-                    static_cast<unsigned>(firmwareMachine.readExternal(0x00fbu)),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0xfffbu)),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0xff80u)),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0xff88u)),
                     static_cast<unsigned>(firmwareMachine.readInternal(0x4eu)),
                     static_cast<unsigned>(firmwareMachine.readInternal(0x4fu)),
                     static_cast<unsigned>(firmwareMachine.readInternal(0x50u)),
