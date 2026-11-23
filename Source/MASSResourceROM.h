@@ -1183,7 +1183,7 @@ private:
 };
 
 enum class MASSIC51PortStreamFormat : std::uint8_t {
-    headerAndThreeBytePreambleAndTriplets,
+    headerAndTwoBytePreambleAndTriplets,
     rotatedHeaderThreeBytePreambleAndPayload
 };
 
@@ -1263,6 +1263,7 @@ struct MASSIC51PortStreamBlock {
     std::uint8_t sourceCount = 0;
     std::uint8_t wireHeader = 0;
     std::array<std::uint8_t, 3> preamble{};
+    std::uint8_t preambleByteCount = 0;
     std::vector<std::uint8_t> payload;
     // B015 increments DPTR at the bottom of each nonzero block and again
     // at the top of the next iteration, skipping one ROM byte between blocks.
@@ -1274,7 +1275,7 @@ struct MASSIC51PortStreamBlock {
 
 struct MASSIC51PortStreamResource {
     MASSIC51PortStreamFormat format =
-        MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets;
+        MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
     std::uint8_t resourceIndex = 0;
     std::uint16_t dataAddress = 0; // Pointer-table address before any firmware pre-increment.
     bool skippedLeadingByte = false; // B015 executes INC DPTR before its first count read.
@@ -1289,7 +1290,8 @@ struct MASSIC51PortStreamResource {
 class MASSIC51PortStreamResolver {
 public:
     // Firmware path through IC4 0xAF93 repeats:
-    //   [count] [three one-time preamble bytes] [count * 3 payload bytes].
+    //   [count] [two fixed preamble bytes] [count * 3 payload bytes].
+    // The third byte after count is already payload byte zero.
     // A zero count ends the resource without a host-port write.
     static bool resolveTripletStream(
         const MASSResourceROM& rom,
@@ -1297,7 +1299,7 @@ public:
         std::uint8_t resourceIndex,
         MASSIC51PortStreamResource& result) {
         return resolve(rom, bank, resourceIndex,
-            MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets,
+            MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets,
             result);
     }
 
@@ -1361,16 +1363,16 @@ private:
             std::size_t payloadSize = 0;
 
             if (format ==
-                MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets) {
+                MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets) {
                 payloadSize = static_cast<std::size_t>(count) * 3u;
-                totalSourceSize = 4u + payloadSize;
+                totalSourceSize = 3u + payloadSize;
                 if (cursor + totalSourceSize > MASSResourceROM::kBankSize)
                     return false;
                 block.wireHeader = count;
+                block.preambleByteCount = 2u;
                 block.preamble[0] = bankData[cursor + 1u];
                 block.preamble[1] = bankData[cursor + 2u];
-                block.preamble[2] = bankData[cursor + 3u];
-                block.payload.assign(bankData + cursor + 4u,
+                block.payload.assign(bankData + cursor + 3u,
                                      bankData + cursor + totalSourceSize);
             } else {
                 payloadSize = count;
@@ -1379,6 +1381,7 @@ private:
                     return false;
                 block.wireHeader = static_cast<std::uint8_t>(
                     (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
+                block.preambleByteCount = 3u;
                 block.preamble = {
                     bankData[cursor + 1u],
                     bankData[cursor + 2u],
