@@ -248,6 +248,29 @@ The unit-test job for the full instruction dump passed in CI run `45257503996`; 
 
 The next trace starts at the group-08 handler entry `0x1C61` and ends at `0x1E67`. It captures 226 instructions and 23 XDATA accesses while processing the live Note 66 / velocity 100 probe. This bridges the previously isolated arithmetic tail to its actual IC51 input.
 
+### Descriptor-selected stream pointer and bytes preceding the pitch record
+
+The live trace also captures the indirection immediately before the seven-byte pitch record. At IC4 instruction `0x1607`, XDATA `0x54E5` is read as `0x00`; at `0x160B`, adjacent XDATA `0x54E6` is read as `0x16`. The firmware copies those bytes into its internal pointer state and then reads IC51 address `0x1600` at `0x162F`. The selected stream base is therefore `0x1600`, calculated from the live XDATA bytes `00 16` in little-endian order.
+
+Before dispatching the group-08 record, the same execution window records these additional IC51 reads:
+
+| IC4 read PC | IC51 address | Value |
+|---:|---:|---:|
+| `162F` | `1600` | `06` |
+| `18D7` | `1602` | `38` |
+| `18DB` | `1603` | `6D` |
+| `1906` | `1604` | `00` |
+| `190A` | `1605` | `F4` |
+| `1906` | `1606` | `79` |
+| `190A` | `1607` | `FD` |
+| `1906` | `1608` | `00` |
+| `190A` | `1609` | `00` |
+| `1942` | `160A` | `00` |
+| `1946` | `160B` | `00` |
+| `1995` | `160C` | `08` |
+
+The read at `0x1995` is a dispatch/look-ahead read of the group-08 opcode. The group-08 handler then reads the same opcode again at `0x1C76` and fetches the complete record from `0x160C–0x1612`. These twelve prefix reads are now asserted in the regression with their exact IC4 PCs, IC51 addresses, values, and IC51-selected state. The values are recorded as firmware input bytes only; their individual payload meanings remain unassigned.
+
 ### IC51 input and Part-slot staging
 
 With the IC51 bank selected (`P3=EC`), IC4 reads seven consecutive bytes:
