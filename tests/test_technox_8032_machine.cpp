@@ -762,7 +762,8 @@ int main(int argc, char** argv) {
         // Program Change setup is no longer conflated with Note On traffic.
         const auto runRealMidiStage = [&](const char* label,
                                           const std::uint8_t* bytes,
-                                          std::size_t byteCount) {
+                                          std::size_t byteCount,
+                                          bool injectReadyAfterResourceLoad = false) {
             const auto startCycle = firmwareMachine.elapsedMachineCycles();
             const auto packetBefore = firmwareMachine.soundCommandPacketCount();
             const auto burstBefore = firmwareMachine.soundHostBurstWordCount();
@@ -790,13 +791,33 @@ int main(int argc, char** argv) {
             const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceBefore = firmwareMachine.xdataWatchTraceCount();
             assert(firmwareMachine.scheduleAciaMidiBytes(bytes, byteCount, startCycle));
-            const auto instructions = firmwareMachine.runForMachineCycles(2000000u);
-            const auto drain = firmwareMachine.runForMachineCycles(5000000u);
+            std::size_t instructions = 0;
+            std::size_t drain = 0;
+            bool statusInjected = false;
+            if (injectReadyAfterResourceLoad) {
+                // Let the real MIDI handler select and parse the resource first.
+                // Then assert the synthetic DSP-ready response before the later
+                // 0x4803 per-Part setup calls.
+                std::uint64_t preCycles = 0;
+                while (preCycles < 2000000u &&
+                       firmwareMachine.watchedCallCount(0x1742u) == helper1742Before) {
+                    instructions += firmwareMachine.runForMachineCycles(10000u);
+                    preCycles += 10000u;
+                }
+                statusInjected =
+                    firmwareMachine.watchedCallCount(0x1742u) > helper1742Before;
+                if (statusInjected)
+                    firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
+                drain = firmwareMachine.runForMachineCycles(7000000u - preCycles);
+            } else {
+                instructions = firmwareMachine.runForMachineCycles(2000000u);
+                drain = firmwareMachine.runForMachineCycles(5000000u);
+            }
             const auto packetAfter = firmwareMachine.soundCommandPacketCount();
             const auto peripheralTraceAfter = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceAfter = firmwareMachine.xdataWatchTraceCount();
             std::printf("Real IC51 MIDI %s: instructions=%zu drain=%zu PC=%04X "
-                        "packets=+%zu burstWords=+%zu hostWrites=+%zu "
+                        "packets=+%zu burstWords=+%zu hostWrites=+%zu statusInjected=%u "
                         "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu "
                         "1494=+%llu AC00=+%llu AC88=+%llu B34D=+%llu "
                         "16C3=+%llu 189D=+%llu 1009=+%llu 018D=+%llu "
@@ -807,6 +828,7 @@ int main(int argc, char** argv) {
                         packetAfter - packetBefore,
                         firmwareMachine.soundHostBurstWordCount() - burstBefore,
                         firmwareMachine.soundHostWriteCount() - hostWriteBefore,
+                        static_cast<unsigned>(statusInjected),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0db7u) - writerBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4256u) - partBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x5671u) - eventBefore),
@@ -895,12 +917,10 @@ int main(int argc, char** argv) {
         }};
         runRealMidiStage("SysEx load temporary Part 1 from Performance 1 Part 13",
                          temporaryPart1.data(), temporaryPart1.size());
-        // Diagnostic only: 0x4803 requires both 0x3703 and 0x7D95 nonzero.
-        // 0x3703 is firmware-set; override 0x7D95 before the first Part 1
-        // Note On so the real resource-load path is not hidden by its cache.
-        firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
-        runRealMidiStage("Note On Part 1 with synthetic 7D95-ready response",
-                         realNoteOn.data(), realNoteOn.size());
+        // Diagnostic only: wait until the real resource loader reaches 0x1742,
+        // then override 0x7D95 before the later 0x4803 per-Part setup calls.
+        runRealMidiStage("Note On Part 1 with delayed synthetic 7D95-ready response",
+                         realNoteOn.data(), realNoteOn.size(), true);
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
