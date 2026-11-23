@@ -740,6 +740,25 @@ int main(int argc, char** argv) {
                 const auto& block = phaser1->streamBResource.blocks.front();
                 const auto expectedPortBytes = block.portWriteByteCount;
                 assert(expectedPortBytes == block.payload.size() + 4u);
+                std::printf("FX2 ROM loader Phaser1: executed=%zu PC=%04X IC51=%llu "
+                            "FF10-writes=%zu expected=%zu last=%02X P2=%02X P3=%02X\\n",
+                            executed,
+                            static_cast<unsigned>(fx2Runtime.cpu().registers().pc),
+                            static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
+                            fx2Runtime.soundDevicePortWriteCount(), expectedPortBytes,
+                            static_cast<unsigned>(fx2Runtime.lastSoundDeviceWrite()),
+                            static_cast<unsigned>(fx2Runtime.readPortLatch(0xa0u)),
+                            static_cast<unsigned>(fx2Runtime.readPortLatch(0xb0u)));
+                for (std::size_t i = 0; i < std::min<std::size_t>(
+                         fx2Runtime.soundDevicePortWriteCount(), 12u); ++i) {
+                    const auto& event = fx2Runtime.soundDevicePortWriteAt(i);
+                    std::printf("  FF10[%zu]=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
+                                i, static_cast<unsigned>(event.value),
+                                static_cast<unsigned>(event.instructionPC),
+                                static_cast<unsigned>(event.stackReturnPC),
+                                static_cast<unsigned>(event.port2),
+                                static_cast<unsigned>(event.port3));
+                }
                 assert(fx2Runtime.soundDevicePortWriteCount() == expectedPortBytes);
 
                 std::size_t portOffset = 0;
