@@ -235,6 +235,7 @@ public:
         soundHostCommandLatch_ = 0;
         soundHostWords_.fill(0);
         for (auto& bytes : soundHostData_) bytes.fill(0);
+        for (auto& bytes : soundHostResponseData_) bytes.fill(0xff);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
         soundHostReadCount_ = 0;
@@ -390,6 +391,16 @@ public:
         return executed;
     }
 
+    // Test/integration seam for an independently modelled external audio device.
+    // Until its protocol is identified, the default response remains open bus.
+    void setSoundHostResponseForTesting(std::uint8_t index,
+                                        const std::array<std::uint8_t, 3>& response) noexcept {
+        soundHostResponseData_[index] = response;
+    }
+
+    const std::array<std::uint8_t, 3>& soundHostPayloadForTesting(
+        std::uint8_t index) const noexcept { return soundHostData_[index]; }
+
     std::uint8_t readCode(std::uint16_t address) const noexcept override {
         return code_[address];
     }
@@ -505,11 +516,11 @@ public:
             const auto index = static_cast<std::size_t>(address - 0x8000u);
             // Firmware helper 0x0DCE selects an index via register 0, then
             // reads response bytes from registers 1, 2 and 3 into R2, R3, R4.
-            // Keep all three response bytes per selected index; the old model
-            // incorrectly echoed only a 16-bit pair and lost register 1.
+            // Response is independent of the host's outgoing command payload.
+            // No peripheral model is connected yet, so unconfigured bytes are 0xff.
             const std::uint8_t value = index == 0
                 ? commandPort_[index]
-                : soundHostData_[soundHostCommandLatch_][index - 1u];
+                : soundHostResponseData_[soundHostCommandLatch_][index - 1u];
             auto& event = soundHostReadTrace_[
                 soundHostReadCount_ % soundHostReadTrace_.size()];
             event.registerIndex = static_cast<std::uint8_t>(index);
@@ -1056,6 +1067,7 @@ private:
     std::uint8_t soundHostCommandLatch_ = 0;
     std::array<std::uint16_t, 256> soundHostWords_{};
     std::array<std::array<std::uint8_t, 3>, 256> soundHostData_{};
+    std::array<std::array<std::uint8_t, 3>, 256> soundHostResponseData_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
     std::array<soundHostReadEvent, 2048> soundHostReadTrace_{};
