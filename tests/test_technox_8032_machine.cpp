@@ -16,7 +16,7 @@
 
 class FX1CatalogProbeBackend final : public technox::IMASSVoiceBackend {
 public:
-    void setFXResourceCatalog(const technox::MASSFX1ResourceCatalog* catalog) noexcept override {
+    void setFX1ResourceCatalog(const technox::MASSFX1ResourceCatalog* catalog) noexcept override {
         receivedCatalog = catalog;
     }
     void prepare(double, int) override {}
@@ -525,8 +525,8 @@ int main(int argc, char** argv) {
                 firmwareCode[address] = firmwareMachine.readCode(
                     static_cast<std::uint16_t>(address));
 
-            technox::MASSFX1ProgramDirectory fxDirectory;
-            assert(fxDirectory.load(firmwareCode.data(), firmwareCode.size()));
+            technox::MASSFX1ProgramDirectory fx1Directory;
+            assert(fx1Directory.load(firmwareCode.data(), firmwareCode.size()));
             struct ExpectedFX {
                 const char* name;
                 std::uint8_t firstResource;
@@ -534,7 +534,7 @@ int main(int argc, char** argv) {
                 std::uint8_t mode;
             };
             const std::array<ExpectedFX, technox::MASSFX1ProgramDirectory::kEntryCount>
-                expectedFX{{
+                expectedFX1{{
                     {"Room",        0x00, 0x01, 0x03},
                     {"SmallRoom",   0x04, 0x05, 0x03},
                     {"WarmRoom",    0x02, 0x03, 0x03},
@@ -558,24 +558,24 @@ int main(int argc, char** argv) {
                     {"no Effect",   0x22, 0x23, 0x00}
                 }};
 
-            for (std::size_t index = 0; index < expectedFX.size(); ++index) {
-                const auto* record = fxDirectory.find(static_cast<int>(index));
+            for (std::size_t index = 0; index < expectedFX1.size(); ++index) {
+                const auto* record = fx1Directory.find(static_cast<int>(index));
                 assert(record != nullptr);
                 assert(record->index == index);
-                assert(record->streamAResourceIndex == expectedFX[index].firstResource);
-                assert(record->streamBResourceIndex == expectedFX[index].secondResource);
-                assert(record->modeByte == expectedFX[index].mode);
+                assert(record->streamAResourceIndex == expectedFX1[index].firstResource);
+                assert(record->streamBResourceIndex == expectedFX1[index].secondResource);
+                assert(record->modeByte == expectedFX1[index].mode);
                 std::size_t nameLength = 0;
-                while (expectedFX[index].name[nameLength] != '\0') {
-                    assert(record->name[nameLength] == expectedFX[index].name[nameLength]);
+                while (expectedFX1[index].name[nameLength] != '\0') {
+                    assert(record->name[nameLength] == expectedFX1[index].name[nameLength]);
                     ++nameLength;
                 }
                 for (std::size_t j = nameLength; j < technox::MASSFX1ProgramDirectory::kNameBytes; ++j)
                     assert(record->name[j] == '\0' || record->name[j] == ' ');
                 assert(record->name[technox::MASSFX1ProgramDirectory::kNameBytes] == '\0');
             }
-            assert(fxDirectory.find(-1) == nullptr);
-            assert(fxDirectory.find(21) == nullptr);
+            assert(fx1Directory.find(-1) == nullptr);
+            assert(fx1Directory.find(21) == nullptr);
 
             technox::MASSResourceROM fxResources;
             assert(fxResources.load(realIC51.data(), realIC51.size()));
@@ -607,8 +607,8 @@ int main(int argc, char** argv) {
             FX1CatalogProbeBackend originalFX1Backend;
             FX1CatalogProbeBackend replacementFX1Backend;
             technox::MASSAudioEngine fx1CatalogEngine(&originalFX1Backend);
-            fx1CatalogEngine.setFXResourceCatalog(&fx1Catalog);
-            assert(fx1CatalogEngine.fxResourceCatalog() == &fx1Catalog);
+            fx1CatalogEngine.setFX1ResourceCatalog(&fx1Catalog);
+            assert(fx1CatalogEngine.fx1ResourceCatalog() == &fx1Catalog);
             assert(originalFX1Backend.receivedCatalog == &fx1Catalog);
             fx1CatalogEngine.setBackend(&replacementFX1Backend);
             assert(replacementFX1Backend.receivedCatalog == &fx1Catalog);
@@ -663,28 +663,28 @@ int main(int argc, char** argv) {
                 const auto bank = bankNumber == 0
                     ? technox::MASSResourceBank::bank0
                     : technox::MASSResourceBank::bank1;
-                for (std::size_t index = 0; index < expectedFX.size(); ++index) {
-                    const auto* record = fxDirectory.find(static_cast<int>(index));
-                    technox::MASSIC51PortStreamResource triplets{};
-                    technox::MASSIC51PortStreamResource rotatedStream{};
+                for (std::size_t index = 0; index < expectedFX1.size(); ++index) {
+                    const auto* record = fx1Directory.find(static_cast<int>(index));
+                    technox::MASSIC51PortStreamResource streamAResource{};
+                    technox::MASSIC51PortStreamResource streamBResource{};
                     assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
-                        fxResources, bank, record->streamAResourceIndex, triplets));
+                        fxResources, bank, record->streamAResourceIndex, streamAResource));
                     assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
-                        fxResources, bank, record->streamBResourceIndex, rotatedStream));
-                    assert(triplets.terminated && rotatedStream.terminated);
-                    assert(triplets.sourceBytesConsumed ==
-                           triplets.portWriteByteCount + 1u);
-                    assert(rotatedStream.sourceBytesConsumed ==
-                           rotatedStream.portWriteByteCount + 1u);
+                        fxResources, bank, record->streamBResourceIndex, streamBResource));
+                    assert(streamAResource.terminated && streamBResource.terminated);
+                    assert(streamAResource.sourceBytesConsumed ==
+                           streamAResource.portWriteByteCount + 1u);
+                    assert(streamBResource.sourceBytesConsumed ==
+                           streamBResource.portWriteByteCount + 1u);
 
-                    for (const auto& block : triplets.blocks) {
+                    for (const auto& block : streamAResource.blocks) {
                         assert(block.payload.size() ==
                                static_cast<std::size_t>(block.sourceCount) * 3u);
                         assert(block.portWriteByteCount == block.payload.size() + 4u);
                         assert(block.sourceBytesConsumed == block.portWriteByteCount);
                         assert(block.wireHeader == block.sourceCount);
                     }
-                    for (const auto& block : rotatedStream.blocks) {
+                    for (const auto& block : streamBResource.blocks) {
                         assert(block.payload.size() ==
                                static_cast<std::size_t>(block.sourceCount));
                         assert(block.portWriteByteCount == block.payload.size() + 4u);
@@ -697,31 +697,31 @@ int main(int argc, char** argv) {
                 }
             }
 
-            technox::MASSIC51PortStreamResource roomTriplets{};
-            technox::MASSIC51PortStreamResource roomRotatedStream{};
+            technox::MASSIC51PortStreamResource roomStreamA{};
+            technox::MASSIC51PortStreamResource roomStreamB{};
             assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
-                fxResources, technox::MASSResourceBank::bank0, 0x00, roomTriplets));
-            assert(roomTriplets.blocks.size() == 2u);
-            const auto& roomBlock = roomTriplets.blocks.front();
-            assert(roomBlock.dataAddress == 0x24d4u);
-            assert(roomBlock.sourceCount == 0x19u);
-            assert(roomBlock.preamble[0] == 0x00u);
-            assert(roomBlock.preamble[1] == 0xcfu);
-            assert(roomBlock.preamble[2] == 0x10u);
-            assert(roomBlock.payload.size() == 75u);
-            assert(roomBlock.portWriteByteCount == 79u);
+                fxResources, technox::MASSResourceBank::bank0, 0x00, roomStreamA));
+            assert(roomStreamA.blocks.size() == 2u);
+            const auto& roomStreamABlock = roomStreamA.blocks.front();
+            assert(roomStreamABlock.dataAddress == 0x24d4u);
+            assert(roomStreamABlock.sourceCount == 0x19u);
+            assert(roomStreamABlock.preamble[0] == 0x00u);
+            assert(roomStreamABlock.preamble[1] == 0xcfu);
+            assert(roomStreamABlock.preamble[2] == 0x10u);
+            assert(roomStreamABlock.payload.size() == 75u);
+            assert(roomStreamABlock.portWriteByteCount == 79u);
             assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
-                fxResources, technox::MASSResourceBank::bank0, 0x01, roomRotatedStream));
-            assert(roomRotatedStream.blocks.size() == 1u);
-            const auto& roomRotatedBlock = roomRotatedStream.blocks.front();
-            assert(roomRotatedBlock.dataAddress == 0x2851u);
-            assert(roomRotatedBlock.sourceCount == 0x7fu);
-            assert(roomRotatedBlock.wireHeader == 0xbfu); // RR A, not SHR A
-            assert(roomRotatedBlock.preamble[0] == 0x00u);
-            assert(roomRotatedBlock.preamble[1] == 0xffu);
-            assert(roomRotatedBlock.preamble[2] == 0x00u);
-            assert(roomRotatedBlock.payload.size() == 127u);
-            assert(roomRotatedBlock.portWriteByteCount == 131u);
+                fxResources, technox::MASSResourceBank::bank0, 0x01, roomStreamB));
+            assert(roomStreamB.blocks.size() == 1u);
+            const auto& roomStreamBBlock = roomStreamB.blocks.front();
+            assert(roomStreamBBlock.dataAddress == 0x2851u);
+            assert(roomStreamBBlock.sourceCount == 0x7fu);
+            assert(roomStreamBBlock.wireHeader == 0xbfu); // RR A, not SHR A
+            assert(roomStreamBBlock.preamble[0] == 0x00u);
+            assert(roomStreamBBlock.preamble[1] == 0xffu);
+            assert(roomStreamBBlock.preamble[2] == 0x00u);
+            assert(roomStreamBBlock.payload.size() == 127u);
+            assert(roomStreamBBlock.portWriteByteCount == 131u);
 
         }
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
