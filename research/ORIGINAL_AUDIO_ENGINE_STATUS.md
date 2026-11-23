@@ -75,6 +75,15 @@ Branch: `research/original-technox-audio-engine`
 - Tests verify all 42 bank/type pairs, both stream terminators, representative Room block data, and catalog forwarding across backend replacement.
 - This is FX resource data plumbing only. The runtime FX type-to-directory index mapping, DSP command meaning, FX algorithms and physical receiver are still unresolved; the generic oscillator is still not the original sound engine.
 
+ 
+## Program catalog now caches both command-stream flag branches
+
+- The resource command decoder has two firmware-confirmed group-0 paths selected by flag 0x0A, and the terminal group-0x20 behavior also changes with that flag.
+- `MASSResourceProgramCatalog::loadBothFirmwareFlagVariants` now predecodes all 4 banks × 128 sounds for both flag states during processor startup. The backend can retrieve the matching immutable stream through `find(bank, sound, firmwareFlag0ASet)`.
+- The existing single-variant `load` and two-argument `find` interfaces remain available; the default lookup remains the flag-clear path.
+- Regression coverage checks both variants for all 512 bank/program pairs, matching descriptor addresses and command-stream pointers, valid terminal states, non-truncated streams and the selected flag carried in each resolved entry.
+- The runtime origin of flag 0x0A has not yet been reconstructed. Both branches are retained so the engine can choose correctly after that state is traced, instead of hard-coding the flag-clear interpretation.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
