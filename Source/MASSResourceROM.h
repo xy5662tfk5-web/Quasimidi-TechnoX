@@ -1264,6 +1264,10 @@ struct MASSIC51PortStreamBlock {
     std::uint8_t wireHeader = 0;
     std::array<std::uint8_t, 3> preamble{};
     std::vector<std::uint8_t> payload;
+    // B015 increments DPTR at the bottom of each nonzero block and again
+    // at the top of the next iteration, skipping one ROM byte between blocks.
+    bool skippedFollowingByte = false;
+    std::uint8_t skippedFollowingByteValue = 0;
     std::size_t sourceBytesConsumed = 0;
     std::size_t portWriteByteCount = 0;
 };
@@ -1387,8 +1391,21 @@ private:
             block.sourceBytesConsumed = totalSourceSize;
             block.portWriteByteCount = totalSourceSize;
             decoded.portWriteByteCount += block.portWriteByteCount;
-            decoded.blocks.push_back(std::move(block));
             cursor += totalSourceSize;
+
+            // B015's block tail increments DPTR once at B085 after the final
+            // payload byte, then loops through B035 which increments it again
+            // before the next count read. The intervening ROM byte is skipped
+            // and must not be reinterpreted as another block header.
+            if (format ==
+                MASSIC51PortStreamFormat::rotatedHeaderThreeBytePreambleAndPayload) {
+                if (cursor >= MASSResourceROM::kBankSize)
+                    return false;
+                block.skippedFollowingByte = true;
+                block.skippedFollowingByteValue = bankData[cursor];
+                ++cursor;
+            }
+            decoded.blocks.push_back(std::move(block));
         }
 
         // The firmware's loader returns only after a zero-count terminator.
