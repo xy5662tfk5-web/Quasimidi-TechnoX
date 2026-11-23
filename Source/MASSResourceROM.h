@@ -2027,6 +2027,8 @@ public:
         }
 
         const auto variant = firmwareFlag0ASet ? 1u : 0u;
+        resources_ = {};
+        loadedVariants_ = {{false, false}};
         resources_[variant] = std::move(parsed);
         loadedVariants_[variant] = true;
         return true;
@@ -2056,8 +2058,10 @@ public:
         return true;
     }
 
-    // Preserve the original single-variant meaning for existing callers.
-    bool isLoaded() const noexcept { return loadedVariants_[0]; }
+    // A catalog is loaded when at least one explicitly requested branch exists.
+    bool isLoaded() const noexcept {
+        return loadedVariants_[0] || loadedVariants_[1];
+    }
     bool isVariantLoaded(bool firmwareFlag0ASet) const noexcept {
         return loadedVariants_[firmwareFlag0ASet ? 1u : 0u];
     }
