@@ -3338,6 +3338,25 @@ int main(int argc, char** argv) {
         assert(pitchAccumulatorResult.registers[2] == 0xd5u);
         assert(pitchAccumulatorResult.registers[3] == 0x1eu);
         assert(pitchAccumulatorResult.registers[4] == 0x02u);
+
+        // Execute the recovered 0x1DC8..0x1E04 arithmetic against the exact
+        // live CPU inputs from this ROM/Note 66 event. This cross-check keeps
+        // register mapping and arithmetic separate from the later slot writes.
+        const auto pitchArithmeticModel = MASS1C61AccumulatorTransform::apply(
+            pitchSecondaryLookup.registers[2],
+            pitchSecondaryLookup.registers[3],
+            pitchSecondaryLookup.registers[4],
+            pitchSecondaryLookup.registers[5],
+            pitchSecondaryLookup.registers[6],
+            pitchSecondaryLookup.registers[7],
+            pitchSecondaryLookup.selectedDirectRam[3],
+            pitchSecondaryLookup.selectedDirectRam[4],
+            pitchSecondaryLookup.selectedDirectRam[5]);
+        assert(!pitchArithmeticModel.zeroInputBypass);
+        assert(pitchArithmeticModel.negativeInput);
+        assert(pitchArithmeticModel.r2 == pitchAccumulatorResult.registers[2]);
+        assert(pitchArithmeticModel.r3 == pitchAccumulatorResult.registers[3]);
+        assert(pitchArithmeticModel.r4 == pitchAccumulatorResult.registers[4]);
         const auto& pitchUpdatedSlot = findPitchSourceStep(0x1e67u);
         assert(pitchUpdatedSlot.registers[2] == 0xd5u);
         assert(pitchUpdatedSlot.registers[3] == 0x1fu);
