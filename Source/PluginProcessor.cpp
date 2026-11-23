@@ -75,6 +75,15 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
             firmwareCode[address] = firmwareMachine->readCode(
                 static_cast<std::uint16_t>(address));
 
+        // Reconstruct the exact 16-KiB C000-FFFF memory image produced by
+        // the original AF1A/AF05 startup transfer. The parser uses IC51 bank 0,
+        // R7=0x48 and the real IC4 remap table at 0xADDD; it does not infer
+        // PCM/sample semantics from these bytes.
+        if (externalSoundMemoryImage.load(
+                resourceROM, firmwareCode.data(), firmwareCode.size())) {
+            massEngine.setExternalSoundMemoryImage(&externalSoundMemoryImage);
+        }
+
         if (resourceFX1Catalog.load(
                 resourceROM, firmwareCode.data(), firmwareCode.size())) {
             massEngine.setFX1ResourceCatalog(&resourceFX1Catalog);
