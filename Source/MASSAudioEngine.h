@@ -447,6 +447,8 @@ public:
         if (part >= MASSPartParameterStore::kPartCount) return;
         const int trackMode = partParameters_.get(static_cast<int>(part), PartParameter::trackMode);
         if (trackMode == 0) return; // Mute
+        const auto bankNumber = static_cast<std::uint8_t>(std::max(0, partParameters_.get(static_cast<int>(part), PartParameter::bankNumber)));
+        const auto soundNumber = static_cast<std::uint8_t>(std::max(0, partParameters_.get(static_cast<int>(part), PartParameter::soundNumber)));
 
         int preferredVoice = -1;
         if (trackMode == 2 || trackMode == 3) { // Mono / Lead: one active voice per Part
@@ -475,9 +477,10 @@ public:
             !voices_.voices()[static_cast<std::size_t>(target)].releasing)
             backend_->noteOff(target, voices_.voices()[static_cast<std::size_t>(target)]);
         const int voiceIndex = preferredVoice >= 0
-            ? (voices_.retargetVoice(static_cast<std::size_t>(preferredVoice), channel, note, velocity)
+            ? (voices_.retargetVoice(static_cast<std::size_t>(preferredVoice), channel, note, velocity,
+                                  bankNumber, soundNumber)
                 ? preferredVoice : -1)
-            : voices_.noteOn(part, channel, note, velocity);
+            : voices_.noteOn(part, channel, note, velocity, -1, bankNumber, soundNumber);
         if (voiceIndex >= 0 && !legatoReuse)
             backend_->noteOn(voiceIndex, voices_.voices()[static_cast<std::size_t>(voiceIndex)]);
         if ((trackMode == 2 || trackMode == 3) && voiceIndex >= 0)
