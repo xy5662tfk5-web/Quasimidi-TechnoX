@@ -731,6 +731,7 @@ int main(int argc, char** argv) {
                 // Set it explicitly so this isolated entry-point test exercises
                 // the actual IC51-to-FF10 sound-memory transfer branch.
                 fx2Runtime.writeInternal(0x23u, 0x08u);
+                assert((fx2Runtime.readInternal(0x23u) & 0x08u) != 0u);
                 fx2Runtime.cpuForTesting().registersForTesting().pc = 0x88d1u;
                 const auto executed = fx2Runtime.runUntilProgramCounter(0x8926u, 100000u);
                 assert(executed > 0u);
@@ -744,15 +745,28 @@ int main(int argc, char** argv) {
                 const auto& block = phaser1->streamBResource.blocks.front();
                 const auto expectedPortBytes = block.portWriteByteCount;
                 assert(expectedPortBytes == block.payload.size() + 4u);
-                std::printf("FX2 ROM loader Phaser1: executed=%zu PC=%04X IC51=%llu "
-                            "FF10-writes=%zu expected=%zu last=%02X P2=%02X P3=%02X\\n",
-                            executed,
-                            static_cast<unsigned>(fx2Runtime.cpu().registers().pc),
-                            static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
-                            fx2Runtime.ff10WriteCount(), expectedPortBytes,
-                            static_cast<unsigned>(fx2Runtime.lastSoundDeviceWrite()),
-                            static_cast<unsigned>(fx2Runtime.readPortLatch(0xa0u)),
-                            static_cast<unsigned>(fx2Runtime.readPortLatch(0xb0u)));
+                std::fprintf(stderr,
+                             "FX2 ROM loader Phaser1: executed=%zu PC=%04X IC51=%llu "
+                             "FF10-writes=%zu expected=%zu last=%02X P2=%02X P3=%02X bit23=%02X\\n",
+                             executed,
+                             static_cast<unsigned>(fx2Runtime.cpu().registers().pc),
+                             static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
+                             fx2Runtime.ff10WriteCount(), expectedPortBytes,
+                             static_cast<unsigned>(fx2Runtime.lastSoundDeviceWrite()),
+                             static_cast<unsigned>(fx2Runtime.readPortLatch(0xa0u)),
+                             static_cast<unsigned>(fx2Runtime.readPortLatch(0xb0u)),
+                             static_cast<unsigned>(fx2Runtime.readInternal(0x23u)));
+                for (std::size_t i = 0; i < std::min<std::size_t>(
+                         fx2Runtime.ff10WriteCount(), 12u); ++i) {
+                    const auto& event = fx2Runtime.ff10WriteAt(i);
+                    std::fprintf(stderr, "  FF10[%zu]=%02X mode=%u pc=%04X ret=%04X P2=%02X P3=%02X\\n",
+                                 i, static_cast<unsigned>(event.value),
+                                 static_cast<unsigned>(event.soundBusMode),
+                                 static_cast<unsigned>(event.instructionPC),
+                                 static_cast<unsigned>(event.stackReturnPC),
+                                 static_cast<unsigned>(event.port2),
+                                 static_cast<unsigned>(event.port3));
+                }
                 for (std::size_t i = 0; i < std::min<std::size_t>(
                          fx2Runtime.ff10WriteCount(), 12u); ++i) {
                     const auto& event = fx2Runtime.ff10WriteAt(i);
