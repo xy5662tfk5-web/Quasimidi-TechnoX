@@ -106,12 +106,13 @@ The current `tests/test_technox_8032_machine.cpp` contains the firmware/MIDI fix
 - This confirms the firmware's staged memory image and address mapping. It does not identify the receiver, decode the copied data format, or establish PCM playback.
 
  
-## IC51 bulk-loader lookup inventory
+## IC51 bulk-loader call-site audit
 
-- Added `MASSIC51BulkBlockDirectory` to parse all 256 candidate lookup positions for a selected IC51 bank using the firmware-observed `DPTR = 2 * R7` and four-byte read.
-- The lookup positions are sliding windows, not independent four-byte records: adjacent positions overlap by two bytes. The catalog deliberately calls their aggregate lengths a *candidate byte-count sum*, not unique sample storage.
-- Regression anchors for the real v1.05 image: bank 0 candidate sum 7,484,183 bytes with 111 source-address wraps; bank 1 candidate sum 4,574,119 bytes with no wraps. Entry `0x48` remains the independently traced startup transfer: bank 0 `0x3C64 / 0x354F`, bank 1 `0x295C / 0x2574`.
-- This expands the audit surface for the 0xAF1A loader. It does not prove that all 256 indices are invoked, that the candidate lengths describe unique payloads, or that the copied data is PCM / ADPCM.
+- The reachable IC4 disassembly currently shows two direct calls to `0xAF1A`: at `0x37A1` and `0x38F1`. Both are immediately preceded by `MOV R7,#0x48`.
+- The routine reads four consecutive bytes at `DPTR=2*R7`. For the observed selector `0x48`, bank 0 yields source `0x3C64` and length `0x354F` (13,647 bytes); bank 1 yields source `0x295C` and length `0x2574` (9,588 bytes).
+- The previous 256-window candidate catalog has been removed. Those positions were overlapping four-byte windows, not 256 independently observed transfer descriptors; their aggregated lengths/wrap counts were not evidence of unique sample storage or runtime loader calls.
+- The real-ROM 8032 fixture verifies the bank-0 transfer byte-for-byte through the firmware-derived XDATA address permutation. The bank-1 source header and length are separately checked.
+- The receiving device, payload format (PCM/compressed/wavetable/code/other), and playback role remain unresolved.
 
  
 ## FX selector range now matches IC4 firmware
