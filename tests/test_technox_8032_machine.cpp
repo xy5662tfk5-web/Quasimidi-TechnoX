@@ -820,20 +820,20 @@ int main(int argc, char** argv) {
             assert(fx1CatalogEngine.setCommonControl(
                 technox::MASSCommonControl::fx1Type, 0));
             assert(fx1CatalogEngine.setCommonControl(
-                technox::MASSCommonControl::fx2Type, 5));
+                technox::MASSCommonControl::fx2Type, 14)); // Equalizr1
             float fxProbeSample = 0.0f;
             float* fxProbeChannels[] = {&fxProbeSample};
             fx1CatalogEngine.render(fxProbeChannels, 1, 1);
             assert(replacementFX1Backend.selectedFX1 == 0);
-            assert(replacementFX1Backend.selectedFX2 == 5);
+            assert(replacementFX1Backend.selectedFX2 == 14);
             assert(replacementFX1Backend.fx1Resolved);
             assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
             assert(replacementFX1Backend.fx1StreamBBlockCount == 0u);
             assert(replacementFX1Backend.fx2Resolved);
-            // FX2 Phaser1 is empty in IC51 bank 0: Stream A resource 0x26
-            // starts with count 0 at 0x52F8. Stream B resource 0x27 has a
-            // skipped leading byte 0x7E at 0x57FE and count 0 at 0x57FF.
-            assert(replacementFX1Backend.fx2StreamABlockCount == 0u);
+            // FX2 Equalizr1 Stream A (resource 0x42) contains two real blocks
+            // in bank 0. Stream B (resource 0x43) skips its leading 0x74 byte
+            // at 0x4D6C and terminates at 0x4D6D before uploading a block.
+            assert(replacementFX1Backend.fx2StreamABlockCount == 2u);
             assert(replacementFX1Backend.fx2StreamBBlockCount == 0u);
 
             // The factory stores independent FX1 and FX2 selectors. Only the
