@@ -806,8 +806,12 @@ int main(int argc, char** argv) {
                 }
                 statusInjected =
                     firmwareMachine.watchedCallCount(0x1742u) > helper1742Before;
-                if (statusInjected)
+                if (statusInjected) {
                     firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
+                    // 0x1780 calls 0x1009 only when XDATA[0x00FB].3 is set
+                    // and bits 5/6 are clear. Synthetic DSP queue-ready response.
+                    firmwareMachine.setTestExternalReadOverride(0x00fbu, 0x08u);
+                }
                 drain = firmwareMachine.runForMachineCycles(7000000u - preCycles);
             } else {
                 instructions = firmwareMachine.runForMachineCycles(2000000u);
@@ -919,7 +923,7 @@ int main(int argc, char** argv) {
                          temporaryPart1.data(), temporaryPart1.size());
         // Diagnostic only: wait until the real resource loader reaches 0x1742,
         // then override 0x7D95 before the later 0x4803 per-Part setup calls.
-        runRealMidiStage("Note On Part 1 with delayed synthetic 7D95-ready response",
+        runRealMidiStage("Note On Part 1 with delayed synthetic DSP queue-ready response",
                          realNoteOn.data(), realNoteOn.size(), true);
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
@@ -958,7 +962,10 @@ int main(int argc, char** argv) {
             0x2f0du, 0x2f0eu, 0x2f0fu, 0x2f80u, 0x2f81u, 0x2f82u,
             0x2f83u, 0x2f84u, 0x2f85u, 0x2f86u, 0x2f87u, 0x2f88u,
             0x2f89u, 0x2f8au, 0x2f8bu, 0x2f8cu, 0x2f8du, 0x2f8eu,
-            0x2f8fu, 0x2ff0u, 0x2fffu, 0x2fd7u, 0x2fa2u, 0x2000u, 0x2001u, 0x2020u,
+            0x2f8fu, 0x0080u, 0x0088u, 0x0090u, 0x0098u, 0x00a0u,
+            0x00a8u, 0x00b0u, 0x00b8u, 0x00c0u, 0x00c8u, 0x00d0u,
+            0x00d8u, 0x00e0u, 0x00e8u, 0x00f0u, 0x00f8u, 0x00fbu,
+            0x2ff0u, 0x2fffu, 0x2fd7u, 0x2fa2u, 0x2000u, 0x2001u, 0x2020u,
             0x2021u, 0x2022u, 0x2023u, 0x2050u, 0x20a0u, 0x20f0u,
             0x2140u, 0x2190u, 0x21e0u, 0x2230u, 0x2280u, 0x22d0u,
             0x2320u, 0x2370u, 0x3700u, 0x3701u, 0x3702u, 0x3703u,
@@ -975,9 +982,10 @@ int main(int argc, char** argv) {
             std::printf(" %04X=%02X", static_cast<unsigned>(address),
                         static_cast<unsigned>(value));
         }
-        std::printf(" effective7BD5=%02X effective7D95=%02X\\n",
+        std::printf(" effective7BD5=%02X effective7D95=%02X effective00FB=%02X\\n",
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)),
-                    static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)));
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)),
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x00fbu)));
         assert(!firmwareMachine.cpuFaulted());
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
