@@ -167,6 +167,17 @@ The next trace slice is now implemented in `Source/TechnoX8032Machine.h` and exe
 
 This is instrumentation and a regression comparison, not yet a decoded trace result. The newly added test has not yet been confirmed by a completed CI run in this checkpoint. Once it runs, the first divergent state/write can be inspected to identify the firmware transformation between the arithmetic helpers and the packet builder. The test-only synthetic ready response remains in use; no external processor behavior or audio output is inferred.
 
+### Pitch descriptor pointer source: XDATA indirection confirmed
+
+The pitch-source probe now starts at the descriptor-pointer load at IC4 PC `0x1607` and follows execution through the `0x1C61` interpolation/parameter path to `0x1E67`.
+
+The failed assertion in the first run exposed a mistaken interpretation: register `R7=0x0C` at PC `0x1607` is not the low byte returned by the pointer read. The instruction bytes at `0x1607` and `0x160B` are both `MOVX A,@DPTR`. The captured execution states show:
+- At PC `0x1607`, DPTR is `0x54E5`; after the MOVX, the following instruction at `0x1608` sees A=`0x00`.
+- PC `0x160A` increments DPTR to `0x54E6`; after the second MOVX at `0x160B`, the following instruction at `0x160C` sees A=`0x16`.
+- The resulting little-endian pointer is therefore `0x1600`. The seven-byte record subsequently read by the pitch path is at `0x160C–0x1612`; the test already checks those seven IC51 read bytes and their matching firmware read PCs.
+
+The test was corrected to assert the actual pointer bytes `00 16`, the two adjacent XDATA addresses `54E5/54E6`, and the combined pointer `0x1600`. It no longer confuses the input selector in R7 with the value loaded by MOVX. This correction is based on the captured 8032 instruction stream; the corrected PR CI run is still required before treating the new assertion set as green.
+
 ### Remaining reverse-engineering work
 
 
