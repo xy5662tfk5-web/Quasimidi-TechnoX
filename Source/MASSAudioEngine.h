@@ -12,6 +12,7 @@ namespace technox {
 
 class MASSResourceProgramCatalog;
 class MASSFX1ResourceCatalog;
+class MASSFX2ResourceCatalog;
 
 class MASSPartParameterStore {
 public:
@@ -383,6 +384,7 @@ public:
     virtual ~IMASSVoiceBackend() = default;
     virtual void setProgramCatalog(const MASSResourceProgramCatalog*) noexcept {}
     virtual void setFX1ResourceCatalog(const MASSFX1ResourceCatalog*) noexcept {}
+    virtual void setFX2ResourceCatalog(const MASSFX2ResourceCatalog*) noexcept {}
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
@@ -436,6 +438,7 @@ public:
         backend_ = backend != nullptr ? backend : &nullBackend_;
         backend_->setProgramCatalog(programCatalog_);
         backend_->setFX1ResourceCatalog(fx1ResourceCatalog_);
+        backend_->setFX2ResourceCatalog(fx2ResourceCatalog_);
         if (prepared_)
             backend_->prepare(preparedSampleRate_, preparedMaximumBlockSize_);
     }
@@ -459,6 +462,15 @@ public:
     }
     const MASSFX1ResourceCatalog* fx1ResourceCatalog() const noexcept {
         return fx1ResourceCatalog_;
+    }
+
+    // Separate FX2 algorithm family; never alias the FX1 directory.
+    void setFX2ResourceCatalog(const MASSFX2ResourceCatalog* catalog) noexcept {
+        fx2ResourceCatalog_ = catalog;
+        backend_->setFX2ResourceCatalog(fx2ResourceCatalog_);
+    }
+    const MASSFX2ResourceCatalog* fx2ResourceCatalog() const noexcept {
+        return fx2ResourceCatalog_;
     }
 
     void prepare(double sampleRate, int maximumBlockSize) {
@@ -825,6 +837,7 @@ private:
     IMASSVoiceBackend* backend_;
     const MASSResourceProgramCatalog* programCatalog_ = nullptr;
     const MASSFX1ResourceCatalog* fx1ResourceCatalog_ = nullptr;
+    const MASSFX2ResourceCatalog* fx2ResourceCatalog_ = nullptr;
     double preparedSampleRate_ = 44100.0;
     int preparedMaximumBlockSize_ = 0;
     bool prepared_ = false;
