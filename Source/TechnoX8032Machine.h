@@ -37,6 +37,14 @@ public:
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
+        // Bus context at the final byte of the transaction. These are
+        // observations, not decoded DSP register meanings.
+        std::uint8_t deviceIndex = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool soundDeviceResetReleased = true;
     };
     struct soundHostReadEvent {
         std::uint8_t registerIndex = 0;
@@ -898,6 +906,12 @@ public:
                     packet.returnPC = static_cast<std::uint16_t>(
                         (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
                     packet.machineCycle = elapsedMachineCycles_;
+                    packet.deviceIndex = soundHostCommandLatch_;
+                    packet.port2 = portPins_[2];
+                    packet.port3 = portPins_[3];
+                    packet.soundBusMode = internal_[0x8e];
+                    packet.ic51Selected = isIC51Selected();
+                    packet.soundDeviceResetReleased = soundDeviceResetReleased_;
                     ++soundCommandPacketCount_;
                     soundHostTransactionActive_ = false;
                     soundHostExpectedRegister_ = 0;
