@@ -80,8 +80,14 @@ int main(int argc, char** argv) {
     machine.setPortPins(0xa0u, 0x12u);
     machine.setPortPins(0xb0u, 0x34u);
     machine.writeExternal(0x8000, 0x11);
+    machine.setPortPins(0xa0u, 0x13u);
+    machine.setPortPins(0xb0u, 0x35u);
     machine.writeExternal(0x8001, 0x22);
+    machine.setPortPins(0xa0u, 0x14u);
+    machine.setPortPins(0xb0u, 0x36u);
     machine.writeExternal(0x8002, 0x33);
+    machine.setPortPins(0xa0u, 0x15u);
+    machine.setPortPins(0xb0u, 0x37u);
     machine.writeExternal(0x8003, 0x44);
     const auto& command = machine.commandPortBytes();
     assert(command[0] == 0x11 && command[1] == 0x22);
@@ -104,6 +110,20 @@ int main(int argc, char** argv) {
     assert(capturedCommand.soundBusMode == 1u);
     assert(!capturedCommand.ic51Selected);
     assert(capturedCommand.soundDeviceResetReleased);
+    assert(capturedCommand.byteContext[0].port2 == 0x12u);
+    assert(capturedCommand.byteContext[1].port2 == 0x13u);
+    assert(capturedCommand.byteContext[2].port2 == 0x14u);
+    assert(capturedCommand.byteContext[3].port2 == 0x15u);
+    assert(capturedCommand.byteContext[0].port3 == 0x34u);
+    assert(capturedCommand.byteContext[1].port3 == 0x35u);
+    assert(capturedCommand.byteContext[2].port3 == 0x36u);
+    assert(capturedCommand.byteContext[3].port3 == 0x37u);
+    for (std::size_t i = 0; i < 4; ++i) {
+        assert(capturedCommand.byteContext[i].deviceIndex == 0x11u);
+        assert(capturedCommand.byteContext[i].soundBusMode == 1u);
+        assert(!capturedCommand.byteContext[i].ic51Selected);
+        assert(capturedCommand.byteContext[i].soundDeviceResetReleased);
+    }
     assert(machine.soundHostBurstWordCount() == 1u);
     const auto& burstWord = machine.soundHostBurstWordAt(0);
     assert(burstWord.lowByte == 0x33u && burstWord.highByte == 0x44u);
