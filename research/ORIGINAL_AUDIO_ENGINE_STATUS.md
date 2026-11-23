@@ -67,15 +67,14 @@ Branch: `research/original-technox-audio-engine`
 - This gives a second verified IC51 path beyond the descriptor/command-stream catalog. It is resource transport metadata only; no FX algorithm, PCM format, or physical DSP has been identified.
 
  
-## FX resource catalog reaches the voice backend
+## FX1 resource catalogue reaches the voice backend
 
-- Added an immutable `MASSFXResourceCatalog` that loads the fixed 21-entry IC4 FX directory and resolves both referenced IC51 stream resources for every FX type in both IC51 banks.
-- Both transport formats are parsed as complete resource sequences: each nonzero block is retained in order, while the terminating zero-count byte is recorded as an end marker and is not sent to the host port.
-- The processor constructs this catalog once at startup from the descrambled IC4 code and validated IC51 image. It passes the read-only catalog to `MASSAudioEngine` and the active voice backend; backend replacement reattaches the same pointer.
-- Tests verify all 42 bank/type pairs, both stream terminators, representative Room block data, and catalog forwarding across backend replacement.
-- This is FX resource data plumbing only. The runtime FX type-to-directory index mapping, DSP command meaning, FX algorithms and physical receiver are still unresolved; the generic oscillator is still not the original sound engine.
+- Recovered the 21-entry IC4 directory at `0x8423`. Its names and order match the manual's FX1 Room/Reverb family.
+- Each FX1 directory entry selects two IC51 upload streams at record offsets `+0x0B` and `+0x0C`. These are now named neutral stream A/B; they are not FX1 and FX2 processor type IDs.
+- `MASSFX1ResourceCatalog` predecodes all 21 FX1 types in both IC51 banks and passes the immutable catalogue to the backend at startup. Backend replacement preserves the catalogue pointer.
+- Regression tests check the 42 bank/type entries, both upload-stream framing formats, complete zero-terminated block sequences and representative Room data. The backend probe resolves FX1 type selection from the Common-control store.
+- FX2 is a separate processor with its own 21-algorithm family (Chorus, Flanger, Phaser, delay, EQ, drive, etc.). Its type byte is preserved in Performance data, but an FX2-specific ROM directory and upload path have not yet been established. The FX1 catalogue is deliberately not used to resolve FX2.
 
- 
 ## Program catalog now caches both command-stream flag outcomes
 
 - The resource command decoder has two firmware-confirmed group-0 paths selected by transient bit 0x0A; terminal group-0x20 behavior also changes with that bit.
