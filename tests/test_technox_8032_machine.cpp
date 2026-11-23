@@ -585,6 +585,31 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.p35TransitionCount() > 0u);
         assert(firmwareMachine.cpu().totalCycles() != 0);
 
+        // Preserve instruction-level evidence for the undocumented 0x7C00-0x7FFF
+        // peripheral window while IC51 is deselected. The machine keeps open-bus
+        // behavior; this trace is observation only, not a guessed device model.
+        const auto unmappedTraceCount = firmwareMachine.unmappedBusTraceCount();
+        const auto firstRetainedUnmapped = unmappedTraceCount > 4096u
+            ? unmappedTraceCount - 4096u : 0u;
+        std::size_t peripheralWindowEvents = 0;
+        std::printf("Undocumented 7Cxx/7Dxx bus trace (instruction-level):\\n");
+        for (std::size_t i = firstRetainedUnmapped; i < unmappedTraceCount; ++i) {
+            const auto& event = firmwareMachine.unmappedBusTraceAt(i);
+            if (event.address < 0x7c00u || event.address > 0x7fffu) continue;
+            ++peripheralWindowEvents;
+            std::printf("  %c %04X=%02X pc=%04X stackRet=%04X P3=%02X 8E=%02X cycle=%llu\\n",
+                        event.write ? 'W' : 'R',
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.stackReturnPC),
+                        static_cast<unsigned>(event.port3),
+                        static_cast<unsigned>(event.soundBusMode),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
+        std::printf("Undocumented peripheral-window events retained: %zu\\n",
+                    peripheralWindowEvents);
+
         // Resume the real-IC51 loader with a controlled ready signature.
         // This is explicitly a synthetic SoundHost handshake, not a claim that
         // the unimplemented DSP returned AC on physical hardware.
