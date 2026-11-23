@@ -478,7 +478,8 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
-        if (pc == 0x210fu || pc == 0x1848u) {
+        if (pc == 0x210fu || pc == 0x1848u ||
+            pc == 0x1fc9u || pc == 0x2027u) {
             const auto& registers = cpu_.registers();
             auto& event = instructionWatchTrace_[
                 instructionWatchCount_ % instructionWatchTrace_.size()];
