@@ -146,6 +146,25 @@ public:
         std::uint8_t globalInterruptEnabled = 0;
         std::uint64_t machineCycle = 0;
     };
+    // Test-only snapshot taken immediately before the packet builder at 0x210F.
+    // Register names are architectural 8051 names; no DSP semantics are implied.
+    struct InstructionWatchEvent {
+        std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
+        std::uint16_t dptr = 0;
+        std::uint8_t accumulator = 0;
+        std::uint8_t b = 0;
+        std::uint8_t psw = 0;
+        std::uint8_t registerBankBase = 0;
+        std::array<std::uint8_t, 8> registers{};
+        std::uint8_t directRam2B = 0;
+        std::uint8_t directRam30 = 0;
+        std::uint8_t directRam31 = 0;
+        std::uint8_t directRam32 = 0;
+        std::uint8_t directRam36 = 0;
+        std::uint8_t directRam37 = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct InternalFlagWriteEvent {
         std::uint8_t bitAddress = 0x0a;
         std::uint8_t byteValue = 0;
@@ -414,6 +433,20 @@ public:
         return bulkTransferEntryTrace_[index % bulkTransferEntryTrace_.size()];
     }
 
+    // The watch point is deliberately narrow: PC 0x210F precedes the
+    // 0x211F packet writer call whose output changes with MIDI velocity.
+    void clearInstructionWatchForTesting() noexcept {
+        instructionWatchTrace_.fill(InstructionWatchEvent{});
+        instructionWatchCount_ = 0;
+    }
+    std::size_t instructionWatchCountForTesting() const noexcept {
+        return instructionWatchCount_;
+    }
+    const InstructionWatchEvent& instructionWatchAtForTesting(
+        std::size_t index) const noexcept {
+        return instructionWatchTrace_[index % instructionWatchTrace_.size()];
+    }
+
     std::uint64_t watchedCallCount(std::uint16_t target) const noexcept {
         switch (target) {
             case 0x57a8: return watchedCallCounts_[0];
@@ -441,6 +474,33 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
+        if (pc == 0x210fu) {
+            const auto& registers = cpu_.registers();
+            auto& event = instructionWatchTrace_[
+                instructionWatchCount_ % instructionWatchTrace_.size()];
+            event.instructionPC = pc;
+            event.dptr = registers.dptr;
+            event.accumulator = registers.a;
+            event.b = registers.b;
+            event.psw = registers.psw.pack();
+            event.registerBankBase = registers.psw.registerBankBase();
+            for (std::size_t index = 0; index < event.registers.size(); ++index)
+                event.registers[index] = readInternal(static_cast<std::uint8_t>(
+                    event.registerBankBase + index));
+            event.directRam2B = readInternal(0x2bu);
+            event.directRam30 = readInternal(0x30u);
+            event.directRam31 = readInternal(0x31u);
+            event.directRam32 = readInternal(0x32u);
+            event.directRam36 = readInternal(0x36u);
+            event.directRam37 = readInternal(0x37u);
+            const auto stackPointer = registers.sp;
+            const auto returnHigh = readIndirect(stackPointer);
+            const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
+            event.returnPC = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
+            event.machineCycle = elapsedMachineCycles_;
+            ++instructionWatchCount_;
+        }
         if (code_[pc] == 0x12u) {
             const auto target = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(code_[static_cast<std::uint16_t>(pc + 1u)]) << 8) |
@@ -1443,6 +1503,8 @@ private:
     std::size_t internalFlagWriteTraceCount_ = 0;
     std::array<BulkTransferEntryEvent, 16> bulkTransferEntryTrace_{};
     std::size_t bulkTransferEntryCount_ = 0;
+    std::array<InstructionWatchEvent, 32> instructionWatchTrace_{};
+    std::size_t instructionWatchCount_ = 0;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
