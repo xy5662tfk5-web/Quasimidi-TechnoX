@@ -13,6 +13,7 @@ namespace technox {
 class MASSResourceProgramCatalog;
 class MASSFX1ResourceCatalog;
 class MASSFX2ResourceCatalog;
+class MASSIC51ExternalSoundMemoryImage;
 
 class MASSPartParameterStore {
 public:
