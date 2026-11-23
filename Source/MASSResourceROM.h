@@ -925,6 +925,54 @@ public:
     }
 };
 
+
+ 
+struct MASS1EDDFullParameterPipelineResult {
+    MASS1EDDParameterPipelineResult nonlinearAndExternal{};
+    MASS1EDDSlotCoefficientResult slotCoefficient{};
+};
+
+// End-to-end byte-accurate composition of the recovered 0x1EDD parameter
+// transform and its 0x1FCB..0x2005 slot/modulation coefficient stage.
+// Inputs are the values visible at those firmware boundaries; externalByte
+// is still supplied by the caller after a P3-selected bus read. This produces
+// the final coefficient byte, not a guessed waveform or physical DSP command.
+class MASS1EDDFullParameterPipeline {
+public:
+    static bool process(const MASSFirmwareROMView& rom,
+                        std::uint8_t opcode,
+                        std::uint8_t ram30,
+                        std::uint8_t r3,
+                        std::uint8_t r4,
+                        std::uint8_t ram3F,
+                        std::uint8_t ram40,
+                        std::uint16_t basePointer,
+                        std::uint8_t selectorInputA,
+                        std::uint8_t ram2F,
+                        std::uint8_t r7,
+                        std::uint8_t externalByte,
+                        std::uint8_t ram31,
+                        std::uint8_t ram32,
+                        std::uint8_t ram41,
+                        std::uint8_t ram43,
+                        MASS1EDDFullParameterPipelineResult& result) noexcept {
+        MASS1EDDFullParameterPipelineResult decoded{};
+        if (!MASS1EDDParameterPipeline::process(
+                rom, opcode, ram30, r3, r4, ram3F, ram40,
+                basePointer, selectorInputA, ram2F, r7, externalByte,
+                decoded.nonlinearAndExternal))
+            return false;
+
+        if (!MASS1EDDSlotCoefficientStage::apply(
+                rom, opcode, decoded.nonlinearAndExternal.coefficientB,
+                ram31, ram32, ram41, ram43, decoded.slotCoefficient))
+            return false;
+
+        result = decoded;
+        return true;
+    }
+};
+
 struct MASSResourceSelection {
     MASSResourceBank bank = MASSResourceBank::bank0;
     std::uint8_t pointerIndex = 0;
