@@ -110,6 +110,8 @@ public:
         std::uint8_t port2 = 0xff;
         std::uint8_t port3 = 0xff;
         std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool writeAccepted = true;
         std::uint64_t machineCycle = 0;
     };
     struct UnmappedBusEvent {
@@ -526,6 +528,21 @@ public:
             ++ic51ReadsByBank_[bank];
             lastIC51ReadAddress_ = address;
             const auto value = ic51Rom_[bank * 0x10000u + address];
+            if (address >= 0x2d00u && address <= 0x2dffu) {
+                auto& watch = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
+                watch.address = address;
+                watch.value = value;
+                watch.write = false;
+                watch.instructionPC = instructionPC;
+                watch.stackReturnPC = currentStackReturnPC();
+                watch.port2 = portPins_[2];
+                watch.port3 = portPins_[3];
+                watch.soundBusMode = internal_[0x8e];
+                watch.ic51Selected = true;
+                watch.writeAccepted = true;
+                watch.machineCycle = elapsedMachineCycles_;
+                ++xdataWatchTraceCount_;
+            }
             auto& event = ic51ReadTrace_[ic51ReadTraceCount_ % ic51ReadTrace_.size()];
             event.address = address;
             event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
@@ -591,6 +608,8 @@ public:
                 event.port2 = portPins_[2];
                 event.port3 = portPins_[3];
                 event.soundBusMode = internal_[0x8e];
+                event.ic51Selected = ic51Selected;
+                event.writeAccepted = true;
                 event.machineCycle = elapsedMachineCycles_;
                 ++xdataWatchTraceCount_;
             }
@@ -673,9 +692,26 @@ public:
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
         const bool ramMode = (internal_[0x8e] & 0x03u) == 0x02u;
-        if (isIC51Selected() && !isDedicatedPeripheralAddress(address) &&
-            !(ramMode && isXdataRam(address)))
+        const bool ic51Selected = isIC51Selected();
+        if (ic51Selected && !isDedicatedPeripheralAddress(address) &&
+            !(ramMode && isXdataRam(address))) {
+            if (address >= 0x2d00u && address <= 0x2dffu) {
+                auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
+                event.address = address;
+                event.value = value;
+                event.write = true;
+                event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                event.stackReturnPC = currentStackReturnPC();
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
+                event.ic51Selected = true;
+                event.writeAccepted = false;
+                event.machineCycle = elapsedMachineCycles_;
+                ++xdataWatchTraceCount_;
+            }
             return; // IC51 is read-only; dedicated I/O and RAM remain writable.
+        }
         if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
             soundDeviceWrite_ = value; // status-port traffic outside RAM mode
             return;
