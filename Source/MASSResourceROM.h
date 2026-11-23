@@ -1956,6 +1956,7 @@ struct MASSResolvedProgramResource {
     MASSResourceSelection selection{};
     std::uint8_t bankNumber = 0;
     std::uint8_t soundNumber = 0;
+    bool firmwareFlag0ASet = false;
     std::uint16_t descriptorAddress = 0;
     MASSResourceDescriptor descriptor{};
     MASSDecodedResourceStream stream{};
@@ -1974,6 +1975,7 @@ public:
         MASSResolvedProgramResource resolved{};
         resolved.bankNumber = static_cast<std::uint8_t>(bankNumber);
         resolved.soundNumber = static_cast<std::uint8_t>(soundNumber);
+        resolved.firmwareFlag0ASet = firmwareFlag0ASet;
         if (!MASSResourceROM::resolvePartResource(
                 bankNumber, resolved.soundNumber, resolved.selection))
             return false;
@@ -2009,7 +2011,10 @@ public:
 class MASSResourceProgramCatalog {
 public:
     static constexpr std::size_t kProgramCount = 4u * 128u;
+    static constexpr std::size_t kFirmwareFlagVariantCount = 2u;
 
+    // Backward-compatible single-path load. Existing callers can request one
+    // exact firmware branch; the startup processor uses loadBothFirmwareFlagVariants.
     bool load(const MASSResourceROM& rom, bool firmwareFlag0ASet = false) {
         std::array<MASSResolvedProgramResource, kProgramCount> parsed{};
         for (int bank = 0; bank < 4; ++bank) {
@@ -2020,27 +2025,61 @@ public:
                     return false;
             }
         }
-        resources_ = std::move(parsed);
-        loaded_ = true;
+
+        const auto variant = firmwareFlag0ASet ? 1u : 0u;
+        resources_[variant] = std::move(parsed);
+        loadedVariants_[variant] = true;
         return true;
     }
 
-    bool isLoaded() const noexcept { return loaded_; }
+    // Predecode both reachable 0x0A branches on the startup thread. The
+    // branch changes the handling of group-0 records and the final slot-fill
+    // behavior, so a voice backend must not be forced to decode it in realtime.
+    bool loadBothFirmwareFlagVariants(const MASSResourceROM& rom) {
+        std::array<std::array<MASSResolvedProgramResource, kProgramCount>,
+                   kFirmwareFlagVariantCount> parsed{};
 
-    const MASSResolvedProgramResource* find(int bank, int sound) const noexcept {
-        if (!loaded_ || bank < 0 || bank >= 4 || sound < 0 || sound >= 128)
+        for (std::size_t variant = 0; variant < kFirmwareFlagVariantCount; ++variant) {
+            const bool firmwareFlag0ASet = variant != 0;
+            for (int bank = 0; bank < 4; ++bank) {
+                for (int sound = 0; sound < 128; ++sound) {
+                    auto& resource = parsed[variant][static_cast<std::size_t>(bank * 128 + sound)];
+                    if (!MASSResourceProgramResolver::resolve(
+                            rom, bank, sound, resource, firmwareFlag0ASet))
+                        return false;
+                }
+            }
+        }
+
+        resources_ = std::move(parsed);
+        loadedVariants_ = {{true, true}};
+        return true;
+    }
+
+    // Preserve the original single-variant meaning for existing callers.
+    bool isLoaded() const noexcept { return loadedVariants_[0]; }
+    bool isVariantLoaded(bool firmwareFlag0ASet) const noexcept {
+        return loadedVariants_[firmwareFlag0ASet ? 1u : 0u];
+    }
+
+    const MASSResolvedProgramResource* find(
+        int bank, int sound, bool firmwareFlag0ASet = false) const noexcept {
+        const auto variant = firmwareFlag0ASet ? 1u : 0u;
+        if (!loadedVariants_[variant] || bank < 0 || bank >= 4 ||
+            sound < 0 || sound >= 128)
             return nullptr;
-        return &resources_[static_cast<std::size_t>(bank * 128 + sound)];
+        return &resources_[variant][static_cast<std::size_t>(bank * 128 + sound)];
     }
 
     void clear() noexcept {
         resources_ = {};
-        loaded_ = false;
+        loadedVariants_ = {{false, false}};
     }
 
 private:
-    std::array<MASSResolvedProgramResource, kProgramCount> resources_{};
-    bool loaded_ = false;
+    std::array<std::array<MASSResolvedProgramResource, kProgramCount>,
+               kFirmwareFlagVariantCount> resources_{};
+    std::array<bool, kFirmwareFlagVariantCount> loadedVariants_{{false, false}};
 };
 
 } // namespace technox
