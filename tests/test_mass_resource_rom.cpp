@@ -987,18 +987,31 @@ void testBankProgramResolver(const char* path) {
     MASSResourceProgramCatalog catalog;
     assert(!catalog.isLoaded());
     assert(catalog.find(2, 10) == nullptr);
-    assert(catalog.load(rom));
+    assert(catalog.loadBothFirmwareFlagVariants(rom));
     assert(catalog.isLoaded());
+    assert(catalog.isVariantLoaded(false));
+    assert(catalog.isVariantLoaded(true));
     assert(catalog.find(-1, 0) == nullptr);
     assert(catalog.find(4, 0) == nullptr);
     assert(catalog.find(0, 128) == nullptr);
+    assert(catalog.find(0, 0, true) != nullptr);
+    assert(catalog.find(0, 0, true)->firmwareFlag0ASet);
     for (int bank = 0; bank < 4; ++bank) {
         for (int sound = 0; sound < 128; ++sound) {
             const auto* cached = catalog.find(bank, sound);
-            assert(cached != nullptr);
+            const auto* alternate = catalog.find(bank, sound, true);
+            assert(cached != nullptr && alternate != nullptr);
             assert(cached->bankNumber == bank);
             assert(cached->soundNumber == sound);
+            assert(!cached->firmwareFlag0ASet);
+            assert(alternate->firmwareFlag0ASet);
+            assert(cached->descriptorAddress == alternate->descriptorAddress);
+            assert(cached->descriptor.commandStreamPointer ==
+                   alternate->descriptor.commandStreamPointer);
             assert(!cached->stream.truncated);
+            assert(!alternate->stream.truncated);
+            assert(cached->stream.outputSlotsWritten <= MASSCommandStreamDecoder::kMaximumSlots);
+            assert(alternate->stream.outputSlotsWritten <= MASSCommandStreamDecoder::kMaximumSlots);
         }
     }
     const auto* performanceOnePart13 = catalog.find(2, 10);
@@ -1007,6 +1020,12 @@ void testBankProgramResolver(const char* path) {
     assert(performanceOnePart13->soundNumber == 10);
     assert(performanceOnePart13->descriptorAddress != 0);
     assert(performanceOnePart13->stream.commands.size() > 0);
+    const auto* performanceOnePart13FlagSet = catalog.find(2, 10, true);
+    assert(performanceOnePart13FlagSet != nullptr);
+    assert(performanceOnePart13FlagSet->firmwareFlag0ASet);
+    assert(performanceOnePart13FlagSet->descriptorAddress ==
+           performanceOnePart13->descriptorAddress);
+    assert(performanceOnePart13FlagSet->stream.commands.size() > 0);
 
     // The same immutable, predecoded catalog is handed to the voice backend.
     // A note captures its Part's bank/program pair, and the backend can resolve
