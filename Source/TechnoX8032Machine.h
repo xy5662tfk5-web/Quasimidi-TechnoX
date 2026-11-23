@@ -375,6 +375,11 @@ public:
                 case 0x02d1: ++watchedCallCounts_[18]; break;
                 default: break;
             }
+            if (testInternalWriteOnCallEnabled_ &&
+                target == testInternalWriteOnCallTarget_) {
+                internal_[testInternalWriteOnCallAddress_] = testInternalWriteOnCallValue_;
+                testInternalWriteOnCallEnabled_ = false;
+            }
         }
         return cpu_.step(*this);
     }
@@ -1112,6 +1117,15 @@ public:
         return address >= 0x7000u && address <= 0x7fffu
             ? testExternalRam7000_[address - 0x7000u] : 0xffu;
     }
+    void setTestInternalWriteOnCall(std::uint16_t callTarget,
+                                     std::uint8_t address,
+                                     std::uint8_t value) noexcept {
+        testInternalWriteOnCallTarget_ = callTarget;
+        testInternalWriteOnCallAddress_ = address;
+        testInternalWriteOnCallValue_ = value;
+        testInternalWriteOnCallEnabled_ = true;
+    }
+
     void setTestExternalReadOverride(std::uint16_t address, std::uint8_t value) noexcept {
         std::size_t freeSlot = testExternalReadOverrideEnabled_.size();
         for (std::size_t i = 0; i < testExternalReadOverrideEnabled_.size(); ++i) {
@@ -1298,6 +1312,10 @@ private:
     std::array<bool, 4> testExternalReadOverrideEnabled_{};
     std::array<std::uint16_t, 4> testExternalReadOverrideAddresses_{};
     std::array<std::uint8_t, 4> testExternalReadOverrideValues_{{0xffu, 0xffu, 0xffu, 0xffu}};
+    bool testInternalWriteOnCallEnabled_ = false;
+    std::uint16_t testInternalWriteOnCallTarget_ = 0;
+    std::uint8_t testInternalWriteOnCallAddress_ = 0;
+    std::uint8_t testInternalWriteOnCallValue_ = 0;
     std::uint64_t soundMemoryReadCount_ = 0;
     std::uint64_t soundMemoryWriteCount_ = 0;
     std::uint64_t soundBusModeWriteCount_ = 0;
