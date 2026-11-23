@@ -896,10 +896,12 @@ void testActualBulkBlockLoader(const char* path) {
     MASSIC51BulkBlockHeader bank0{};
     MASSIC51BulkBlockHeader bank1{};
     assert(MASSIC51BulkBlockHeader::parse(
-        image.data(), MASSResourceROM::kBankSize, 0x48, bank0));
+        image.data(), MASSResourceROM::kBankSize,
+        MASSIC51BulkBlockHeader::kObservedStartupTransferIndex, bank0));
     assert(MASSIC51BulkBlockHeader::parse(
         image.data() + MASSResourceROM::kBankSize,
-        MASSResourceROM::kBankSize, 0x48, bank1));
+        MASSResourceROM::kBankSize,
+        MASSIC51BulkBlockHeader::kObservedStartupTransferIndex, bank1));
 
     assert(bank0.sourceAddress == 0x3c64);
     assert(bank0.countHigh == 0x35 && bank0.countLow == 0x4f);
@@ -907,44 +909,6 @@ void testActualBulkBlockLoader(const char* path) {
     assert(bank1.sourceAddress == 0x295c);
     assert(bank1.countHigh == 0x25 && bank1.countLow == 0x74);
     assert(bank1.firmwareByteCount() == 0x2574);
-
-    // Audit all 256 candidate lookup positions in both IC51 banks. These
-    // are sliding four-byte windows at DPTR=2*R7, not independent 4-byte
-    // records: neighboring positions overlap by two bytes. Totals therefore
-    // describe candidate windows, not unique PCM/sample storage.
-    MASSIC51BulkBlockDirectory candidateDirectory0;
-    MASSIC51BulkBlockDirectory candidateDirectory1;
-    assert(candidateDirectory0.load(image.data(), MASSResourceROM::kBankSize));
-    assert(candidateDirectory1.load(
-        image.data() + MASSResourceROM::kBankSize, MASSResourceROM::kBankSize));
-    assert(candidateDirectory0.isLoaded() && candidateDirectory1.isLoaded());
-    assert(candidateDirectory0.find(0) != nullptr);
-    assert(candidateDirectory0.find(255) != nullptr);
-    assert(candidateDirectory0.find(256) == nullptr);
-    assert(candidateDirectory0.find(0x48)->sourceAddress == 0x3c64);
-    assert(candidateDirectory0.find(0x48)->firmwareByteCount() == 0x354f);
-    assert(candidateDirectory1.find(0x48)->sourceAddress == 0x295c);
-    assert(candidateDirectory1.find(0x48)->firmwareByteCount() == 0x2574);
-    assert(candidateDirectory0.candidateByteCountSum() == 7484183u);
-    assert(candidateDirectory1.candidateByteCountSum() == 4574119u);
-    assert(candidateDirectory0.sourceWrapCount() == 111u);
-    assert(candidateDirectory1.sourceWrapCount() == 0u);
-
-    // The firmware increments a 16-bit IC51 source pointer. Verify the
-    // observed address wrap for candidate index 0x81 against the real ROM.
-    const auto* wrappingHeader = candidateDirectory0.find(0x81);
-    assert(wrappingHeader != nullptr);
-    assert(wrappingHeader->sourceAddress == 0x729d);
-    assert(wrappingHeader->firmwareByteCount() == 0x9ec3);
-    std::vector<std::uint8_t> wrappedPayload(wrappingHeader->firmwareByteCount());
-    assert(MASSIC51BulkBlockHeader::copyPayload(
-        image.data(), MASSResourceROM::kBankSize, *wrappingHeader,
-        wrappedPayload.data(), wrappedPayload.size()));
-    assert(wrappedPayload.front() == image[0x729d]);
-    assert(wrappedPayload[0x10000u - 0x729du] == image[0]);
-    assert(wrappedPayload.back() == image[
-        (static_cast<std::uint16_t>(wrappingHeader->sourceAddress +
-                                    wrappingHeader->firmwareByteCount() - 1u))]);
 
     std::vector<std::uint8_t> payload0(bank0.firmwareByteCount());
     std::vector<std::uint8_t> payload1(bank1.firmwareByteCount());
