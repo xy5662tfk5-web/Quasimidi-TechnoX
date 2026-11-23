@@ -165,6 +165,40 @@ public:
         std::uint8_t directRam37 = 0;
         std::uint64_t machineCycle = 0;
     };
+    // Bounded execution trace from the two firmware helper-return sites to the
+    // next Note On packet builder. Values are raw 8032 architectural state.
+    struct ExecutionInstructionEvent {
+        std::uint16_t windowStartPC = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint16_t dptr = 0;
+        std::uint64_t machineCycle = 0;
+        std::uint64_t dataAccessCount = 0;
+        std::array<std::uint8_t, 3> opcodeBytes{};
+        std::array<std::uint8_t, 8> registers{};
+        // [0] is direct IRAM 0x2B; [1..8] are direct IRAM 0x30..0x37.
+        std::array<std::uint8_t, 9> ram2BAnd30To37{};
+        std::uint8_t accumulator = 0;
+        std::uint8_t b = 0;
+        std::uint8_t psw = 0;
+        std::uint8_t registerBankBase = 0;
+        std::uint8_t stackPointer = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+    };
+    struct ExecutionDataAccessEvent {
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint16_t address = 0;
+        std::uint64_t machineCycle = 0;
+        std::uint8_t value = 0xff;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool write = false;
+        bool ic51Selected = false;
+    };
     struct InternalFlagWriteEvent {
         std::uint8_t bitAddress = 0x0a;
         std::uint8_t byteValue = 0;
@@ -369,6 +403,13 @@ public:
         watchedCallCounts_.fill(0);
         instructionWatchTrace_.fill(InstructionWatchEvent{});
         instructionWatchCount_ = 0;
+        executionInstructionTrace_.fill(ExecutionInstructionEvent{});
+        executionInstructionTraceCount_ = 0;
+        executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
+        executionDataAccessTraceCount_ = 0;
+        executionTraceWindowStartPC_ = 0;
+        executionTraceArmed_ = false;
+        executionTraceActive_ = false;
         ic51ReadTrace_.fill(IC51ReadEvent{});
         ic51ReadTraceCount_ = 0;
         xdataWatchTrace_.fill(XdataWatchEvent{});
@@ -450,6 +491,42 @@ public:
         return instructionWatchTrace_[index % instructionWatchTrace_.size()];
     }
 
+    // Arms capture only when firmware reaches 0x1FC9 or 0x2027, and each
+    // window ends after the pre-instruction snapshot at 0x210F.
+    void clearExecutionTraceForTesting() noexcept {
+        executionInstructionTrace_.fill(ExecutionInstructionEvent{});
+        executionInstructionTraceCount_ = 0;
+        executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
+        executionDataAccessTraceCount_ = 0;
+        executionTraceWindowStartPC_ = 0;
+        executionTraceArmed_ = true;
+        executionTraceActive_ = false;
+    }
+    void disableExecutionTraceForTesting() noexcept {
+        executionTraceArmed_ = false;
+        executionTraceActive_ = false;
+    }
+    std::size_t executionInstructionTraceCountForTesting() const noexcept {
+        return executionInstructionTraceCount_;
+    }
+    std::size_t executionInstructionTraceRetainedCountForTesting() const noexcept {
+        return std::min(executionInstructionTraceCount_, executionInstructionTrace_.size());
+    }
+    const ExecutionInstructionEvent& executionInstructionTraceAtForTesting(
+        std::size_t absoluteIndex) const noexcept {
+        return executionInstructionTrace_[absoluteIndex % executionInstructionTrace_.size()];
+    }
+    std::size_t executionDataAccessTraceCountForTesting() const noexcept {
+        return executionDataAccessTraceCount_;
+    }
+    std::size_t executionDataAccessTraceRetainedCountForTesting() const noexcept {
+        return std::min(executionDataAccessTraceCount_, executionDataAccessTrace_.size());
+    }
+    const ExecutionDataAccessEvent& executionDataAccessTraceAtForTesting(
+        std::size_t absoluteIndex) const noexcept {
+        return executionDataAccessTrace_[absoluteIndex % executionDataAccessTrace_.size()];
+    }
+
     std::uint64_t watchedCallCount(std::uint16_t target) const noexcept {
         switch (target) {
             case 0x57a8: return watchedCallCounts_[0];
@@ -478,6 +555,45 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
+        if (executionTraceArmed_ && !executionTraceActive_ &&
+            (pc == 0x1fc9u || pc == 0x2027u)) {
+            executionTraceActive_ = true;
+            executionTraceWindowStartPC_ = pc;
+        }
+        if (executionTraceActive_) {
+            const auto& registers = cpu_.registers();
+            auto& event = executionInstructionTrace_[
+                executionInstructionTraceCount_ % executionInstructionTrace_.size()];
+            event.windowStartPC = executionTraceWindowStartPC_;
+            event.instructionPC = pc;
+            event.stackReturnPC = currentStackReturnPC();
+            event.dptr = registers.dptr;
+            event.machineCycle = elapsedMachineCycles_;
+            event.dataAccessCount = executionDataAccessTraceCount_;
+            event.opcodeBytes = {{
+                readCode(pc),
+                readCode(static_cast<std::uint16_t>(pc + 1u)),
+                readCode(static_cast<std::uint16_t>(pc + 2u))
+            }};
+            event.accumulator = registers.a;
+            event.b = registers.b;
+            event.psw = registers.psw.pack();
+            event.registerBankBase = registers.psw.registerBankBase();
+            event.stackPointer = registers.sp;
+            event.port2 = portPins_[2];
+            event.port3 = portPins_[3];
+            event.soundBusMode = internal_[0x8e];
+            for (std::size_t index = 0; index < event.registers.size(); ++index)
+                event.registers[index] = readInternal(static_cast<std::uint8_t>(
+                    event.registerBankBase + index));
+            event.ram2BAnd30To37[0] = readInternal(0x2bu);
+            for (std::size_t index = 0; index < 8; ++index)
+                event.ram2BAnd30To37[index + 1u] = readInternal(
+                    static_cast<std::uint8_t>(0x30u + index));
+            ++executionInstructionTraceCount_;
+            if (pc == 0x210fu)
+                executionTraceActive_ = false;
+        }
         if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u) {
             const auto& registers = cpu_.registers();
@@ -708,6 +824,12 @@ public:
     }
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
+        const auto value = readExternalImpl(address);
+        recordExecutionDataAccess(address, value, false);
+        return value;
+    }
+
+    std::uint8_t readExternalImpl(std::uint16_t address) noexcept {
         const auto instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
         const bool ic51Selected = isIC51Selected();
         if (instructionPC >= 0xaf3cu && instructionPC <= 0xaf63u) {
@@ -942,6 +1064,11 @@ public:
     }
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
+        writeExternalImpl(address, value);
+        recordExecutionDataAccess(address, value, true);
+    }
+
+    void writeExternalImpl(std::uint16_t address, std::uint8_t value) noexcept {
         const bool ramMode = (internal_[0x8e] & 0x03u) == 0x02u;
         const bool ic51Selected = isIC51Selected();
         if (address == 0xff10u) {
@@ -1423,6 +1550,25 @@ public:
     }
 
 private:
+    void recordExecutionDataAccess(std::uint16_t address, std::uint8_t value,
+                                   bool write) noexcept {
+        if (!executionTraceActive_)
+            return;
+        auto& event = executionDataAccessTrace_[
+            executionDataAccessTraceCount_ % executionDataAccessTrace_.size()];
+        event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        event.stackReturnPC = currentStackReturnPC();
+        event.address = address;
+        event.machineCycle = elapsedMachineCycles_;
+        event.value = value;
+        event.port2 = portPins_[2];
+        event.port3 = portPins_[3];
+        event.soundBusMode = internal_[0x8e];
+        event.write = write;
+        event.ic51Selected = isIC51Selected();
+        ++executionDataAccessTraceCount_;
+    }
+
     std::uint16_t currentStackReturnPC() const noexcept {
         const auto stackPointer = cpu_.registers().sp;
         const auto returnHigh = readIndirect(stackPointer);
@@ -1511,6 +1657,13 @@ private:
     std::size_t bulkTransferEntryCount_ = 0;
     std::array<InstructionWatchEvent, 32> instructionWatchTrace_{};
     std::size_t instructionWatchCount_ = 0;
+    std::array<ExecutionInstructionEvent, 4096> executionInstructionTrace_{};
+    std::size_t executionInstructionTraceCount_ = 0;
+    std::array<ExecutionDataAccessEvent, 8192> executionDataAccessTrace_{};
+    std::size_t executionDataAccessTraceCount_ = 0;
+    std::uint16_t executionTraceWindowStartPC_ = 0;
+    bool executionTraceArmed_ = false;
+    bool executionTraceActive_ = false;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
