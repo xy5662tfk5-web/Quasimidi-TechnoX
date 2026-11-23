@@ -1778,8 +1778,33 @@ int main(int argc, char** argv) {
         // Send a second, different note after the first resource/voice setup so
         // its incremental SoundHost writes can be separated from initialization.
         const std::array<std::uint8_t, 3> secondNoteOn{{0x90u, 0x40u, 0x64u}};
+        const auto secondNotePacketStart = firmwareMachine.soundCommandPacketCount();
         runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
                          secondNoteOn.data(), secondNoteOn.size());
+        const auto secondNotePacketCount =
+            firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
+        assert(secondNotePacketCount == 549u);
+
+        // Pin the five per-note resource/voice transactions observed before
+        // the firmware's repeated 544-command SoundHost initialization sweep.
+        // Their payload meanings remain opaque until the external device is identified.
+        struct ExpectedNoteCommand {
+            std::array<std::uint8_t, 4> bytes;
+            std::uint16_t caller;
+        };
+        constexpr std::array<ExpectedNoteCommand, 5> expectedNoteCommands{{
+            {{{0x00u, 0xa9u, 0xe4u, 0x01u}}, 0x0a52u},
+            {{{0x02u, 0x01u, 0x00u, 0x00u}}, 0x0a52u},
+            {{{0x05u, 0xfbu, 0xd0u, 0x03u}}, 0x22fbu},
+            {{{0x0au, 0x00u, 0x78u, 0x00u}}, 0x2122u},
+            {{{0x0fu, 0x00u, 0x00u, 0x00u}}, 0x236eu}
+        }};
+        for (std::size_t i = 0; i < expectedNoteCommands.size(); ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                secondNotePacketStart + i);
+            assert(packet.bytes == expectedNoteCommands[i].bytes);
+            assert(packet.returnPC == expectedNoteCommands[i].caller);
+        }
 
         // Capture the firmware's 16-slot resource staging page. The page is
         // selected dynamically through internal RAM[0x2D], so do not assume
