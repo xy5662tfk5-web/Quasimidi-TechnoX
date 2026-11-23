@@ -86,6 +86,15 @@ Branch: `research/original-technox-audio-engine`
 - Regression coverage checks both possible decoder outcomes for all 512 bank/program pairs, matching descriptor addresses and command-stream pointers, valid terminal states, non-truncated streams and the flag-context marker in each cached entry.
 - The cache preserves both results so a future backend can model the correct interpreter call context. It does not claim that one flag value applies to an entire preset or voice.
 
+ 
+## Firmware-loaded 16-KiB sound-memory image reaches the audio backend
+
+- Added `MASSIC51ExternalSoundMemoryImage`, a startup-time reconstruction of the C000-FFFF image written by the original IC4 bulk loader.
+- The image uses the observed IC51 bank-0 table entry R7=`0x48`: source address `0x3C64`, 13,647 bytes (`0x354F`), and the exact IC4 logical-to-physical map at code address `0xADDD`. The final written byte is at `0xF5B2`; the array retains all 16,384 bytes and leaves unwritten locations zero.
+- The processor builds the immutable image once at startup and passes it to `MASSAudioEngine` / `IMASSVoiceBackend`. The engine forwards the same image pointer when a backend is replaced; no ROM parsing, permutation or allocation occurs in the audio callback.
+- The real-ROM integration test compares the reconstructed image against every byte of the XDATA window after executing IC4 boot. The resource test also verifies image bounds, transfer metadata, mapped source bytes and backend hand-off.
+- This is an exact ROM-to-memory reconstruction, not sample decoding: the receiver identity and format of the 16-KiB contents remain unknown, and the generic oscillator is still not the original DSP.
+
 ## What is not established
 
 - The four external register meanings are not decoded. The current names `register0..register3` are intentionally neutral.
