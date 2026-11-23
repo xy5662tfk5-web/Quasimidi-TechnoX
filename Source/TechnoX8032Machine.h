@@ -729,6 +729,8 @@ public:
                 event.port2 = portPins_[2];
                 event.port3 = portPins_[3];
                 event.soundBusMode = internal_[0x8e];
+                event.ic51Selected = ic51Selected;
+                event.writeAccepted = true;
                 event.machineCycle = elapsedMachineCycles_;
                 ++xdataWatchTraceCount_;
             }
