@@ -930,6 +930,22 @@ void testActualBulkBlockLoader(const char* path) {
     assert(candidateDirectory0.sourceWrapCount() == 111u);
     assert(candidateDirectory1.sourceWrapCount() == 0u);
 
+    // The firmware increments a 16-bit IC51 source pointer. Verify the
+    // observed address wrap for candidate index 0x81 against the real ROM.
+    const auto* wrappingHeader = candidateDirectory0.find(0x81);
+    assert(wrappingHeader != nullptr);
+    assert(wrappingHeader->sourceAddress == 0x729d);
+    assert(wrappingHeader->firmwareByteCount() == 0x9e93);
+    std::vector<std::uint8_t> wrappedPayload(wrappingHeader->firmwareByteCount());
+    assert(MASSIC51BulkBlockHeader::copyPayload(
+        image.data(), MASSResourceROM::kBankSize, *wrappingHeader,
+        wrappedPayload.data(), wrappedPayload.size()));
+    assert(wrappedPayload.front() == image[0x729d]);
+    assert(wrappedPayload[0x10000u - 0x729du] == image[0]);
+    assert(wrappedPayload.back() == image[
+        (static_cast<std::uint16_t>(wrappingHeader->sourceAddress +
+                                    wrappingHeader->firmwareByteCount() - 1u))]);
+
     std::vector<std::uint8_t> payload0(bank0.firmwareByteCount());
     std::vector<std::uint8_t> payload1(bank1.firmwareByteCount());
     assert(MASSIC51BulkBlockHeader::copyPayload(
