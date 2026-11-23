@@ -1354,6 +1354,84 @@ private:
     }
 };
 
+ 
+// Immutable, startup-decoded catalog of the 21 fixed FX programs in IC4.
+// Both IC51 banks are retained because the physical FX bank select is still
+// being mapped. All vectors are populated off the audio thread.
+struct MASSFXResolvedProgram {
+    MASSFXProgramRecord directoryEntry{};
+    MASSIC51PortStreamResource firstResource{};
+    MASSIC51PortStreamResource secondResource{};
+};
+
+class MASSFXResourceCatalog {
+public:
+    static constexpr std::size_t kBankCount = 2u;
+    static constexpr std::size_t kProgramCount = MASSFXProgramDirectory::kEntryCount;
+
+    bool load(const MASSResourceROM& rom,
+              const std::uint8_t* firmwareCode,
+              std::size_t firmwareCodeSize) {
+        if (!rom.isLoaded())
+            return false;
+
+        MASSFXProgramDirectory directory;
+        if (!directory.load(firmwareCode, firmwareCodeSize))
+            return false;
+
+        std::array<std::array<MASSFXResolvedProgram, kProgramCount>, kBankCount> parsed{};
+        for (std::size_t bankIndex = 0; bankIndex < kBankCount; ++bankIndex) {
+            const auto bank = bankIndex == 0
+                ? MASSResourceBank::bank0 : MASSResourceBank::bank1;
+            for (std::size_t fxIndex = 0; fxIndex < kProgramCount; ++fxIndex) {
+                const auto* entry = directory.find(static_cast<int>(fxIndex));
+                if (entry == nullptr)
+                    return false;
+
+                auto& destination = parsed[bankIndex][fxIndex];
+                destination.directoryEntry = *entry;
+                if (!MASSIC51PortStreamResolver::resolveTripletStream(
+                        rom, bank, entry->firstResourceIndex,
+                        destination.firstResource) ||
+                    !MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
+                        rom, bank, entry->secondResourceIndex,
+                        destination.secondResource) ||
+                    !destination.firstResource.terminated ||
+                    !destination.secondResource.terminated)
+                    return false;
+            }
+        }
+
+        directory_ = directory;
+        programs_ = std::move(parsed);
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+
+    const MASSFXResolvedProgram* find(int bank, int fxIndex) const noexcept {
+        if (!loaded_ || bank < 0 || bank >= static_cast<int>(kBankCount) ||
+            fxIndex < 0 || fxIndex >= static_cast<int>(kProgramCount))
+            return nullptr;
+        return &programs_[static_cast<std::size_t>(bank)]
+                         [static_cast<std::size_t>(fxIndex)];
+    }
+
+    const MASSFXProgramDirectory& directory() const noexcept { return directory_; }
+
+    void clear() noexcept {
+        directory_ = {};
+        programs_ = {};
+        loaded_ = false;
+    }
+
+private:
+    MASSFXProgramDirectory directory_{};
+    std::array<std::array<MASSFXResolvedProgram, kProgramCount>, kBankCount> programs_{};
+    bool loaded_ = false;
+};
+
 // Firmware XDATA addressing for MOVX @R0: P2 selects the page and R0 is
 // the eight-bit offset. Incrementing R0 wraps within the selected page.
 struct MASSXDataAddress {
