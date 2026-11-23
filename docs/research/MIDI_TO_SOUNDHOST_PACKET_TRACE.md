@@ -156,7 +156,19 @@ At `0x1FC9`, B also changes from `0xEA` (velocity 100) to `0xE2` (velocity 50), 
 
 The second helper result is therefore not itself the velocity-sensitive packet byte: its output A is `0x0F` / `0x53`, while the later packet builder at `0x210F` sees R3/R4 = `0x78/0x78` or `0x98/0x9A`. The remaining task is to capture the instruction stream and register state between each helper return and the next consumer, including writes to R3, R4, RAM[0x2B], and any indirect/XDATA operands. Do not infer a direct A-to-packet mapping.
 
-### Next instrumentation slice
+### Instrumentation implementation: bounded 8032 execution trace
+
+The next trace slice is now implemented in `Source/TechnoX8032Machine.h` and exercised by the same-note velocity differential in `tests/test_technox_8032_machine.cpp`.
+
+- Capture is explicitly armed by the test and starts when the CPU reaches either `0x1FC9` or `0x2027`; it records every instruction up to and including the pre-execution snapshot at `0x210F`.
+- Each instruction record includes the three code bytes, PC, stack return PC, machine cycle, A/B/PSW, active register-bank base and R0–R7, DPTR, SP, P2/P3, sound-bus mode, direct RAM `0x2B`, and the consecutive RAM bytes `0x30–0x37`.
+- A separate bounded event stream records each MOVX/XDATA read and write during the same active window: instruction PC, stack return PC, address, value, direction, machine cycle, P2/P3, bus mode and IC51-select state.
+- The test captures the same note/Part/program at velocity 100 and 50, then reports the first instruction-path divergence, first CPU-state divergence, and first XDATA access divergence. It deliberately does not assign semantic names to the changed values.
+
+This is instrumentation and a regression comparison, not yet a decoded trace result. The newly added test has not yet been confirmed by a completed CI run in this checkpoint. Once it runs, the first divergent state/write can be inspected to identify the firmware transformation between the arithmetic helpers and the packet builder. The test-only synthetic ready response remains in use; no external processor behavior or audio output is inferred.
+
+### Remaining reverse-engineering work
+
 
 1. Add a bounded instruction trace for the two dynamic return addresses captured at `0x1848`, starting at each return PC (`0x1FC9` and `0x2027`) and ending at the next relevant consumer / `0x210F` packet builder.
 2. For each instruction record PC, opcode bytes, A/B/PSW, active R0-R7 bank, DPTR, P2/P3, current stack return PC, and the values of RAM[0x2B], RAM[0x30..0x37]. Record XDATA reads/writes in the same cycle window.
@@ -164,3 +176,5 @@ The second helper result is therefore not itself the velocity-sensitive packet b
 4. Repeat with a second pitch and a second Part before assigning a field name. Then classify the first five Note On commands separately from the 544-command configuration sweep.
 
 The current fixture still uses a synthetic ready response. These traces establish firmware behavior only; they do not identify the external processor or prove audible sample playback.
+5. Obtain and inspect the CI execution trace for the two velocity runs; use the first divergent PC/state/XDATA operand to trace the producer of R3/R4.
+6. Repeat with another pitch and a second Part, then classify all five Note On-associated commands independently from the 544-command configuration sweep.
