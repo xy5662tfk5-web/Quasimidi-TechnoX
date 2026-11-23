@@ -806,14 +806,8 @@ int main(int argc, char** argv) {
                 }
                 statusInjected =
                     firmwareMachine.watchedCallCount(0x1742u) > helper1742Before;
-                if (statusInjected) {
+                if (statusInjected)
                     firmwareMachine.setTestExternalReadOverride(0x7d95u, 0x01u);
-                    // 0x1742 enters 0x1780 only when XDATA[0x00E8] is nonzero.
-                    // 0x1780 then calls 0x1009 only when XDATA[0x00FB].3 is set
-                    // and bits 5/6 are clear. These are synthetic DSP responses.
-                    firmwareMachine.setTestExternalReadOverride(0x00e8u, 0x01u);
-                    firmwareMachine.setTestExternalReadOverride(0x00fbu, 0x08u);
-                }
                 drain = firmwareMachine.runForMachineCycles(7000000u - preCycles);
             } else {
                 instructions = firmwareMachine.runForMachineCycles(2000000u);
@@ -923,9 +917,13 @@ int main(int argc, char** argv) {
         }};
         runRealMidiStage("SysEx load temporary Part 1 from Performance 1 Part 13",
                          temporaryPart1.data(), temporaryPart1.size());
-        // Diagnostic only: wait until the real resource loader reaches 0x1742,
-        // then override 0x7D95 before the later 0x4803 per-Part setup calls.
-        runRealMidiStage("Note On Part 1 with delayed synthetic DSP queue-ready response",
+        // 0x1742 drains its queue when internal RAM[0x52] is zero.
+        // Force that queue-empty state exactly at 0x1742 entry; 0xFB=0x08
+        // permits 0x1780 to enter the 16-slot scanner. Both are synthetic probes.
+        firmwareMachine.setTestExternalReadOverride(0x00fbu, 0x08u);
+        firmwareMachine.setTestInternalWriteOnCall(0x1742u, 0x52u, 0x00u);
+        // The stage hook sets 0x7D95 only after resource loading has entered.
+        runRealMidiStage("Note On Part 1 with synthetic queue-drain handshake",
                          realNoteOn.data(), realNoteOn.size(), true);
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
@@ -984,11 +982,16 @@ int main(int argc, char** argv) {
             std::printf(" %04X=%02X", static_cast<unsigned>(address),
                         static_cast<unsigned>(value));
         }
-        std::printf(" effective7BD5=%02X effective7D95=%02X effective00E8=%02X effective00FB=%02X\\n",
+        std::printf(" effective7BD5=%02X effective7D95=%02X effective00FB=%02X "
+                    "RAM[4E]=%02X RAM[4F]=%02X RAM[50]=%02X RAM[51]=%02X RAM[52]=%02X\\n",
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)),
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)),
-                    static_cast<unsigned>(firmwareMachine.readExternal(0x00e8u)),
-                    static_cast<unsigned>(firmwareMachine.readExternal(0x00fbu)));
+                    static_cast<unsigned>(firmwareMachine.readExternal(0x00fbu)),
+                    static_cast<unsigned>(firmwareMachine.readInternal(0x4eu)),
+                    static_cast<unsigned>(firmwareMachine.readInternal(0x4fu)),
+                    static_cast<unsigned>(firmwareMachine.readInternal(0x50u)),
+                    static_cast<unsigned>(firmwareMachine.readInternal(0x51u)),
+                    static_cast<unsigned>(firmwareMachine.readInternal(0x52u)));
         assert(!firmwareMachine.cpuFaulted());
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
