@@ -1854,6 +1854,15 @@ int main(int argc, char** argv) {
         std::size_t secondNote1848InputCount = 0;
         std::size_t secondNote1848ReturnCount = 0;
         TechnoX8032Machine::InstructionWatchEvent secondNoteInstructionWatch{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            secondNoteWriter0A4F{};
+        TechnoX8032Machine::InstructionWatchEvent secondNoteWriter22F8{};
+        TechnoX8032Machine::InstructionWatchEvent secondNoteWriter211F{};
+        TechnoX8032Machine::InstructionWatchEvent secondNoteWriter236B{};
+        std::size_t secondNoteWriter0A4FCount = 0;
+        std::size_t secondNoteWriter22F8Count = 0;
+        std::size_t secondNoteWriter211FCount = 0;
+        std::size_t secondNoteWriter236BCount = 0;
         bool foundSecondNotePacketBuilder = false;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
@@ -1868,11 +1877,27 @@ int main(int argc, char** argv) {
             } else if (event.instructionPC == 0x210fu) {
                 secondNoteInstructionWatch = event;
                 foundSecondNotePacketBuilder = true;
+            } else if (event.instructionPC == 0x0a4fu) {
+                assert(secondNoteWriter0A4FCount < secondNoteWriter0A4F.size());
+                secondNoteWriter0A4F[secondNoteWriter0A4FCount++] = event;
+            } else if (event.instructionPC == 0x22f8u) {
+                secondNoteWriter22F8 = event;
+                ++secondNoteWriter22F8Count;
+            } else if (event.instructionPC == 0x211fu) {
+                secondNoteWriter211F = event;
+                ++secondNoteWriter211FCount;
+            } else if (event.instructionPC == 0x236bu) {
+                secondNoteWriter236B = event;
+                ++secondNoteWriter236BCount;
             }
         }
         assert(secondNote1848InputCount == 2u);
         assert(secondNote1848ReturnCount == 2u);
         assert(foundSecondNotePacketBuilder);
+        assert(secondNoteWriter0A4FCount == 2u);
+        assert(secondNoteWriter22F8Count == 1u);
+        assert(secondNoteWriter211FCount == 1u);
+        assert(secondNoteWriter236BCount == 1u);
 
         // Pin the five per-note resource/voice transactions observed before
         // the firmware's repeated 544-command SoundHost initialization sweep.
@@ -1888,12 +1913,44 @@ int main(int argc, char** argv) {
             {{{0x0au, 0x00u, 0x78u, 0x00u}}, 0x2122u},
             {{{0x0fu, 0x00u, 0x00u, 0x00u}}, 0x236eu}
         }};
+        const std::array<const TechnoX8032Machine::InstructionWatchEvent*, 5>
+            noteWriterSnapshots{{
+                &secondNoteWriter0A4F[0], &secondNoteWriter0A4F[1],
+                &secondNoteWriter22F8, &secondNoteWriter211F,
+                &secondNoteWriter236B
+            }};
+        constexpr std::array<std::uint16_t, 5> writerCallPCs{{
+            0x0a4fu, 0x0a4fu, 0x22f8u, 0x211fu, 0x236bu
+        }};
         for (std::size_t i = 0; i < expectedNoteCommands.size(); ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(
                 secondNotePacketStart + i);
             assert(packet.bytes == expectedNoteCommands[i].bytes);
             assert(packet.returnPC == expectedNoteCommands[i].caller);
+            const auto& snapshot = *noteWriterSnapshots[i];
+            assert(snapshot.instructionPC == writerCallPCs[i]);
+            // The callsite's active R5/R2/R3/R4 are copied byte-for-byte
+            // into the writer's four consecutive 0x8000-0x8003 writes.
+            assert(snapshot.registers[5] == packet.bytes[0]);
+            assert(snapshot.registers[2] == packet.bytes[1]);
+            assert(snapshot.registers[3] == packet.bytes[2]);
+            assert(snapshot.registers[4] == packet.bytes[3]);
         }
+
+        // Verify the exact firmware bit packing between the second arithmetic
+        // helper and the velocity-sensitive fourth packet.
+        const auto packHelperResult = [](std::uint8_t value) noexcept {
+            const auto swapped = static_cast<std::uint8_t>(
+                static_cast<std::uint8_t>(value << 4u) | (value >> 4u));
+            return static_cast<std::uint8_t>((swapped >> 1u) | (swapped << 7u));
+        };
+        const auto velocity100Packed = packHelperResult(
+            secondNote1848Returns[1].accumulator);
+        assert(secondNote1848Returns[1].accumulator == 0x0fu);
+        assert(velocity100Packed == 0x78u);
+        assert(secondNoteInstructionWatch.registers[4] == velocity100Packed);
+        assert(secondNoteInstructionWatch.registers[3] ==
+               static_cast<std::uint8_t>(velocity100Packed & 0xf8u));
 
         // Preserve the final IC51 reads from this isolated event. The trace is
         // a ring buffer; the most recent 64 entries retain the descriptor and
@@ -2201,6 +2258,13 @@ int main(int argc, char** argv) {
         assert(lowerVelocity1848InputCount == 2u);
         assert(lowerVelocity1848ReturnCount == 2u);
         assert(foundLowerVelocityPacketBuilder);
+        const auto velocity50Packed = packHelperResult(
+            lowerVelocity1848Returns[1].accumulator);
+        assert(lowerVelocity1848Returns[1].accumulator == 0x53u);
+        assert(velocity50Packed == 0x9au);
+        assert(lowerVelocityInstructionWatch.registers[4] == velocity50Packed);
+        assert(lowerVelocityInstructionWatch.registers[3] ==
+               static_cast<std::uint8_t>(velocity50Packed & 0xf8u));
 
         // Dump the complete bounded windows side-by-side so the first
         // velocity-dependent store can be followed to its later consumers.
