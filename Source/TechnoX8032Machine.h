@@ -640,11 +640,8 @@ public:
                 event.write = false;
                 event.instructionPC = cpu_.registers().pc;
                 event.stackReturnPC = currentStackReturnPC();
-                event.port2 = portPins_[2];
                 event.port3 = portPins_[3];
                 event.soundBusMode = internal_[0x8e];
-                event.ic51Selected = ic51Selected;
-                event.writeAccepted = false;
                 event.machineCycle = elapsedMachineCycles_;
                 ++unmappedBusTraceCount_;
             }
