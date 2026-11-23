@@ -640,6 +640,20 @@ public:
                 address != testExternalReadOverrideAddresses_[i])
                 continue;
             const auto value = testExternalReadOverrideValues_[i];
+            if (address >= 0xc000u && address <= 0xffffu) {
+                ++soundMemoryReadCount_;
+                const auto mode = static_cast<std::size_t>(internal_[0x8e] & 0x03u);
+                ++soundMemoryReadsByMode_[mode];
+                auto& soundEvent = soundMemoryReadTrace_[
+                    soundMemoryReadTraceCount_ % soundMemoryReadTrace_.size()];
+                soundEvent.address = address;
+                soundEvent.instructionPC = cpu_.registers().pc;
+                soundEvent.returnPC = currentStackReturnPC();
+                soundEvent.value = value;
+                soundEvent.mode = static_cast<std::uint8_t>(mode);
+                soundEvent.machineCycle = elapsedMachineCycles_;
+                ++soundMemoryReadTraceCount_;
+            }
             if (address >= 0x7c00u && address <= 0x7fffu) {
                 auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
                 event.address = address;
@@ -1309,9 +1323,9 @@ private:
     std::array<std::uint8_t, 0x1000> testExternalRam7000_{};
     std::array<ExternalWindowEvent, 1024> externalWindowTrace_{};
     std::size_t externalWindowTraceCount_ = 0;
-    std::array<bool, 4> testExternalReadOverrideEnabled_{};
-    std::array<std::uint16_t, 4> testExternalReadOverrideAddresses_{};
-    std::array<std::uint8_t, 4> testExternalReadOverrideValues_{{0xffu, 0xffu, 0xffu, 0xffu}};
+    std::array<bool, 8> testExternalReadOverrideEnabled_{};
+    std::array<std::uint16_t, 8> testExternalReadOverrideAddresses_{};
+    std::array<std::uint8_t, 8> testExternalReadOverrideValues_{{0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu}};
     bool testInternalWriteOnCallEnabled_ = false;
     std::uint16_t testInternalWriteOnCallTarget_ = 0;
     std::uint8_t testInternalWriteOnCallAddress_ = 0;
