@@ -981,6 +981,46 @@ struct MASSIC51BulkBlockHeader {
         }
         return true;
     }
+
+    // IC4 0xAF05 maps each logical R0 byte through the firmware table at
+    // 0xADDD, then writes it to the current 256-byte XDATA page. R0 wraps
+    // naturally and increments P2, so each subsequent block uses the next
+    // physical page. The caller supplies the exact 256-byte firmware map;
+    // this avoids silently substituting a guessed permutation.
+    static bool copyPayloadToPagedXdata(
+        const std::uint8_t* bankData,
+        std::size_t bankSize,
+        const MASSIC51BulkBlockHeader& header,
+        const std::uint8_t* logicalToPhysical,
+        std::uint8_t* xdataWindow,
+        std::size_t xdataWindowSize,
+        std::uint16_t xdataBaseAddress = 0xc000u,
+        std::uint16_t* lastPhysicalAddress = nullptr) noexcept {
+        const auto count = header.firmwareByteCount();
+        if (bankData == nullptr || bankSize < 0x10000u ||
+            logicalToPhysical == nullptr || xdataWindow == nullptr ||
+            xdataBaseAddress < 0xc000u || xdataBaseAddress > 0xffffu ||
+            xdataWindowSize > 0x10000u - xdataBaseAddress)
+            return false;
+        const auto pageCount = (count + 0xffu) / 0x100u;
+        if (pageCount * 0x100u > xdataWindowSize)
+            return false;
+
+        for (std::size_t i = 0; i < count; ++i) {
+            const auto pageOffset = (i & ~std::size_t{0xff});
+            const auto physicalOffset = pageOffset +
+                logicalToPhysical[i & 0xffu];
+            if (physicalOffset >= xdataWindowSize)
+                return false;
+            const auto sourceAddress = static_cast<std::uint16_t>(
+                static_cast<std::size_t>(header.sourceAddress) + i);
+            xdataWindow[physicalOffset] = bankData[sourceAddress];
+            if (lastPhysicalAddress != nullptr && i + 1u == count)
+                *lastPhysicalAddress = static_cast<std::uint16_t>(
+                    xdataBaseAddress + physicalOffset);
+        }
+        return true;
+    }
 };
 
 class MASSResourceROM {
