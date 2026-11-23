@@ -69,6 +69,7 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MASSResourceROM resourceROM;
+    technox::MASSIC51ExternalSoundMemoryImage externalSoundMemoryImage;
     technox::MASSResourceProgramCatalog resourceProgramCatalog;
     technox::MASSFX1ResourceCatalog resourceFX1Catalog;
     technox::MASSFX2ResourceCatalog resourceFX2Catalog;
