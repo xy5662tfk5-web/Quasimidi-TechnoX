@@ -890,8 +890,15 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x02d1u) - pitchTableBefore),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
             const auto hostWriteAfter = firmwareMachine.soundHostWriteCount();
-            std::printf("  SoundHost writes=+%zu\\n", hostWriteAfter - hostWriteBefore);
-            for (std::size_t i = hostWriteBefore; i < hostWriteAfter; ++i) {
+            constexpr std::size_t hostWriteTraceCapacity = 4096u;
+            const auto firstRetainedHostWrite = hostWriteAfter > hostWriteTraceCapacity
+                ? hostWriteAfter - hostWriteTraceCapacity : 0u;
+            const auto firstStageHostWrite = std::max(hostWriteBefore, firstRetainedHostWrite);
+            std::printf("  SoundHost writes=+%zu (retained=%zu, overwritten=%zu)\\n",
+                        hostWriteAfter - hostWriteBefore,
+                        hostWriteAfter - firstStageHostWrite,
+                        firstStageHostWrite - hostWriteBefore);
+            for (std::size_t i = firstStageHostWrite; i < hostWriteAfter; ++i) {
                 const auto& event = firmwareMachine.soundHostWriteAt(i);
                 std::printf("    W%u=%02X dev=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
                             "mode=%u IC51=%u reset=%u cycle=%llu\\n",
@@ -907,8 +914,15 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.soundDeviceResetReleased),
                             static_cast<unsigned long long>(event.machineCycle));
             }
-            std::printf("  SoundHost reads=+%zu\\n", hostReadAfter - hostReadBefore);
-            for (std::size_t i = hostReadBefore; i < hostReadAfter; ++i) {
+            constexpr std::size_t hostReadTraceCapacity = 2048u;
+            const auto firstRetainedHostRead = hostReadAfter > hostReadTraceCapacity
+                ? hostReadAfter - hostReadTraceCapacity : 0u;
+            const auto firstStageHostRead = std::max(hostReadBefore, firstRetainedHostRead);
+            std::printf("  SoundHost reads=+%zu (retained=%zu, overwritten=%zu)\\n",
+                        hostReadAfter - hostReadBefore,
+                        hostReadAfter - firstStageHostRead,
+                        firstStageHostRead - hostReadBefore);
+            for (std::size_t i = firstStageHostRead; i < hostReadAfter; ++i) {
                 const auto& event = firmwareMachine.soundHostReadAt(i);
                 std::printf("    R%u=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
                             "mode=%u IC51=%u reset=%u cycle=%llu\\n",
