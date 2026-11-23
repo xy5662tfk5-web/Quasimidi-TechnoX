@@ -1859,6 +1859,10 @@ int main(int argc, char** argv) {
         TechnoX8032Machine::InstructionWatchEvent secondNoteWriter22F8{};
         TechnoX8032Machine::InstructionWatchEvent secondNoteWriter211F{};
         TechnoX8032Machine::InstructionWatchEvent secondNoteWriter236B{};
+        TechnoX8032Machine::InstructionWatchEvent secondNoteHandler224C{};
+        TechnoX8032Machine::InstructionWatchEvent secondNoteHandler2301{};
+        std::size_t secondNoteHandler224CCount = 0;
+        std::size_t secondNoteHandler2301Count = 0;
         std::size_t secondNoteWriter0A4FCount = 0;
         std::size_t secondNoteWriter22F8Count = 0;
         std::size_t secondNoteWriter211FCount = 0;
@@ -1889,6 +1893,12 @@ int main(int argc, char** argv) {
             } else if (event.instructionPC == 0x236bu) {
                 secondNoteWriter236B = event;
                 ++secondNoteWriter236BCount;
+            } else if (event.instructionPC == 0x224cu) {
+                secondNoteHandler224C = event;
+                ++secondNoteHandler224CCount;
+            } else if (event.instructionPC == 0x2301u) {
+                secondNoteHandler2301 = event;
+                ++secondNoteHandler2301Count;
             }
         }
         assert(secondNote1848InputCount == 2u);
@@ -1898,6 +1908,42 @@ int main(int argc, char** argv) {
         assert(secondNoteWriter22F8Count == 1u);
         assert(secondNoteWriter211FCount == 1u);
         assert(secondNoteWriter236BCount == 1u);
+        std::printf("IC4 handler entry probes: 224C=%zu 2301=%zu\\n",
+                    secondNoteHandler224CCount, secondNoteHandler2301Count);
+        if (secondNoteHandler224CCount != 0u) {
+            std::printf("  224C entry: RET=%04X DPTR=%04X R2=%02X R3=%02X "
+                        "R4=%02X R5=%02X R6=%02X R7=%02X RAM2B=%02X "
+                        "RAM30=%02X RAM31=%02X RAM32=%02X\\n",
+                        static_cast<unsigned>(secondNoteHandler224C.returnPC),
+                        static_cast<unsigned>(secondNoteHandler224C.dptr),
+                        static_cast<unsigned>(secondNoteHandler224C.registers[2]),
+                        static_cast<unsigned>(secondNoteHandler224C.registers[3]),
+                        static_cast<unsigned>(secondNoteHandler224C.registers[4]),
+                        static_cast<unsigned>(secondNoteHandler224C.registers[5]),
+                        static_cast<unsigned>(secondNoteHandler224C.registers[6]),
+                        static_cast<unsigned>(secondNoteHandler224C.registers[7]),
+                        static_cast<unsigned>(secondNoteHandler224C.directRam2B),
+                        static_cast<unsigned>(secondNoteHandler224C.directRam30),
+                        static_cast<unsigned>(secondNoteHandler224C.directRam31),
+                        static_cast<unsigned>(secondNoteHandler224C.directRam32));
+        }
+        if (secondNoteHandler2301Count != 0u) {
+            std::printf("  2301 entry: RET=%04X DPTR=%04X R2=%02X R3=%02X "
+                        "R4=%02X R5=%02X R6=%02X R7=%02X RAM2B=%02X "
+                        "RAM30=%02X RAM31=%02X RAM32=%02X\\n",
+                        static_cast<unsigned>(secondNoteHandler2301.returnPC),
+                        static_cast<unsigned>(secondNoteHandler2301.dptr),
+                        static_cast<unsigned>(secondNoteHandler2301.registers[2]),
+                        static_cast<unsigned>(secondNoteHandler2301.registers[3]),
+                        static_cast<unsigned>(secondNoteHandler2301.registers[4]),
+                        static_cast<unsigned>(secondNoteHandler2301.registers[5]),
+                        static_cast<unsigned>(secondNoteHandler2301.registers[6]),
+                        static_cast<unsigned>(secondNoteHandler2301.registers[7]),
+                        static_cast<unsigned>(secondNoteHandler2301.directRam2B),
+                        static_cast<unsigned>(secondNoteHandler2301.directRam30),
+                        static_cast<unsigned>(secondNoteHandler2301.directRam31),
+                        static_cast<unsigned>(secondNoteHandler2301.directRam32));
+        }
         const auto writer0A4FReturnA = secondNoteWriter0A4F[0].returnPC;
         const auto writer0A4FReturnB = secondNoteWriter0A4F[1].returnPC;
         std::printf("0x0A4F observed stack returns: packet0=%04X packet1=%04X "
