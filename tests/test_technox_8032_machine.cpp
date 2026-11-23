@@ -739,6 +739,17 @@ int main(int argc, char** argv) {
                 const auto* equalizr1 = fx2Catalog.find(0, 14);
                 assert(equalizr1 != nullptr);
                 assert(equalizr1->streamAResource.blocks.size() == 1u);
+                const auto& equalizr1StreamA =
+                    equalizr1->streamAResource.blocks.front();
+                assert(equalizr1StreamA.dataAddress == 0x4f02u);
+                assert(equalizr1StreamA.sourceCount == 0x3au);
+                assert(equalizr1StreamA.preambleByteCount == 2u);
+                assert(equalizr1StreamA.preamble[0] == 0x15u);
+                assert(equalizr1StreamA.preamble[1] == 0x00u);
+                assert(equalizr1StreamA.payload.size() == 174u);
+                assert(equalizr1StreamA.payload.front() == 0xdcu);
+                assert(equalizr1StreamA.portWriteByteCount == 177u);
+                assert(equalizr1->streamAResource.terminatorAddress == 0x4fb3u);
                 assert(equalizr1->streamBResource.blocks.empty());
                 assert(equalizr1->streamBResource.skippedLeadingByte);
                 assert(equalizr1->streamBResource.leadingByteValue == 0x74u);
@@ -966,6 +977,11 @@ int main(int argc, char** argv) {
             assert(roomStreamABlock.dataAddress == 0x24d4u);
             assert(roomStreamABlock.sourceCount == 0x19u);
             assert(roomStreamABlock.preambleByteCount == 2u);
+            assert(roomStreamABlock.preamble[0] == 0x00u);
+            assert(roomStreamABlock.preamble[1] == 0xcfu);
+            assert(roomStreamABlock.payload.size() == 75u);
+            assert(roomStreamABlock.payload.front() == 0x10u);
+            assert(roomStreamABlock.portWriteByteCount == 78u);
             assert(roomStreamABlock.preamble[0] == 0x00u);
             assert(roomStreamABlock.preamble[1] == 0xcfu);
             assert(roomStreamABlock.payload.size() == 75u);
