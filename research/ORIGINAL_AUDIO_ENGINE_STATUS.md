@@ -176,3 +176,17 @@ This is now a verified register-level correlation between MIDI velocity and the 
 3. Continue separating resource bytes uploaded through `FF10` from the parameter/command traffic sent through `0x8000–0x8003`.
 4. Identify the external sound processor and its ready/busy/ack protocol before implementing a device-specific host model.
 5. Locate the larger waveform/sample-memory path and establish its codec, address mapping, sample rates and loop representation before replacing the generic oscillator with an original-sound backend.
+
+
+### Fixed-point helper inputs isolated
+
+The CI trace now captures both entries into firmware helper `0x1848` for each velocity-only test. Each event enters the helper twice, and the captured inputs are:
+
+| Helper call | Velocity 100: A / B / R2 / R3 / R4 | Velocity 50: A / B / R2 / R3 / R4 |
+|---:|---|---|
+| 1 | `B0 / 16 / 11 / 64 / FF` | `B0 / 16 / 63 / 64 / FF` |
+| 2 | `00 / 13 / 0F / 64 / FF` | `00 / 13 / 53 / 64 / FF` |
+
+For each corresponding call, A, B, R3 and R4 are identical across the two tests; **R2 is the only captured helper input that changes**. The regression now asserts this relationship and records the caller return address for both entries. This is stronger evidence that the velocity-dependent difference is already present at the input to the reconstructed 0x1848 arithmetic, before the later `0x210F/0x211F` packet-building sequence.
+
+The meaning of the resulting arithmetic value and its eventual DSP field is still unknown. The next trace will use the two recorded return addresses to follow the R2 producers and the post-return register flow toward the packet builder.
