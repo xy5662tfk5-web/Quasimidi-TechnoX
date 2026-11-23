@@ -251,3 +251,12 @@ For the already tested table entry R7=`0x48`, the source/count headers resolve t
 | 1 | `0x295C` | 9,588 bytes (`0x2574`) |
 
 **Still unknown:** what physical IC or logic owns the `0xC000` XDATA window, whether the copied bytes are PCM, compressed samples, wavetable data, or another representation, and how the `0xAC` completion marker is generated. The C++ regression test now reconstructs all 13,647 transferred bytes through the ROM-derived address permutation and compares them byte-for-byte with the IC51 source block; it also verifies the final physical write at `0xF5B2`. The disassembly and test prove the copy protocol and memory mapping, not the receiving chip identity or audio encoding. The next implementation target is therefore an accurate paged external-XDATA model for this transfer protocol, with the handshake represented explicitly; audio decoding must wait until the stored data format is identified.
+
+ 
+## 10. Runtime FX selector normalization (IC4 0x7FF2)
+
+The FX table uses direct zero-based indexes 0..20. The firmware helper beginning at `0x7FF2` reads the selected byte from XDATA `0x7BFE`, writes it to `0x3098`, then executes `CLR C; SUBB A,#0x15`. Inputs below `0x15` are retained; inputs `0x15` and above are replaced with `0x14`. The later lookup at `0x8004` multiplies `0x3098` by `0x20` and indexes the 21-entry table at `0x8423`.
+
+Therefore the effective FX selector is always in the range 0..20; raw values 21..127 collapse to entry 20 (`no Effect`). The processor's Common FX1/FX2 values are now normalized to the same maximum when loaded from factory Performance data, changed through their MIDI controllers, or restored from saved plugin state. `MASSCommonControlStore` applies the same clamp at the engine boundary.
+
+**Important unresolved connection:** the current firmware fixture's `0x7BFE` read is served by an explicitly synthetic writable-RAM overlay and returned `0x00`; the trace proves the read → `0x3098` → clamp → table-index path, but it does not prove how the physical instrument sources that byte from its two Performance FX fields. The emulator must not claim that FX1/FX2 playback is active until the `0x7BFE` source path is mapped and the receiving DSP protocol is identified.
