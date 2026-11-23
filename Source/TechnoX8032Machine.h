@@ -62,7 +62,14 @@ public:
         std::uint8_t registerIndex = 0;
         std::uint8_t value = 0xff;
         std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
         std::uint64_t machineCycle = 0;
+        std::uint8_t deviceIndex = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool soundDeviceResetReleased = true;
     };
     struct soundHostWriteEvent {
         std::uint8_t registerIndex = 0;
@@ -606,7 +613,14 @@ public:
             event.registerIndex = static_cast<std::uint8_t>(index);
             event.value = value;
             event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+            event.returnPC = currentStackReturnPC();
             event.machineCycle = elapsedMachineCycles_;
+            event.deviceIndex = soundHostCommandLatch_;
+            event.port2 = portPins_[2];
+            event.port3 = portPins_[3];
+            event.soundBusMode = internal_[0x8e];
+            event.ic51Selected = ic51Selected;
+            event.soundDeviceResetReleased = soundDeviceResetReleased_;
             ++soundHostReadCount_;
             return value;
         }
