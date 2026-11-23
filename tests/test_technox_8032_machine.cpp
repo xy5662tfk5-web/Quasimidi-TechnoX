@@ -1898,6 +1898,16 @@ int main(int argc, char** argv) {
         assert(secondNoteWriter22F8Count == 1u);
         assert(secondNoteWriter211FCount == 1u);
         assert(secondNoteWriter236BCount == 1u);
+        const auto writer0A4FReturnA = secondNoteWriter0A4F[0].returnPC;
+        const auto writer0A4FReturnB = secondNoteWriter0A4F[1].returnPC;
+        const bool writer0A4FCallersMatch =
+            (writer0A4FReturnA == 0x09a7u && writer0A4FReturnB == 0x1e6au) ||
+            (writer0A4FReturnA == 0x1e6au && writer0A4FReturnB == 0x09a7u);
+        assert(writer0A4FCallersMatch);
+        std::printf("0x0A4F dual callers: packet0 return=%04X packet1 return=%04X "
+                    "(0x09A4 helper path / 0x1E67 M.A.S.S. path)\\n",
+                    static_cast<unsigned>(writer0A4FReturnA),
+                    static_cast<unsigned>(writer0A4FReturnB));
 
         // Pin the five per-note resource/voice transactions observed before
         // the firmware's repeated 544-command SoundHost initialization sweep.
