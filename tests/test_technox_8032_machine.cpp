@@ -824,7 +824,9 @@ int main(int argc, char** argv) {
             const auto* roomBank0 = fx1Catalog.find(0, 0);
             assert(roomBank0 != nullptr);
             assert(roomBank0->streamAResource.blocks.size() == 2u);
-            assert(roomBank0->streamBResource.blocks.size() == 1u);
+            assert(roomBank0->streamBResource.blocks.empty());
+            assert(roomBank0->streamBResource.skippedLeadingByte);
+            assert(roomBank0->streamBResource.leadingByteValue == 0x7fu);
             assert(fx1Catalog.find(1, 0)->streamAResource.blocks.size() > 0u);
 
             for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
@@ -862,13 +864,13 @@ int main(int argc, char** argv) {
             assert(replacementFX1Backend.selectedFX2 == 5);
             assert(replacementFX1Backend.fx1Resolved);
             assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
-            assert(replacementFX1Backend.fx1StreamBBlockCount == 1u);
+            assert(replacementFX1Backend.fx1StreamBBlockCount == 0u);
             assert(replacementFX1Backend.fx2Resolved);
-            // FX2 Phaser1 uses an empty Stream A in IC51 bank 0: resource
-            // 0x26 resolves to a zero-count terminator at 0x52F8. Stream B
-            // resource 0x27 contains exactly one block at 0x57FE.
+            // FX2 Phaser1 is empty in IC51 bank 0: Stream A resource 0x26
+            // starts with count 0 at 0x52F8. Stream B resource 0x27 has a
+            // skipped leading byte 0x7E at 0x57FE and count 0 at 0x57FF.
             assert(replacementFX1Backend.fx2StreamABlockCount == 0u);
-            assert(replacementFX1Backend.fx2StreamBBlockCount == 1u);
+            assert(replacementFX1Backend.fx2StreamBBlockCount == 0u);
 
             // The factory stores independent FX1 and FX2 selectors. Only the
             // FX1 selector maps to the 21-entry directory at IC4 0x8423.
@@ -935,8 +937,9 @@ int main(int argc, char** argv) {
                     assert(streamAResource.terminated && streamBResource.terminated);
                     assert(streamAResource.sourceBytesConsumed ==
                            streamAResource.portWriteByteCount + 1u);
+                    assert(streamBResource.skippedLeadingByte);
                     assert(streamBResource.sourceBytesConsumed ==
-                           streamBResource.portWriteByteCount + 1u);
+                           streamBResource.portWriteByteCount + 2u);
 
                     for (const auto& block : streamAResource.blocks) {
                         assert(block.payload.size() ==
@@ -973,16 +976,12 @@ int main(int argc, char** argv) {
             assert(roomStreamABlock.portWriteByteCount == 79u);
             assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
                 fxResources, technox::MASSResourceBank::bank0, 0x01, roomStreamB));
-            assert(roomStreamB.blocks.size() == 1u);
-            const auto& roomStreamBBlock = roomStreamB.blocks.front();
-            assert(roomStreamBBlock.dataAddress == 0x2851u);
-            assert(roomStreamBBlock.sourceCount == 0x7fu);
-            assert(roomStreamBBlock.wireHeader == 0xbfu); // RR A, not SHR A
-            assert(roomStreamBBlock.preamble[0] == 0x00u);
-            assert(roomStreamBBlock.preamble[1] == 0xffu);
-            assert(roomStreamBBlock.preamble[2] == 0x00u);
-            assert(roomStreamBBlock.payload.size() == 127u);
-            assert(roomStreamBBlock.portWriteByteCount == 131u);
+            assert(roomStreamB.skippedLeadingByte);
+            assert(roomStreamB.leadingByteValue == 0x7fu);
+            assert(roomStreamB.blocks.empty());
+            assert(roomStreamB.terminatorAddress == 0x2852u);
+            assert(roomStreamB.sourceBytesConsumed == 2u);
+            assert(roomStreamB.portWriteByteCount == 0u);
 
         }
         assert(firmwareMachine.readCode(0x0001) == 0xeb);
