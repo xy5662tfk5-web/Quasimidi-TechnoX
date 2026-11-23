@@ -587,6 +587,61 @@ int main(int argc, char** argv) {
             assert(fx1Directory.find(-1) == nullptr);
             assert(fx1Directory.find(21) == nullptr);
 
+            // FX2 has a separate IC4 directory at 0x8F99 (0x2A-byte stride).
+            technox::MASSFX2ProgramDirectory fx2Directory;
+            assert(fx2Directory.load(firmwareCode.data(), firmwareCode.size()));
+            struct ExpectedFX2 {
+                const char* name;
+                std::uint8_t streamAResource;
+                std::uint8_t streamBResource;
+                std::uint8_t mode;
+            };
+            constexpr std::array<ExpectedFX2, technox::MASSFX2ProgramDirectory::kEntryCount>
+                expectedFX2{{
+                    {"Chorus1",   0x24, 0x25, 0x01},
+                    {"Chorus2",   0x24, 0x25, 0x02},
+                    {"Chorus3",   0x24, 0x25, 0x03},
+                    {"Flanger1",  0x24, 0x25, 0x02},
+                    {"Flanger2",  0x24, 0x25, 0x03},
+                    {"Phaser1",   0x26, 0x27, 0x02},
+                    {"Phaser2",   0x26, 0x27, 0x03},
+                    {"Panning",   0x32, 0x25, 0x04},
+                    {"ShortDely", 0x24, 0x25, 0x02},
+                    {"LongDelay", 0x36, 0x27, 0x02},
+                    {"HQ-Delay",  0x44, 0x27, 0x02},
+                    {"Ping-Pong", 0x34, 0x27, 0x02},
+                    {"GatedDely", 0x36, 0x27, 0x02},
+                    {"SpecialFX", 0x24, 0x25, 0x03},
+                    {"Equalizr1", 0x42, 0x43, 0x04},
+                    {"Equalizr2", 0x42, 0x43, 0x04},
+                    {"Wahwah+Ov", 0x3a, 0x25, 0x01},
+                    {"AutoWahwa", 0x38, 0x25, 0x01},
+                    {"WarmOvdrv", 0x3c, 0x25, 0x00},
+                    {"Distortn",  0x3c, 0x25, 0x00},
+                    {"no Effect", 0x46, 0x47, 0x00}
+                }};
+            for (std::size_t index = 0; index < expectedFX2.size(); ++index) {
+                const auto* record = fx2Directory.find(static_cast<int>(index));
+                assert(record != nullptr);
+                assert(record->index == index);
+                assert(record->streamAResourceIndex == expectedFX2[index].streamAResource);
+                assert(record->streamBResourceIndex == expectedFX2[index].streamBResource);
+                assert(record->modeByte == expectedFX2[index].mode);
+                std::size_t nameLength = 0;
+                while (expectedFX2[index].name[nameLength] != '\\0') {
+                    assert(record->name[nameLength] == expectedFX2[index].name[nameLength]);
+                    ++nameLength;
+                }
+                for (std::size_t j = nameLength; j < technox::MASSFX2ProgramDirectory::kNameBytes; ++j)
+                    assert(record->name[j] == '\\0' || record->name[j] == ' ');
+                assert(record->name[technox::MASSFX2ProgramDirectory::kNameBytes] == '\\0');
+            }
+            assert(fx2Directory.find(-1) == nullptr);
+            assert(fx2Directory.find(21) == nullptr);
+            const auto* phaser1 = fx2Directory.find(5);
+            assert(phaser1 != nullptr);
+            assert(phaser1->name[0] == 'P' && phaser1->name[5] == '1');
+
             technox::MASSResourceROM fxResources;
             assert(fxResources.load(realIC51.data(), realIC51.size()));
 
@@ -594,6 +649,11 @@ int main(int argc, char** argv) {
             assert(fx1Catalog.load(
                 fxResources, firmwareCode.data(), firmwareCode.size()));
             assert(fx1Catalog.isLoaded());
+
+            technox::MASSFX2ResourceCatalog fx2Catalog;
+            assert(fx2Catalog.load(
+                fxResources, firmwareCode.data(), firmwareCode.size()));
+            assert(fx2Catalog.isLoaded());
             for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
                 for (int fxIndex = 0; fxIndex < 21; ++fxIndex) {
                     const auto* resolved = fx1Catalog.find(bankIndex, fxIndex);
@@ -612,16 +672,30 @@ int main(int argc, char** argv) {
             assert(roomBank0->streamBResource.blocks.size() == 1u);
             assert(fx1Catalog.find(1, 0)->streamAResource.blocks.size() > 0u);
 
+            for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
+                for (int fxIndex = 0; fxIndex < 21; ++fxIndex) {
+                    const auto* resolved = fx2Catalog.find(bankIndex, fxIndex);
+                    assert(resolved != nullptr);
+                    assert(resolved->streamAResource.terminated);
+                    assert(resolved->streamBResource.terminated);
+                    assert(resolved->directoryEntry.index == fxIndex);
+                }
+            }
+
             // The real-time backend receives the immutable FX1 catalog on initial
             // attachment and again when replaced, just like the program catalog.
             FX1CatalogProbeBackend originalFX1Backend;
             FX1CatalogProbeBackend replacementFX1Backend;
             technox::MASSAudioEngine fx1CatalogEngine(&originalFX1Backend);
             fx1CatalogEngine.setFX1ResourceCatalog(&fx1Catalog);
+            fx1CatalogEngine.setFX2ResourceCatalog(&fx2Catalog);
             assert(fx1CatalogEngine.fx1ResourceCatalog() == &fx1Catalog);
-            assert(originalFX1Backend.receivedCatalog == &fx1Catalog);
+            assert(fx1CatalogEngine.fx2ResourceCatalog() == &fx2Catalog);
+            assert(originalFX1Backend.receivedFX1Catalog == &fx1Catalog);
+            assert(originalFX1Backend.receivedFX2Catalog == &fx2Catalog);
             fx1CatalogEngine.setBackend(&replacementFX1Backend);
-            assert(replacementFX1Backend.receivedCatalog == &fx1Catalog);
+            assert(replacementFX1Backend.receivedFX1Catalog == &fx1Catalog);
+            assert(replacementFX1Backend.receivedFX2Catalog == &fx2Catalog);
             assert(fx1CatalogEngine.setCommonControl(
                 technox::MASSCommonControl::fx1Type, 0));
             assert(fx1CatalogEngine.setCommonControl(
@@ -634,12 +708,16 @@ int main(int argc, char** argv) {
             assert(replacementFX1Backend.fx1Resolved);
             assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
             assert(replacementFX1Backend.fx1StreamBBlockCount == 1u);
+            assert(replacementFX1Backend.fx2Resolved);
+            assert(replacementFX1Backend.fx2StreamABlockCount > 0u);
+            assert(replacementFX1Backend.fx2StreamBBlockCount > 0u);
 
             // The factory stores independent FX1 and FX2 selectors. Only the
             // FX1 selector maps to the 21-entry directory at IC4 0x8423.
             // FX2 has a separate algorithm family and is not resolved here.
             assert(factoryFrames.size() == 300u);
             std::array<bool, technox::MASSFX1ProgramDirectory::kEntryCount> usedFX1{};
+            std::array<bool, technox::MASSFX2ProgramDirectory::kEntryCount> usedFX2{};
             for (std::size_t performance = 0; performance < 50u; ++performance) {
                 const auto& commonFrame = factoryFrames[performance * 6u + 1u].bytes;
                 assert(commonFrame.size() == 74u);
@@ -649,8 +727,11 @@ int main(int argc, char** argv) {
                 assert(fx1Index < technox::MASSFX1ProgramDirectory::kEntryCount);
                 assert(fx2Index <= 21u);
                 usedFX1[fx1Index] = true;
-                for (int bankIndex = 0; bankIndex < 2; ++bankIndex)
+                usedFX2[fx2Index] = true;
+                for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
                     assert(fx1Catalog.find(bankIndex, fx1Index) != nullptr);
+                    assert(fx2Catalog.find(bankIndex, fx2Index) != nullptr);
+                }
             }
 
             // Exact FX1 algorithm indices used by the 50 factory Performances.
@@ -662,12 +743,23 @@ int main(int argc, char** argv) {
                 }};
             assert(usedFX1 == expectedFactoryFX1);
 
+            constexpr std::array<bool, technox::MASSFX2ProgramDirectory::kEntryCount>
+                expectedFactoryFX2{{
+                    true, false, false, false, true, true, true,
+                    true, false, true, true, true, false, true,
+                    false, true, false, false, true, false, false
+                }};
+            assert(usedFX2 == expectedFactoryFX2);
+
             // Factory Performance 6 ("Fantasy"): FX1 Room (index 0),
             // FX2 Phaser 1 (index 5). These are distinct processor families.
             const auto& fantasyCommon = factoryFrames[1u * 6u + 1u].bytes;
             assert(fantasyCommon[5] == 6u);
             assert(fantasyCommon[8u + 0x2au] == 0u);
             assert(fantasyCommon[8u + 0x32u] == 5u);
+            assert(fx2Catalog.find(0, 5) != nullptr);
+            assert(fx2Catalog.find(0, 5)->directoryEntry.name[0] == 'P');
+            assert(fx2Catalog.find(0, 5)->directoryEntry.name[5] == '1');
 
             for (int bankNumber = 0; bankNumber < 2; ++bankNumber) {
                 const auto bank = bankNumber == 0
