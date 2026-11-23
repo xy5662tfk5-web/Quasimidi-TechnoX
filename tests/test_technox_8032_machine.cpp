@@ -1908,8 +1908,25 @@ int main(int argc, char** argv) {
         assert(secondNoteWriter22F8Count == 1u);
         assert(secondNoteWriter211FCount == 1u);
         assert(secondNoteWriter236BCount == 1u);
-        std::printf("IC4 handler entry probes: 224C=%zu 2301=%zu\\n",
-                    secondNoteHandler224CCount, secondNoteHandler2301Count);
+        // Both entries were reached through JMP @A+DPTR at 0x19C1:
+        // DPTR remains the jump-table base, while A is the rotated opcode
+        // group offset (0x0C for group 0x18, 0x10 for group 0x20).
+        assert(secondNoteHandler224CCount == 1u);
+        assert(secondNoteHandler2301Count == 1u);
+        assert(secondNoteHandler224C.dptr == 0x1bc3u);
+        assert(secondNoteHandler224C.accumulator == 0x0cu);
+        assert(secondNoteHandler224C.returnPC == 0x1720u);
+        assert(secondNoteHandler2301.dptr == 0x1bc3u);
+        assert(secondNoteHandler2301.accumulator == 0x10u);
+        assert(secondNoteHandler2301.returnPC == 0x1720u);
+        std::printf("IC4 handler entry probes: 224C=%zu A=%02X DPTR=%04X; "
+                    "2301=%zu A=%02X DPTR=%04X\\n",
+                    secondNoteHandler224CCount,
+                    static_cast<unsigned>(secondNoteHandler224C.accumulator),
+                    static_cast<unsigned>(secondNoteHandler224C.dptr),
+                    secondNoteHandler2301Count,
+                    static_cast<unsigned>(secondNoteHandler2301.accumulator),
+                    static_cast<unsigned>(secondNoteHandler2301.dptr));
         if (secondNoteHandler224CCount != 0u) {
             std::printf("  224C entry: RET=%04X DPTR=%04X R2=%02X R3=%02X "
                         "R4=%02X R5=%02X R6=%02X R7=%02X RAM2B=%02X "
