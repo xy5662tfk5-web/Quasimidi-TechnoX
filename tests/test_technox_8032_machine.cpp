@@ -852,8 +852,6 @@ int main(int argc, char** argv) {
         std::printf(" effective7BD5=%02X\\n",
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)));
         assert(!firmwareMachine.cpuFaulted());
-        const auto realPackets = firmwareMachine.soundCommandPacketCount();
-        const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
             const auto& word = firmwareMachine.soundHostBurstWordAt(i);
