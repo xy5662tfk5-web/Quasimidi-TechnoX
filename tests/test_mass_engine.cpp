@@ -6,6 +6,20 @@ using namespace technox;
 int main() {
     MASSAudioEngine engine;
     engine.prepare(44100.0, 512);
+    assert(engine.setPartParameter(12, PartParameter::bankNumber, 2));
+    assert(engine.setPartParameter(12, PartParameter::soundNumber, 10));
+    engine.noteOn(12, 13, 60, 100);
+    assert(engine.voiceManager().activeVoiceCount() == 1);
+    assert(engine.voiceManager().voices()[0].bankNumber == 2);
+    assert(engine.voiceManager().voices()[0].soundNumber == 10);
+    assert(engine.setPartParameter(12, PartParameter::soundNumber, 93));
+    engine.noteOn(12, 13, 62, 100);
+    bool capturedUpdatedProgram = false;
+    for (const auto& voice : engine.voiceManager().voices())
+        if (voice.active && voice.part == 12 && voice.note == 62)
+            capturedUpdatedProgram = voice.bankNumber == 2 && voice.soundNumber == 93;
+    assert(capturedUpdatedProgram);
+    engine.allSoundsOff();
     assert(engine.setPartParameter(12, PartParameter::cutoffFrequency, 91));
     assert(engine.getPartParameter(12, PartParameter::cutoffFrequency) == 91);
     assert(engine.getCommonControl(MASSCommonControl::performanceMode) == -1);
