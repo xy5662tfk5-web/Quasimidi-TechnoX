@@ -738,7 +738,7 @@ int main(int argc, char** argv) {
 
                 const auto* equalizr1 = fx2Catalog.find(0, 14);
                 assert(equalizr1 != nullptr);
-                assert(equalizr1->streamAResource.blocks.size() == 2u);
+                assert(equalizr1->streamAResource.blocks.size() == 1u);
                 assert(equalizr1->streamBResource.blocks.empty());
                 assert(equalizr1->streamBResource.skippedLeadingByte);
                 assert(equalizr1->streamBResource.leadingByteValue == 0x74u);
@@ -784,9 +784,10 @@ int main(int argc, char** argv) {
                     assert(header.value == block.sourceCount);
                     assert(header.soundBusMode == 0x02u);
                     assert(header.port2 == 0xffu);
-                    for (const auto expected : block.preamble) {
+                    for (std::size_t prefix = 0;
+                         prefix < block.preambleByteCount; ++prefix) {
                         const auto& event = fx2Runtime.ff10WriteAt(portOffset++);
-                        assert(event.value == expected);
+                        assert(event.value == block.preamble[prefix]);
                         assert(event.soundBusMode == 0x02u);
                         assert(event.port2 == 0xffu);
                     }
@@ -814,7 +815,7 @@ int main(int argc, char** argv) {
             assert(fx1Catalog.find(2, 0) == nullptr);
             const auto* roomBank0 = fx1Catalog.find(0, 0);
             assert(roomBank0 != nullptr);
-            assert(roomBank0->streamAResource.blocks.size() == 2u);
+            assert(roomBank0->streamAResource.blocks.size() == 1u);
             assert(roomBank0->streamBResource.blocks.empty());
             assert(roomBank0->streamBResource.skippedLeadingByte);
             assert(roomBank0->streamBResource.leadingByteValue == 0x7fu);
@@ -934,13 +935,15 @@ int main(int argc, char** argv) {
                                2u + streamBResource.blocks.size());
 
                     for (const auto& block : streamAResource.blocks) {
+                        assert(block.preambleByteCount == 2u);
                         assert(block.payload.size() ==
                                static_cast<std::size_t>(block.sourceCount) * 3u);
-                        assert(block.portWriteByteCount == block.payload.size() + 4u);
+                        assert(block.portWriteByteCount == block.payload.size() + 3u);
                         assert(block.sourceBytesConsumed == block.portWriteByteCount);
                         assert(block.wireHeader == block.sourceCount);
                     }
                     for (const auto& block : streamBResource.blocks) {
+                        assert(block.preambleByteCount == 3u);
                         assert(block.payload.size() ==
                                static_cast<std::size_t>(block.sourceCount));
                         assert(block.portWriteByteCount == block.payload.size() + 4u);
@@ -958,15 +961,16 @@ int main(int argc, char** argv) {
             technox::MASSIC51PortStreamResource roomStreamB{};
             assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
                 fxResources, technox::MASSResourceBank::bank0, 0x00, roomStreamA));
-            assert(roomStreamA.blocks.size() == 2u);
+            assert(roomStreamA.blocks.size() == 1u);
             const auto& roomStreamABlock = roomStreamA.blocks.front();
             assert(roomStreamABlock.dataAddress == 0x24d4u);
             assert(roomStreamABlock.sourceCount == 0x19u);
+            assert(roomStreamABlock.preambleByteCount == 2u);
             assert(roomStreamABlock.preamble[0] == 0x00u);
             assert(roomStreamABlock.preamble[1] == 0xcfu);
-            assert(roomStreamABlock.preamble[2] == 0x10u);
             assert(roomStreamABlock.payload.size() == 75u);
-            assert(roomStreamABlock.portWriteByteCount == 79u);
+            assert(roomStreamABlock.payload.front() == 0x10u);
+            assert(roomStreamABlock.portWriteByteCount == 78u);
             assert(technox::MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
                 fxResources, technox::MASSResourceBank::bank0, 0x01, roomStreamB));
             assert(roomStreamB.skippedLeadingByte);
