@@ -1137,6 +1137,8 @@ int main(int argc, char** argv) {
             const auto ic51Before = firmwareMachine.ic51ReadCount();
             const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceBefore = firmwareMachine.xdataWatchTraceCount();
+            const auto internalFlagTraceBefore =
+                firmwareMachine.internalFlagWriteTraceCount();
             assert(firmwareMachine.scheduleAciaMidiBytes(bytes, byteCount, startCycle));
             std::size_t instructions = 0;
             std::size_t drain = 0;
@@ -1324,8 +1326,51 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.writeAccepted),
                             static_cast<unsigned long long>(event.machineCycle));
             }
+            const auto internalFlagTraceAfter =
+                firmwareMachine.internalFlagWriteTraceCount();
+            constexpr std::size_t internalFlagTraceCapacity = 256u;
+            const auto firstRetainedFlagTrace =
+                internalFlagTraceAfter > internalFlagTraceCapacity
+                    ? internalFlagTraceAfter - internalFlagTraceCapacity : 0u;
+            const auto firstStageFlagTrace =
+                std::max(internalFlagTraceBefore, firstRetainedFlagTrace);
+            std::printf("  Internal bit 0A transitions: total=%zu retained=%zu\\n",
+                        internalFlagTraceAfter - internalFlagTraceBefore,
+                        internalFlagTraceAfter - firstStageFlagTrace);
+            for (std::size_t i = firstStageFlagTrace;
+                 i < internalFlagTraceAfter; ++i) {
+                const auto& event = firmwareMachine.internalFlagWriteTraceAt(i);
+                std::printf("    %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                            static_cast<unsigned>(event.previousValue),
+                            static_cast<unsigned>(event.currentValue),
+                            static_cast<unsigned>(event.byteValue),
+                            static_cast<unsigned>(event.opcode),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
             assert(!firmwareMachine.cpuFaulted());
         };
+
+        // Show boot/factory-load bit-0A transitions separately from later MIDI
+        // events so the two firmware contexts are not conflated.
+        {
+            const auto count = firmwareMachine.internalFlagWriteTraceCount();
+            const auto first = count > 256u ? count - 256u : 0u;
+            std::printf("IC4 boot bit 0A transitions: total=%zu retained=%zu\\n",
+                        count, count - first);
+            for (std::size_t i = first; i < count; ++i) {
+                const auto& event = firmwareMachine.internalFlagWriteTraceAt(i);
+                std::printf("  %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                            static_cast<unsigned>(event.previousValue),
+                            static_cast<unsigned>(event.currentValue),
+                            static_cast<unsigned>(event.byteValue),
+                            static_cast<unsigned>(event.opcode),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
+        }
 
         const std::array<std::uint8_t, 2> realProgramChange{{0xc0u, 0x05u}};
         const std::array<std::uint8_t, 3> realNoteOn{{0x90u, 0x3cu, 0x64u}};
