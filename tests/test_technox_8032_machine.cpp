@@ -3334,7 +3334,7 @@ int main(int argc, char** argv) {
             pitchAddressBuilderEntry.indirectRam9E);
         assert(pitchSecondaryBase == 0x3903u);
         const auto pitchTableAddress =
-            MASS1C61SecondaryTableAddressBuilder::resolve(
+            technox::MASS1C61SecondaryTableAddressBuilder::resolve(
                 pitchSecondaryBase,
                 pitchAddressBuilderEntry.registers[3],
                 pitchAddressBuilderEntry.selectedDirectRam[0],
@@ -3357,7 +3357,7 @@ int main(int argc, char** argv) {
                 pitchTableAddress.address + 0x100u))
         }};
         const auto pitchTableFields =
-            MASS1C61PackedLookupDecoder::decode(pitchTableBytes);
+            technox::MASS1C61PackedLookupDecoder::decode(pitchTableBytes);
         const auto& pitchSecondaryLookup =
             findPitchSourceStep(0x1dc8u);
         assert(pitchTableFields.r3 == 0x60u);
@@ -3389,7 +3389,7 @@ int main(int argc, char** argv) {
         // Execute the recovered 0x1DC8..0x1E04 arithmetic against the exact
         // live CPU inputs from this ROM/Note 66 event. This cross-check keeps
         // register mapping and arithmetic separate from the later slot writes.
-        const auto pitchArithmeticModel = MASS1C61AccumulatorTransform::apply(
+        const auto pitchArithmeticModel = technox::MASS1C61AccumulatorTransform::apply(
             pitchSecondaryLookup.registers[2],
             pitchSecondaryLookup.registers[3],
             pitchSecondaryLookup.registers[4],
