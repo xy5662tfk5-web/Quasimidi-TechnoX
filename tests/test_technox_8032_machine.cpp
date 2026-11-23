@@ -3252,9 +3252,29 @@ int main(int argc, char** argv) {
         // only at its 1E67 arithmetic tail. This captures the seven-byte
         // stream record as IC4 copies it into the active Part slot.
         const std::array<std::uint8_t, 3> pitchSourceProbe{{0x90u, 0x42u, 0x64u}};
+        const auto pitchSourcePacketStart = firmwareMachine.soundCommandPacketCount();
         firmwareMachine.armExecutionTraceWindowForTesting(0x1c61u, 0x1e67u, 1u);
         runRealMidiStage("Note 66 velocity 100: trace pitch record 1C61 to 1E67",
                          pitchSourceProbe.data(), pitchSourceProbe.size());
+        constexpr std::array<std::array<std::uint8_t, 4>, 5>
+            expectedNote66Packets{{
+                {{0x00u, 0xf0u, 0x1fu, 0x02u}},
+                {{0x02u, 0x01u, 0x00u, 0x00u}},
+                {{0x05u, 0xfbu, 0xd0u, 0x03u}},
+                {{0x0au, 0x00u, 0x78u, 0x00u}},
+                {{0x0fu, 0x00u, 0x00u, 0x00u}}
+            }};
+        constexpr std::array<std::uint16_t, 5> expectedNote66Returns{{
+            0x0a52u, 0x0a52u, 0x22fbu, 0x2122u, 0x236eu
+        }};
+        assert(firmwareMachine.soundCommandPacketCount() -
+               pitchSourcePacketStart == 549u);
+        for (std::size_t i = 0; i < expectedNote66Packets.size(); ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                pitchSourcePacketStart + i);
+            assert(packet.bytes == expectedNote66Packets[i]);
+            assert(packet.returnPC == expectedNote66Returns[i]);
+        }
         firmwareMachine.disableExecutionTraceForTesting();
         const auto pitchSourceInstructionCount =
             firmwareMachine.executionInstructionTraceCountForTesting();
