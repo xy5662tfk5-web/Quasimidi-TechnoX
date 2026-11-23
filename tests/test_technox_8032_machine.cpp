@@ -1944,6 +1944,23 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.bytes[2]),
                         static_cast<unsigned>(packet.bytes[3]));
         }
+
+        const auto bit0ATraceCount = injectedResponseMachine.internalFlagWriteTraceCount();
+        const auto firstRetainedBit0A = bit0ATraceCount > 256u
+            ? bit0ATraceCount - 256u : 0u;
+        std::printf("Synthetic-ready bit 0A transitions: total=%zu retained=%zu\\n",
+                    bit0ATraceCount, bit0ATraceCount - firstRetainedBit0A);
+        for (std::size_t i = firstRetainedBit0A; i < bit0ATraceCount; ++i) {
+            const auto& event = injectedResponseMachine.internalFlagWriteTraceAt(i);
+            std::printf("  %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                        static_cast<unsigned>(event.previousValue),
+                        static_cast<unsigned>(event.currentValue),
+                        static_cast<unsigned>(event.byteValue),
+                        static_cast<unsigned>(event.opcode),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.stackReturnPC),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         } else {
             std::printf("MIDI bytes were received, but this fixture emitted no SoundHost host transaction yet.\\n");
         }
