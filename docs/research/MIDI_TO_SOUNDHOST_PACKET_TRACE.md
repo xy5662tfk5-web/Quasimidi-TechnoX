@@ -231,3 +231,65 @@ The entire command sequence is now pinned byte-for-byte by `tests/test_mass_reso
 The stream contains one group-08 pitch-parameter record at offset `0x0179`, which is consistent with the live `0x1C61 -> 0x1E67 -> 0x09B9` pitch-handler path. The current trace starts at `0x1E67`, however; it does not yet prove that this particular ROM record supplied the two captured slot bases and coefficient triplets. That byte-to-register provenance is the next trace slice: capture the executing `0x1C61` record load through its `0x1E67` caller and compare all seven source bytes to the live R2/R3/R4/R5/R6/R7 inputs.
 
 The unit-test job for the full instruction dump passed in CI run `45257503996`; the new full-stream asserts and exact pitch packet asserts are being tested in the subsequent run. The fixture still injects a synthetic DSP-ready state. No external sound processor response, PCM decode, or audible output is established by these traces.
+
+
+## End-to-end 1C61 pitch-record reconstruction (live trace + ROM model)
+
+The next trace starts at the group-08 handler entry `0x1C61` and ends at `0x1E67`. It captures 226 instructions and 23 XDATA accesses while processing the live Note 66 / velocity 100 probe. This bridges the previously isolated arithmetic tail to its actual IC51 input.
+
+### IC51 input and Part-slot staging
+
+With the IC51 bank selected (`P3=EC`), IC4 reads seven consecutive bytes:
+
+| IC51 address | Byte | Destination in the handler's register/field sequence |
+|---:|---:|---|
+| `160C` | `08` | `F0` / group-08 opcode |
+| `160D` | `20` | `R2` |
+| `160E` | `18` | `R3` |
+| `160F` | `A0` | `R4` |
+| `1610` | `F6` | `R7` |
+| `1611` | `00` | `R6` |
+| `1612` | `00` | `R5` |
+
+The handler writes the record into the current Part's XDATA slot. It stages `08` at `0080`, `A0` at `0083`, and the remaining record bytes into `0084–0086`. The live slot is based at `0x80`; the subsequent arithmetic path uses the neighbouring `0x90` slot on the next invocation.
+
+### Secondary-table lookup, now reproduced from the actual IC4 ROM
+
+The live register/IRAM state entering the secondary-table lookup is:
+
+- base pointer assembled from `IRAM[0x9F:0x9E]` = `0x3903`;
+- `R3=0x18`, `RAM[0x2F]=0x7B`, `R4=0xA0`;
+- the firmware's signed wrap loop converts `0x18 + 0x7B = 0x93` to the 7-bit index `0x7B`;
+- `R4.4` is clear, so no `0x180` secondary-table offset is added;
+- adding the original `R7=0x7B` gives the MOVC base `0x397E`.
+
+The actual descrambled IC4 ROM bytes at `0x397E`, `0x39FE`, and `0x3A7E` are `05 43 02`. The packed-field decoder produces the live values observed at `0x1DC8`:
+
+| Register | Value |
+|---|---:|
+| `R2` | `80` |
+| `R3` | `60` |
+| `R4` | `48` |
+| `R5` | `05` |
+| `R6` | `43` |
+| `R7` | `02` |
+
+The C++ regression now resolves this same address with `MASS1C61SecondaryTableAddressBuilder`, reads all three bytes with `MASS1C61SecondaryTableReader`, and decodes them with `MASS1C61PackedLookupDecoder` against the real firmware image. The instruction-level model `MASS1C61AccumulatorTransform` is then run with those exact live registers and the captured direct-RAM operands. It reproduces the first arithmetic result `R2:R3:R4 = D5:1E:02`, which is what the CPU trace reaches at the next stage boundary (`0x1E05`).
+
+### Final correction and slot writeback
+
+The firmware then performs a distinct correction step from `0x1E05` through `0x1E2B`. In this probe, the correction changes the middle byte from `0x1E` to `0x1F`; it is not part of the preceding secondary-table multiply/accumulate result. IC4 clears the slot pair at `008E/008F`, consults the slot state at `2019/2018`, and writes back the final three-byte vector:
+
+| Instruction | XDATA write | Result |
+|---:|---|---:|
+| `1E60` | `0083` | `A2` |
+| `1E63` | `0082` | `1F` |
+| `1E66` | `0081` | `D5` |
+
+The `0x1E67` entry snapshot is therefore `R2=D5, R3=1F, R4=06, R5=00, R6=43, R7=02`. The following `0x09B9` handler consumes the staged record and produces the two initial packets through `0x0A4F`.
+
+The regression now asserts the seven IC51 input bytes and addresses, the decoded register tuple at `0x1DC8`, the arithmetic tuple at `0x1E05`, the final tuple at `0x1E67`, and the exact XDATA writeback bytes `D5 1F A2`. The resource-model test independently verifies the real IC4 ROM table lookup and first accumulator result. This closes the byte-to-table-to-arithmetic-to-slot-writeback path for this tested event; it does not yet assign a musical unit or physical sound-engine meaning to the resulting three-byte vector.
+
+**Packet-byte correction:** the second pitch-handler packet observed for the Note 65 probe is `02 01 00 00` (not `02 00 00 00`). The regression assertion and the earlier CI writer trace both use `02 01 00 00`.
+
+The current CI checks are running for the new live-trace assertions and the real-ROM model test. The DSP-ready response in the broader Note On fixture is still synthetic, so these results confirm IC4's computation and bus writes, not an external DSP response or audible playback.
