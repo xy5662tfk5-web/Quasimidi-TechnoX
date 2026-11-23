@@ -1113,6 +1113,96 @@ private:
     bool loaded_ = false;
 };
 
+ 
+// Firmware-loaded 16-KiB external sound-memory image at XDATA C000-FFFF.
+// Reconstructed from the observed IC51 bank-0 transfer (R7=0x48) and the
+// exact IC4 logical-to-physical byte map at code address 0xADDD.
+// This is the byte image after the original boot loader, not a claim that its
+// contents are PCM or that the external DSP's sample codec is known.
+class MASSIC51ExternalSoundMemoryImage {
+public:
+    static constexpr std::uint16_t kBaseAddress = 0xc000u;
+    static constexpr std::size_t kImageSize = 0x4000u;
+    static constexpr std::uint16_t kFirmwareMapAddress = 0xadddu;
+    static constexpr std::size_t kFirmwareMapSize = 0x100u;
+    static constexpr MASSResourceBank kObservedBootBank = MASSResourceBank::bank0;
+
+    bool load(const MASSResourceROM& rom,
+              const std::uint8_t* firmwareCode,
+              std::size_t firmwareCodeSize) noexcept {
+        clear();
+        if (!rom.isLoaded() || firmwareCode == nullptr ||
+            firmwareCodeSize < static_cast<std::size_t>(kFirmwareMapAddress) +
+                                   kFirmwareMapSize)
+            return false;
+
+        const auto* bankData = rom.dataForBank(kObservedBootBank);
+        if (bankData == nullptr)
+            return false;
+
+        MASSIC51BulkBlockHeader header{};
+        if (!MASSIC51BulkBlockHeader::parse(
+                bankData, MASSResourceROM::kBankSize,
+                MASSIC51BulkBlockHeader::kObservedStartupTransferIndex, header))
+            return false;
+
+        std::uint16_t lastPhysicalAddress = 0;
+        if (!MASSIC51BulkBlockHeader::copyPayloadToPagedXdata(
+                bankData, MASSResourceROM::kBankSize, header,
+                firmwareCode + kFirmwareMapAddress,
+                image_.data(), image_.size(), kBaseAddress,
+                &lastPhysicalAddress)) {
+            clear();
+            return false;
+        }
+
+        header_ = header;
+        sourceBank_ = kObservedBootBank;
+        lastPhysicalAddress_ = lastPhysicalAddress;
+        loadedByteCount_ = header.firmwareByteCount();
+        loaded_ = true;
+        return true;
+    }
+
+    void clear() noexcept {
+        image_.fill(0);
+        header_ = {};
+        sourceBank_ = MASSResourceBank::bank0;
+        lastPhysicalAddress_ = 0;
+        loadedByteCount_ = 0;
+        loaded_ = false;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+    const std::uint8_t* data() const noexcept { return image_.data(); }
+    std::size_t size() const noexcept { return image_.size(); }
+    std::size_t loadedByteCount() const noexcept { return loadedByteCount_; }
+    std::uint16_t baseAddress() const noexcept { return kBaseAddress; }
+    std::uint16_t endAddress() const noexcept {
+        return static_cast<std::uint16_t>(kBaseAddress + kImageSize - 1u);
+    }
+    std::uint16_t lastPhysicalAddress() const noexcept {
+        return lastPhysicalAddress_;
+    }
+    MASSResourceBank sourceBank() const noexcept { return sourceBank_; }
+    const MASSIC51BulkBlockHeader& sourceHeader() const noexcept { return header_; }
+
+    std::uint8_t byteAt(std::uint16_t address) const noexcept {
+        if (address < kBaseAddress ||
+            static_cast<std::size_t>(address - kBaseAddress) >= image_.size())
+            return 0xffu;
+        return image_[static_cast<std::size_t>(address - kBaseAddress)];
+    }
+
+private:
+    std::array<std::uint8_t, kImageSize> image_{};
+    MASSIC51BulkBlockHeader header_{};
+    MASSResourceBank sourceBank_ = MASSResourceBank::bank0;
+    std::uint16_t lastPhysicalAddress_ = 0;
+    std::size_t loadedByteCount_ = 0;
+    bool loaded_ = false;
+};
+
 
 // IC4 v1.05's 21 FX1 algorithm records at 0x8423 (Room/Reverb family).
 // The firmware reads two IC51 upload-stream selectors from offsets +0x0B
