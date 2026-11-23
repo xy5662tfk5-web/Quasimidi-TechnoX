@@ -1,12 +1,10 @@
 name: Intel Mac build and tests
 
+# Automatic Intel builds are handled by macos-intel.yml, which runs the
+# factory fixture/parser regression suite before packaging AU/VST3/Standalone.
+# Keep this workflow available for an explicit manual run without creating a
+# second identical macOS runner queue on every research-branch push.
 on:
-  push:
-    branches:
-      - "research/**"
-  pull_request:
-    branches:
-      - "research/**"
   workflow_dispatch:
 
 jobs:
