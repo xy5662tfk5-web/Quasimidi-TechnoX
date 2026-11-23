@@ -642,6 +642,7 @@ public:
                 event.stackReturnPC = currentStackReturnPC();
                 event.port3 = portPins_[3];
                 event.soundBusMode = internal_[0x8e];
+                event.syntheticTestOverlay = true;
                 event.machineCycle = elapsedMachineCycles_;
                 ++unmappedBusTraceCount_;
             }
