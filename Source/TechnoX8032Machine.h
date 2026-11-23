@@ -330,6 +330,15 @@ public:
             case 0xac00: return watchedCallCounts_[5];
             case 0xac88: return watchedCallCounts_[6];
             case 0xb34d: return watchedCallCounts_[7];
+            case 0x16c3: return watchedCallCounts_[8];
+            case 0x189d: return watchedCallCounts_[9];
+            case 0x1009: return watchedCallCounts_[10];
+            case 0x018d: return watchedCallCounts_[11];
+            case 0x1780: return watchedCallCounts_[12];
+            case 0x17d4: return watchedCallCounts_[13];
+            case 0x0e8e: return watchedCallCounts_[14];
+            case 0x1456: return watchedCallCounts_[15];
+            case 0x1742: return watchedCallCounts_[16];
             default: return 0;
         }
     }
@@ -349,6 +358,15 @@ public:
                 case 0xac00: ++watchedCallCounts_[5]; break;
                 case 0xac88: ++watchedCallCounts_[6]; break;
                 case 0xb34d: ++watchedCallCounts_[7]; break;
+                case 0x16c3: ++watchedCallCounts_[8]; break;
+                case 0x189d: ++watchedCallCounts_[9]; break;
+                case 0x1009: ++watchedCallCounts_[10]; break;
+                case 0x018d: ++watchedCallCounts_[11]; break;
+                case 0x1780: ++watchedCallCounts_[12]; break;
+                case 0x17d4: ++watchedCallCounts_[13]; break;
+                case 0x0e8e: ++watchedCallCounts_[14]; break;
+                case 0x1456: ++watchedCallCounts_[15]; break;
+                case 0x1742: ++watchedCallCounts_[16]; break;
                 default: break;
             }
         }
@@ -1156,7 +1174,7 @@ private:
     std::size_t portWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
     mutable std::size_t portReadCount_ = 0;
-    std::array<std::uint64_t, 8> watchedCallCounts_{};
+    std::array<std::uint64_t, 17> watchedCallCounts_{};
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;
