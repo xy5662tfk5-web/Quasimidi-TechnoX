@@ -3124,6 +3124,107 @@ int main(int argc, char** argv) {
                 firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
         }
 
+        // Preserve the two loop-entry states, the 0x09B9 compare/step
+        // inputs, and the 0x09DA normalized multiplier for each slot pass.
+        std::array<TechnoX8032Machine::ExecutionInstructionEvent, 2>
+            pitchPathEntrySnapshots{};
+        std::array<TechnoX8032Machine::ExecutionInstructionEvent, 2>
+            pitchPathHandlerEntrySnapshots{};
+        std::array<TechnoX8032Machine::ExecutionInstructionEvent, 2>
+            pitchPathArithmeticEntrySnapshots{};
+        std::size_t pitchPathEntrySnapshotCount = 0;
+        std::size_t pitchPathHandlerEntryCount = 0;
+        std::size_t pitchPathArithmeticEntryCount = 0;
+        std::size_t pitchPathPositiveBranchCount = 0;
+        for (const auto& event : pitchPathInstructions) {
+            if (event.instructionPC == 0x1e67u) {
+                assert(pitchPathEntrySnapshotCount < pitchPathEntrySnapshots.size());
+                pitchPathEntrySnapshots[pitchPathEntrySnapshotCount++] = event;
+            } else if (event.instructionPC == 0x09b9u) {
+                assert(pitchPathHandlerEntryCount < pitchPathHandlerEntrySnapshots.size());
+                pitchPathHandlerEntrySnapshots[pitchPathHandlerEntryCount++] = event;
+            } else if (event.instructionPC == 0x09dau) {
+                assert(pitchPathArithmeticEntryCount <
+                       pitchPathArithmeticEntrySnapshots.size());
+                pitchPathArithmeticEntrySnapshots[pitchPathArithmeticEntryCount++] = event;
+            } else if (event.instructionPC == 0x09d2u) {
+                ++pitchPathPositiveBranchCount;
+            }
+        }
+        assert(pitchPathEntrySnapshotCount == 2u);
+        assert(pitchPathHandlerEntryCount == 2u);
+        assert(pitchPathArithmeticEntryCount == 2u);
+        assert(pitchPathPositiveBranchCount == 2u);
+        constexpr std::array<std::array<std::uint8_t, 6>, 2>
+            expectedPitchHandlerInputs{{
+                {{0x57u, 0x01u, 0x06u, 0x00u, 0x22u, 0x02u}},
+                {{0x01u, 0x00u, 0x06u, 0x00u, 0xf3u, 0x00u}}
+            }};
+        constexpr std::array<std::uint8_t, 2> expectedPitchSlotSelectors{{0x00u, 0x02u}};
+        for (std::size_t i = 0; i < 2u; ++i) {
+            const auto& loopEntry = pitchPathEntrySnapshots[i];
+            const auto& handlerEntry = pitchPathHandlerEntrySnapshots[i];
+            const auto& arithmeticEntry = pitchPathArithmeticEntrySnapshots[i];
+            assert(loopEntry.stackReturnPC == 0x1720u);
+            assert(handlerEntry.stackReturnPC == 0x1e6au);
+            assert(arithmeticEntry.stackReturnPC == 0x1e6au);
+            assert(loopEntry.ram2BAnd30To37[0] == expectedPitchSlotSelectors[i]);
+            assert(handlerEntry.ram2BAnd30To37[0] == expectedPitchSlotSelectors[i]);
+            for (std::size_t reg = 0; reg < 6u; ++reg) {
+                assert(loopEntry.registers[reg + 2u] ==
+                       expectedPitchHandlerInputs[i][reg]);
+                assert(handlerEntry.registers[reg + 2u] ==
+                       expectedPitchHandlerInputs[i][reg]);
+            }
+            assert(arithmeticEntry.registers[4] == 0x0du);
+            assert(arithmeticEntry.registers[5] == 0x00u);
+        }
+
+        // Assert the exact 20 MOVX operations in order. This proves that
+        // each 0x09B9 pass compares its own +0E/+0F step cache, reads its
+        // own three-byte slot vector twice, and writes back the new cache.
+        struct ExpectedPitchXdataAccess {
+            std::uint16_t instructionPC;
+            std::uint16_t address;
+            std::uint8_t value;
+            bool write;
+        };
+        constexpr std::array<ExpectedPitchXdataAccess, 20>
+            expectedPitchXdataAccesses{{
+                {0x09bfu, 0x008eu, 0x00u, false},
+                {0x09c3u, 0x008fu, 0x00u, false},
+                {0x09cau, 0x008fu, 0x00u, true},
+                {0x09cdu, 0x008eu, 0x06u, true},
+                {0x09dfu, 0x0081u, 0x57u, false},
+                {0x09e6u, 0x0082u, 0x01u, false},
+                {0x0a00u, 0x0083u, 0xa2u, false},
+                {0x0a35u, 0x0081u, 0x57u, false},
+                {0x0a39u, 0x0082u, 0x01u, false},
+                {0x0a3du, 0x0083u, 0xa2u, false},
+                {0x09bfu, 0x009eu, 0x00u, false},
+                {0x09c3u, 0x009fu, 0x00u, false},
+                {0x09cau, 0x009fu, 0x00u, true},
+                {0x09cdu, 0x009eu, 0x06u, true},
+                {0x09dfu, 0x0091u, 0x01u, false},
+                {0x09e6u, 0x0092u, 0x00u, false},
+                {0x0a00u, 0x0093u, 0x48u, false},
+                {0x0a35u, 0x0091u, 0x01u, false},
+                {0x0a39u, 0x0092u, 0x00u, false},
+                {0x0a3du, 0x0093u, 0x48u, false}
+            }};
+        assert(pitchPathDataCount == expectedPitchXdataAccesses.size());
+        assert(pitchPathDataRetained == expectedPitchXdataAccesses.size());
+        for (std::size_t i = 0; i < expectedPitchXdataAccesses.size(); ++i) {
+            const auto& actual = pitchPathData[i];
+            const auto& expected = expectedPitchXdataAccesses[i];
+            assert(actual.instructionPC == expected.instructionPC);
+            assert(actual.address == expected.address);
+            assert(actual.value == expected.value);
+            assert(actual.write == expected.write);
+            assert(actual.stackReturnPC == 0x1e6au);
+            assert(!actual.ic51Selected);
+        }
+
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
             pitchPathWriterSnapshots{};
         std::size_t pitchPathWriterSnapshotCount = 0;
@@ -3150,6 +3251,33 @@ int main(int argc, char** argv) {
             assert(pitchPathWriterSnapshots[i].registers[2] == packet.bytes[1]);
             assert(pitchPathWriterSnapshots[i].registers[3] == packet.bytes[2]);
             assert(pitchPathWriterSnapshots[i].registers[4] == packet.bytes[3]);
+
+            // Reconstruct the 24-bit slot value from the three reads seen by
+            // the real 8032 and use the normalized 09DA R5:R4 factor.
+            const auto dataBase = i * 10u;
+            const auto stepMagnitude = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(
+                    pitchPathArithmeticEntrySnapshots[i].registers[5]) << 8u) |
+                pitchPathArithmeticEntrySnapshots[i].registers[4]);
+            const auto transformed = technox::MASS09B9SlotInterpolationArithmetic::apply(
+                pitchPathData[dataBase + 4u].value,
+                pitchPathData[dataBase + 5u].value,
+                pitchPathData[dataBase + 6u].value,
+                stepMagnitude, false);
+            const auto livePacketValue =
+                (static_cast<std::uint32_t>(packet.bytes[3]) << 16u) |
+                (static_cast<std::uint32_t>(packet.bytes[2]) << 8u) |
+                packet.bytes[1];
+            assert(transformed.outputValue24 == livePacketValue);
+            if (i == 0u) {
+                assert(transformed.inputValue24 == 0x020157u);
+                assert(transformed.incrementMagnitude24 == 0x00001au);
+                assert(transformed.outputValue24 == 0x020171u);
+            } else {
+                assert(transformed.inputValue24 == 0x000001u);
+                assert(transformed.incrementMagnitude24 == 0x000000u);
+                assert(transformed.outputValue24 == 0x000001u);
+            }
         }
 
         std::printf("PITCH-HANDLER TRACE: instructions=%zu retained=%zu "
