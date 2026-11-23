@@ -857,21 +857,30 @@ int main(int argc, char** argv) {
         const std::array<std::uint8_t, 2> realProgramChange{{0xc0u, 0x05u}};
         const std::array<std::uint8_t, 3> realNoteOn{{0x90u, 0x3cu, 0x64u}};
         const std::array<std::uint8_t, 3> realNoteOff{{0x80u, 0x3cu, 0x40u}};
-        runRealMidiStage("Program Change with 7D95=00", realProgramChange.data(), realProgramChange.size());
-        // 0x2895 branches away from the event path when the external 0x7D95
-        // status byte is zero. Inject a minimal nonzero value only as a
-        // diagnostic fixture; this is not a hardware-confirmed status value.
-        firmwareMachine.setTestExternalRamByte(0x7d95u, 0x01u);
-        runRealMidiStage("Program Change with synthetic 7D95=01",
+        runRealMidiStage("Program Change in Performance mode",
                          realProgramChange.data(), realProgramChange.size());
-        // Channel 1 is routed by this fixture to Part index 12. In the
-        // firmware's 24-byte Part window, 0x7C17 + 12*0x18 = 0x7D37.
-        // Seed only this nonzero gate to see whether the downstream
-        // descriptor/voice path becomes reachable; this is synthetic state.
-        firmwareMachine.setTestExternalRamByte(0x7d37u, 0x01u);
-        runRealMidiStage("Note On with synthetic 7D95=01 and Part12 marker",
+        runRealMidiStage("Note On in Performance mode",
                          realNoteOn.data(), realNoteOn.size());
-        runRealMidiStage("Note Off with synthetic 7D95=01",
+        runRealMidiStage("Note Off in Performance mode",
+                         realNoteOff.data(), realNoteOff.size());
+
+        // The owner's manual defines system parameter address 00 00 03 as
+        // "multi mode" (0=Performance, 1=Sequencer Multi). Send the documented
+        // Quasimidi dump-data SysEx so the following test uses Part 1 / MIDI 1
+        // rather than the four performance layers (Parts 13-16).
+        const std::array<std::uint8_t, 10> enableMultiMode{{
+            0xf0u, 0x3fu, 0x00u, 0x22u, 0x44u, 0x00u, 0x00u, 0x03u, 0x01u, 0xf7u
+        }};
+        runRealMidiStage("SysEx set Multi mode=1",
+                         enableMultiMode.data(), enableMultiMode.size());
+        const std::array<std::uint8_t, 5> bankAAndProgram5{{
+            0xb0u, 0x00u, 0x00u, 0xc0u, 0x05u
+        }};
+        runRealMidiStage("Bank A + Program Change 5 in Multi mode",
+                         bankAAndProgram5.data(), bankAAndProgram5.size());
+        runRealMidiStage("Note On Part 1 in Multi mode",
+                         realNoteOn.data(), realNoteOn.size());
+        runRealMidiStage("Note Off Part 1 in Multi mode",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
