@@ -984,7 +984,7 @@ public:
 
         if (testExternalRam7000Enabled_ && address >= 0x7000u && address <= 0x7fffu) {
             testExternalRam7000_[address - 0x7000u] = value;
-            if (address >= 0x7c00u) {
+            if (address >= 0x7c00u || address == 0x7bfeu) {
                 auto& event = unmappedBusTrace_[unmappedBusTraceCount_ % unmappedBusTrace_.size()];
                 event.address = address;
                 event.value = value;
