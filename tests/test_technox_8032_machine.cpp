@@ -849,10 +849,10 @@ int main(int argc, char** argv) {
         const auto firstRetainedUnmapped = unmappedTraceCount > 4096u
             ? unmappedTraceCount - 4096u : 0u;
         std::size_t peripheralWindowEvents = 0;
-        std::printf("Undocumented 7Cxx/7Dxx bus trace (instruction-level):\\n");
+        std::printf("Undocumented 7BFE/7Cxx/7Dxx bus trace (instruction-level):\\n");
         for (std::size_t i = firstRetainedUnmapped; i < unmappedTraceCount; ++i) {
             const auto& event = firmwareMachine.unmappedBusTraceAt(i);
-            if (event.address < 0x7c00u || event.address > 0x7fffu) continue;
+            if ((event.address < 0x7c00u || event.address > 0x7fffu) && event.address != 0x7bfeu) continue;
             ++peripheralWindowEvents;
             std::printf("  %c %04X=%02X pc=%04X stackRet=%04X P3=%02X 8E=%02X cycle=%llu\\n",
                         event.write ? 'W' : 'R',
@@ -1203,8 +1203,8 @@ int main(int argc, char** argv) {
             for (std::size_t i = std::max(firstTrace, peripheralTraceBefore);
                  i < peripheralTraceAfter; ++i) {
                 const auto& event = firmwareMachine.unmappedBusTraceAt(i);
-                if (event.address < 0x7c00u || event.address > 0x7fffu) continue;
-                std::printf("  MIDI-7C %c %04X=%02X pc=%04X stackRet=%04X "
+                if ((event.address < 0x7c00u || event.address > 0x7fffu) && event.address != 0x7bfeu) continue;
+                std::printf("  MIDI-7B/7C %c %04X=%02X pc=%04X stackRet=%04X "
                             "P3=%02X 8E=%02X overlay=%u cycle=%llu\\n",
                             event.write ? 'W' : 'R',
                             static_cast<unsigned>(event.address),
