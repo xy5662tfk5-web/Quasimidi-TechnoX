@@ -1223,7 +1223,7 @@ private:
 
 enum class MASSIC51PortStreamFormat : std::uint8_t {
     headerAndTwoBytePreambleAndTriplets,
-    rotatedHeaderAndQuadruplets
+    rotatedHeaderThreeBytePreambleAndPayload
 };
 
 // A decoded resource block that firmware streams byte-by-byte to XDATA
@@ -1236,7 +1236,7 @@ struct MASSIC51PortStreamBlock {
     std::uint16_t dataAddress = 0;
     std::uint8_t sourceCount = 0;
     std::uint8_t wireHeader = 0;
-    std::array<std::uint8_t, 2> preamble{};
+    std::array<std::uint8_t, 3> preamble{};
     std::vector<std::uint8_t> payload;
     std::size_t sourceBytesConsumed = 0;
     std::size_t portWriteByteCount = 0;
@@ -1280,20 +1280,21 @@ public:
             return false;
 
         decoded.wireHeader = decoded.sourceCount;
-        decoded.preamble = {bankData[address + 1u], bankData[address + 2u]};
+        decoded.preamble[0] = bankData[address + 1u];
+        decoded.preamble[1] = bankData[address + 2u];
         decoded.payload.assign(bankData + address + 3u,
                                bankData + address + totalSourceSize);
         decoded.sourceBytesConsumed = totalSourceSize;
-        decoded.portWriteByteCount = 1u + 2u + payloadSize;
+        decoded.portWriteByteCount = totalSourceSize;
         result = std::move(decoded);
         return true;
     }
 
     // Firmware path through IC4 0xB015:
-    //   [count] [count * 4 payload bytes].
-    // The header is sent with the 8051 RR A operation (circular rotate),
-    // not a logical right shift. A zero count exits before the port write.
-    static bool resolveQuadrupletStream(
+    //   [count] [three fixed preamble bytes] [count payload bytes].
+    // The header is sent with 8051 RR A (circular rotate-right), not a shift.
+    // A zero count exits before any host-port write.
+    static bool resolveRotatedHeaderStream(
         const MASSResourceROM& rom,
         MASSResourceBank bank,
         std::uint8_t resourceIndex,
@@ -1306,7 +1307,8 @@ public:
             return false;
 
         MASSIC51PortStreamBlock decoded{};
-        decoded.format = MASSIC51PortStreamFormat::rotatedHeaderAndQuadruplets;
+        decoded.format =
+            MASSIC51PortStreamFormat::rotatedHeaderThreeBytePreambleAndPayload;
         decoded.resourceIndex = resourceIndex;
         decoded.dataAddress = address;
         decoded.sourceCount = bankData[address];
@@ -1317,8 +1319,8 @@ public:
             return true;
         }
 
-        const auto payloadSize = static_cast<std::size_t>(decoded.sourceCount) * 4u;
-        const auto totalSourceSize = 1u + payloadSize;
+        const auto payloadSize = static_cast<std::size_t>(decoded.sourceCount);
+        const auto totalSourceSize = 4u + payloadSize;
         if (static_cast<std::size_t>(address) + totalSourceSize >
             MASSResourceROM::kBankSize)
             return false;
@@ -1326,7 +1328,12 @@ public:
         const auto count = decoded.sourceCount;
         decoded.wireHeader = static_cast<std::uint8_t>(
             (count >> 1u) | static_cast<std::uint8_t>(count << 7u));
-        decoded.payload.assign(bankData + address + 1u,
+        decoded.preamble = {
+            bankData[address + 1u],
+            bankData[address + 2u],
+            bankData[address + 3u]
+        };
+        decoded.payload.assign(bankData + address + 4u,
                                bankData + address + totalSourceSize);
         decoded.sourceBytesConsumed = totalSourceSize;
         decoded.portWriteByteCount = totalSourceSize;
