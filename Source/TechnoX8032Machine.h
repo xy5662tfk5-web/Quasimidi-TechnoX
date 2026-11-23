@@ -435,8 +435,9 @@ public:
         return bulkTransferEntryTrace_[index % bulkTransferEntryTrace_.size()];
     }
 
-    // The watch point is deliberately narrow: PC 0x210F precedes the
-    // 0x211F packet writer call whose output changes with MIDI velocity.
+    // Narrow test watch points: 0x1848 captures fixed-point helper inputs;
+    // 0x210F captures registers immediately before the velocity-sensitive
+    // packet builder that calls the four-byte writer at 0x211F.
     void clearInstructionWatchForTesting() noexcept {
         instructionWatchTrace_.fill(InstructionWatchEvent{});
         instructionWatchCount_ = 0;
@@ -477,7 +478,7 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
-        if (pc == 0x210fu) {
+        if (pc == 0x210fu || pc == 0x1848u) {
             const auto& registers = cpu_.registers();
             auto& event = instructionWatchTrace_[
                 instructionWatchCount_ % instructionWatchTrace_.size()];
