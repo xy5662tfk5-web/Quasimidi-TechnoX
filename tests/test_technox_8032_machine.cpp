@@ -1784,10 +1784,53 @@ int main(int argc, char** argv) {
         // last 512 reads from factory boot and the preceding note.
         firmwareMachine.clearIC51ReadTraceForTesting();
         firmwareMachine.clearInstructionWatchForTesting();
+        firmwareMachine.clearExecutionTraceForTesting();
         const auto secondNotePacketStart = firmwareMachine.soundCommandPacketCount();
         const auto secondNote1848CallStart = firmwareMachine.watchedCallCount(0x1848u);
         runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
                          secondNoteOn.data(), secondNoteOn.size());
+        firmwareMachine.disableExecutionTraceForTesting();
+        const auto secondNoteExecutionTraceCount =
+            firmwareMachine.executionInstructionTraceCountForTesting();
+        const auto secondNoteExecutionTraceRetained =
+            firmwareMachine.executionInstructionTraceRetainedCountForTesting();
+        assert(secondNoteExecutionTraceCount > 0u);
+        std::vector<TechnoX8032Machine::ExecutionInstructionEvent>
+            secondNoteExecutionTrace;
+        secondNoteExecutionTrace.reserve(secondNoteExecutionTraceRetained);
+        bool secondNoteTraceSaw1FC9 = false;
+        bool secondNoteTraceSaw2027 = false;
+        bool secondNoteTraceSaw210F = false;
+        for (std::size_t absolute = secondNoteExecutionTraceCount -
+                 secondNoteExecutionTraceRetained;
+             absolute < secondNoteExecutionTraceCount; ++absolute) {
+            const auto& event =
+                firmwareMachine.executionInstructionTraceAtForTesting(absolute);
+            secondNoteExecutionTrace.push_back(event);
+            secondNoteTraceSaw1FC9 = secondNoteTraceSaw1FC9 ||
+                event.instructionPC == 0x1fc9u;
+            secondNoteTraceSaw2027 = secondNoteTraceSaw2027 ||
+                event.instructionPC == 0x2027u;
+            secondNoteTraceSaw210F = secondNoteTraceSaw210F ||
+                event.instructionPC == 0x210fu;
+            assert(event.opcodeBytes[0] ==
+                   firmwareMachine.readCode(event.instructionPC));
+        }
+        assert(secondNoteTraceSaw1FC9 || secondNoteTraceSaw2027);
+        assert(secondNoteTraceSaw210F);
+        const auto secondNoteExecutionDataCount =
+            firmwareMachine.executionDataAccessTraceCountForTesting();
+        const auto secondNoteExecutionDataRetained =
+            firmwareMachine.executionDataAccessTraceRetainedCountForTesting();
+        std::printf("8032 EXEC-TRACE vel100: instructions=%zu retained=%zu "
+                    "xdata-accesses=%zu retained-xdata=%zu firstPC=%04X "
+                    "saw1FC9=%u saw2027=%u saw210F=%u\\n",
+                    secondNoteExecutionTraceCount, secondNoteExecutionTraceRetained,
+                    secondNoteExecutionDataCount, secondNoteExecutionDataRetained,
+                    static_cast<unsigned>(secondNoteExecutionTrace.front().windowStartPC),
+                    secondNoteTraceSaw1FC9 ? 1u : 0u,
+                    secondNoteTraceSaw2027 ? 1u : 0u,
+                    secondNoteTraceSaw210F ? 1u : 0u);
         const auto secondNotePacketCount =
             firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
         assert(secondNotePacketCount == 549u);
@@ -2063,8 +2106,42 @@ int main(int argc, char** argv) {
         const auto lowerVelocityPacketStart = firmwareMachine.soundCommandPacketCount();
         const auto lowerVelocity1848CallStart = firmwareMachine.watchedCallCount(0x1848u);
         firmwareMachine.clearInstructionWatchForTesting();
+        firmwareMachine.clearExecutionTraceForTesting();
         runRealMidiStage("Same note 64 with lower velocity 50",
                          sameNoteLowerVelocity.data(), sameNoteLowerVelocity.size());
+        firmwareMachine.disableExecutionTraceForTesting();
+        const auto lowerVelocityExecutionTraceCount =
+            firmwareMachine.executionInstructionTraceCountForTesting();
+        const auto lowerVelocityExecutionTraceRetained =
+            firmwareMachine.executionInstructionTraceRetainedCountForTesting();
+        assert(lowerVelocityExecutionTraceCount > 0u);
+        std::vector<TechnoX8032Machine::ExecutionInstructionEvent>
+            lowerVelocityExecutionTrace;
+        lowerVelocityExecutionTrace.reserve(lowerVelocityExecutionTraceRetained);
+        bool lowerVelocityTraceSawPacketBuilder = false;
+        for (std::size_t absolute = lowerVelocityExecutionTraceCount -
+                 lowerVelocityExecutionTraceRetained;
+             absolute < lowerVelocityExecutionTraceCount; ++absolute) {
+            const auto& event =
+                firmwareMachine.executionInstructionTraceAtForTesting(absolute);
+            lowerVelocityExecutionTrace.push_back(event);
+            lowerVelocityTraceSawPacketBuilder = lowerVelocityTraceSawPacketBuilder ||
+                event.instructionPC == 0x210fu;
+            assert(event.opcodeBytes[0] ==
+                   firmwareMachine.readCode(event.instructionPC));
+        }
+        assert(lowerVelocityTraceSawPacketBuilder);
+        const auto lowerVelocityExecutionDataCount =
+            firmwareMachine.executionDataAccessTraceCountForTesting();
+        const auto lowerVelocityExecutionDataRetained =
+            firmwareMachine.executionDataAccessTraceRetainedCountForTesting();
+        std::printf("8032 EXEC-TRACE vel50: instructions=%zu retained=%zu "
+                    "xdata-accesses=%zu retained-xdata=%zu firstPC=%04X "
+                    "saw210F=%u\\n",
+                    lowerVelocityExecutionTraceCount, lowerVelocityExecutionTraceRetained,
+                    lowerVelocityExecutionDataCount, lowerVelocityExecutionDataRetained,
+                    static_cast<unsigned>(lowerVelocityExecutionTrace.front().windowStartPC),
+                    lowerVelocityTraceSawPacketBuilder ? 1u : 0u);
         const auto lowerVelocityPacketCount =
             firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
         assert(lowerVelocityPacketCount == 549u);
@@ -2097,6 +2174,74 @@ int main(int argc, char** argv) {
         assert(lowerVelocity1848InputCount == 2u);
         assert(lowerVelocity1848ReturnCount == 2u);
         assert(foundLowerVelocityPacketBuilder);
+
+        // Compare the real 8032 instruction streams, not just their final
+        // packet bytes. Report the first changed instruction/state without
+        // assigning undocumented meanings to any register or XDATA location.
+        const auto comparedInstructionCount = std::min(
+            secondNoteExecutionTrace.size(), lowerVelocityExecutionTrace.size());
+        bool firstExecutionDifferenceReported = false;
+        for (std::size_t i = 0; i < comparedInstructionCount; ++i) {
+            const auto& high = secondNoteExecutionTrace[i];
+            const auto& low = lowerVelocityExecutionTrace[i];
+            if (high.instructionPC != low.instructionPC ||
+                high.opcodeBytes != low.opcodeBytes) {
+                std::printf("8032 FIRST PATH DIVERGENCE[%zu]: "
+                            "vel100 PC=%04X op=%02X %02X %02X; "
+                            "vel50 PC=%04X op=%02X %02X %02X\\n",
+                            i,
+                            static_cast<unsigned>(high.instructionPC),
+                            static_cast<unsigned>(high.opcodeBytes[0]),
+                            static_cast<unsigned>(high.opcodeBytes[1]),
+                            static_cast<unsigned>(high.opcodeBytes[2]),
+                            static_cast<unsigned>(low.instructionPC),
+                            static_cast<unsigned>(low.opcodeBytes[0]),
+                            static_cast<unsigned>(low.opcodeBytes[1]),
+                            static_cast<unsigned>(low.opcodeBytes[2]));
+                firstExecutionDifferenceReported = true;
+                break;
+            }
+            const bool stateDiffers =
+                high.accumulator != low.accumulator || high.b != low.b ||
+                high.psw != low.psw || high.dptr != low.dptr ||
+                high.registers != low.registers ||
+                high.ram2BAnd30To37 != low.ram2BAnd30To37;
+            if (stateDiffers) {
+                std::printf("8032 FIRST STATE DIVERGENCE[%zu] PC=%04X: "
+                            "A=%02X/%02X B=%02X/%02X PSW=%02X/%02X "
+                            "DPTR=%04X/%04X R2=%02X/%02X RAM2B=%02X/%02X "
+                            "RAM30=%02X/%02X RAM31=%02X/%02X\\n",
+                            i, static_cast<unsigned>(high.instructionPC),
+                            static_cast<unsigned>(high.accumulator),
+                            static_cast<unsigned>(low.accumulator),
+                            static_cast<unsigned>(high.b),
+                            static_cast<unsigned>(low.b),
+                            static_cast<unsigned>(high.psw),
+                            static_cast<unsigned>(low.psw),
+                            static_cast<unsigned>(high.dptr),
+                            static_cast<unsigned>(low.dptr),
+                            static_cast<unsigned>(high.registers[2]),
+                            static_cast<unsigned>(low.registers[2]),
+                            static_cast<unsigned>(high.ram2BAnd30To37[0]),
+                            static_cast<unsigned>(low.ram2BAnd30To37[0]),
+                            static_cast<unsigned>(high.ram2BAnd30To37[1]),
+                            static_cast<unsigned>(low.ram2BAnd30To37[1]),
+                            static_cast<unsigned>(high.ram2BAnd30To37[2]),
+                            static_cast<unsigned>(low.ram2BAnd30To37[2]));
+                firstExecutionDifferenceReported = true;
+                break;
+            }
+        }
+        if (!firstExecutionDifferenceReported) {
+            std::printf("8032 instruction trace prefix identical: compared=%zu "
+                        "vel100=%zu vel50=%zu\\n",
+                        comparedInstructionCount, secondNoteExecutionTrace.size(),
+                        lowerVelocityExecutionTrace.size());
+        }
+        std::printf("8032 XDATA trace totals: vel100=%zu (retained %zu), "
+                    "vel50=%zu (retained %zu)\\n",
+                    secondNoteExecutionDataCount, secondNoteExecutionDataRetained,
+                    lowerVelocityExecutionDataCount, lowerVelocityExecutionDataRetained);
         std::printf("MASS velocity differential: reference=note64/vel100 "
                     "comparison=note64/vel50 packets=%zu\\n",
                     lowerVelocityPacketCount);
