@@ -1272,7 +1272,9 @@ struct MASSIC51PortStreamResource {
     MASSIC51PortStreamFormat format =
         MASSIC51PortStreamFormat::headerAndThreeBytePreambleAndTriplets;
     std::uint8_t resourceIndex = 0;
-    std::uint16_t dataAddress = 0;
+    std::uint16_t dataAddress = 0; // Pointer-table address before any firmware pre-increment.
+    bool skippedLeadingByte = false; // B015 executes INC DPTR before its first count read.
+    std::uint8_t leadingByteValue = 0;
     std::vector<MASSIC51PortStreamBlock> blocks;
     std::uint16_t terminatorAddress = 0;
     std::size_t sourceBytesConsumed = 0; // Includes the zero terminator byte.
@@ -1295,10 +1297,12 @@ public:
             result);
     }
 
-    // Firmware path through IC4 0xB015 repeats:
-    //   [count] [three fixed preamble bytes] [count payload bytes].
-    // The header is sent with 8051 RR A (circular rotate-right), not a shift.
-    // A zero count ends the resource without a host-port write.
+    // Firmware path through IC4 0xB015 first increments DPTR once, then
+    // repeats [count] [three fixed preamble bytes] [count payload bytes].
+    // The byte at the pointer-table address is skipped; the first count is
+    // read from address +1. The header is sent with 8051 RR A (circular
+    // rotate-right), not a shift. A zero count ends the resource without a
+    // host-port write.
     static bool resolveRotatedHeaderStream(
         const MASSResourceROM& rom,
         MASSResourceBank bank,
@@ -1328,6 +1332,13 @@ private:
         decoded.resourceIndex = resourceIndex;
         decoded.dataAddress = address;
         std::size_t cursor = address;
+        if (format == MASSIC51PortStreamFormat::rotatedHeaderThreeBytePreambleAndPayload) {
+            decoded.skippedLeadingByte = true;
+            decoded.leadingByteValue = bankData[cursor];
+            ++cursor; // B015's A3 before its first MOVX count read.
+            if (cursor >= MASSResourceROM::kBankSize)
+                return false;
+        }
 
         while (cursor < MASSResourceROM::kBankSize) {
             const auto count = bankData[cursor];
