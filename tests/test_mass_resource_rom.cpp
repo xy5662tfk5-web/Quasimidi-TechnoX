@@ -942,8 +942,10 @@ void testBankProgramResolver(const char* path) {
     }
     const auto* performanceOnePart13 = catalog.find(2, 10);
     assert(performanceOnePart13 != nullptr);
-    assert(performanceOnePart13->descriptorAddress ==
-           resolvedDescriptors.empty() ? 0 : performanceOnePart13->descriptorAddress);
+    assert(performanceOnePart13->bankNumber == 2);
+    assert(performanceOnePart13->soundNumber == 10);
+    assert(performanceOnePart13->descriptorAddress != 0);
+    assert(performanceOnePart13->stream.commands.size() > 0);
 
     // Performance 1 in TECHNOX.MID uses Part 13 = bank 2 / sound 10 and
     // Part 14 = bank 1 / sound 93. Keep their real IC51 descriptors and
