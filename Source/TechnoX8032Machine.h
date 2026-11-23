@@ -577,7 +577,7 @@ public:
                 (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
-                (address >= 0x3700u && address <= 0x370fu) || address == 0x3098u) {
+                (address >= 0x3700u && address <= 0x370fu)) {
                 auto& watch = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 watch.address = address;
                 watch.value = value;
