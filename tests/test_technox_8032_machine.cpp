@@ -719,8 +719,10 @@ int main(int argc, char** argv) {
             // FX1 selector maps to the 21-entry directory at IC4 0x8423.
             // FX2 has a separate algorithm family and is not resolved here.
             assert(factoryFrames.size() == 300u);
-            std::array<bool, technox::MASSFX1ProgramDirectory::kEntryCount> usedFX1{};
-            std::array<bool, technox::MASSFX2ProgramDirectory::kEntryCount> usedFX2{};
+            std::array<unsigned, technox::MASSFX1ProgramDirectory::kEntryCount>
+                factoryFX1UseCounts{};
+            std::array<unsigned, technox::MASSFX2ProgramDirectory::kEntryCount>
+                factoryFX2UseCounts{};
             for (std::size_t performance = 0; performance < 50u; ++performance) {
                 const auto& commonFrame = factoryFrames[performance * 6u + 1u].bytes;
                 assert(commonFrame.size() == 74u);
@@ -728,31 +730,30 @@ int main(int argc, char** argv) {
                 const auto fx1Index = commonFrame[8u + 0x2au];
                 const auto fx2Index = commonFrame[8u + 0x32u];
                 assert(fx1Index < technox::MASSFX1ProgramDirectory::kEntryCount);
-                assert(fx2Index <= 21u);
-                usedFX1[fx1Index] = true;
-                usedFX2[fx2Index] = true;
+                assert(fx2Index < technox::MASSFX2ProgramDirectory::kEntryCount);
+                ++factoryFX1UseCounts[fx1Index];
+                ++factoryFX2UseCounts[fx2Index];
                 for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
                     assert(fx1Catalog.find(bankIndex, fx1Index) != nullptr);
                     assert(fx2Catalog.find(bankIndex, fx2Index) != nullptr);
                 }
             }
 
-            // Exact FX1 algorithm indices used by the 50 factory Performances.
-            constexpr std::array<bool, technox::MASSFX1ProgramDirectory::kEntryCount>
-                expectedFactoryFX1{{
-                    true, true, true, true, true, true, true,
-                    true, true, true, true, true, true, true,
-                    false, true, false, false, true, true, false
+            // Exact selector histograms extracted from the 50 factory Common
+            // SysEx frames. These are direct zero-based indices in two separate
+            // directories; indices 20 are valid "no Effect" choices when used.
+            constexpr std::array<unsigned, technox::MASSFX1ProgramDirectory::kEntryCount>
+                expectedFactoryFX1UseCounts{{
+                    15, 6, 1, 2, 0, 0, 0, 1, 2, 0, 4,
+                    1, 1, 0, 0, 0, 0, 0, 14, 3, 0
                 }};
-            assert(usedFX1 == expectedFactoryFX1);
-
-            constexpr std::array<bool, technox::MASSFX2ProgramDirectory::kEntryCount>
-                expectedFactoryFX2{{
-                    true, false, false, false, true, true, true,
-                    true, false, true, true, true, false, true,
-                    false, true, false, false, true, false, false
+            constexpr std::array<unsigned, technox::MASSFX2ProgramDirectory::kEntryCount>
+                expectedFactoryFX2UseCounts{{
+                    10, 0, 0, 0, 3, 5, 4, 2, 0, 1, 5,
+                    5, 0, 1, 0, 9, 0, 0, 5, 0, 0
                 }};
-            assert(usedFX2 == expectedFactoryFX2);
+            assert(factoryFX1UseCounts == expectedFactoryFX1UseCounts);
+            assert(factoryFX2UseCounts == expectedFactoryFX2UseCounts);
 
             // Factory Performance 6 ("Fantasy"): FX1 Room (index 0),
             // FX2 Phaser 1 (index 5). These are distinct processor families.
