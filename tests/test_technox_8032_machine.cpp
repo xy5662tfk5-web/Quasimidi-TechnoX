@@ -2127,16 +2127,41 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < secondNote1848Returns.size(); ++i) {
             const auto& high = secondNote1848Returns[i];
             const auto& low = lowerVelocity1848Returns[i];
+            const auto& highInput = secondNote1848Inputs[i];
+            const auto& lowInput = lowerVelocity1848Inputs[i];
             assert(high.instructionPC == low.instructionPC);
-            std::printf("  MASS-1848-OUT[%zu] pc=%04X vel100 A=%02X B=%02X R2=%02X PSW=%02X "
-                        "vel50 A=%02X B=%02X R2=%02X PSW=%02X\\n",
+            assert(high.instructionPC == highInput.returnPC);
+            assert(low.instructionPC == lowInput.returnPC);
+            const auto highModel = technox::MASS1848Arithmetic::execute(
+                highInput.accumulator, highInput.b, highInput.registers[2]);
+            const auto lowModel = technox::MASS1848Arithmetic::execute(
+                lowInput.accumulator, lowInput.b, lowInput.registers[2]);
+            // Live IC4 return A and PSW flags must match the instruction-level
+            // C++ model for both MIDI velocities and both call sites.
+            assert(high.accumulator == highModel.value);
+            assert(low.accumulator == lowModel.value);
+            assert(((high.psw & 0x80u) != 0u) == highModel.carryOut);
+            assert(((low.psw & 0x80u) != 0u) == lowModel.carryOut);
+            assert(((high.psw & 0x04u) != 0u) == highModel.overflow);
+            assert(((low.psw & 0x04u) != 0u) == lowModel.overflow);
+            if (i == 0u) {
+                assert(high.instructionPC == 0x1fc9u);
+                assert(highModel.value == 0x10u && lowModel.value == 0x59u);
+            } else {
+                assert(high.instructionPC == 0x2027u);
+                assert(highModel.value == 0x0fu && lowModel.value == 0x53u);
+            }
+            std::printf("  MASS-1848-OUT[%zu] pc=%04X vel100 A=%02X/model=%02X B=%02X R2=%02X PSW=%02X "
+                        "vel50 A=%02X/model=%02X B=%02X R2=%02X PSW=%02X\\n",
                         i,
                         static_cast<unsigned>(high.instructionPC),
                         static_cast<unsigned>(high.accumulator),
+                        static_cast<unsigned>(highModel.value),
                         static_cast<unsigned>(high.b),
                         static_cast<unsigned>(high.registers[2]),
                         static_cast<unsigned>(high.psw),
                         static_cast<unsigned>(low.accumulator),
+                        static_cast<unsigned>(lowModel.value),
                         static_cast<unsigned>(low.b),
                         static_cast<unsigned>(low.registers[2]),
                         static_cast<unsigned>(low.psw));
