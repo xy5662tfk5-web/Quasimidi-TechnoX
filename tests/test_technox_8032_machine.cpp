@@ -596,6 +596,40 @@ int main(int argc, char** argv) {
             assert(originalFXBackend.receivedCatalog == &fxCatalog);
             fxCatalogEngine.setBackend(&replacementFXBackend);
             assert(replacementFXBackend.receivedCatalog == &fxCatalog);
+
+            // The 50 factory Performance Common blocks store FX1 and FX2 as
+            // direct indices into the 21-entry IC4 directory (not 1-based IDs).
+            // Verify every factory selector resolves in both candidate IC51 banks.
+            assert(factoryFrames.size() == 300u);
+            std::array<bool, technox::MASSFXProgramDirectory::kEntryCount> usedFX{};
+            for (std::size_t performance = 0; performance < 50u; ++performance) {
+                const auto& commonFrame = factoryFrames[performance * 6u + 1u].bytes;
+                assert(commonFrame.size() == 74u);
+                assert(commonFrame[6] == 0x00u); // Common block selector
+                const auto fx1Index = commonFrame[8u + 0x2au];
+                const auto fx2Index = commonFrame[8u + 0x32u];
+                assert(fx1Index < technox::MASSFXProgramDirectory::kEntryCount);
+                assert(fx2Index < technox::MASSFXProgramDirectory::kEntryCount);
+                usedFX[fx1Index] = true;
+                usedFX[fx2Index] = true;
+                for (int bankIndex = 0; bankIndex < 2; ++bankIndex) {
+                    assert(fxCatalog.find(bankIndex, fx1Index) != nullptr);
+                    assert(fxCatalog.find(bankIndex, fx2Index) != nullptr);
+                }
+            }
+            // Entries 0..19 occur in the factory bank; entry 20 is the
+            // firmware's explicit "no Effect" fallback at the upper clamp.
+            for (std::size_t index = 0; index < 20u; ++index)
+                assert(usedFX[index]);
+            assert(!usedFX[20u]);
+
+            // Performance 6 ("Fantasy") carries direct FX indices 0 and 5.
+            const auto& fantasyCommon = factoryFrames[1u * 6u + 1u].bytes;
+            assert(fantasyCommon[5] == 6u);
+            assert(fantasyCommon[8u + 0x2au] == 0u);
+            assert(fantasyCommon[8u + 0x32u] == 5u);
+            assert(fxDirectory.find(fantasyCommon[8u + 0x2au])->index == 0u);
+            assert(fxDirectory.find(fantasyCommon[8u + 0x32u])->index == 5u);
             for (int bankNumber = 0; bankNumber < 2; ++bankNumber) {
                 const auto bank = bankNumber == 0
                     ? technox::MASSResourceBank::bank0
