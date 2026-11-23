@@ -773,11 +773,13 @@ int main(int argc, char** argv) {
             const auto midiBefore = firmwareMachine.watchedCallCount(0x57a8u);
             const auto ic51Before = firmwareMachine.ic51ReadCount();
             const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
+            const auto xdataTraceBefore = firmwareMachine.xdataWatchTraceCount();
             assert(firmwareMachine.scheduleAciaMidiBytes(bytes, byteCount, startCycle));
             const auto instructions = firmwareMachine.runForMachineCycles(2000000u);
             const auto drain = firmwareMachine.runForMachineCycles(5000000u);
             const auto packetAfter = firmwareMachine.soundCommandPacketCount();
             const auto peripheralTraceAfter = firmwareMachine.unmappedBusTraceCount();
+            const auto xdataTraceAfter = firmwareMachine.xdataWatchTraceCount();
             std::printf("Real IC51 MIDI %s: instructions=%zu drain=%zu PC=%04X "
                         "packets=+%zu burstWords=+%zu hostWrites=+%zu "
                         "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu] "
@@ -808,6 +810,23 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.port3),
                             static_cast<unsigned>(event.soundBusMode),
                             static_cast<unsigned>(event.syntheticTestOverlay),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
+            const auto firstXdataTrace = xdataTraceAfter > 4096u
+                ? xdataTraceAfter - 4096u : 0u;
+            for (std::size_t i = std::max(firstXdataTrace, xdataTraceBefore);
+                 i < xdataTraceAfter; ++i) {
+                const auto& event = firmwareMachine.xdataWatchTraceAt(i);
+                std::printf("  MIDI-XDATA %c %04X=%02X pc=%04X stackRet=%04X "
+                            "P2=%02X P3=%02X 8E=%02X cycle=%llu\\n",
+                            event.write ? 'W' : 'R',
+                            static_cast<unsigned>(event.address),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.port2),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.soundBusMode),
                             static_cast<unsigned long long>(event.machineCycle));
             }
             assert(!firmwareMachine.cpuFaulted());
