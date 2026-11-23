@@ -777,7 +777,11 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < bootTransactions; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
             const auto& word = firmwareMachine.soundHostBurstWordAt(i);
-            std::printf("  %03zu: %02X %02X %02X %02X -> %04X pc=%04X ret=%04X\\n",
+            const auto& firstContext = packet.byteContext[0];
+            const auto& lastContext = packet.byteContext[3];
+            std::printf("  %03zu: %02X %02X %02X %02X -> %04X pc=%04X ret=%04X "
+                        "P2/P3/8E=%02X/%02X/%02X->%02X/%02X/%02X "
+                        "reset=%u/%u IC51=%u/%u\\n",
                         i,
                         static_cast<unsigned>(packet.bytes[0]),
                         static_cast<unsigned>(packet.bytes[1]),
@@ -785,7 +789,17 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.bytes[3]),
                         static_cast<unsigned>(word.value),
                         static_cast<unsigned>(packet.instructionPC),
-                        static_cast<unsigned>(packet.returnPC));
+                        static_cast<unsigned>(packet.returnPC),
+                        static_cast<unsigned>(firstContext.port2),
+                        static_cast<unsigned>(firstContext.port3),
+                        static_cast<unsigned>(firstContext.soundBusMode),
+                        static_cast<unsigned>(lastContext.port2),
+                        static_cast<unsigned>(lastContext.port3),
+                        static_cast<unsigned>(lastContext.soundBusMode),
+                        firstContext.soundDeviceResetReleased ? 1u : 0u,
+                        lastContext.soundDeviceResetReleased ? 1u : 0u,
+                        firstContext.ic51Selected ? 1u : 0u,
+                        lastContext.ic51Selected ? 1u : 0u);
         }
 
         // Experimental real-IC51 MIDI path: the controlled external-RAM
