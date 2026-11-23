@@ -101,3 +101,27 @@ The firmware helper at `0x0DB7` writes these four bytes in the order R5, R2, R3,
 The remaining 544 packets form a repeated configuration sweep: 512 transactions return through `0x0E6A`, followed by 32 transactions returning through `0x0E1D`. This is a firmware-observed reconfiguration burst after the five initial note-associated transactions. It is not proof that all 544 writes are voice data or that the five preceding packets alone start audible playback.
 
 The regression now asserts the 549-packet delta and the exact five leading packet byte arrays and return PCs. This turns the observation into a repeatable guard against accidental changes in the emulated firmware bus path. It does not validate an external chip response, sample decoder, or audible output.
+
+
+## Latest differential probe: velocity-only change
+
+The same runtime then receives a second event with the same Part, selected program and pitch (note 64), but velocity is reduced from 100 to 50:
+
+```
+Reference:   90 40 64
+Comparison:  90 40 32
+```
+
+Both events produce 549 SoundHost transactions and 549 burst words. Comparing the first five packets gives:
+
+| Order | Velocity 100 | Velocity 50 | Changed bytes | Return PC |
+|---:|---|---|---|---|
+| 1 | `00 A9 E4 01` | `00 A9 E4 01` | none | `0x0A52` |
+| 2 | `02 01 00 00` | `02 01 00 00` | none | `0x0A52` |
+| 3 | `05 FB D0 03` | `05 FB D0 03` | none | `0x22FB` |
+| 4 | `0A 00 78 00` | `0A 00 98 02` | bytes 2 and 3 | `0x2122` |
+| 5 | `0F 00 00 00` | `0F 00 00 00` | none | `0x236E` |
+
+This is a controlled firmware-level correlation: with Part, program and note held constant, changing only MIDI velocity changes the third and fourth bytes of the packet emitted from the `0x2122` call site. It identifies a promising velocity-sensitive command field, but the hardware meaning, scaling, and whether it directly controls amplitude remain unverified.
+
+The probe is asserted/reported by the regression test in `tests/test_technox_8032_machine.cpp`. As before, the DSP-ready response is synthetic; this proves how IC4 constructs the packet, not how the external sound processor reacts to it.
