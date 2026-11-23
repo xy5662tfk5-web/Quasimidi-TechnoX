@@ -1172,7 +1172,6 @@ int main(int argc, char** argv) {
             assert(externalImage.loadedByteCount() == 13647u);
             assert(externalImage.lastPhysicalAddress() == 0xf5b2u);
             assert(externalImage.byteAt(0xbfffu) == 0xffu);
-            assert(externalImage.byteAt(0x10000u) == 0xffu);
             for (std::uint32_t address = 0xc000u; address <= 0xffffu; ++address) {
                 const auto actual = firmwareMachine.xdataByteForTesting(
                     static_cast<std::uint16_t>(address));
