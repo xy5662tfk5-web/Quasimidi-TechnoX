@@ -1023,6 +1023,53 @@ struct MASSIC51BulkBlockHeader {
     }
 };
 
+ 
+// Candidate inventory for the 0xAF1A bulk-loader lookup. Firmware forms
+// DPTR=2*R7 and reads four bytes, so adjacent indices overlap by two bytes.
+// Only indices actually observed at runtime should be treated as confirmed
+// transfers; this catalog makes the full candidate address space auditable.
+class MASSIC51BulkBlockDirectory {
+public:
+    static constexpr std::size_t kEntryCount = 256;
+
+    bool load(const std::uint8_t* bankData, std::size_t bankSize) noexcept {
+        std::array<MASSIC51BulkBlockHeader, kEntryCount> parsed{};
+        std::uint64_t byteCount = 0;
+        std::size_t wrapped = 0;
+        for (std::size_t index = 0; index < kEntryCount; ++index) {
+            if (!MASSIC51BulkBlockHeader::parse(
+                    bankData, bankSize, static_cast<std::uint8_t>(index),
+                    parsed[index]))
+                return false;
+            const auto count = parsed[index].firmwareByteCount();
+            byteCount += count;
+            if (static_cast<std::uint32_t>(parsed[index].sourceAddress) + count >
+                0x10000u)
+                ++wrapped;
+        }
+        entries_ = parsed;
+        candidateByteCountSum_ = byteCount;
+        sourceWrapCount_ = wrapped;
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+    const MASSIC51BulkBlockHeader* find(std::size_t index) const noexcept {
+        return loaded_ && index < kEntryCount ? &entries_[index] : nullptr;
+    }
+    std::uint64_t candidateByteCountSum() const noexcept {
+        return candidateByteCountSum_;
+    }
+    std::size_t sourceWrapCount() const noexcept { return sourceWrapCount_; }
+
+private:
+    std::array<MASSIC51BulkBlockHeader, kEntryCount> entries_{};
+    std::uint64_t candidateByteCountSum_ = 0;
+    std::size_t sourceWrapCount_ = 0;
+    bool loaded_ = false;
+};
+
 class MASSResourceROM {
 public:
     static constexpr std::size_t kBankSize = 0x10000;
