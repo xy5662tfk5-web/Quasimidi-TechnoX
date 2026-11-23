@@ -2087,9 +2087,16 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < secondNote1848Inputs.size(); ++i) {
             const auto& high = secondNote1848Inputs[i];
             const auto& low = lowerVelocity1848Inputs[i];
-            std::printf("  MASS-1848[%zu] vel100 A=%02X B=%02X R2=%02X R3=%02X R4=%02X "
+            assert(high.returnPC == low.returnPC);
+            assert(high.accumulator == low.accumulator);
+            assert(high.b == low.b);
+            assert(high.registers[3] == low.registers[3]);
+            assert(high.registers[4] == low.registers[4]);
+            assert(high.registers[2] != low.registers[2]);
+            std::printf("  MASS-1848[%zu] ret=%04X vel100 A=%02X B=%02X R2=%02X R3=%02X R4=%02X "
                         "vel50 A=%02X B=%02X R2=%02X R3=%02X R4=%02X\\n",
                         i,
+                        static_cast<unsigned>(high.returnPC),
                         static_cast<unsigned>(high.accumulator),
                         static_cast<unsigned>(high.b),
                         static_cast<unsigned>(high.registers[2]),
