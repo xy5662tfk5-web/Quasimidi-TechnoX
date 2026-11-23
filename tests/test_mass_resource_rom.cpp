@@ -20,6 +20,10 @@ public:
     void setProgramCatalog(const MASSResourceProgramCatalog* catalog) noexcept override {
         catalog_ = catalog;
     }
+    void setExternalSoundMemoryImage(
+        const MASSIC51ExternalSoundMemoryImage* image) noexcept override {
+        receivedExternalMemoryImage = image;
+    }
     void prepare(double, int) override {}
     void noteOn(int, const VoiceSlot& voice) noexcept override {
         const auto* resource = catalog_ != nullptr
@@ -40,6 +44,7 @@ public:
     bool resolvedOnNote = false;
     std::uint16_t descriptorAddress = 0;
     std::size_t commandCount = 0;
+    const MASSIC51ExternalSoundMemoryImage* receivedExternalMemoryImage = nullptr;
 private:
     const MASSResourceProgramCatalog* catalog_ = nullptr;
 };
@@ -961,6 +966,41 @@ void testBankProgramResolver(const char* path) {
 
     MASSResourceROM rom;
     assert(rom.load(image.data(), image.size()));
+
+    // Build the startup sound-memory image using an identity byte map. The
+    // TechnoX-specific 0xADDD permutation is verified against real firmware
+    // separately in test_technox_8032_machine.cpp.
+    constexpr std::size_t imageFirmwareCodeSize =
+        MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress +
+        MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize;
+    std::array<std::uint8_t, imageFirmwareCodeSize> imageFirmwareCode{};
+    for (std::size_t i = 0; i < MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize; ++i)
+        imageFirmwareCode[MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress + i] =
+            static_cast<std::uint8_t>(i);
+
+    MASSIC51ExternalSoundMemoryImage externalImage;
+    assert(!externalImage.isLoaded());
+    assert(!externalImage.load(rom, nullptr, imageFirmwareCode.size()));
+    assert(externalImage.load(
+        rom, imageFirmwareCode.data(), imageFirmwareCode.size()));
+    assert(externalImage.isLoaded());
+    assert(externalImage.baseAddress() == 0xc000u);
+    assert(externalImage.endAddress() == 0xffffu);
+    assert(externalImage.size() == 0x4000u);
+    assert(externalImage.sourceBank() == MASSResourceBank::bank0);
+    assert(externalImage.sourceHeader().sourceAddress == 0x3c64u);
+    assert(externalImage.sourceHeader().firmwareByteCount() == 13647u);
+    assert(externalImage.loadedByteCount() == 13647u);
+    assert(externalImage.lastPhysicalAddress() == 0xf5b2u);
+    assert(externalImage.byteAt(0xbfffu) == 0xffu);
+    for (std::size_t i = 0; i < externalImage.loadedByteCount(); ++i) {
+        const auto expected = rom.dataForBank(MASSResourceBank::bank0)[
+            static_cast<std::uint16_t>(0x3c64u + i)];
+        const auto physicalOffset = (i & ~std::size_t{0xffu}) + (i & 0xffu);
+        assert(externalImage.data()[physicalOffset] == expected);
+    }
+    assert(externalImage.data()[0x3600u - 1u] == 0u);
+
     std::set<std::pair<int, int>> resolvedPairs;
     std::set<std::pair<int, std::uint16_t>> resolvedDescriptors;
     for (int bankNumber = 0; bankNumber < 4; ++bankNumber) {
@@ -1033,7 +1073,10 @@ void testBankProgramResolver(const char* path) {
     ResourceCatalogProbeBackend probeBackend;
     MASSAudioEngine resourceAwareEngine(&probeBackend);
     resourceAwareEngine.setProgramCatalog(&catalog);
+    resourceAwareEngine.setExternalSoundMemoryImage(&externalImage);
     assert(resourceAwareEngine.programCatalog() == &catalog);
+    assert(resourceAwareEngine.externalSoundMemoryImage() == &externalImage);
+    assert(probeBackend.receivedExternalMemoryImage == &externalImage);
     assert(resourceAwareEngine.setPartParameter(12, PartParameter::bankNumber, 2));
     assert(resourceAwareEngine.setPartParameter(12, PartParameter::soundNumber, 10));
     resourceAwareEngine.noteOn(12, 1, 60, 100);
@@ -1044,6 +1087,7 @@ void testBankProgramResolver(const char* path) {
     // Replacing the backend while stopped must preserve the same catalog handoff.
     ResourceCatalogProbeBackend replacementBackend;
     resourceAwareEngine.setBackend(&replacementBackend);
+    assert(replacementBackend.receivedExternalMemoryImage == &externalImage);
     resourceAwareEngine.noteOn(12, 1, 61, 100);
     assert(replacementBackend.resolvedOnNote);
     assert(replacementBackend.descriptorAddress == performanceOnePart13->descriptorAddress);
