@@ -18,6 +18,21 @@ Corroborating product references:
 - Quasimidi chip-family association: https://en.wikipedia.org/wiki/List_of_sound_chips
 - Recent Quasimidi architecture discussion: https://gearspace.com/threads/quasimidi-architecture-custom-firmware-jorg-schaaf-emulation-community-sam9407-dev-kits-prototypes.1468196/
 
+## New comparison after reconstructing the IC51 boot transfer
+
+A complete 16-KiB XDATA image can now be reconstructed from IC51 bank 0, table selector R7=`0x48` (source `0x3C64`, transfer length 13,647 bytes), using the IC4 byte-remap table at `0xADDD`. The reconstructed C000-FFFF window matches the image produced by executing IC4, byte-for-byte. This validates the 8032-side external-memory copy and its address permutation.
+
+That result does **not** identify the image as a waveform bank. A contemporary April 1995 review of the TechnoX describes its sample memory as six megabytes and lists 21-note polyphony, 16 Parts, 512 ROM patches and 24 ROM drum sets. The 16-KiB C000-FFFF transfer is therefore much smaller than the advertised sample-memory capacity and should be treated as a boot-time control/program/resource image until a later device-side read path proves otherwise. Source: *The Mix*, “Revolt into style”, April 1995, https://www.muzines.co.uk/articles/revolt-into-style/12193?theme=2 (see the Technox “Overall features” and “Spec check” sections).
+
+The SAM9407 data sheet gives a useful *discriminator*, not a confirmation:
+- Its P16 processor executes from external memory; the synthesis DSP shares external ROM/RAM via an MMU. Sample data and delay lines reside in external ROM/SRAM/DRAM.
+- Its host interface is a 16-bit data bus with three address inputs A0-A2. Registers 0/1 are MPU-401 UART, 2/3 are a 16-bit burst-data port, and 4-7 are auxiliary/game-compatible registers.
+- In BOOT mode, the internal bootstrap expects 256 words (512 bytes) over the 16-bit burst port, stores them at external address 0x0100-0x01FF, then transfers execution to 0x0100.
+
+The TechnoX 8032 trace currently shows a different-looking set of operations: a 13,647-byte IC51-to-C000 paged memory copy and 544 four-byte command-port transactions at XDATA 0x8000-0x8003. The documented SAM9407 interface has not yet been mapped pin-for-pin to the 8032 P2/P3/SFR 0x8E bus controls. In particular, the 512-word bootstrap sequence in the data sheet must not be conflated with the 544 captured four-byte transactions. The IC4 C000 transfer might be shared P16/DSP program or data memory, or another resource buffer; the current trace alone cannot distinguish those roles.
+
+The next discriminating firmware/hardware test is to map the 8032 port and P3 strobes to candidate SAM9407 pins (CS/, RD/, WR/, A0-A2, RESET/, BOOT, S0-S1 and WA/WD buses), then establish whether the external C000-FFFF image is read by the candidate chip after the upload. Until that is done, SAM9407 remains an interface hypothesis rather than an identified TechnoX component.
+
 ## Comparison with current firmware evidence
 
 - IC4 exposes an undocumented four-byte external register window at 0x8000-0x8003. The project currently records sequential writes as neutral bytes and paired 16-bit words; it does not assign SAM9407 register meanings.
