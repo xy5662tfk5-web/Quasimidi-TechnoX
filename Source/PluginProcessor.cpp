@@ -134,10 +134,14 @@ void QuasimidiTechnoXAudioProcessor::initialiseCommonControlsFromBank() noexcept
         const int arpSpeed = frame[8 + 0x3D];
         if (performanceMode <= 3)
             commonValues[performanceIndex][0].store(performanceMode, std::memory_order_relaxed);
-        if (fx1Type <= 21)
-            commonValues[performanceIndex][1].store(fx1Type, std::memory_order_relaxed);
-        if (fx2Type <= 21)
-            commonValues[performanceIndex][2].store(fx2Type, std::memory_order_relaxed);
+        if (fx1Type <= 127)
+            commonValues[performanceIndex][1].store(
+                std::min(fx1Type, technox::MASSCommonControlStore::kFXTypeMaximumIndex),
+                std::memory_order_relaxed);
+        if (fx2Type <= 127)
+            commonValues[performanceIndex][2].store(
+                std::min(fx2Type, technox::MASSCommonControlStore::kFXTypeMaximumIndex),
+                std::memory_order_relaxed);
         commonValues[performanceIndex][3].store(arpPacked & 0x03, std::memory_order_relaxed);
         commonValues[performanceIndex][4].store(arpSpeed, std::memory_order_relaxed);
     }
@@ -464,9 +468,16 @@ bool QuasimidiTechnoXAudioProcessor::setCommonControlRaw(
     int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept
 {
     const auto index = static_cast<std::size_t>(control);
-    constexpr int maxima[5] = {3, 21, 21, 3, 127};
-    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 5 ||
-        rawValue < 0 || rawValue > maxima[index])
+    constexpr int maxima[5] = {
+        3, technox::MASSCommonControlStore::kFXTypeMaximumIndex,
+        technox::MASSCommonControlStore::kFXTypeMaximumIndex, 3, 127
+    };
+    if (performanceIndex < 0 || performanceIndex >= 50 || index >= 5 || rawValue < 0)
+        return false;
+    if (control == technox::MASSCommonControl::fx1Type ||
+        control == technox::MASSCommonControl::fx2Type)
+        rawValue = std::min(rawValue, technox::MASSCommonControlStore::kFXTypeMaximumIndex);
+    else if (rawValue > maxima[index])
         return false;
     commonValues[static_cast<std::size_t>(performanceIndex)][index].store(rawValue, std::memory_order_release);
     if (performanceIndex == getCurrentProgram()) {
@@ -632,7 +643,10 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
             }
 
     if (magic == kStateMagicV4) {
-        constexpr int maxima[5] = {3, 21, 21, 3, 127};
+        constexpr int maxima[5] = {
+            3, technox::MASSCommonControlStore::kFXTypeMaximumIndex,
+            technox::MASSCommonControlStore::kFXTypeMaximumIndex, 3, 127
+        };
         for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
             for (std::size_t control = 0; control < 5; ++control) {
                 const int value = static_cast<unsigned char>(stream.readByte());
@@ -642,7 +656,10 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
             }
     } else if (magic == kStateMagicV3) {
         initialiseCommonControlsFromBank();
-        constexpr int oldMaxima[4] = {21, 21, 3, 127};
+        constexpr int oldMaxima[4] = {
+            technox::MASSCommonControlStore::kFXTypeMaximumIndex,
+            technox::MASSCommonControlStore::kFXTypeMaximumIndex, 3, 127
+        };
         for (std::size_t performance = 0; performance < commonValues.size(); ++performance)
             for (std::size_t control = 0; control < 4; ++control) {
                 const int value = static_cast<unsigned char>(stream.readByte());
