@@ -3135,11 +3135,17 @@ int main(int argc, char** argv) {
             pitchPathWriterSnapshots[pitchPathWriterSnapshotCount++] = event;
         }
         assert(pitchPathWriterSnapshotCount == 2u);
+        constexpr std::array<std::array<std::uint8_t, 4>, 2>
+            expectedPitchHandlerPackets{{
+                {{0x00u, 0x71u, 0x01u, 0x02u}},
+                {{0x02u, 0x01u, 0x00u, 0x00u}}
+            }};
         for (std::size_t i = 0; i < pitchPathWriterSnapshots.size(); ++i) {
             assert(pitchPathWriterSnapshots[i].returnPC == 0x1e6au);
             const auto& packet = firmwareMachine.soundCommandPacketAt(
                 pitchPathPacketStart + i);
             assert(packet.returnPC == 0x0a52u);
+            assert(packet.bytes == expectedPitchHandlerPackets[i]);
             assert(pitchPathWriterSnapshots[i].registers[5] == packet.bytes[0]);
             assert(pitchPathWriterSnapshots[i].registers[2] == packet.bytes[1]);
             assert(pitchPathWriterSnapshots[i].registers[3] == packet.bytes[2]);
