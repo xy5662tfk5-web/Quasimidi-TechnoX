@@ -2202,6 +2202,97 @@ int main(int argc, char** argv) {
         assert(lowerVelocity1848ReturnCount == 2u);
         assert(foundLowerVelocityPacketBuilder);
 
+        // Dump the complete bounded windows side-by-side so the first
+        // velocity-dependent store can be followed to its later consumers.
+        const auto traceDumpCount = std::min(
+            secondNoteExecutionTrace.size(), lowerVelocityExecutionTrace.size());
+        for (std::size_t i = 0; i < traceDumpCount; ++i) {
+            const auto& high = secondNoteExecutionTrace[i];
+            const auto& low = lowerVelocityExecutionTrace[i];
+            std::printf("8032 STEP[%02zu] PC=%04X op=%02X %02X %02X "
+                        "A=%02X/%02X B=%02X/%02X PSW=%02X/%02X "
+                        "DPTR=%04X/%04X RET=%04X/%04X BANK=%02X/%02X "
+                        "R=%02X %02X %02X %02X %02X %02X %02X %02X/"
+                        "%02X %02X %02X %02X %02X %02X %02X %02X "
+                        "RAM2B=%02X/%02X RAM30-37=",
+                        i, static_cast<unsigned>(high.instructionPC),
+                        static_cast<unsigned>(high.opcodeBytes[0]),
+                        static_cast<unsigned>(high.opcodeBytes[1]),
+                        static_cast<unsigned>(high.opcodeBytes[2]),
+                        static_cast<unsigned>(high.accumulator),
+                        static_cast<unsigned>(low.accumulator),
+                        static_cast<unsigned>(high.b),
+                        static_cast<unsigned>(low.b),
+                        static_cast<unsigned>(high.psw),
+                        static_cast<unsigned>(low.psw),
+                        static_cast<unsigned>(high.dptr),
+                        static_cast<unsigned>(low.dptr),
+                        static_cast<unsigned>(high.stackReturnPC),
+                        static_cast<unsigned>(low.stackReturnPC),
+                        static_cast<unsigned>(high.registerBankBase),
+                        static_cast<unsigned>(low.registerBankBase),
+                        static_cast<unsigned>(high.registers[0]),
+                        static_cast<unsigned>(high.registers[1]),
+                        static_cast<unsigned>(high.registers[2]),
+                        static_cast<unsigned>(high.registers[3]),
+                        static_cast<unsigned>(high.registers[4]),
+                        static_cast<unsigned>(high.registers[5]),
+                        static_cast<unsigned>(high.registers[6]),
+                        static_cast<unsigned>(high.registers[7]),
+                        static_cast<unsigned>(low.registers[0]),
+                        static_cast<unsigned>(low.registers[1]),
+                        static_cast<unsigned>(low.registers[2]),
+                        static_cast<unsigned>(low.registers[3]),
+                        static_cast<unsigned>(low.registers[4]),
+                        static_cast<unsigned>(low.registers[5]),
+                        static_cast<unsigned>(low.registers[6]),
+                        static_cast<unsigned>(low.registers[7]),
+                        static_cast<unsigned>(high.ram2BAnd30To37[0]),
+                        static_cast<unsigned>(low.ram2BAnd30To37[0]));
+            for (std::size_t byte = 1; byte < 9; ++byte)
+                std::printf(" %02X/%02X",
+                            static_cast<unsigned>(high.ram2BAnd30To37[byte]),
+                            static_cast<unsigned>(low.ram2BAnd30To37[byte]));
+            std::printf(" P2=%02X/%02X P3=%02X/%02X 8E=%02X/%02X\\n",
+                        static_cast<unsigned>(high.port2),
+                        static_cast<unsigned>(low.port2),
+                        static_cast<unsigned>(high.port3),
+                        static_cast<unsigned>(low.port3),
+                        static_cast<unsigned>(high.soundBusMode),
+                        static_cast<unsigned>(low.soundBusMode));
+        }
+        for (std::size_t i = 0; i < std::max(
+                 secondNoteDataTrace.size(), lowerVelocityDataTrace.size()); ++i) {
+            if (i < secondNoteDataTrace.size()) {
+                const auto& event = secondNoteDataTrace[i];
+                std::printf("8032 XDATA100[%02zu] PC=%04X RET=%04X %c %04X=%02X "
+                            "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
+                            i, static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            event.write ? 'W' : 'R',
+                            static_cast<unsigned>(event.address),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.port2),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.soundBusMode),
+                            event.ic51Selected ? 1u : 0u);
+            }
+            if (i < lowerVelocityDataTrace.size()) {
+                const auto& event = lowerVelocityDataTrace[i];
+                std::printf("8032 XDATA050[%02zu] PC=%04X RET=%04X %c %04X=%02X "
+                            "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
+                            i, static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            event.write ? 'W' : 'R',
+                            static_cast<unsigned>(event.address),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.port2),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.soundBusMode),
+                            event.ic51Selected ? 1u : 0u);
+            }
+        }
+
         // Compare the real 8032 instruction streams, not just their final
         // packet bytes. Report the first changed instruction/state without
         // assigning undocumented meanings to any register or XDATA location.
