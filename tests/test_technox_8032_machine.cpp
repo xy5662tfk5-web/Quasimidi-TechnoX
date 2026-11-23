@@ -2167,126 +2167,6 @@ int main(int argc, char** argv) {
             std::printf("\\n");
         }
 
-        // Isolate the pitch-parameter handler's nested packet path. The
-        // 1C61 handler stores the seven-byte group-08 record in the active
-        // Part slot, then calls 09B9 from 1E67. Capture two invocations through
-        // the 0A4F writer so the exact slot reads/writes can be matched to IC51.
-        const std::array<std::uint8_t, 3> pitchPathProbe{{0x90u, 0x41u, 0x64u}};
-        firmwareMachine.clearInstructionWatchForTesting();
-        firmwareMachine.armExecutionTraceWindowForTesting(0x1e67u, 0x0a4fu, 2u);
-        const auto pitchPathPacketStart = firmwareMachine.soundCommandPacketCount();
-        runRealMidiStage("Note 65 velocity 100: trace pitch handler 1E67 to writer 0A4F",
-                         pitchPathProbe.data(), pitchPathProbe.size());
-        firmwareMachine.disableExecutionTraceForTesting();
-
-        const auto pitchPathInstructionCount =
-            firmwareMachine.executionInstructionTraceCountForTesting();
-        const auto pitchPathInstructionRetained =
-            firmwareMachine.executionInstructionTraceRetainedCountForTesting();
-        const auto pitchPathDataCount =
-            firmwareMachine.executionDataAccessTraceCountForTesting();
-        const auto pitchPathDataRetained =
-            firmwareMachine.executionDataAccessTraceRetainedCountForTesting();
-        assert(pitchPathInstructionCount > 0u);
-        std::vector<TechnoX8032Machine::ExecutionInstructionEvent>
-            pitchPathInstructions;
-        pitchPathInstructions.reserve(pitchPathInstructionRetained);
-        std::size_t pitchPathStartCount = 0;
-        std::size_t pitchPathWriterCount = 0;
-        for (std::size_t absolute = pitchPathInstructionCount -
-                 pitchPathInstructionRetained;
-             absolute < pitchPathInstructionCount; ++absolute) {
-            const auto& event =
-                firmwareMachine.executionInstructionTraceAtForTesting(absolute);
-            pitchPathInstructions.push_back(event);
-            if (event.instructionPC == 0x1e67u) ++pitchPathStartCount;
-            if (event.instructionPC == 0x0a4fu) ++pitchPathWriterCount;
-            assert(event.opcodeBytes[0] ==
-                   firmwareMachine.readCode(event.instructionPC));
-        }
-        assert(pitchPathStartCount == 2u);
-        assert(pitchPathWriterCount == 2u);
-
-        std::vector<TechnoX8032Machine::ExecutionDataAccessEvent>
-            pitchPathData;
-        pitchPathData.reserve(pitchPathDataRetained);
-        for (std::size_t absolute = pitchPathDataCount -
-                 pitchPathDataRetained;
-             absolute < pitchPathDataCount; ++absolute) {
-            pitchPathData.push_back(
-                firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
-        }
-
-        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
-            pitchPathWriterSnapshots{};
-        std::size_t pitchPathWriterSnapshotCount = 0;
-        for (std::size_t i = 0;
-             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
-            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
-            if (event.instructionPC != 0x0a4fu) continue;
-            assert(pitchPathWriterSnapshotCount < pitchPathWriterSnapshots.size());
-            pitchPathWriterSnapshots[pitchPathWriterSnapshotCount++] = event;
-        }
-        assert(pitchPathWriterSnapshotCount == 2u);
-        for (std::size_t i = 0; i < pitchPathWriterSnapshots.size(); ++i) {
-            assert(pitchPathWriterSnapshots[i].returnPC == 0x1e6au);
-            const auto& packet = firmwareMachine.soundCommandPacketAt(
-                pitchPathPacketStart + i);
-            assert(packet.returnPC == 0x0a52u);
-            assert(pitchPathWriterSnapshots[i].registers[5] == packet.bytes[0]);
-            assert(pitchPathWriterSnapshots[i].registers[2] == packet.bytes[1]);
-            assert(pitchPathWriterSnapshots[i].registers[3] == packet.bytes[2]);
-            assert(pitchPathWriterSnapshots[i].registers[4] == packet.bytes[3]);
-        }
-
-        std::printf("PITCH-HANDLER TRACE: instructions=%zu retained=%zu "
-                    "xdata=%zu retained-xdata=%zu start=1E67 windows=%zu "
-                    "writer=0A4F windows=%zu\\n",
-                    pitchPathInstructionCount, pitchPathInstructionRetained,
-                    pitchPathDataCount, pitchPathDataRetained,
-                    pitchPathStartCount, pitchPathWriterCount);
-        for (const auto& event : pitchPathInstructions) {
-            if (event.instructionPC == 0x1e67u) {
-                std::printf("  PITCH-WINDOW entry PC=%04X op=%02X %02X %02X "
-                            "RET=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
-                            "R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X "
-                            "RAM2B=%02X RAM30-37=",
-                            static_cast<unsigned>(event.instructionPC),
-                            static_cast<unsigned>(event.opcodeBytes[0]),
-                            static_cast<unsigned>(event.opcodeBytes[1]),
-                            static_cast<unsigned>(event.opcodeBytes[2]),
-                            static_cast<unsigned>(event.stackReturnPC),
-                            static_cast<unsigned>(event.accumulator),
-                            static_cast<unsigned>(event.b),
-                            static_cast<unsigned>(event.psw),
-                            static_cast<unsigned>(event.dptr),
-                            static_cast<unsigned>(event.registers[2]),
-                            static_cast<unsigned>(event.registers[3]),
-                            static_cast<unsigned>(event.registers[4]),
-                            static_cast<unsigned>(event.registers[5]),
-                            static_cast<unsigned>(event.registers[6]),
-                            static_cast<unsigned>(event.registers[7]),
-                            static_cast<unsigned>(event.ram2BAnd30To37[0]));
-                for (std::size_t byte = 1; byte < event.ram2BAnd30To37.size(); ++byte)
-                    std::printf(" %02X",
-                                static_cast<unsigned>(event.ram2BAnd30To37[byte]));
-                std::printf("\\n");
-            }
-        }
-        for (const auto& event : pitchPathData) {
-            std::printf("  PITCH-XDATA PC=%04X RET=%04X %c %04X=%02X "
-                        "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
-                        static_cast<unsigned>(event.instructionPC),
-                        static_cast<unsigned>(event.stackReturnPC),
-                        event.write ? 'W' : 'R',
-                        static_cast<unsigned>(event.address),
-                        static_cast<unsigned>(event.value),
-                        static_cast<unsigned>(event.port2),
-                        static_cast<unsigned>(event.port3),
-                        static_cast<unsigned>(event.soundBusMode),
-                        event.ic51Selected ? 1u : 0u);
-        }
-
         // Differentially hold pitch/Part/program constant and change only
         // velocity. The preceding distinct-note probe used note 64 at velocity
         // 100; this sends note 64 again at velocity 50 with the same ready-state
@@ -3194,6 +3074,126 @@ int main(int argc, char** argv) {
         } else {
             std::printf("MIDI bytes were received, but this fixture emitted no SoundHost host transaction yet.\\n");
         }
+        // Isolate the pitch-parameter handler's nested packet path. The
+        // 1C61 handler stores the seven-byte group-08 record in the active
+        // Part slot, then calls 09B9 from 1E67. Capture two invocations through
+        // the 0A4F writer so the exact slot reads/writes can be matched to IC51.
+        const std::array<std::uint8_t, 3> pitchPathProbe{{0x90u, 0x41u, 0x64u}};
+        firmwareMachine.clearInstructionWatchForTesting();
+        firmwareMachine.armExecutionTraceWindowForTesting(0x1e67u, 0x0a4fu, 2u);
+        const auto pitchPathPacketStart = firmwareMachine.soundCommandPacketCount();
+        runRealMidiStage("Note 65 velocity 100: trace pitch handler 1E67 to writer 0A4F",
+                         pitchPathProbe.data(), pitchPathProbe.size());
+        firmwareMachine.disableExecutionTraceForTesting();
+
+        const auto pitchPathInstructionCount =
+            firmwareMachine.executionInstructionTraceCountForTesting();
+        const auto pitchPathInstructionRetained =
+            firmwareMachine.executionInstructionTraceRetainedCountForTesting();
+        const auto pitchPathDataCount =
+            firmwareMachine.executionDataAccessTraceCountForTesting();
+        const auto pitchPathDataRetained =
+            firmwareMachine.executionDataAccessTraceRetainedCountForTesting();
+        assert(pitchPathInstructionCount > 0u);
+        std::vector<TechnoX8032Machine::ExecutionInstructionEvent>
+            pitchPathInstructions;
+        pitchPathInstructions.reserve(pitchPathInstructionRetained);
+        std::size_t pitchPathStartCount = 0;
+        std::size_t pitchPathWriterCount = 0;
+        for (std::size_t absolute = pitchPathInstructionCount -
+                 pitchPathInstructionRetained;
+             absolute < pitchPathInstructionCount; ++absolute) {
+            const auto& event =
+                firmwareMachine.executionInstructionTraceAtForTesting(absolute);
+            pitchPathInstructions.push_back(event);
+            if (event.instructionPC == 0x1e67u) ++pitchPathStartCount;
+            if (event.instructionPC == 0x0a4fu) ++pitchPathWriterCount;
+            assert(event.opcodeBytes[0] ==
+                   firmwareMachine.readCode(event.instructionPC));
+        }
+        assert(pitchPathStartCount == 2u);
+        assert(pitchPathWriterCount == 2u);
+
+        std::vector<TechnoX8032Machine::ExecutionDataAccessEvent>
+            pitchPathData;
+        pitchPathData.reserve(pitchPathDataRetained);
+        for (std::size_t absolute = pitchPathDataCount -
+                 pitchPathDataRetained;
+             absolute < pitchPathDataCount; ++absolute) {
+            pitchPathData.push_back(
+                firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
+        }
+
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            pitchPathWriterSnapshots{};
+        std::size_t pitchPathWriterSnapshotCount = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC != 0x0a4fu) continue;
+            assert(pitchPathWriterSnapshotCount < pitchPathWriterSnapshots.size());
+            pitchPathWriterSnapshots[pitchPathWriterSnapshotCount++] = event;
+        }
+        assert(pitchPathWriterSnapshotCount == 2u);
+        for (std::size_t i = 0; i < pitchPathWriterSnapshots.size(); ++i) {
+            assert(pitchPathWriterSnapshots[i].returnPC == 0x1e6au);
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                pitchPathPacketStart + i);
+            assert(packet.returnPC == 0x0a52u);
+            assert(pitchPathWriterSnapshots[i].registers[5] == packet.bytes[0]);
+            assert(pitchPathWriterSnapshots[i].registers[2] == packet.bytes[1]);
+            assert(pitchPathWriterSnapshots[i].registers[3] == packet.bytes[2]);
+            assert(pitchPathWriterSnapshots[i].registers[4] == packet.bytes[3]);
+        }
+
+        std::printf("PITCH-HANDLER TRACE: instructions=%zu retained=%zu "
+                    "xdata=%zu retained-xdata=%zu start=1E67 windows=%zu "
+                    "writer=0A4F windows=%zu\\n",
+                    pitchPathInstructionCount, pitchPathInstructionRetained,
+                    pitchPathDataCount, pitchPathDataRetained,
+                    pitchPathStartCount, pitchPathWriterCount);
+        for (const auto& event : pitchPathInstructions) {
+            if (event.instructionPC == 0x1e67u) {
+                std::printf("  PITCH-WINDOW entry PC=%04X op=%02X %02X %02X "
+                            "RET=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
+                            "R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X "
+                            "RAM2B=%02X RAM30-37=",
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.opcodeBytes[0]),
+                            static_cast<unsigned>(event.opcodeBytes[1]),
+                            static_cast<unsigned>(event.opcodeBytes[2]),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.accumulator),
+                            static_cast<unsigned>(event.b),
+                            static_cast<unsigned>(event.psw),
+                            static_cast<unsigned>(event.dptr),
+                            static_cast<unsigned>(event.registers[2]),
+                            static_cast<unsigned>(event.registers[3]),
+                            static_cast<unsigned>(event.registers[4]),
+                            static_cast<unsigned>(event.registers[5]),
+                            static_cast<unsigned>(event.registers[6]),
+                            static_cast<unsigned>(event.registers[7]),
+                            static_cast<unsigned>(event.ram2BAnd30To37[0]));
+                for (std::size_t byte = 1; byte < event.ram2BAnd30To37.size(); ++byte)
+                    std::printf(" %02X",
+                                static_cast<unsigned>(event.ram2BAnd30To37[byte]));
+                std::printf("\\n");
+            }
+        }
+        for (const auto& event : pitchPathData) {
+            std::printf("  PITCH-XDATA PC=%04X RET=%04X %c %04X=%02X "
+                        "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.stackReturnPC),
+                        event.write ? 'W' : 'R',
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.port3),
+                        static_cast<unsigned>(event.soundBusMode),
+                        event.ic51Selected ? 1u : 0u);
+        }
+
     }
     return 0;
 }
