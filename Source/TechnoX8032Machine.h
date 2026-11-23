@@ -105,6 +105,11 @@ public:
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
         bool write = false;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
         std::uint64_t machineCycle = 0;
     };
     struct UnmappedBusEvent {
@@ -557,11 +562,17 @@ public:
                 ++soundMemoryReadTraceCount_;
             }
             const auto value = xdata_[address];
-            if (address >= 0x7bd4u && address <= 0x7bd7u) {
+            if ((address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
                 event.value = value;
                 event.write = false;
+                event.instructionPC = instructionPC;
+                event.stackReturnPC = currentStackReturnPC();
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
                 event.machineCycle = elapsedMachineCycles_;
                 ++xdataWatchTraceCount_;
             }
@@ -653,11 +664,17 @@ public:
         }
         if (isXdataRam(address)) {
             xdata_[address] = value;
-            if (address >= 0x7bd4u && address <= 0x7bd7u) {
+            if ((address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
                 event.value = value;
                 event.write = true;
+                event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                event.stackReturnPC = currentStackReturnPC();
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.soundBusMode = internal_[0x8e];
                 event.machineCycle = elapsedMachineCycles_;
                 ++xdataWatchTraceCount_;
             }
@@ -1097,7 +1114,7 @@ private:
     std::uint16_t lastIC51ReadAddress_ = 0;
     std::array<IC51ReadEvent, 512> ic51ReadTrace_{};
     std::size_t ic51ReadTraceCount_ = 0;
-    std::array<XdataWatchEvent, 512> xdataWatchTrace_{};
+    std::array<XdataWatchEvent, 4096> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
     std::size_t unmappedBusTraceCount_ = 0;
