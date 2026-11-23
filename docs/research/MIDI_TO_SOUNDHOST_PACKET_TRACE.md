@@ -330,3 +330,23 @@ For the two live passes, the same normalized step `0x000D` gives:
 The arithmetic helper has standalone positive, negative, high-byte-mask, and zero-step tests. The live 8032 regression independently reconstructs each input from its exact XDATA reads, obtains the 16-bit multiplier from the captured R5:R4 state at PC `0x09DA`, runs the model, and asserts that its output equals R2:R3:R4 at the corresponding packet writer. Thus the model is checked against both real slot passes, not just synthetic inputs.
 
 The test fixture still supplies a synthetic DSP-ready response. These assertions prove the firmware's slot transform and packet construction; they do not establish the external processor's semantic interpretation or audible playback.
+
+
+
+## Initial five Note On-associated packets: handler-family classification
+
+The observed five-packet prefix remains pinned byte-for-byte and to its writer return PCs. The current handler analysis classifies four distinct producer paths (the first two packets share the same slot-update routine):
+
+| Order | Packet | Writer callsite / return | Recovered producer path | Remaining uncertainty |
+|---:|---|---|---|---|
+| 1 | `00 A9 E4 01` | `0x0A4F / 0x0A52` | `0x09B9` 24-bit slot interpolation | Physical meaning/units of the updated 24-bit slot value |
+| 2 | `02 01 00 00` | `0x0A4F / 0x0A52` | Second pass through the same `0x09B9` routine, different slot | Same semantic uncertainty |
+| 3 | `05 FB D0 03` | `0x22F8 / 0x22FB` | Shared packet exit inside the `0x224C` multi-branch command handler | Need the live entry/dispatch trace to distinguish group-00 extended-record path from group-18 four-byte path |
+| 4 | `0A 00 78 00` | `0x211F / 0x2122` | Velocity-sensitive arithmetic/packing path ending at `0x210F` | Meaning of the two velocity-dependent payload bytes at the external device |
+| 5 | `0F 00 00 00` | `0x236B / 0x236E` | Terminal group-0x20 handler at `0x2301` | Meaning of the terminal/control packet to the external processor |
+
+The static disassembly of the `0x224C` handler shows it reads the command opcode plus three payload bytes into the active register bank, masks the last byte to three bits, stages the command, then reaches the shared `0x22F8` writer call. Both the group-00 extended path and group-18 four-byte path can enter this handler, so the packet values alone do not establish which dispatch branch generated packet 3.
+
+The terminal `0x2301` path fills the remaining resource-command slots as required, then builds the packet at `0x236B`: `R5 = RAM[0x2B] | 0x0F`, `R2 = direct RAM[0x07]`, `R3 = direct RAM[0x02]`, and `R4` is the terminal payload masked to three bits. The observed fifth packet `0F 00 00 00` matches those fields. This classification comes from the live writer return PC and firmware instruction sequence; the packet's external-device semantics remain unassigned.
+
+The next trace should capture the entry and dispatch state at `0x224C` and `0x2301`, plus their command-stream pointer and source bytes, to resolve packet 3's exact branch and packet 5's terminal payload provenance.
