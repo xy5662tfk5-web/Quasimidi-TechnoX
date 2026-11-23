@@ -635,6 +635,17 @@ int main(int argc, char** argv) {
                 expectedWord = i < 528u ? 0x0040u : 0x8040u;
                 expectedCaller = 0x0e1du;
             }
+            if (packet.bytes[0] != expectedIndex || packet.bytes[1] != 0x00u ||
+                packet.bytes[2] != static_cast<std::uint8_t>(expectedWord & 0xffu) ||
+                packet.bytes[3] != static_cast<std::uint8_t>(expectedWord >> 8u) ||
+                packet.returnPC != expectedCaller) {
+                std::printf("SoundHost packet mismatch[%zu]: actual=%02X %02X %02X %02X ", i,
+                    packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3]);
+                std::printf("expected=%02X 00 %02X %02X caller=%04X expectedCaller=%04X\\n",
+                    expectedIndex, static_cast<unsigned>(expectedWord & 0xffu),
+                    static_cast<unsigned>(expectedWord >> 8u), packet.returnPC, expectedCaller);
+                std::fflush(stdout);
+            }
             assert(packet.bytes[0] == expectedIndex);
             assert(packet.bytes[1] == 0x00u);
             assert(packet.bytes[2] == static_cast<std::uint8_t>(expectedWord & 0xffu));
