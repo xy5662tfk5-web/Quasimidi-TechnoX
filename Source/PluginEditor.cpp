@@ -95,7 +95,9 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
     // A new press always owns exactly one control. Never carry a previous drag
     // target into the next gesture.
     dragTarget = DragTarget::none;
-    const auto p = e.position;
+    // JUCE events can originate in a child/component coordinate space; always
+    // convert to this editor's local coordinates before hit-testing.
+    const auto p = e.getEventRelativeTo(this).position;
     const auto insideKnob = [&p](float cx, float cy, float radius) {
         return p.getDistanceFrom(juce::Point<float>(cx, cy)) <= radius;
     };
@@ -143,7 +145,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDrag(const juce::MouseEvent& e)
 {
     if (dragTarget == DragTarget::none || !e.mods.isLeftButtonDown())
         return;
-    updateFromDrag(e.position.y);
+    updateFromDrag(e.getEventRelativeTo(this).position.y);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
