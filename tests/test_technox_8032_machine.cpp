@@ -591,6 +591,40 @@ int main(int argc, char** argv) {
             technox::MASSFX2ProgramDirectory fx2Directory;
             assert(fx2Directory.load(firmwareCode.data(), firmwareCode.size()));
 
+            // The firmware has distinct gated call sites for the two effect
+            // processors. FX2 is entered from 0x7D3F when XDATA 0x308D is
+            // nonzero; FX1 is entered from 0x7D71 when XDATA 0x308B is
+            // nonzero. Both callers fetch the shared 0x3097 staging byte.
+            assert(firmwareMachine.readCode(0x7d34u) == 0x90u);
+            assert(firmwareMachine.readCode(0x7d35u) == 0x30u);
+            assert(firmwareMachine.readCode(0x7d36u) == 0x8du);
+            assert(firmwareMachine.readCode(0x7d37u) == 0xe0u);
+            assert(firmwareMachine.readCode(0x7d38u) == 0x60u);
+            assert(firmwareMachine.readCode(0x7d39u) == 0x08u);
+            assert(firmwareMachine.readCode(0x7d3au) == 0x90u);
+            assert(firmwareMachine.readCode(0x7d3bu) == 0x30u);
+            assert(firmwareMachine.readCode(0x7d3cu) == 0x97u);
+            assert(firmwareMachine.readCode(0x7d3du) == 0xe0u);
+            assert(firmwareMachine.readCode(0x7d3eu) == 0xffu);
+            assert(firmwareMachine.readCode(0x7d3fu) == 0x12u);
+            assert(firmwareMachine.readCode(0x7d40u) == 0x88u);
+            assert(firmwareMachine.readCode(0x7d41u) == 0xd1u);
+
+            assert(firmwareMachine.readCode(0x7d66u) == 0x90u);
+            assert(firmwareMachine.readCode(0x7d67u) == 0x30u);
+            assert(firmwareMachine.readCode(0x7d68u) == 0x8bu);
+            assert(firmwareMachine.readCode(0x7d69u) == 0xe0u);
+            assert(firmwareMachine.readCode(0x7d6au) == 0x60u);
+            assert(firmwareMachine.readCode(0x7d6bu) == 0x0au);
+            assert(firmwareMachine.readCode(0x7d6cu) == 0x90u);
+            assert(firmwareMachine.readCode(0x7d6du) == 0x30u);
+            assert(firmwareMachine.readCode(0x7d6eu) == 0x97u);
+            assert(firmwareMachine.readCode(0x7d6fu) == 0xe0u);
+            assert(firmwareMachine.readCode(0x7d70u) == 0xffu);
+            assert(firmwareMachine.readCode(0x7d71u) == 0x12u);
+            assert(firmwareMachine.readCode(0x7d72u) == 0x7fu);
+            assert(firmwareMachine.readCode(0x7d73u) == 0xf2u);
+
             // Pin the independent FX2 firmware loader to the real IC4 image:
             // XDATA 0x7C06 supplies the type index, values >= 0x15 clamp to
             // 0x14, records are 0x2A bytes at 0x8F99, and the two stream
