@@ -92,20 +92,30 @@ void QuasimidiTechnoXAudioProcessorEditor::changeSelectedValue(int delta)
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
 {
+    // A new press always owns exactly one control. Never carry a previous drag
+    // target into the next gesture.
+    dragTarget = DragTarget::none;
     const auto p = e.position;
-    if (p.x >= 986 && p.x <= 1038 && p.y >= 42 && p.y <= 96) {
+    const auto insideKnob = [&p](float cx, float cy, float radius) {
+        return p.getDistanceFromOrigin() >= 0.0f &&
+               p.getDistance(juce::Point<float>(cx, cy)) <= radius;
+    };
+
+    // Use the visible circular knob faces rather than broad rectangular zones.
+    // The three hit regions are mutually exclusive in the TechnoX panel layout.
+    if (insideKnob(kVolumeX, kKnobY, 21.0f)) {
         dragTarget = DragTarget::volume;
         dragStartY = p.y;
         dragStartValue = audioProcessor.getOutputGain();
         return;
     }
-    if (p.x >= 540 && p.x <= 596 && p.y >= 40 && p.y <= 98) {
+    if (insideKnob(kParameterX, kKnobY, 29.0f)) {
         dragTarget = DragTarget::parameter;
         dragStartY = p.y;
         dragStartValue = static_cast<float>(selectedParameter);
         return;
     }
-    if (p.x >= 646 && p.x <= 702 && p.y >= 40 && p.y <= 98) {
+    if (insideKnob(kValueX, kKnobY, 29.0f)) {
         dragTarget = DragTarget::value;
         dragStartY = p.y;
         const int v = audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
@@ -132,6 +142,8 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseDrag(const juce::MouseEvent& e)
 {
+    if (dragTarget == DragTarget::none || !e.mods.isLeftButtonDown())
+        return;
     updateFromDrag(e.position.y);
 }
 
