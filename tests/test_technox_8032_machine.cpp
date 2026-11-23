@@ -771,6 +771,15 @@ int main(int argc, char** argv) {
             const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
             const auto eventBefore = firmwareMachine.watchedCallCount(0x5671u);
             const auto midiBefore = firmwareMachine.watchedCallCount(0x57a8u);
+            const auto dispatchBefore = firmwareMachine.watchedCallCount(0x16c3u);
+            const auto streamBefore = firmwareMachine.watchedCallCount(0x189du);
+            const auto scanBefore = firmwareMachine.watchedCallCount(0x1009u);
+            const auto validateBefore = firmwareMachine.watchedCallCount(0x018du);
+            const auto helper1780Before = firmwareMachine.watchedCallCount(0x1780u);
+            const auto helper17d4Before = firmwareMachine.watchedCallCount(0x17d4u);
+            const auto helper0e8eBefore = firmwareMachine.watchedCallCount(0x0e8eu);
+            const auto helper1456Before = firmwareMachine.watchedCallCount(0x1456u);
+            const auto helper1742Before = firmwareMachine.watchedCallCount(0x1742u);
             const auto ic51Before = firmwareMachine.ic51ReadCount();
             const auto peripheralTraceBefore = firmwareMachine.unmappedBusTraceCount();
             const auto xdataTraceBefore = firmwareMachine.xdataWatchTraceCount();
@@ -782,7 +791,9 @@ int main(int argc, char** argv) {
             const auto xdataTraceAfter = firmwareMachine.xdataWatchTraceCount();
             std::printf("Real IC51 MIDI %s: instructions=%zu drain=%zu PC=%04X "
                         "packets=+%zu burstWords=+%zu hostWrites=+%zu "
-                        "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu] "
+                        "calls[0DB7=+%llu 4256=+%llu 5671=+%llu 57A8=+%llu "
+                        "16C3=+%llu 189D=+%llu 1009=+%llu 018D=+%llu "
+                        "1780=+%llu 17D4=+%llu 0E8E=+%llu 1456=+%llu 1742=+%llu] "
                         "IC51=+%llu\\n",
                         label, instructions, drain,
                         static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
@@ -793,6 +804,15 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x4256u) - partBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x5671u) - eventBefore),
                         static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x57a8u) - midiBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x16c3u) - dispatchBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x189du) - streamBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1009u) - scanBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x018du) - validateBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1780u) - helper1780Before),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x17d4u) - helper17d4Before),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e8eu) - helper0e8eBefore),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1456u) - helper1456Before),
+                        static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x1742u) - helper1742Before),
                         static_cast<unsigned long long>(firmwareMachine.ic51ReadCount() - ic51Before));
             const auto firstTrace = peripheralTraceAfter > 4096u
                 ? peripheralTraceAfter - 4096u : 0u;
