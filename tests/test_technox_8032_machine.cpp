@@ -29,11 +29,28 @@ public:
                 const technox::MASSPartParameterStore&,
                 const technox::MASSModulationSourceStore&,
                 const technox::MASSPartRuntimeControlStore&,
-                const technox::MASSCommonControlStore&,
+                const technox::MASSCommonControlStore& common,
                 const technox::MASSPerformanceImageStore&,
-                const technox::MASSDrumParameterStore&) noexcept override {}
+                const technox::MASSDrumParameterStore&) noexcept override {
+        selectedFX1 = common.get(technox::MASSCommonControl::fx1Type);
+        selectedFX2 = common.get(technox::MASSCommonControl::fx2Type);
+        const auto* fx1 = receivedCatalog != nullptr && selectedFX1 >= 0
+            ? receivedCatalog->find(0, selectedFX1) : nullptr;
+        const auto* fx2 = receivedCatalog != nullptr && selectedFX2 >= 0
+            ? receivedCatalog->find(0, selectedFX2) : nullptr;
+        resolvedFX1 = fx1 != nullptr;
+        resolvedFX2 = fx2 != nullptr;
+        fx1FirstBlockCount = resolvedFX1 ? fx1->fx1Resource.blocks.size() : 0u;
+        fx2SecondBlockCount = resolvedFX2 ? fx2->fx2Resource.blocks.size() : 0u;
+    }
 
     const technox::MASSFXResourceCatalog* receivedCatalog = nullptr;
+    int selectedFX1 = -1;
+    int selectedFX2 = -1;
+    bool resolvedFX1 = false;
+    bool resolvedFX2 = false;
+    std::size_t fx1FirstBlockCount = 0;
+    std::size_t fx2SecondBlockCount = 0;
 };
 
 int main(int argc, char** argv) {
@@ -596,6 +613,19 @@ int main(int argc, char** argv) {
             assert(originalFXBackend.receivedCatalog == &fxCatalog);
             fxCatalogEngine.setBackend(&replacementFXBackend);
             assert(replacementFXBackend.receivedCatalog == &fxCatalog);
+            assert(fxCatalogEngine.setCommonControl(
+                technox::MASSCommonControl::fx1Type, 0));
+            assert(fxCatalogEngine.setCommonControl(
+                technox::MASSCommonControl::fx2Type, 5));
+            float fxProbeSample = 0.0f;
+            float* fxProbeChannels[] = {&fxProbeSample};
+            fxCatalogEngine.render(fxProbeChannels, 1, 1);
+            assert(replacementFXBackend.selectedFX1 == 0);
+            assert(replacementFXBackend.selectedFX2 == 5);
+            assert(replacementFXBackend.resolvedFX1);
+            assert(replacementFXBackend.resolvedFX2);
+            assert(replacementFXBackend.fx1FirstBlockCount == 2u);
+            assert(replacementFXBackend.fx2SecondBlockCount > 0u);
 
             // The 50 factory Performance Common blocks store FX1 and FX2 as
             // direct indices into the 21-entry IC4 directory (not 1-based IDs).
