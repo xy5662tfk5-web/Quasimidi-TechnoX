@@ -1159,8 +1159,8 @@ private:
 struct MASSFXProgramRecord {
     std::uint8_t index = 0;
     std::array<char, 11> name{};
-    std::uint8_t firstResourceIndex = 0;
-    std::uint8_t secondResourceIndex = 0;
+    std::uint8_t fx1ResourceIndex = 0;
+    std::uint8_t fx2ResourceIndex = 0;
     std::uint8_t modeByte = 0;
     std::array<std::uint8_t, 18> opaqueTail{};
 };
@@ -1171,8 +1171,8 @@ public:
     static constexpr std::size_t kEntryCount = 21u;
     static constexpr std::size_t kEntryStride = 0x20u;
     static constexpr std::size_t kNameBytes = 10u;
-    static constexpr std::size_t kFirstResourceOffset = 0x0bu;
-    static constexpr std::size_t kSecondResourceOffset = 0x0cu;
+    static constexpr std::size_t kFX1ResourceOffset = 0x0bu;
+    static constexpr std::size_t kFX2ResourceOffset = 0x0cu;
     static constexpr std::size_t kModeOffset = 0x0du;
     static constexpr std::size_t kTableEnd =
         static_cast<std::size_t>(kTableAddress) + kEntryCount * kEntryStride;
@@ -1191,8 +1191,8 @@ public:
                 record.name[i] = value == 0 ? '\0' : static_cast<char>(value);
             }
             record.name[kNameBytes] = '\0';
-            record.firstResourceIndex = source[kFirstResourceOffset];
-            record.secondResourceIndex = source[kSecondResourceOffset];
+            record.fx1ResourceIndex = source[kFX1ResourceOffset];
+            record.fx2ResourceIndex = source[kFX2ResourceOffset];
             record.modeByte = source[kModeOffset];
             std::copy_n(source + 0x0eu, record.opaqueTail.size(),
                         record.opaqueTail.begin());
@@ -1361,8 +1361,8 @@ private:
 // being mapped. All vectors are populated off the audio thread.
 struct MASSFXResolvedProgram {
     MASSFXProgramRecord directoryEntry{};
-    MASSIC51PortStreamResource firstResource{};
-    MASSIC51PortStreamResource secondResource{};
+    MASSIC51PortStreamResource fx1Resource{};
+    MASSIC51PortStreamResource fx2Resource{};
 };
 
 class MASSFXResourceCatalog {
@@ -1392,13 +1392,13 @@ public:
                 auto& destination = parsed[bankIndex][fxIndex];
                 destination.directoryEntry = *entry;
                 if (!MASSIC51PortStreamResolver::resolveTripletStream(
-                        rom, bank, entry->firstResourceIndex,
-                        destination.firstResource) ||
+                        rom, bank, entry->fx1ResourceIndex,
+                        destination.fx1Resource) ||
                     !MASSIC51PortStreamResolver::resolveRotatedHeaderStream(
-                        rom, bank, entry->secondResourceIndex,
-                        destination.secondResource) ||
-                    !destination.firstResource.terminated ||
-                    !destination.secondResource.terminated)
+                        rom, bank, entry->fx2ResourceIndex,
+                        destination.fx2Resource) ||
+                    !destination.fx1Resource.terminated ||
+                    !destination.fx2Resource.terminated)
                     return false;
             }
         }
