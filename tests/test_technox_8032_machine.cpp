@@ -3519,6 +3519,23 @@ int main(int argc, char** argv) {
         constexpr std::array<std::uint16_t, 7> pitchSourceReadPCs{{
             0x1c76u, 0x1c7au, 0x1c7du, 0x1c80u, 0x1c83u, 0x1c86u, 0x1c89u
         }};
+        technox::MASSResourceCommand pitchRecordCommand{};
+        pitchRecordCommand.opcode = pitchSourceRecord[0];
+        pitchRecordCommand.kind = technox::MASSResourceCommandKind::pitchParameter;
+        pitchRecordCommand.length = static_cast<std::uint8_t>(pitchSourceRecord.size());
+        std::copy(pitchSourceRecord.begin(), pitchSourceRecord.end(),
+                  pitchRecordCommand.bytes.begin());
+        technox::MASSPitchParameterRegisterFields pitchRecordFields{};
+        assert(technox::MASSResourceCommandFieldDecoder::decodePitchParameter(
+            pitchRecordCommand, pitchRecordFields));
+        const auto& pitchRecordLoaded = findPitchSourceStep(0x1c9au);
+        assert(pitchRecordFields.opcode == 0x08u);
+        assert(pitchRecordFields.r2 == pitchRecordLoaded.registers[2]);
+        assert(pitchRecordFields.r3 == pitchRecordLoaded.registers[3]);
+        assert(pitchRecordFields.r4 == pitchRecordLoaded.registers[4]);
+        assert(pitchRecordFields.r7 == pitchRecordLoaded.registers[7]);
+        assert(pitchRecordFields.r6 == pitchRecordLoaded.registers[6]);
+        assert(pitchRecordFields.r5 == pitchRecordLoaded.registers[5]);
         for (std::size_t i = 0; i < pitchSourceRecord.size(); ++i)
             assert(sawPitchSourceAccess(
                 pitchSourceReadPCs[i], pitchSourceAddresses[i],
