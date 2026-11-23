@@ -39,13 +39,28 @@ These are byte-layout observations, not proof of sample boundaries. The two acti
 
 Entropy and adjacent-byte statistics do not identify a PCM/ADPCM codec. In particular, do not infer sample rate, bit depth, signedness, channel count, loop points or sample offsets from these statistics alone.
 
-## 4. The 64 MB specification discrepancy
+## 4. Firmware-staged IC51 blocks
+
+The IC4 startup path calls the bulk loader with R7=`0x48`. The four-byte records at `2*R7` resolve to these source blocks:
+
+| IC51 bank | Source | Length |
+|---|---:|---:|
+| 0 | `0x3C64` | 13,647 bytes (`0x354F`) |
+| 1 | `0x295C` | 9,588 bytes (`0x2574`) |
+
+The bank-0 payload has approximately 5.00 bits/byte of Shannon entropy and 5,088 zero bytes; bank 1 has approximately 4.93 bits/byte and 3,653 zero bytes. These statistics show structured data, but do not identify a codec or prove that either block is PCM.
+
+The IC4 lookup at `0xADDD` is read from the descrambled program ROM. All 256 entries match the emulator's low-byte address permutation. The 8032 integration test executes the firmware's real bank-0 transfer and checks every staged byte against the IC51 source payload, including the final physical write at `0xF5B2`.
+
+This establishes how one startup resource block is copied into paged XDATA. The destination device, payload format, and relationship to the advertised waveform memory remain unknown.
+
+## 5. The 64 MB specification discrepancy
 
 Some secondary TechnoX specification pages describe a 64 MB ROM sample bank. The MAME dump inventory currently exposes only a 128 KiB IC51 image as the samples region. These statements are not reconciled by the available evidence. The IC51 dump must not be treated as a complete 64 MB waveform library.
 
 Reference: https://www.vintagesynth.com/quasimidi/technox
 
-## 5. What is still needed to decode sound
+## 6. What is still needed to decode sound
 
 1. Complete, verified ROM/EPROM inventory from a physical TechnoX, including PCB photographs and IC markings.
 2. A disassembly of the descrambled IC4 firmware, especially the routines that read IC51 and configure the sound hardware.
@@ -53,6 +68,6 @@ Reference: https://www.vintagesynth.com/quasimidi/technox
 4. Repeated tests at different sample rates/notes to identify sample playback rates, loop boundaries and interpolation.
 5. Only after these steps: implement a candidate decoder and compare its output against hardware recordings.
 
-## 6. Consequence for M.A.S.S.
+## 7. Consequence for M.A.S.S.
 
 The project now has a voice allocator, a 16-Part parameter store, a modulation matrix, per-Part Mod Wheel source storage and a backend interface. The backend remains deliberately silent. This separates the already verified MIDI/Part/control model from the unknown audio engine and avoids inventing a sound that merely resembles the TechnoX.
