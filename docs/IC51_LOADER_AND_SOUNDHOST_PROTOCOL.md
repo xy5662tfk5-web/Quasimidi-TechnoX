@@ -53,7 +53,9 @@ These values are recorded as observed initialization traffic only. Register name
 - Firmware toggles P3.5 while reading the IC51 image; the test verifies the bank-0/bank-1 selection behavior against the actual ROM bytes.
 - The `0xFF10` external port is accessed as a sound-device data/status port in the machine model. The value `0xAC` used to pass the startup wait is an explicit test injection, not an observed response from real hardware.
 - The firmware's 544 initialization transactions occur only after the synthetic ready response is supplied. The current model does not claim to reproduce the real peripheral's ready/status behavior.
-- A subsequent MIDI Program Change + Note On probe receives all bytes through the emulated ACIA, but the current test run still produces no additional SoundHost command transactions or sound-memory reads. The MIDI-to-voice-command path remains unresolved.
+- The combined MIDI probe (Program Change 5 followed by Note On, note 60, velocity 100) is delivered through the emulated ACIA. In the synthetic-ready fixture, the test observes 553 additional four-byte command-port packets and confirms calls through firmware addresses 0x57A8, 0x5671, 0x4256 and 0x0DB7. This supersedes the earlier "no additional transactions" observation.
+- The 553-packet burst is not yet attributable to the Note On alone: Program Change and Note On are sent in one batch, and the test does not yet run isolated differential cases. The packet trace identifies two 256-write sweeps called from 0x0E67 (return PC 0x0E6A), plus a 32-iteration path through 0x0DF7 / 0x0E1A, split into two 16-packet groups around a control write from 0x0DE4 (return PC 0x0E0B). These are confirmed caller/shape relationships, not decoded peripheral semantics.
+- The MIDI regression does not establish original voice triggering, sample reads, or audible playback. The test explicitly avoids asserting a completed MIDI-to-voice dispatch until the external SoundHost path is modeled.
 
 ## 5. Next reverse-engineering tasks
 
