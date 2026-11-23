@@ -142,8 +142,8 @@ public:
         std::uint8_t p2 = 0xff;
         std::uint8_t p3 = 0xff;
         std::uint8_t soundBusMode = 0;
-        std::uint8_t flagByte1B = 0;
-        std::uint8_t flagByteAF = 0;
+        std::uint8_t flagBit1B = 0;
+        std::uint8_t globalInterruptEnabled = 0;
         std::uint64_t machineCycle = 0;
     };
     struct InternalFlagWriteEvent {
@@ -451,8 +451,8 @@ public:
                     event.p2 = portLatch_[2];
                     event.p3 = portLatch_[3];
                     event.soundBusMode = internal_[0x8e];
-                    event.flagByte1B = internal_[0x1b];
-                    event.flagByteAF = readBitValue(0xafu);
+                    event.flagBit1B = static_cast<std::uint8_t>((internal_[0x23u] >> 3u) & 0x01u);
+                    event.globalInterruptEnabled = static_cast<std::uint8_t>((readInternal(0xa8u) >> 7u) & 0x01u);
                     event.machineCycle = elapsedMachineCycles_;
                     ++bulkTransferEntryCount_;
                     break;
