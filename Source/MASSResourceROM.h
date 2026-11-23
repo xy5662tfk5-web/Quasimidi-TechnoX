@@ -426,6 +426,58 @@ public:
     }
 };
 
+// IC4 handler 0x09B9 / arithmetic body 0x09DA..0x0A3E.
+// The caller supplies the already-normalized 16-bit step magnitude produced
+// by the handler's compare/sign/rotate path. The three-byte slot value is
+// interpreted as an unsigned 24-bit fixed-point quantity; firmware masks
+// its top input byte to three bits, computes (value * step) >> 16, applies
+// the sign branch, then adds that increment back to the original value.
+// This models the arithmetic only; it does not assign physical or musical
+// units to the slot value or to the resulting SoundHost packet.
+struct MASS09B9SlotInterpolationResult {
+    std::uint32_t inputValue24 = 0;
+    std::uint32_t incrementMagnitude24 = 0;
+    std::uint32_t outputValue24 = 0;
+    bool negativeStep = false;
+    bool overflow24 = false;
+    bool underflow24 = false;
+};
+
+class MASS09B9SlotInterpolationArithmetic {
+public:
+    static constexpr std::uint32_t kValueMask = 0x00ffffffu;
+
+    static MASS09B9SlotInterpolationResult apply(
+        std::uint8_t valueLow,
+        std::uint8_t valueMiddle,
+        std::uint8_t valueHigh,
+        std::uint16_t stepMagnitude,
+        bool negativeStep) noexcept {
+        const auto inputValue = (
+            (static_cast<std::uint32_t>(valueHigh & 0x07u) << 16u) |
+            (static_cast<std::uint32_t>(valueMiddle) << 8u) |
+            static_cast<std::uint32_t>(valueLow));
+
+        const auto product = static_cast<std::uint64_t>(inputValue) *
+                             static_cast<std::uint64_t>(stepMagnitude);
+        const auto increment = static_cast<std::uint32_t>(
+            (product >> 16u) & kValueMask);
+
+        const auto signedOutput = static_cast<std::int64_t>(inputValue) +
+            (negativeStep ? -static_cast<std::int64_t>(increment)
+                          : static_cast<std::int64_t>(increment));
+
+        return {
+            inputValue,
+            increment,
+            static_cast<std::uint32_t>(signedOutput) & kValueMask,
+            negativeStep,
+            signedOutput > static_cast<std::int64_t>(kValueMask),
+            signedOutput < 0
+        };
+    }
+};
+
 struct MASS1EDDLookupResult {
     bool lookupPerformed = false;
     bool bSignBranch = false;
