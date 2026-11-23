@@ -37,9 +37,15 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         soundCatalog.loadFromJson(catalogData, catalogSize);
     const auto* resourceData = BinaryData::getNamedResource(
         "technox_IC51_nm27c010_v105_bin", resourceRomSize);
-    if (resourceData != nullptr)
+    if (resourceData != nullptr &&
         resourceROM.load(reinterpret_cast<const std::uint8_t*>(resourceData),
-                         static_cast<std::size_t>(resourceRomSize));
+                         static_cast<std::size_t>(resourceRomSize)) &&
+        resourceProgramCatalog.load(resourceROM)) {
+        // The catalog is immutable after construction. Every voice backend can
+        // resolve its captured bank/program pair without parsing or allocating
+        // on the audio thread.
+        massEngine.setProgramCatalog(&resourceProgramCatalog);
+    }
     int firmwareRomSize = 0;
     if (const auto* firmwareData = BinaryData::getNamedResource(
             "technox_IC4_mx27c1000_v105_bin", firmwareRomSize)) {
