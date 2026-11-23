@@ -3442,6 +3442,33 @@ int main(int argc, char** argv) {
                            event.write == write && event.ic51Selected == ic51;
                 });
         };
+        // Pin the bytes consumed before the group-08 pitch record is
+        // dispatched. These are live IC51 reads made after the selected
+        // command-stream pointer has been loaded as 0x1600. Preserve their
+        // instruction PCs and raw values without guessing field semantics.
+        struct PitchStreamPrefixRead {
+            std::uint16_t instructionPC;
+            std::uint16_t address;
+            std::uint8_t value;
+        };
+        constexpr std::array<PitchStreamPrefixRead, 12> pitchStreamPrefix{{
+            {0x162fu, 0x1600u, 0x06u},
+            {0x18d7u, 0x1602u, 0x38u},
+            {0x18dbu, 0x1603u, 0x6du},
+            {0x1906u, 0x1604u, 0x00u},
+            {0x190au, 0x1605u, 0xf4u},
+            {0x1906u, 0x1606u, 0x79u},
+            {0x190au, 0x1607u, 0xfdu},
+            {0x1906u, 0x1608u, 0x00u},
+            {0x190au, 0x1609u, 0x00u},
+            {0x1942u, 0x160au, 0x00u},
+            {0x1946u, 0x160bu, 0x00u},
+            {0x1995u, 0x160cu, 0x08u}
+        }};
+        for (const auto& read : pitchStreamPrefix)
+            assert(sawPitchSourceAccess(read.instructionPC, read.address,
+                                        read.value, false, true));
+
         constexpr std::array<std::uint8_t, 7> pitchSourceRecord{{
             0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u
         }};
