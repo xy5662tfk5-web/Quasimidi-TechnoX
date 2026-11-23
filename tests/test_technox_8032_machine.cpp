@@ -3283,6 +3283,38 @@ int main(int argc, char** argv) {
         }
         assert(pitchSourceEntryCount == 1u);
         assert(pitchSourceTailCount == 1u);
+        const auto findPitchSourceStep = [&](std::uint16_t pc)
+            -> const TechnoX8032Machine::ExecutionInstructionEvent& {
+            const auto found = std::find_if(
+                pitchSourceInstructions.begin(), pitchSourceInstructions.end(),
+                [pc](const auto& event) { return event.instructionPC == pc; });
+            assert(found != pitchSourceInstructions.end());
+            return *found;
+        };
+        const auto& pitchSecondaryLookup =
+            findPitchSourceStep(0x1dc8u);
+        assert(pitchSecondaryLookup.registers[2] == 0x80u);
+        assert(pitchSecondaryLookup.registers[3] == 0x60u);
+        assert(pitchSecondaryLookup.registers[4] == 0x48u);
+        assert(pitchSecondaryLookup.registers[5] == 0x05u);
+        assert(pitchSecondaryLookup.registers[6] == 0x43u);
+        assert(pitchSecondaryLookup.registers[7] == 0x02u);
+        assert(pitchSecondaryLookup.dptr == 0x3a7eu);
+        assert(pitchSecondaryLookup.selectedDirectRam[0] == 0x7bu);
+        assert(pitchSecondaryLookup.selectedDirectRam[1] == 0x80u);
+        assert(pitchSecondaryLookup.selectedDirectRam[3] == 0x05u);
+        assert(pitchSecondaryLookup.selectedDirectRam[4] == 0x43u);
+        const auto& pitchAccumulatorResult = findPitchSourceStep(0x1e05u);
+        assert(pitchAccumulatorResult.registers[2] == 0xd5u);
+        assert(pitchAccumulatorResult.registers[3] == 0x1eu);
+        assert(pitchAccumulatorResult.registers[4] == 0x02u);
+        const auto& pitchUpdatedSlot = findPitchSourceStep(0x1e67u);
+        assert(pitchUpdatedSlot.registers[2] == 0xd5u);
+        assert(pitchUpdatedSlot.registers[3] == 0x1fu);
+        assert(pitchUpdatedSlot.registers[4] == 0x06u);
+        assert(pitchUpdatedSlot.registers[5] == 0x00u);
+        assert(pitchUpdatedSlot.registers[6] == 0x43u);
+        assert(pitchUpdatedSlot.registers[7] == 0x02u);
         std::printf("PITCH-SOURCE TRACE: instructions=%zu retained=%zu "
                     "xdata=%zu retained-xdata=%zu entry=1C61 tail=1E67\\n",
                     pitchSourceInstructionCount, pitchSourceInstructionRetained,
@@ -3330,11 +3362,47 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.indirectRam9F),
                         static_cast<unsigned long long>(event.dataAccessCount));
         }
+        std::vector<TechnoX8032Machine::ExecutionDataAccessEvent>
+            pitchSourceData;
+        pitchSourceData.reserve(pitchSourceDataRetained);
         for (std::size_t absolute = pitchSourceDataCount -
                  pitchSourceDataRetained;
              absolute < pitchSourceDataCount; ++absolute) {
-            const auto& event =
-                firmwareMachine.executionDataAccessTraceAtForTesting(absolute);
+            pitchSourceData.push_back(
+                firmwareMachine.executionDataAccessTraceAtForTesting(absolute));
+        }
+        const auto sawPitchSourceAccess = [&](std::uint16_t pc,
+                                               std::uint16_t address,
+                                               std::uint8_t value,
+                                               bool write,
+                                               bool ic51) {
+            return std::any_of(
+                pitchSourceData.begin(), pitchSourceData.end(),
+                [&](const auto& event) {
+                    return event.instructionPC == pc &&
+                           event.address == address && event.value == value &&
+                           event.write == write && event.ic51Selected == ic51;
+                });
+        };
+        constexpr std::array<std::uint8_t, 7> pitchSourceRecord{{
+            0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u
+        }};
+        constexpr std::array<std::uint16_t, 7> pitchSourceAddresses{{
+            0x160cu, 0x160du, 0x160eu, 0x160fu, 0x1610u, 0x1611u, 0x1612u
+        }};
+        constexpr std::array<std::uint16_t, 7> pitchSourceReadPCs{{
+            0x1c76u, 0x1c7au, 0x1c7du, 0x1c80u, 0x1c83u, 0x1c86u, 0x1c89u
+        }};
+        for (std::size_t i = 0; i < pitchSourceRecord.size(); ++i)
+            assert(sawPitchSourceAccess(
+                pitchSourceReadPCs[i], pitchSourceAddresses[i],
+                pitchSourceRecord[i], false, true));
+        assert(sawPitchSourceAccess(0x1c9cu, 0x0080u, 0x08u, true, false));
+        assert(sawPitchSourceAccess(0x1cabu, 0x0083u, 0xa0u, true, false));
+        assert(sawPitchSourceAccess(0x1e60u, 0x0083u, 0xa2u, true, false));
+        assert(sawPitchSourceAccess(0x1e63u, 0x0082u, 0x1fu, true, false));
+        assert(sawPitchSourceAccess(0x1e66u, 0x0081u, 0xd5u, true, false));
+        for (const auto& event : pitchSourceData) {
             std::printf("  PITCH-SOURCE-XDATA PC=%04X RET=%04X %c %04X=%02X "
                         "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
                         static_cast<unsigned>(event.instructionPC),
