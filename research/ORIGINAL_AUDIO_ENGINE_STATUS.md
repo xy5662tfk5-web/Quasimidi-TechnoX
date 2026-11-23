@@ -17,7 +17,7 @@ Branch: `research/original-technox-audio-engine`
 - A captured firmware packet is not yet a sample-playback command specification. Do not assign sample address, pitch, loop, envelope, or voice semantics based only on byte patterns.
 - `MASSResourceProgramResolver` recovers IC51 metadata and command streams; it explicitly does not decode PCM.
 - `BasicMASSVoiceBackend` is still a generic oscillator test voice. It is not original TechnoX audio.
-- The physical sound processor / DSP identity, its host-port handshake, sample-memory mapping, sample encoding, voice architecture, filters and effects remain unverified.
+- The physical sound processor / DSP identity, its host-port handshake, sample-memory mapping, sample encoding, voice architecture, filters and effects remain unverified. Period advertising describes 6 MB of sampled waveforms, so the 128 KB IC51 image cannot by itself be treated as the complete waveform store; the larger sample-memory path still has to be located and mapped.
 - The modeled C000–FFFF sound-memory backing store is an emulation aid, not proof of the physical memory topology or a decoded audio ROM.
 
 ## Next reverse-engineering milestone
