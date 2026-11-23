@@ -826,7 +826,7 @@ int main(int argc, char** argv) {
             assert(fx1Catalog.find(2, 0) == nullptr);
             const auto* roomBank0 = fx1Catalog.find(0, 0);
             assert(roomBank0 != nullptr);
-            assert(roomBank0->streamAResource.blocks.size() == 1u);
+            assert(roomBank0->streamAResource.blocks.size() == 2u);
             assert(roomBank0->streamBResource.blocks.empty());
             assert(roomBank0->streamBResource.skippedLeadingByte);
             assert(roomBank0->streamBResource.leadingByteValue == 0x7fu);
@@ -866,7 +866,7 @@ int main(int argc, char** argv) {
             assert(replacementFX1Backend.selectedFX1 == 0);
             assert(replacementFX1Backend.selectedFX2 == 14);
             assert(replacementFX1Backend.fx1Resolved);
-            assert(replacementFX1Backend.fx1StreamABlockCount == 1u);
+            assert(replacementFX1Backend.fx1StreamABlockCount == 2u);
             assert(replacementFX1Backend.fx1StreamBBlockCount == 0u);
             assert(replacementFX1Backend.fx2Resolved);
             // FX2 Equalizr1 Stream A (resource 0x42) contains one real block
@@ -972,7 +972,7 @@ int main(int argc, char** argv) {
             technox::MASSIC51PortStreamResource roomStreamB{};
             assert(technox::MASSIC51PortStreamResolver::resolveTripletStream(
                 fxResources, technox::MASSResourceBank::bank0, 0x00, roomStreamA));
-            assert(roomStreamA.blocks.size() == 1u);
+            assert(roomStreamA.blocks.size() == 2u);
             const auto& roomStreamABlock = roomStreamA.blocks.front();
             assert(roomStreamABlock.dataAddress == 0x24d4u);
             assert(roomStreamABlock.sourceCount == 0x19u);
@@ -982,6 +982,15 @@ int main(int argc, char** argv) {
             assert(roomStreamABlock.payload.size() == 75u);
             assert(roomStreamABlock.payload.front() == 0x10u);
             assert(roomStreamABlock.portWriteByteCount == 78u);
+            const auto& roomStreamABlock2 = roomStreamA.blocks[1];
+            assert(roomStreamABlock2.dataAddress == 0x2522u);
+            assert(roomStreamABlock2.sourceCount == 0xfcu);
+            assert(roomStreamABlock2.preambleByteCount == 2u);
+            assert(roomStreamABlock2.preamble[0] == 0x19u);
+            assert(roomStreamABlock2.preamble[1] == 0x08u);
+            assert(roomStreamABlock2.payload.size() == 756u);
+            assert(roomStreamABlock2.payload.front() == 0x16u);
+            assert(roomStreamABlock2.portWriteByteCount == 759u);
             assert(roomStreamABlock.preamble[0] == 0x00u);
             assert(roomStreamABlock.preamble[1] == 0xcfu);
             assert(roomStreamABlock.payload.size() == 75u);
