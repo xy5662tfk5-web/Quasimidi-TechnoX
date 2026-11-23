@@ -1114,11 +1114,12 @@ private:
 };
 
  
-// Firmware-loaded 16-KiB external sound-memory image at XDATA C000-FFFF.
-// Reconstructed from the observed IC51 bank-0 transfer (R7=0x48) and the
-// exact IC4 logical-to-physical byte map at code address 0xADDD.
-// This is the byte image after the original boot loader, not a claim that its
-// contents are PCM or that the external DSP's sample codec is known.
+// Firmware-loaded 16-KiB external storage image at XDATA C000-FFFF.
+// IC4 first write/read-tests this range at 0xB34D; only after that succeeds,
+// startup at 0x379F calls 0xAF1A with R7=0x48 to copy this IC51 block into it.
+// Reconstructed with the exact IC4 logical-to-physical byte map at 0xADDD.
+// This is post-upload RAM content, not a claim that the bytes are PCM or that
+// the target is a particular DSP or sample codec.
 class MASSIC51ExternalSoundMemoryImage {
 public:
     static constexpr std::uint16_t kBaseAddress = 0xc000u;
