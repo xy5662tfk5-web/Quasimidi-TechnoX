@@ -3957,6 +3957,8 @@ int main(int argc, char** argv) {
         // that the first note-specific 24-bit word doubles relative to key 66.
         const std::array<std::uint8_t, 3> note72On{{0x90u, 0x48u, 0x64u}};
         const auto note72PacketStart = firmwareMachine.soundCommandPacketCount();
+        firmwareMachine.clearInstructionWatchForTesting();
+        firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
         runRealMidiStage("Note On pitch 72 after releasing pitch 66",
                          note72On.data(), note72On.size());
         const auto note72PacketCount =
@@ -3970,6 +3972,75 @@ int main(int argc, char** argv) {
             note72PitchPacket.bytes[1] |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[2]) << 8u) |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[3]) << 16u));
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note72InterpolationEntries{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note72InterpolationWriters{};
+        std::size_t note72InterpolationCount = 0;
+        std::size_t note72WriterCount = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x09dau) {
+                assert(note72InterpolationCount < note72InterpolationEntries.size());
+                note72InterpolationEntries[note72InterpolationCount++] = event;
+            } else if (event.instructionPC == 0x0a4fu) {
+                assert(note72WriterCount < note72InterpolationWriters.size());
+                note72InterpolationWriters[note72WriterCount++] = event;
+            }
+        }
+        assert(note72InterpolationCount == 2u);
+        assert(note72WriterCount == 2u);
+        const auto note72AccessCount =
+            firmwareMachine.slotInterpolationDataAccessTraceCountForTesting();
+        for (std::size_t pass = 0; pass < note72InterpolationCount; ++pass) {
+            const auto& input = note72InterpolationEntries[pass];
+            const auto nextCycle = pass + 1u < note72InterpolationCount
+                ? note72InterpolationEntries[pass + 1u].machineCycle
+                : std::numeric_limits<std::uint64_t>::max();
+            const auto findNote72Read = [&](std::uint16_t pc)
+                -> const TechnoX8032Machine::SlotInterpolationDataAccessEvent* {
+                for (std::size_t index = 0; index < note72AccessCount; ++index) {
+                    const auto& access =
+                        firmwareMachine.slotInterpolationDataAccessTraceAtForTesting(index);
+                    if (!access.write && access.instructionPC == pc &&
+                        access.stackReturnPC == input.returnPC &&
+                        access.machineCycle >= input.machineCycle &&
+                        access.machineCycle < nextCycle)
+                        return &access;
+                }
+                return nullptr;
+            };
+            const auto* low = findNote72Read(0x09dfu);
+            const auto* middle = findNote72Read(0x09e6u);
+            const auto* high = findNote72Read(0x0a00u);
+            assert(low && middle && high);
+            const auto step = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(input.registers[5]) << 8u) |
+                input.registers[4]);
+            const bool negative = (input.directRam20 & 0x08u) != 0;
+            const auto projected = technox::MASS09B9SlotInterpolationArithmetic::apply(
+                low->value, middle->value, high->value, step, negative);
+            const auto& writer = note72InterpolationWriters[pass];
+            assert(writer.registers[2] ==
+                   static_cast<std::uint8_t>(projected.outputValue24 & 0xffu));
+            assert(writer.registers[3] ==
+                   static_cast<std::uint8_t>((projected.outputValue24 >> 8u) & 0xffu));
+            assert(writer.registers[4] ==
+                   static_cast<std::uint8_t>((projected.outputValue24 >> 16u) & 0x07u));
+            std::printf("NOTE72 INTERPOLATION LANE[%zu]: ret=%04X source=%04X:%02X "
+                        "%04X:%02X %04X:%02X step=%04X negative=%u result=%06X "
+                        "writer=%02X/%02X/%02X\\n",
+                        pass, static_cast<unsigned>(input.returnPC),
+                        static_cast<unsigned>(low->address), static_cast<unsigned>(low->value),
+                        static_cast<unsigned>(middle->address), static_cast<unsigned>(middle->value),
+                        static_cast<unsigned>(high->address), static_cast<unsigned>(high->value),
+                        static_cast<unsigned>(step), negative ? 1u : 0u,
+                        static_cast<unsigned>(projected.outputValue24),
+                        static_cast<unsigned>(writer.registers[2]),
+                        static_cast<unsigned>(writer.registers[3]),
+                        static_cast<unsigned>(writer.registers[4]));
+        }
         constexpr std::uint32_t note66ReferencePitchWord = 0x021ff0u;
         const auto note72To66RatioPPM =
             (static_cast<std::uint64_t>(note72PitchStep) * 1000000u +
