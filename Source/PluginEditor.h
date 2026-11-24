@@ -20,6 +20,10 @@ private:
     void selectNextParameter(int delta);
     void changeSelectedValue(int delta);
     void syncValueDialFromSelection() noexcept;
+    void syncParameterDialFromSelection() noexcept;
+    void syncDialsFromCurrentSelection() noexcept;
+    technox::PanelOperatingMode panelOperatingMode() const noexcept;
+    int selectedPerformanceForDial() const noexcept;
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
     DragTarget dragTarget = DragTarget::none;
@@ -29,7 +33,11 @@ private:
     float volumeDragStartValue = 0.0f;
     // The VALUE dial has its own displayed state. It is frozen while the
     // PARAMETER encoder is being moved, then synchronised when that gesture ends.
+    float parameterDialNormalized = 0.0f;
     float valueDialNormalized = 0.0f;
+    bool ramPerformanceBank = false;
+    int ramPerformanceSelection = 0;
+    MidiRoutingMode lastRoutingMode = MidiRoutingMode::performanceOmni;
     int selectedPart = 0;
     int selectedParameter = 3;
     bool editMode = false;
