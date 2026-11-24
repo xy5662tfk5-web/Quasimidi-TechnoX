@@ -250,6 +250,13 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         firmwareMachine != nullptr && hostSampleRate > 0.0
             ? static_cast<double>(firmwareMachine->machineCyclesPerSecond()) / hostSampleRate
             : 0.0;
+    // Host Program Change callbacks may arrive on the message thread. Defer
+    // the full Performance image/voice-state replacement until this audio
+    // callback so MASSAudioEngine's VoiceManager/backend are never mutated
+    // concurrently with render().
+    if (pendingPerformanceSync.exchange(false, std::memory_order_acq_rel))
+        syncCurrentPerformanceToEngine();
+
     const int performanceIndex = getCurrentProgram();
 
     // GUI-originated edits are applied only on the audio thread. The editor
@@ -432,7 +439,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 void QuasimidiTechnoXAudioProcessor::setCurrentProgram(int index)
 {
     if (index >= 0 && performanceBank.select(static_cast<std::size_t>(index)))
-        syncCurrentPerformanceToEngine();
+        pendingPerformanceSync.store(true, std::memory_order_release);
 }
 
 const juce::String QuasimidiTechnoXAudioProcessor::getProgramName(int index)
