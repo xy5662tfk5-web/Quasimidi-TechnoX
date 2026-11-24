@@ -1795,8 +1795,27 @@ int main(int argc, char** argv) {
         firmwareMachine.setTestExternalReadOverride(0xff88u, 0x16u);
         firmwareMachine.setTestInternalWriteOnCall(0x1742u, 0x52u, 0x00u);
         // The stage hook sets 0x7D95 only after resource loading has entered.
+        const auto firstNotePacketStart = firmwareMachine.soundCommandPacketCount();
         runRealMidiStage("Note On Part 1 with synthetic queue-drain handshake",
                          realNoteOn.data(), realNoteOn.size(), true);
+
+        // The very first ready/queue-drain stage has two extra startup packets
+        // from the IC4 helper returning to 0x1048. Keep these distinct from the
+        // five packets emitted by the later warm-state Note On.
+        const auto firstNotePacketCount =
+            firmwareMachine.soundCommandPacketCount() - firstNotePacketStart;
+        assert(firstNotePacketCount == 546u);
+        constexpr std::array<std::array<std::uint8_t, 4>, 2>
+            expectedFirstNoteStartupPackets{{
+                {{0xf0u, 0x80u, 0x01u, 0x80u}},
+                {{0xf1u, 0x80u, 0x01u, 0x80u}}
+            }};
+        for (std::size_t packet = 0; packet < expectedFirstNoteStartupPackets.size(); ++packet) {
+            const auto& observed = firmwareMachine.soundCommandPacketAt(
+                firstNotePacketStart + packet);
+            assert(observed.returnPC == 0x1048u);
+            assert(observed.bytes == expectedFirstNoteStartupPackets[packet]);
+        }
 
         // Differential probe: the synthetic ready override remains asserted.
         // Send a second, different note after the first resource/voice setup so
