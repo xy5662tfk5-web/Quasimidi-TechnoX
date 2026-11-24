@@ -496,11 +496,21 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
     const auto completedTarget = dragTarget;
     dragTarget = DragTarget::none;
 
-    // Only Part Edit couples selection of a new parameter to the stored VALUE.
-    if (completedTarget == DragTarget::parameter && page == EditorPage::editPart)
-        syncValueDialFromSelection();
-    else if (completedTarget == DragTarget::value)
-        syncValueDialFromSelection();
+    if (completedTarget == DragTarget::parameter || completedTarget == DragTarget::value) {
+        // Performance and Edit Function use both dials to select the same item:
+        // only the active pointer moves during the gesture, then both indicators
+        // settle on the selected Performance/function after release.
+        if ((page == EditorPage::main &&
+             panelOperatingMode() == technox::PanelOperatingMode::performance) ||
+            page == EditorPage::editFunctionMenu) {
+            syncDialsFromCurrentSelection();
+        } else if (page == EditorPage::editPart) {
+            // In Part Edit, PARAMETER selects a field and VALUE follows that field.
+            syncValueDialFromSelection();
+        } else if (completedTarget == DragTarget::value) {
+            syncValueDialFromSelection();
+        }
+    }
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
