@@ -58,7 +58,20 @@ It does **not** yet establish:
 
 For that reason, do not invent 8032 input-register writes or claim that the UI has already been routed through the original panel scanner. That connection requires a firmware trace or hardware capture for each physical encoder/button action.
 
-## 5. Required long-term architecture
+## 5. Original firmware panel-input path discovered
+
+Reachable IC4 v1.05 code contains actual external-pin scan routines. The evidence is documented in `docs/research/FRONT_PANEL_GPIO_SCAN.md`:
+
+- `0xA6FF` performs a four-pattern P1/P3.0 scan and samples P1.3/P1.7.
+- `0xA762` performs an additional two-entry scan using P3.0 and P1.5/P1.6/P1.7.
+- Both enqueue byte events through `0xA6D1`; `0xA6E7` reads the 16-byte internal-RAM event FIFO.
+- The timer interrupt calls `0xA762`; several main-state routines call `0xA6FF`.
+
+The emulator already exposes `TechnoX8032Machine::setExternalPortInputs()`, which overrides sampled P1/P3 pin levels independently of the output latch. A regression test now exercises this input seam.
+
+This is the first confirmed firmware-level route for panel input. It is **not yet** a complete mapping from physical controls to UI labels: the exact PARAMETER/VALUE encoder signals, button matrix wiring, detent direction and event consumers must still be correlated. Do not synthesize guessed GPIO sequences.
+
+## 6. Required long-term architecture
 
 Keep one canonical Performance/Part state and one typed control-event boundary:
 
@@ -74,13 +87,13 @@ Panel input
 
 The firmware adapter and audio backend must not become two independent sources of truth. A confirmed firmware response should update the canonical model; the backend should consume that same model or the verified firmware-produced resource/command stream. Unknown bytes and SysEx fields must continue to be preserved.
 
-## 6. Important distinctions for later implementation
+## 7. Important distinctions for later implementation
 
 - **Performance index** is the selected one of 50 factory Performance memories.
 - **Part number** is user-facing Parts 13–16 for the four stored Performance blocks; runtime firmware event IDs/record indices use zero-based values 12–15.
 - **Bank/Sound** selects one of 512 single sounds assigned to a Part.
 - **MIDI Program Change** is not the same as selecting one of the 50 Performance memories. The current processor applies Program Change to the Part Sound Number in Sequencer Multi/Part Channels mode; in Performance Omni mode the current MIDI handler does not apply Program Change to a Part. Keep this behavior explicit until the manual's mode-specific Program Change behavior and the firmware path are implemented and regression-tested.
 
-## 7. Evidence boundary
+## 8. Evidence boundary
 
 Manual-confirmed ranges, firmware-derived record layout, and the current project implementation are distinct evidence layers. The control UI should follow the manual's documented parameter ranges, the firmware's verified Part/Performance mapping, and only verified hardware input/command semantics. No panel control should be wired to guessed DSP registers.
