@@ -27,6 +27,10 @@ private:
     technox::PanelOperatingMode panelOperatingMode() const noexcept;
     technox::PanelEditPage panelEditPage() const noexcept;
     int selectedPerformanceForDial() const noexcept;
+    int currentPartParameterRaw(technox::PartParameter parameter) const noexcept;
+    bool queueCurrentPartParameterRaw(technox::PartParameter parameter, int rawValue) noexcept;
+    juce::String currentPartSoundName() const;
+    int currentPartDisplayNumber() const noexcept;
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
     DragTarget dragTarget = DragTarget::none;
