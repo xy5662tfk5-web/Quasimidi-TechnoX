@@ -58,6 +58,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MCS51Core.h
     Source/TechnoX8032Machine.h
     Source/TechnoXPanelControlEvents.h
+    Source/TechnoXPanelControlMap.h
     Source/MCS51Timers.h
 )
 
@@ -172,6 +173,18 @@ if (BUILD_TESTING)
     target_compile_options(technox_panel_control_events_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_panel_control_events_tests
         COMMAND technox_panel_control_events_tests
+    )
+endif()
+
+# Dependency-free tests for manual-based mode/encoder control semantics.
+if (BUILD_TESTING)
+    add_executable(technox_panel_control_map_tests
+        tests/test_panel_control_map.cpp
+    )
+    target_compile_features(technox_panel_control_map_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_panel_control_map_tests PRIVATE -UNDEBUG)
+    add_test(NAME technox_panel_control_map_tests
+        COMMAND technox_panel_control_map_tests
     )
 endif()
 
