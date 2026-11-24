@@ -168,6 +168,14 @@ public:
         std::uint8_t directRam6F = 0;
         std::uint8_t directRam70 = 0;
         std::uint8_t directRam71 = 0;
+        std::uint8_t directRam3C = 0;
+        std::uint8_t directRam3D = 0;
+        std::uint8_t directRam3E = 0;
+        std::uint8_t directRam3F = 0;
+        std::uint8_t directRam45 = 0;
+        std::uint8_t directRam50 = 0;
+        std::uint8_t directRam51 = 0;
+        std::uint8_t directRam52 = 0;
         std::uint8_t directRam30 = 0;
         std::uint8_t directRam31 = 0;
         std::uint8_t directRam32 = 0;
@@ -708,6 +716,24 @@ public:
             pc == 0x4430u || pc == 0x4440u || pc == 0x4455u ||
             pc == 0x4458u || pc == 0x4459u || pc == 0x4467u ||
             pc == 0x446au ||
+            pc == 0x16a4u || pc == 0x16a7u || pc == 0x16afu ||
+            pc == 0x16b0u || pc == 0x16c3u || pc == 0x16cau ||
+            pc == 0x16d8u || pc == 0x16dbu || pc == 0x16ddu ||
+            pc == 0x16e4u || pc == 0x16e6u || pc == 0x16f7u ||
+            pc == 0x1700u || pc == 0x171du || pc == 0x1720u ||
+            pc == 0x172du || pc == 0x1734u || pc == 0x1742u ||
+            pc == 0x1749u || pc == 0x174cu || pc == 0x174eu ||
+            pc == 0x174fu || pc == 0x177eu || pc == 0x1780u ||
+            pc == 0x1788u || pc == 0x1789u || pc == 0x1792u ||
+            pc == 0x179au || pc == 0x179eu || pc == 0x179fu ||
+            pc == 0x17acu || pc == 0x17b4u || pc == 0x17bbu ||
+            pc == 0x17c3u || pc == 0x17c7u || pc == 0x17c8u ||
+            pc == 0x17d4u || pc == 0x17dau || pc == 0x17e6u ||
+            pc == 0x17eau || pc == 0x17ebu || pc == 0x17f8u ||
+            pc == 0x1800u || pc == 0x1807u || pc == 0x1813u ||
+            pc == 0x1817u || pc == 0x1818u || pc == 0x182bu ||
+            pc == 0x1834u || pc == 0x1837u || pc == 0x183bu ||
+            pc == 0x183cu || pc == 0x1841u || pc == 0x1848u ||
             pc == 0x57a7u || pc == 0x9968u || pc == 0x9987u ||
             pc == 0x9988u || pc == 0x9994u || pc == 0x9997u ||
             pc == 0x99b5u || pc == 0x99b8u || pc == 0x99c5u ||
@@ -738,6 +764,14 @@ public:
             event.directRam6F = readInternal(0x6fu);
             event.directRam70 = readInternal(0x70u);
             event.directRam71 = readInternal(0x71u);
+            event.directRam3C = readInternal(0x3cu);
+            event.directRam3D = readInternal(0x3du);
+            event.directRam3E = readInternal(0x3eu);
+            event.directRam3F = readInternal(0x3fu);
+            event.directRam45 = readInternal(0x45u);
+            event.directRam50 = readInternal(0x50u);
+            event.directRam51 = readInternal(0x51u);
+            event.directRam52 = readInternal(0x52u);
             event.directRam30 = readInternal(0x30u);
             event.directRam31 = readInternal(0x31u);
             event.directRam32 = readInternal(0x32u);
