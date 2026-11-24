@@ -35,7 +35,7 @@ The project now keeps two separate models:
 - **Performance memory:** 50 factory ROM Performance records. Each contains a Common block and four stored Part blocks, corresponding to user-visible Parts 13–16 (runtime voice slots 12–15).
 - **Sequencer Multi:** 16 independent live Part parameter sets, separate from the four stored Performance blocks. The panel has a separate Part selector for these Parts 1–16; selecting a Multi Part never changes the Performance Part 13–16 selector.
 
-The 16 Sequencer Multi Parts default to MIDI channels 1–16. A unique channel map is validated when a V5/V6 plugin state is restored. Part 10 (index 9) has a **separate Drum Set field** (manual temporary address `02 7E 00`), with values 0–7. It is not stored in Part 10's ordinary Sound Number field. MIDI Program Change on channel 10 and the panel VALUE control address this dedicated Drum Set state.
+The 16 Sequencer Multi Parts default to MIDI channels 1–16. A unique channel map is validated when a V5/V6 plugin state is restored. Part 10 (index 9) has a **separate Drum Set field** (manual temporary address `02 7E 00`), with values 0–7. It is not stored in Part 10's ordinary Sound Number field. MIDI Program Change on Part 10's assigned channel (channel 10 by default) and the panel VALUE control address this dedicated Drum Set state.
 
 The 4-bank × 128-sound catalog contains names, not waveforms. The 512 names are used for single-sound lookup on Parts 1–9 and 11–16. The Drum Set name/selection uses its own field and is distinct from the single-sound catalog.
 
@@ -61,7 +61,7 @@ Sequencer Multi single-sound Part 1–9 / 11–16:
     -> MASSAudioEngine Part 1–16
 
 Sequencer Multi Part 10 Drum Set:
-  VALUE encoder or MIDI Program Change on channel 10
+  VALUE encoder or MIDI Program Change on Part 10's assigned channel (normally channel 10)
     -> dedicated Drum Set value 0–7 (manual temporary address 02 7E 00)
     -> atomic drum-set state + pending audio-thread update
     -> processBlock() calls MASSAudioEngine::setDrumSet(Part 10, kit)
@@ -73,7 +73,7 @@ Plugin state format V6 stores all 16 Sequencer-Multi Part parameter sets, 16 MID
 
 Host Performance selection is similarly split: `setCurrentProgram()` changes the selected Performance index and sets a pending flag; the full Performance/Part image is synchronized to MASSAudioEngine at the start of the next `processBlock()`. This moves VoiceManager/backend mutations out of the host/message thread.
 
-Bank/Sound values are the bank/program identity used by the engine. `VoiceSlot` captures that identity for newly started voices, and the predecoded IC51 descriptor/command catalog is available to the backend.
+Bank/Sound values are the bank/program identity used by the engine. `VoiceSlot` captures that identity for newly started single-sound voices. It also captures the separate `drumSetNumber` for voices started on Part 10, so changing the selected kit does not rewrite the identity of notes that are already sounding. The backend receives the dedicated Drum Set through `IMASSVoiceBackend::setDrumSet()`; the per-voice captured value is available in the Note On `VoiceSlot`. The predecoded IC51 descriptor/command catalog is available to the backend.
 
 The dedicated Drum Set selection is now represented in the engine and exposed through a separate optional `IMASSVoiceBackend::setDrumSet()` hook. The current `BasicMASSVoiceBackend` does not yet synthesize the original drum kits; this is a state/contract connection only, not recovered drum audio.
 
