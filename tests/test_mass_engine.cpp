@@ -76,6 +76,28 @@ int main() {
     assert(!engine.setDrumSet(9, 8));
     assert(!engine.setDrumSet(9, -1));
     assert(!engine.setDrumSet(16, 0));
+    engine.noteOn(9, 10, 60, 100);
+    bool firstDrumVoiceCapturedKit = false;
+    for (const auto& voice : engine.voiceManager().voices())
+        if (voice.active && voice.part == 9 && voice.note == 60)
+            firstDrumVoiceCapturedKit = voice.drumSetNumber == 7;
+    assert(firstDrumVoiceCapturedKit);
+
+    // Changing the selected kit must not rewrite the identity captured by
+    // an already-started voice; the next note captures the new Drum Set.
+    assert(engine.setDrumSet(9, 2));
+    engine.noteOn(9, 10, 62, 100);
+    bool oldVoiceKeptKit = false;
+    bool newVoiceCapturedKit = false;
+    for (const auto& voice : engine.voiceManager().voices()) {
+        if (!voice.active || voice.part != 9) continue;
+        if (voice.note == 60)
+            oldVoiceKeptKit = voice.drumSetNumber == 7;
+        if (voice.note == 62)
+            newVoiceCapturedKit = voice.drumSetNumber == 2;
+    }
+    assert(oldVoiceKeptKit && newVoiceCapturedKit);
+    engine.allSoundsOff();
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
     assert(!engine.setModWheel(16, 127));
