@@ -3557,11 +3557,32 @@ int main(int argc, char** argv) {
         const auto note65PacketStart = firmwareMachine.soundCommandPacketCount();
         firmwareMachine.clearInstructionWatchForTesting();
         firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
+        firmwareMachine.clearPitchSourceDataAccessTraceForTesting();
         runRealMidiStage("Note 65 Part 1 after same-program setup",
                          note65On.data(), note65On.size());
         const auto note65PacketCount =
             firmwareMachine.soundCommandPacketCount() - note65PacketStart;
         assert(note65PacketCount == 549u);
+        const auto note65PitchSourceAccessCount =
+            firmwareMachine.pitchSourceDataAccessTraceCountForTesting();
+        std::printf("NOTE65 PITCH SOURCE ACCESS: count=%zu\\n",
+                    note65PitchSourceAccessCount);
+        for (std::size_t i = 0; i < note65PitchSourceAccessCount; ++i) {
+            const auto& access =
+                firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+            std::printf("  NOTE65-PITCH-SOURCE %c %04X=%02X pc=%04X ret=%04X "
+                        "P2=%02X P3=%02X mode=%u IC51=%u cycle=%llu\\n",
+                        access.write ? 'W' : 'R',
+                        static_cast<unsigned>(access.address),
+                        static_cast<unsigned>(access.value),
+                        static_cast<unsigned>(access.instructionPC),
+                        static_cast<unsigned>(access.stackReturnPC),
+                        static_cast<unsigned>(access.port2),
+                        static_cast<unsigned>(access.port3),
+                        static_cast<unsigned>(access.soundBusMode),
+                        static_cast<unsigned>(access.ic51Selected),
+                        static_cast<unsigned long long>(access.machineCycle));
+        }
 
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
             note65SlotEntryEvents{};
@@ -3952,18 +3973,39 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.soundCommandPacketCount() == note66OffPacketStart);
         assert(firmwareMachine.watchedCallCount(0x0db7u) == note66OffWriterStart);
 
-        // Octave probe: key 72 is one octave above key 60 and six semitones
-        // above key 66. Keep the same Part, program and velocity, then check
-        // that the first note-specific 24-bit word doubles relative to key 66.
+        // High-key range probe: keep the same Part, program and velocity.
+        // Capture the source triplet accesses so sample/root-zone or parameter
+        // changes can be distinguished from the interpolation arithmetic.
         const std::array<std::uint8_t, 3> note72On{{0x90u, 0x48u, 0x64u}};
         const auto note72PacketStart = firmwareMachine.soundCommandPacketCount();
         firmwareMachine.clearInstructionWatchForTesting();
         firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
+        firmwareMachine.clearPitchSourceDataAccessTraceForTesting();
         runRealMidiStage("Note On pitch 72 after releasing pitch 66",
                          note72On.data(), note72On.size());
         const auto note72PacketCount =
             firmwareMachine.soundCommandPacketCount() - note72PacketStart;
         assert(note72PacketCount == 549u);
+        const auto note72PitchSourceAccessCount =
+            firmwareMachine.pitchSourceDataAccessTraceCountForTesting();
+        std::printf("NOTE72 PITCH SOURCE ACCESS: count=%zu\\n",
+                    note72PitchSourceAccessCount);
+        for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
+            const auto& access =
+                firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+            std::printf("  NOTE72-PITCH-SOURCE %c %04X=%02X pc=%04X ret=%04X "
+                        "P2=%02X P3=%02X mode=%u IC51=%u cycle=%llu\\n",
+                        access.write ? 'W' : 'R',
+                        static_cast<unsigned>(access.address),
+                        static_cast<unsigned>(access.value),
+                        static_cast<unsigned>(access.instructionPC),
+                        static_cast<unsigned>(access.stackReturnPC),
+                        static_cast<unsigned>(access.port2),
+                        static_cast<unsigned>(access.port3),
+                        static_cast<unsigned>(access.soundBusMode),
+                        static_cast<unsigned>(access.ic51Selected),
+                        static_cast<unsigned long long>(access.machineCycle));
+        }
         const auto& note72PitchPacket =
             firmwareMachine.soundCommandPacketAt(note72PacketStart);
         assert(note72PitchPacket.returnPC == 0x0a52u);
