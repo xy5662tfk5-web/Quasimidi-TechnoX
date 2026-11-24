@@ -3210,8 +3210,9 @@ int main(int argc, char** argv) {
             assert(nestedSourceByte->accumulator == 0xa4u);
             assert(nestedSourceByte->registers[3] == 0x86u);
             assert(nestedSetBit->accumulator == 0xa4u);
+            // PC 1A1F is the pre-instruction snapshot for MOV R0,A, so R0
+            // is not updated until that instruction executes.
             assert(nestedPostSetBit->accumulator == 0xe4u);
-            assert(nestedPostSetBit->registers[0] == 0xe4u);
             assert(nestedTupleLoad->registers[0] == 0xe4u);
             assert(nestedTupleLoad->registers[2] == 0x16u);
             assert(nestedTupleLoad->registers[6] == 0xa3u);
