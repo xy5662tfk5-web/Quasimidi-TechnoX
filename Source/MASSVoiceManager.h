@@ -15,6 +15,8 @@ struct VoiceSlot {
     // IC51 program identity captured at note-on for the DSP backend.
     std::uint8_t bankNumber = 0;
     std::uint8_t soundNumber = 0;
+    // Dedicated Drum Set selector captured for Part 10; 0xff means none.
+    std::uint8_t drumSetNumber = 0xff;
     std::uint64_t age = 0;
     bool keyDown = true;
     bool sustained = false;
@@ -50,7 +52,7 @@ public:
 
     int noteOn(std::uint8_t part, std::uint8_t channel, std::uint8_t note, std::uint8_t velocity,
                int preferredVoiceIndex = -1, std::uint8_t bankNumber = 0,
-               std::uint8_t soundNumber = 0) noexcept {
+               std::uint8_t soundNumber = 0, std::uint8_t drumSetNumber = 0xff) noexcept {
         if (velocity == 0) {
             noteOff(channel, note);
             return -1;
@@ -86,6 +88,7 @@ public:
         voice.velocity = velocity;
         voice.bankNumber = bankNumber;
         voice.soundNumber = soundNumber;
+        voice.drumSetNumber = drumSetNumber;
         voice.age = ++age_;
         voice.keyDown = true;
         return selected;
@@ -108,10 +111,12 @@ public:
 
     bool retargetVoice(std::size_t voiceIndex, std::uint8_t channel,
                        std::uint8_t note, std::uint8_t velocity,
-                       std::uint8_t bankNumber, std::uint8_t soundNumber) noexcept {
+                       std::uint8_t bankNumber, std::uint8_t soundNumber,
+                       std::uint8_t drumSetNumber = 0xff) noexcept {
         if (!retargetVoice(voiceIndex, channel, note, velocity)) return false;
         voices_[voiceIndex].bankNumber = bankNumber;
         voices_[voiceIndex].soundNumber = soundNumber;
+        voices_[voiceIndex].drumSetNumber = drumSetNumber;
         return true;
     }
 
