@@ -142,3 +142,16 @@ A passing real-ROM Note 65 trace follows the second active Part event (`0x0D`) o
 The new focused `ResourceTupleWriteTrace` keeps these writes in a dedicated small ring, independent of the broad XDATA trace. The regression asserts the IC51 source bytes, the raw `A4` source byte, the post-`SETB ACC.6` value `E4`, the remaining registers, and all four destination addresses/values/PCs with the active P2 page and caller `0x1720`. This avoids losing the four writes when the much larger generic XDATA ring rolls over.
 
 This is a confirmed IC51 resource-record transfer and firmware bit operation. The four bytes are not yet identified as a sample descriptor, pitch, PCM, or hardware DSP command; those meanings remain open until the next consumer and physical interface are established.
+## 10. Nested-slot metadata writes are branch-dependent
+
+A follow-up instruction-level watch corrects the first interpretation of the post-copy metadata writes. The byte written at PC `0x1A57` is **not a constant `0x7F`**:
+
+- After the four-byte copy, `0x1A4A` reads selected-page offset `+1`; `0x1A4B` places the result in `R2`.
+- For the second event's nested tuple `E4 16 A3 40`, the second byte is `0x16`. At the pre-instruction snapshot of `0x1A4E` (the `JNZ 0x1A8C`), both `A` and `R2` are `0x16`, so firmware takes the nonzero branch.
+- `0x1A8C` clears A. The loop returns through `0x1A52`/`0x1A54`/`0x1A55`; the `XCH A,F0` leaves A=`0x00`, so `MOVX @R1,A` at `0x1A57` writes `00` to selected-page offset `+3`.
+- The alternative `0x7F` value is staged at `0x1A50` only when the byte read at `+1` is zero. That value is exchanged with the current `+3` byte at `0x1A55`; it is not the value emitted on the nonzero-R2 path tested here.
+- The remaining captured writes for this branch are `+4=00` at `0x1A44` and `0x1AA5`, `+5=80` at `0x1A82`, and `+6=00` at `0x1A88`.
+
+The regression now watches PC `0x1A4E` and asserts `A=R2=0x16`, watches `0x1A8C` before the clear, and pins the `0x1A57` write to zero. This makes the condition, not a guessed constant, the tested property.
+
+This is IC4's conditional slot-metadata post-processing after the nested four-byte table tuple copy. It is still not a decoded sample address or physical DSP command.
