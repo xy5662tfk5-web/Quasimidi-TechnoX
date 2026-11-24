@@ -157,6 +157,8 @@ public:
         std::uint8_t psw = 0;
         std::uint8_t registerBankBase = 0;
         std::array<std::uint8_t, 8> registers{};
+        std::uint8_t directRam25 = 0;
+        std::uint8_t directRam26 = 0;
         std::uint8_t directRam28 = 0;
         std::uint8_t directRam29 = 0;
         std::uint8_t directRam2F = 0;
@@ -655,6 +657,8 @@ public:
             for (std::size_t index = 0; index < event.registers.size(); ++index)
                 event.registers[index] = readInternal(static_cast<std::uint8_t>(
                     event.registerBankBase + index));
+            event.directRam25 = readInternal(0x25u);
+            event.directRam26 = readInternal(0x26u);
             event.directRam28 = readInternal(0x28u);
             event.directRam29 = readInternal(0x29u);
             event.directRam2F = readInternal(0x2fu);
