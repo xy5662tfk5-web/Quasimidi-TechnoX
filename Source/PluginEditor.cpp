@@ -199,7 +199,7 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
                 + ": " + audioProcessor.getCurrentPerformanceName();
     } else {
         line1 = "TECHNOX";
-        if (selectedPart == 9) {
+        if (currentPartDisplayNumber() == 10) {
             const int kit = juce::jlimit(1, 8, sound + 1);
             line2 = "10:DRUM" + juce::String(kit).paddedLeft('0', 2);
         } else {
@@ -306,7 +306,7 @@ int QuasimidiTechnoXAudioProcessorEditor::currentPartParameterRaw(
     if (panelOperatingMode() == technox::PanelOperatingMode::performance)
         return audioProcessor.getPartParameterRaw(
             audioProcessor.getCurrentProgram(), selectedPart, parameter);
-    return audioProcessor.getSequencerPartParameterRaw(selectedPart, parameter);
+    return audioProcessor.getSequencerPartParameterRaw(selectedSequencerPart, parameter);
 }
 
 bool QuasimidiTechnoXAudioProcessorEditor::queueCurrentPartParameterRaw(
@@ -315,20 +315,20 @@ bool QuasimidiTechnoXAudioProcessorEditor::queueCurrentPartParameterRaw(
     if (panelOperatingMode() == technox::PanelOperatingMode::performance)
         return audioProcessor.queuePanelPartParameterRaw(
             audioProcessor.getCurrentProgram(), selectedPart, parameter, rawValue);
-    return audioProcessor.queueSequencerPartParameterRaw(selectedPart, parameter, rawValue);
+    return audioProcessor.queueSequencerPartParameterRaw(selectedSequencerPart, parameter, rawValue);
 }
 
 juce::String QuasimidiTechnoXAudioProcessorEditor::currentPartSoundName() const
 {
     if (panelOperatingMode() == technox::PanelOperatingMode::performance)
         return audioProcessor.getCurrentPartSoundName(selectedPart);
-    return audioProcessor.getSequencerPartSoundName(selectedPart);
+    return audioProcessor.getSequencerPartSoundName(selectedSequencerPart);
 }
 
 int QuasimidiTechnoXAudioProcessorEditor::currentPartDisplayNumber() const noexcept
 {
     return panelOperatingMode() == technox::PanelOperatingMode::performance
-        ? selectedPart + 13 : selectedPart + 1;
+        ? selectedPart + 13 : selectedSequencerPart + 1;
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noexcept
@@ -374,7 +374,7 @@ void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
             / static_cast<float>(maximumProgram);
     } else {
         const int sound = currentPartParameterRaw(technox::PartParameter::soundNumber);
-        const int maximumSound = selectedPart == 9 ? 7 : 127;
+        const int maximumSound = currentPartDisplayNumber() == 10 ? 7 : 127;
         valueDialNormalized = sound < 0 ? 0.0f
             : static_cast<float>(juce::jlimit(0, maximumSound, sound))
                 / static_cast<float>(maximumSound);
@@ -516,10 +516,14 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
             syncDialsFromCurrentSelection();
         } else if (action == technox::PanelControlAction::selectPart) {
             // Performance memories store four Parts (13–16); Sequencer
-            // Multi owns all 16 channels/Parts, independently of those records.
-            const int maximumPart = mode == technox::PanelOperatingMode::performance ? 3 : 15;
-            selectedPart = juce::jlimit(0, maximumPart,
-                selectedPart + (p.x < 776 ? -1 : 1));
+            // Multi has its own independent selector for Parts 1–16.
+            if (mode == technox::PanelOperatingMode::performance) {
+                selectedPart = juce::jlimit(0, 3,
+                    selectedPart + (p.x < 776 ? -1 : 1));
+            } else {
+                selectedSequencerPart = juce::jlimit(0, 15,
+                    selectedSequencerPart + (p.x < 776 ? -1 : 1));
+            }
             syncDialsFromCurrentSelection();
         }
         repaint();
