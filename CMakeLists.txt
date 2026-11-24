@@ -184,5 +184,6 @@ if (BUILD_TESTING)
     target_compile_options(technox_panel_gpio_input_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_panel_gpio_input_tests
         COMMAND technox_panel_gpio_input_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
     )
 endif()
