@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "TechnoXPanelControlMap.h"
 
 class QuasimidiTechnoXAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                                    private juce::Timer
