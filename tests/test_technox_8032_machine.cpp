@@ -725,6 +725,77 @@ int main(int argc, char** argv) {
         assert(sineDoubleStep[1] == 0x1eu);
         assert(sineDoubleStep[2] == firmwareMachine.readCode(0x002du));
 
+        // Differentially execute the alternate 0x047E consumer branch.
+        // Keep Part/slot inputs fixed and vary only the real sine updater's
+        // output byte; the two internal fixed-point scratch bytes must respond.
+        const auto runSineSlotConsumer = [&](std::uint8_t sineStepCount) {
+            TechnoX8032Machine consumerMachine;
+            assert(consumerMachine.loadIC4Rom(realRom.data(), realRom.size()));
+            consumerMachine.reset();
+            auto& cpuRegisters = consumerMachine.cpuForTesting().registersForTesting();
+
+            cpuRegisters.pc = 0x0148u;
+            assert(consumerMachine.runUntilProgramCounter(0x0162u, 50000u) > 0u);
+            assert(cpuRegisters.pc == 0x0162u);
+
+            cpuRegisters.pc = 0x0130u;
+            assert(consumerMachine.runUntilProgramCounter(0x0147u, 1000u) > 0u);
+            assert(cpuRegisters.pc == 0x0147u);
+            assert(consumerMachine.xdataByteForTesting(0x2050u) == 0x3cu);
+            for (std::size_t slot = 0; slot < 16u; ++slot)
+                assert(consumerMachine.xdataByteForTesting(
+                    static_cast<std::uint16_t>(0x2b61u + slot)) == 0x98u);
+
+            consumerMachine.writeInternal(0x47u, sineStepCount);
+            consumerMachine.writeExternal(0x2064u, 0x01u);
+            cpuRegisters.pc = 0x044cu;
+            assert(consumerMachine.runUntilProgramCounter(0x047du, 512u) > 0u);
+            assert(cpuRegisters.pc == 0x047du);
+            assert(!consumerMachine.cpuFaulted());
+            const auto sineSample = consumerMachine.xdataByteForTesting(0x2053u);
+            assert(sineSample == consumerMachine.readCode(
+                static_cast<std::uint16_t>(0x001eu +
+                    ((consumerMachine.xdataByteForTesting(0x2052u) >> 1u) & 0x3fu))));
+
+            // Select slot 0, choose the 0x28C8 table page (ACC.3 clear), and
+            // provide non-zero fixed-point base/coefficient operands.
+            consumerMachine.writeExternal(0x00fbu, 0x00u);
+            consumerMachine.writeExternal(0x00fcu, 0x00u);
+            consumerMachine.writeExternal(0x00fdu, 0x00u);
+            consumerMachine.writeExternal(0x28c8u, 0x22u);
+            consumerMachine.writeExternal(0x2888u, 0x33u);
+            consumerMachine.writeExternal(0x2898u, 0x44u);
+            consumerMachine.writeExternal(0x2020u, 0x05u);
+            consumerMachine.writeExternal(0x2021u, 0x00u);
+
+            cpuRegisters.pc = 0x047eu;
+            const auto consumerInstructions =
+                consumerMachine.runUntilProgramCounter(0x0550u, 4096u);
+            assert(consumerInstructions > 0u);
+            assert(cpuRegisters.pc == 0x0550u);
+            assert(!consumerMachine.cpuFaulted());
+            assert(consumerMachine.readInternal(0x30u) == 0x00u);
+            assert(consumerMachine.readInternal(0x45u) == 0x22u);
+            assert(consumerMachine.readInternal(0x41u) == 0x33u);
+            assert(consumerMachine.readInternal(0x36u) != 0u ||
+                   consumerMachine.readInternal(0x37u) != 0u);
+            assert(consumerMachine.soundCommandPacketCount() == 0u);
+            assert(consumerMachine.soundHostWriteCount() == 0u);
+            assert(consumerMachine.soundHostReadCount() == 0u);
+            return std::array<std::uint8_t, 3>{{
+                sineSample,
+                consumerMachine.readInternal(0x36u),
+                consumerMachine.readInternal(0x37u)
+            }};
+        };
+
+        const auto slotConsumerSingle = runSineSlotConsumer(0x01u);
+        const auto slotConsumerDouble = runSineSlotConsumer(0x02u);
+        assert(slotConsumerSingle[0] == sineSingleStep[2]);
+        assert(slotConsumerDouble[0] == sineDoubleStep[2]);
+        assert(slotConsumerSingle[1] != slotConsumerDouble[1] ||
+               slotConsumerSingle[2] != slotConsumerDouble[2]);
+
         // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
         // then resolve the two IC51 upload-stream formats associated with each FX1 entry.
         if (!realIC51.empty()) {
