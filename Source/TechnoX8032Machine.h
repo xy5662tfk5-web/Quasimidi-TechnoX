@@ -519,6 +519,8 @@ public:
         instructionWatchCount_ = 0;
         slotInterpolationDataAccessTrace_.fill(SlotInterpolationDataAccessEvent{});
         slotInterpolationDataAccessTraceCount_ = 0;
+        pitchSourceDataAccessTrace_.fill(SlotInterpolationDataAccessEvent{});
+        pitchSourceDataAccessTraceCount_ = 0;
         executionInstructionTrace_.fill(ExecutionInstructionEvent{});
         executionInstructionTraceCount_ = 0;
         executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
@@ -623,6 +625,18 @@ public:
         std::size_t index) const noexcept {
         return slotInterpolationDataAccessTrace_[
             index % slotInterpolationDataAccessTrace_.size()];
+    }
+    void clearPitchSourceDataAccessTraceForTesting() noexcept {
+        pitchSourceDataAccessTrace_.fill(SlotInterpolationDataAccessEvent{});
+        pitchSourceDataAccessTraceCount_ = 0;
+    }
+    std::size_t pitchSourceDataAccessTraceCountForTesting() const noexcept {
+        return pitchSourceDataAccessTraceCount_;
+    }
+    const SlotInterpolationDataAccessEvent& pitchSourceDataAccessTraceAtForTesting(
+        std::size_t index) const noexcept {
+        return pitchSourceDataAccessTrace_[
+            index % pitchSourceDataAccessTrace_.size()];
     }
 
     // Arms capture only when firmware reaches 0x1FC9 or 0x2027, and each
@@ -1147,6 +1161,7 @@ public:
         const auto value = readExternalImpl(address);
         recordMidiEventGateAccess(address, value, false);
         recordSlotInterpolationDataAccess(address, value, false);
+        recordPitchSourceDataAccess(address, value, false);
         recordExecutionDataAccess(address, value, false);
         return value;
     }
@@ -1392,6 +1407,7 @@ public:
         writeExternalImpl(address, value);
         recordMidiEventGateAccess(address, value, true);
         recordSlotInterpolationDataAccess(address, value, true);
+        recordPitchSourceDataAccess(address, value, true);
         recordExecutionDataAccess(address, value, true);
     }
 
@@ -1965,6 +1981,29 @@ private:
         ++slotInterpolationDataAccessTraceCount_;
     }
 
+    void recordPitchSourceDataAccess(std::uint16_t address,
+                                      std::uint8_t value,
+                                      bool write) noexcept {
+        const bool pitchSourceAddress =
+            (address >= 0x0081u && address <= 0x0083u) ||
+            (address >= 0x0091u && address <= 0x0093u);
+        if (!pitchSourceAddress)
+            return;
+        auto& event = pitchSourceDataAccessTrace_[
+            pitchSourceDataAccessTraceCount_ % pitchSourceDataAccessTrace_.size()];
+        event.address = address;
+        event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        event.stackReturnPC = currentStackReturnPC();
+        event.value = value;
+        event.port2 = portLatch_[2];
+        event.port3 = portPins_[3];
+        event.soundBusMode = internal_[0x8e];
+        event.write = write;
+        event.ic51Selected = isIC51Selected();
+        event.machineCycle = elapsedMachineCycles_;
+        ++pitchSourceDataAccessTraceCount_;
+    }
+
     void recordExecutionDataAccess(std::uint16_t address, std::uint8_t value,
                                    bool write) noexcept {
         if (!executionTraceActive_)
@@ -2074,6 +2113,8 @@ private:
     std::size_t instructionWatchCount_ = 0;
     std::array<SlotInterpolationDataAccessEvent, 256> slotInterpolationDataAccessTrace_{};
     std::size_t slotInterpolationDataAccessTraceCount_ = 0;
+    std::array<SlotInterpolationDataAccessEvent, 2048> pitchSourceDataAccessTrace_{};
+    std::size_t pitchSourceDataAccessTraceCount_ = 0;
     std::array<ExecutionInstructionEvent, 4096> executionInstructionTrace_{};
     std::size_t executionInstructionTraceCount_ = 0;
     std::array<ExecutionDataAccessEvent, 8192> executionDataAccessTrace_{};
