@@ -77,3 +77,37 @@ Possible explanations include additional undumped ROMs, a partial/incomplete MAM
 ## Current project status
 
 The JUCE project is an interface/build scaffold only. Its audio processor intentionally outputs silence. The research above does not yet provide a working synthesizer engine, complete waveform data, or verified AU-in-Logic operation.
+
+
+## Candidate sound processor lead: Dream SAM9407 (not confirmed)
+
+A secondary sound-chip reference lists the Dream/Atmel SAM9407 among chips used in Quasimidi instruments including the TechnoX. This is a useful lead, not primary proof of the TechnoX bill of materials. No board photograph, readable marking, or schematic in this repository currently identifies a SAM9407 on the TechnoX PCB.
+
+The SAM9407 objective datasheet (February 1996) describes an integrated sound engine with:
+- a 16-bit CISC P16 control processor and a separate RISC synthesis/DSP core;
+- MIDI UART and host-interface FIFO/burst logic;
+- wavetable synthesis, 16-bit samples, 44.1 kHz operation, interpolation, alternate loops and a 24 dB resonant filter per voice;
+- external ROM/SRAM/DRAM shared through an MMU for samples and delay lines;
+- an external host interface using A0–A2, CS, RD and WR, plus READY/CS16 handshake signals;
+- up to 64 MB of 8-bit sample address space in the maximum memory configuration;
+- a 144-lead TQFP package.
+
+The host-register description is particularly worth comparing against the TechnoX firmware: SAM9407 A0–A2 selects eight registers; register 0 is the MPU-401 data register, register 1 is status/control, register 2 is the 16-bit burst-transfer port, and the upper address range is game-compatible sound registers. The TechnoX IC4 code instead writes four sequential byte offsets at `0x8000–0x8003`, and has a separate `0x0DCE` helper that changes register-3 control bits and reads back offsets 2/3. That is architecturally suggestive of a host/peripheral protocol, but it is **not enough to equate the two address maps**: SAM9407's bus is 16-bit and uses its own A0–A2/CS/RD/WR pin timing. We have not shown that the 8032's XDATA port is wired directly to those pins.
+
+There is also a package discrepancy to resolve. An earlier project note mentions an 80-pin QFP in the unidentified hardware path, whereas the SAM9407 datasheet specifies TQFP144. Until the board is inspected, these may refer to different components or the earlier package note may be mistaken. The SAM9407 must remain a candidate, not a chosen emulation target.
+
+The memory-size discrepancy also has a more concrete context now. A contemporaneous 1995 review describes the TechnoX as having six megabytes of sample memory, while the SAM9407 datasheet states a maximum configuration of 64 MB of 8-bit sample address space. These are not necessarily contradictory: one is a reported installed capacity and the other a chip-family maximum. Neither establishes that the TechnoX uses SAM9407, and neither makes the current 128 KiB IC51 dump a complete waveform set.
+
+### Discriminating evidence needed before implementing a SAM9407 model
+
+1. A clear top-side and underside PCB photo showing the large sound IC, all memory ICs, package pin count, and silkscreen designators.
+2. The exact IC top marking and package. A 144-lead package would fit the SAM9407 datasheet; an 80-lead part would rule out that exact package/device.
+3. Continuity or schematic evidence linking IC4 bus/control lines to the candidate chip's A0–A2, CS, RD, WR, READY and data pins.
+4. Correlation of the firmware's `0x0DCE` read/strobe sequence with the candidate's actual handshake pins, followed by one real-hardware note capture.
+
+Do not yet replace the generic backend with a SAM9407 emulator. First establish the chip identity and the electrical mapping.
+
+References:
+- Dream SA, *SAM9407 Integrated Sound Studio*, objective specification (February 1996): https://dosdays.co.uk/media/dream/SAM9407.PDF
+- Contemporary MX review, *Revolt into style* (April 1995), describing the TechnoX's six-megabyte sample memory: https://www.muzines.co.uk/articles/revolt-into-style/12193?theme=2
+- Secondary chip-reference listing (lead only, not confirmation): https://en.wikipedia.org/wiki/List_of_sound_chips
