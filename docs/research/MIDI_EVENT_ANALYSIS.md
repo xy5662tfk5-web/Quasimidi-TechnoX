@@ -162,7 +162,7 @@ This is the directly relevant Note On route. `0x418E` is called later from a dif
 - Computes the per-slot record base `0x2900 + 0x0C*eventID`, stores it in XDATA `0x2B98–0x2B99`.
 - Reads a per-slot value from `0x7C00 + 0x18*eventID + 0x1C`, combines it with XDATA `0x3700`, and normalizes the resulting 16-bit value into a bounded address/range before storing it in the per-slot record.
 - Reads another per-slot field at `0x7C00 + 0x18*eventID + 0x26`, passes it through `0xABBF`, and stores the mapped result at `0x2901 + 0x0C*eventID`.
-- Reads further per-slot control fields at offsets `0x17`, `0x19`, `0xD7`, and `0xA2`. Depending on their values, it calls `0xAC00`, `0xAC88`, `0x695A`, and ultimately builds a 13-byte descriptor for `0x1494` using the record pointer in `0x2B98–0x2B99`.
+- Reads further per-slot control fields at offsets `0x17`, `0x19`, `0xD7`, and `0xA2`. Depending on their values, it calls `0xAC00`, `0xAC88`, `0x695A`, and fills the 12-byte per-event resource-selection record at `0x2900 + 0x0C*eventID`; the pointer to that record is stored at `0x2B98–0x2B99` before `0x1494` consumes it.
 
 This proves that Note On is converted through per-slot parameter records and descriptor transactions. It still does not prove that the final descriptor is a direct sample/DSP start command; that requires tracing the descriptor's downstream consumer and physical interface.
 
@@ -181,7 +181,7 @@ The four-entry lookup table at `0x5C3D` begins `07, 07, 06, 06`; `0x418E` uses i
 The most promising chain to follow now is:
 `0x5671 (Note On) -> 0x4256 -> per-slot XDATA 0x7Cxx -> 0xABBF / 0xAC00 / 0xAC88 -> descriptor 0x1494 -> 0x16C3 / 0x189D`.
 
-The key unresolved question is what the per-slot `0x7Cxx` fields and the resulting 13-byte descriptor mean at the hardware boundary.
+The key unresolved question is what the per-slot `0x7Cxx` fields, the 12-byte resource-selection record, and the IC51 descriptor/command-stream data mean at the hardware boundary.
 
 ## 17. Downstream helpers used by the Note On descriptor path
 
@@ -192,7 +192,7 @@ The helpers reached from `0x4256` have now been classified at the level supporte
 - `0xAC88` uses the same per-event indexing and XDATA page `0x35`, but its computed jump table has 17 cases and it also receives an extra mask/value in `R3`. It is a companion field/bit update helper.
 - `0x695A` reads per-slot mode `XDATA[0x7C00 + 0x18*eventID + 0x19]` and chooses a translated value using table `0x72DA` and event/selector fields. This feeds the descriptor path.
 
-These helpers manipulate and translate structured per-slot state. The descriptor transaction `0x1494` remains the first confirmed boundary where a 13-byte record is consumed and a hardware-facing exchange sequence may begin. The exact physical target of the XDATA page `0x35` and the `0x7Cxx` windows remains unidentified without a board schematic or trace.
+These helpers manipulate and translate structured per-slot state. The `0x1494` transaction consumes a 12-byte per-event resource-selection record from XDATA page `0x29`, follows its IC51 descriptor pointer, and stages the downstream page-selected resource exchange. Keep this record distinct from the variable-length descriptor stored in IC51. The exact physical target of the XDATA page `0x35` and the `0x7Cxx` windows remains unidentified without a board schematic or trace.
 
 ## 18. 0x1494 -> 0x16C3: concrete four-register exchange sequence
 
