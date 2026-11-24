@@ -3245,21 +3245,29 @@ int main(int argc, char** argv) {
                 selectorXdataBefore, firstRetainedResourceXdata);
             std::size_t resourcePageReads = 0;
             std::size_t resourcePageWrites = 0;
-            std::printf("NOTE65 RESOURCE PAGE 2D XDATA TRACE:\\n");
+            std::printf("NOTE65 SELECTED XDATA PAGES 01/02 TRACE:\\n");
             for (std::size_t i = firstResourceXdata; i < resourceXdataAfter; ++i) {
                 const auto& access = firmwareMachine.xdataWatchTraceAt(i);
-                if (access.address < 0x2d00u || access.address > 0x2dffu)
+                const auto page = static_cast<unsigned>(access.address >> 8u);
+                if (page != 0x01u && page != 0x02u)
+                    continue;
+                const auto offset = static_cast<unsigned>(access.address & 0xffu);
+                if (offset < 0x60u)
                     continue;
                 if (access.write) ++resourcePageWrites;
                 else ++resourcePageReads;
-                const auto offset = static_cast<unsigned>(access.address & 0xffu);
-                if (offset == 0x60u || offset == 0x61u || offset == 0x62u ||
-                    offset == 0xf8u || offset == 0xfbu || offset == 0xfcu ||
-                    offset == 0xfdu || offset == 0xfeu || offset == 0xffu ||
-                    (offset >= 0x80u && offset <= 0xf8u && access.write)) {
-                    std::printf("  RESOURCE-XDATA %c 2D%02X=%02X pc=%04X ret=%04X "
+                const bool stagingField = offset == 0x60u || offset == 0x61u ||
+                    offset == 0x62u || offset == 0xf8u || offset == 0xfbu ||
+                    offset == 0xfcu || offset == 0xfdu || offset == 0xfeu ||
+                    offset == 0xffu;
+                const bool streamSlotWrite = access.write &&
+                    offset >= 0x80u && offset <= 0xf8u;
+                const bool slotIdentifier = offset >= 0x70u && offset <= 0x7fu;
+                if (stagingField || streamSlotWrite || slotIdentifier) {
+                    std::printf("  RESOURCE-XDATA %c %04X=%02X pc=%04X ret=%04X "
                                 "P2=%02X P3=%02X mode=%u cycle=%llu\\n",
-                                access.write ? 'W' : 'R', offset,
+                                access.write ? 'W' : 'R',
+                                static_cast<unsigned>(access.address),
                                 static_cast<unsigned>(access.value),
                                 static_cast<unsigned>(access.instructionPC),
                                 static_cast<unsigned>(access.stackReturnPC),
@@ -3269,7 +3277,7 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned long long>(access.machineCycle));
                 }
             }
-            std::printf("NOTE65 RESOURCE PAGE COUNTS: reads=%zu writes=%zu\\n",
+            std::printf("NOTE65 SELECTED XDATA PAGE COUNTS: reads=%zu writes=%zu\\n",
                         resourcePageReads, resourcePageWrites);
             const auto gateAccessCount =
                 firmwareMachine.midiEventGateTraceCountForTesting();
