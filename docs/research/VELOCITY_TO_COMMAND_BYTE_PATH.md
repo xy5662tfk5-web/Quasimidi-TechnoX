@@ -33,6 +33,22 @@ The bounded 8032 execution trace captures 80 instructions from `0x1FC9` through 
 
 The first differing CPU state is at `0x1FC9`; the first differing XDATA access is the write to `0x00D1` at `0x2005`. The later packet-byte derivation is now explained by the second helper's return and the SWAP/RR/mask sequence above.
 
+## Cross-pitch control: the 0x2122 packet stays fixed at velocity 100
+
+The later real-ROM Note 72 probe holds MIDI velocity at 100 while changing the note from the earlier Note 65 reference. Its first five packets are asserted byte-for-byte:
+
+| Order | Note 72 / velocity 100 | Return PC |
+|---:|---|---:|
+| 1 | `00 D1 80 01` | `0x0A52` |
+| 2 | `02 01 00 00` | `0x0A52` |
+| 3 | `05 FB D0 03` | `0x22FB` |
+| 4 | `0A 00 78 00` | `0x2122` |
+| 5 | `0F 00 00 00` | `0x236E` |
+
+The first packet differs from the Note 65 reference because the resource-derived interpolation input differs. The fourth packet, emitted by the 0x210F builder, remains `0A 00 78 00`, the same value observed for Note 65 at velocity 100. Together with the same-note velocity-100/50 differential above, this separates two tested influences: the first packet changes in the cross-pitch probe, while the fourth packet changes in the same-pitch cross-velocity probe.
+
+The regression now asserts the Note 72 packet prefix and the six resource-handler writes that populate interpolation slots 0x0081–0x0083 and 0x0091–0x0093. This makes the independence observed in the two controlled comparisons executable. It still does not establish what the external device calls these command fields or prove that the fourth packet directly encodes amplitude.
+
 ## Interpretation boundary
 
 This closes the firmware dataflow from the velocity-sensitive `0x1848` result to bytes 2 and 3 of one observed four-byte command. It does **not** establish whether those bytes encode amplitude, envelope, sample position, pitch, or another external-processor parameter. The identity and response protocol of the device at `0x8000..0x8003` remain unknown; the synthetic ready response is not a hardware capture. The 544 later configuration-sweep packets are not reclassified as voice data by this result.
