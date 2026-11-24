@@ -222,6 +222,33 @@ private:
     std::array<std::array<std::array<std::atomic<int>, kParameterCount>, kKeyCount>, kPartCount> values_{};
 };
 
+// The drumset number is a dedicated global/temporary drum field in the
+// TechnoX SysEx address map (02 7E 00), not a normal Part Sound Number.
+class MASSDrumSetStore {
+public:
+    static constexpr std::size_t kPartCount = 16;
+    MASSDrumSetStore() noexcept {
+        for (auto& value : values_)
+            value.store(-1, std::memory_order_relaxed);
+    }
+    bool set(int partIndex, int drumSet) noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            drumSet < 0 || drumSet > 7)
+            return false;
+        values_[static_cast<std::size_t>(partIndex)].store(
+            drumSet, std::memory_order_release);
+        return true;
+    }
+    int get(int partIndex) const noexcept {
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount))
+            return -1;
+        return values_[static_cast<std::size_t>(partIndex)].load(
+            std::memory_order_acquire);
+    }
+private:
+    std::array<std::atomic<int>, kPartCount> values_{};
+};
+
 class MASSModulationSourceStore {
 public:
     static constexpr std::size_t kPartCount = 16;
@@ -388,6 +415,7 @@ public:
     virtual void setFX2ResourceCatalog(const MASSFX2ResourceCatalog*) noexcept {}
     virtual void setExternalSoundMemoryImage(
         const MASSIC51ExternalSoundMemoryImage*) noexcept {}
+    virtual void setDrumSet(int /*partIndex*/, int /*drumSet*/) noexcept {}
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
     virtual void noteOff(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
@@ -443,6 +471,8 @@ public:
         backend_->setFX1ResourceCatalog(fx1ResourceCatalog_);
         backend_->setFX2ResourceCatalog(fx2ResourceCatalog_);
         backend_->setExternalSoundMemoryImage(externalSoundMemoryImage_);
+        for (std::size_t part = 0; part < MASSDrumSetStore::kPartCount; ++part)
+            backend_->setDrumSet(static_cast<int>(part), drumSets_.get(static_cast<int>(part)));
         if (prepared_)
             backend_->prepare(preparedSampleRate_, preparedMaximumBlockSize_);
     }
@@ -648,6 +678,13 @@ public:
 
     bool setDrumParameter(int partIndex, int keyNumber, int parameterIndex, int value) noexcept { return drumParameters_.set(partIndex, keyNumber, parameterIndex, value); }
     int getDrumParameter(int partIndex, int keyNumber, int parameterIndex) const noexcept { return drumParameters_.get(partIndex, keyNumber, parameterIndex); }
+
+    bool setDrumSet(int partIndex, int drumSet) noexcept {
+        if (!drumSets_.set(partIndex, drumSet)) return false;
+        backend_->setDrumSet(partIndex, drumSet);
+        return true;
+    }
+    int getDrumSet(int partIndex) const noexcept { return drumSets_.get(partIndex); }
 
     bool setPerformanceNameByte(int index, int value) noexcept { return performanceImage_.setNameByte(index, value); }
     bool setPerformanceCommonByte(int index, int value) noexcept { return performanceImage_.setCommonByte(index, value); }
@@ -866,6 +903,7 @@ private:
     MASSCommonControlStore commonControls_;
     MASSPerformanceImageStore performanceImage_;
     MASSDrumParameterStore drumParameters_;
+    MASSDrumSetStore drumSets_;
     std::array<std::atomic<bool>, MASSPartParameterStore::kPartCount> sustainControllerDown_{};
     std::array<std::array<MonoKeyEntry, kMonoKeyCapacity>, MASSPartParameterStore::kPartCount> monoKeyStacks_{};
     std::array<std::size_t, MASSPartParameterStore::kPartCount> monoKeyCounts_{};
