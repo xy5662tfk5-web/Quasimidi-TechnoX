@@ -3067,6 +3067,8 @@ int main(int argc, char** argv) {
             firmwareMachine.setTestExternalReadOverride(0x7bd5u, selector);
             assert(firmwareMachine.readExternal(0x7bd5u) == selector);
             firmwareMachine.clearInstructionWatchForTesting();
+            const auto selectorWindowBefore = firmwareMachine.externalWindowTraceCount();
+            const auto selectorXdataBefore = firmwareMachine.xdataWatchTraceCount();
             const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
             const auto descriptorBefore = firmwareMachine.watchedCallCount(0x1494u);
             const auto streamBefore = firmwareMachine.watchedCallCount(0x189du);
@@ -3097,6 +3099,85 @@ int main(int argc, char** argv) {
                 assert(event.registers[3] == 0x64u);
             }
             assert(observedCount == partCalls);
+
+            std::size_t selectorReadCount = 0;
+            std::size_t selectorBranchCount = 0;
+            std::size_t selectorCallsiteCount = 0;
+            std::printf("NOTE65 593D DISPATCH TRACE selector=%u:\\n",
+                        static_cast<unsigned>(selector));
+            for (std::size_t i = 0;
+                 i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+                const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                const auto pc = event.instructionPC;
+                const bool selectorPath =
+                    pc == 0x593du || pc == 0x5940u || pc == 0x5941u ||
+                    pc == 0x5942u || pc == 0x5945u || pc == 0x5948u ||
+                    pc == 0x594cu || pc == 0x5958u || pc == 0x5962u ||
+                    pc == 0x596cu || pc == 0x5976u || pc == 0x597eu ||
+                    pc == 0x598au || pc == 0x598du || pc == 0x5999u ||
+                    pc == 0x599cu || pc == 0x59a8u || pc == 0x59abu ||
+                    pc == 0x59b7u;
+                if (!selectorPath)
+                    continue;
+                if (pc == 0x5941u) ++selectorReadCount;
+                if (pc == 0x5958u || pc == 0x5962u ||
+                    pc == 0x596cu || pc == 0x5976u)
+                    ++selectorBranchCount;
+                if (pc == 0x598au || pc == 0x5999u ||
+                    pc == 0x59a8u || pc == 0x59b7u)
+                    ++selectorCallsiteCount;
+                std::printf("  PC=%04X A=%02X DPTR=%04X P3=%02X ret=%04X "
+                            "R7=%02X flags[2F/30/31/32]=%u/%u/%u/%u "
+                            "RAM28=%02X\\n",
+                            static_cast<unsigned>(pc),
+                            static_cast<unsigned>(event.accumulator),
+                            static_cast<unsigned>(event.dptr),
+                            static_cast<unsigned>(event.port3Pins),
+                            static_cast<unsigned>(event.returnPC),
+                            static_cast<unsigned>(event.registers[7]),
+                            static_cast<unsigned>(event.directRam2F & 1u),
+                            static_cast<unsigned>(event.directRam30 & 1u),
+                            static_cast<unsigned>(event.directRam31 & 1u),
+                            static_cast<unsigned>(event.directRam32 & 1u),
+                            static_cast<unsigned>(event.directRam28));
+            }
+            std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
+                        selectorReadCount, selectorBranchCount,
+                        selectorCallsiteCount);
+            const auto selectorWindowAfter = firmwareMachine.externalWindowTraceCount();
+            const auto selectorWindowFirst = selectorWindowAfter > 1024u
+                ? selectorWindowAfter - 1024u : 0u;
+            std::size_t selectorOverrideReads = 0;
+            for (std::size_t i = std::max(selectorWindowBefore, selectorWindowFirst);
+                 i < selectorWindowAfter; ++i) {
+                const auto& event = firmwareMachine.externalWindowTraceAt(i);
+                if (event.address != 0x7bd5u || event.write)
+                    continue;
+                ++selectorOverrideReads;
+                std::printf("  7BD5 OVERRIDE READ: value=%02X cycle=%llu\\n",
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
+            const auto selectorXdataAfter = firmwareMachine.xdataWatchTraceCount();
+            const auto selectorXdataFirst = selectorXdataAfter > 8192u
+                ? selectorXdataAfter - 8192u : 0u;
+            for (std::size_t i = std::max(selectorXdataBefore, selectorXdataFirst);
+                 i < selectorXdataAfter; ++i) {
+                const auto& event = firmwareMachine.xdataWatchTraceAt(i);
+                if ((event.address < 0x2800u || event.address > 0x28ffu) &&
+                    event.address != 0x7bd5u)
+                    continue;
+                std::printf("  RESOURCE XDATA %c %04X=%02X pc=%04X ret=%04X "
+                            "P3=%02X IC51=%u\\n",
+                            event.write ? 'W' : 'R',
+                            static_cast<unsigned>(event.address),
+                            static_cast<unsigned>(event.value),
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.stackReturnPC),
+                            static_cast<unsigned>(event.port3),
+                            static_cast<unsigned>(event.ic51Selected));
+            }
+            assert(observedEventIds.size() >= observedCount);
             for (std::size_t i = 0; i < observedCount; ++i) {
                 assert(observedEventIds[i] >= 0x0cu);
                 assert(observedEventIds[i] <= static_cast<std::uint8_t>(0x0cu + selector));
