@@ -4054,6 +4054,37 @@ int main(int argc, char** argv) {
         for (const bool seen : note72SawResourceProducer)
             assert(seen);
 
+        std::printf("NOTE72 IC4 1E00-1E5F EXECUTION CONTEXT (B register source):\\n");
+        std::size_t note72SubroutineInstructionCount = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.returnPC != 0x1720u ||
+                event.instructionPC < 0x1e00u ||
+                event.instructionPC > 0x1e5fu)
+                continue;
+            ++note72SubroutineInstructionCount;
+            std::printf("  PC=%04X opcode=%02X/%02X/%02X R7=%02X A=%02X B=%02X "
+                        "PSW=%02X DPTR=%04X R0-R6=%02X/%02X/%02X/%02X/%02X/%02X/%02X\\n",
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(firmwareMachine.readCode(event.instructionPC)),
+                        static_cast<unsigned>(firmwareMachine.readCode(static_cast<std::uint16_t>(event.instructionPC + 1u))),
+                        static_cast<unsigned>(firmwareMachine.readCode(static_cast<std::uint16_t>(event.instructionPC + 2u))),
+                        static_cast<unsigned>(event.registers[7]),
+                        static_cast<unsigned>(event.accumulator),
+                        static_cast<unsigned>(event.b),
+                        static_cast<unsigned>(event.psw),
+                        static_cast<unsigned>(event.dptr),
+                        static_cast<unsigned>(event.registers[0]),
+                        static_cast<unsigned>(event.registers[1]),
+                        static_cast<unsigned>(event.registers[2]),
+                        static_cast<unsigned>(event.registers[3]),
+                        static_cast<unsigned>(event.registers[4]),
+                        static_cast<unsigned>(event.registers[5]),
+                        static_cast<unsigned>(event.registers[6]));
+        }
+        assert(note72SubroutineInstructionCount > 0u);
+
         const auto& note72PitchPacket =
             firmwareMachine.soundCommandPacketAt(note72PacketStart);
         assert(note72PitchPacket.returnPC == 0x0a52u);
