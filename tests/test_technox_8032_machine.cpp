@@ -578,8 +578,9 @@ int main(int argc, char** argv) {
             registers.pc = 0x044cu;
             const auto executed = phaseMachine.runUntilProgramCounter(0x047du, 512u);
             std::fprintf(stderr,
-                "Periodic scheduler exit pc=%04X executed=%zu P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\\n",
+                "Periodic scheduler exit pc=%04X executed=%zu page=%02X P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\\n",
                 static_cast<unsigned>(registers.pc), executed,
+                static_cast<unsigned>(schedulerPage),
                 static_cast<unsigned>(phaseMachine.readPortLatch(0xa0u)),
                 static_cast<unsigned>(phaseMachine.readInternal(0x47u)),
                 static_cast<unsigned>(phaseMachine.readInternal(0x48u)),
@@ -588,6 +589,14 @@ int main(int argc, char** argv) {
                 static_cast<unsigned>(phaseMachine.readExternal(schedulerStatusAddress)),
                 static_cast<unsigned>(phaseMachine.readExternal(0x2064u)),
                 phaseMachine.cpuFaulted() ? 1 : 0);
+            for (std::size_t n = 0; n < phaseMachine.xdataWatchTraceCount(); ++n) {
+                const auto& event = phaseMachine.xdataWatchTraceAt(n);
+                if (event.instructionPC == 0x0465u) {
+                    std::fprintf(stderr, "  scheduler MOVX addr=%04X value=%02X P2=%02X P3=%02X\\n",
+                        static_cast<unsigned>(event.address), static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.port2), static_cast<unsigned>(event.port3));
+                }
+            }
             assert(executed > 0u);
             assert(registers.pc == 0x047du);
             assert(!phaseMachine.cpuFaulted());
