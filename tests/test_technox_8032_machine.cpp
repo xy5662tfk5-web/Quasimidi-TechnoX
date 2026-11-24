@@ -3165,19 +3165,37 @@ int main(int argc, char** argv) {
                 const bool streamInterpreterPath =
                     pc == 0x189du || pc == 0x18a6u || pc == 0x18b8u ||
                     pc == 0x18c0u || pc == 0x18d7u || pc == 0x18dbu ||
-                    pc == 0x18dfu || pc == 0x195fu || pc == 0x1975u ||
-                    pc == 0x1986u || pc == 0x1995u || pc == 0x199cu ||
-                    pc == 0x19a2u || pc == 0x19a4u || pc == 0x19bdu ||
-                    pc == 0x19c1u || pc == 0x19bcu || pc == 0x19cdu ||
-                    pc == 0x19e1u || pc == 0x19fbu || pc == 0x1a01u ||
-                    pc == 0x1a16u || pc == 0x1a1fu || pc == 0x1a31u ||
-                    pc == 0x1a3eu || pc == 0x1a4au || pc == 0x1a8fu ||
-                    pc == 0x1a9fu || pc == 0x1aa6u || pc == 0x1aacu ||
-                    pc == 0x1acbu || pc == 0x1ad4u || pc == 0x1b00u ||
-                    pc == 0x1b20u || pc == 0x1b40u || pc == 0x1b60u ||
-                    pc == 0x1b80u || pc == 0x1ba0u || pc == 0x1bb1u ||
-                    pc == 0x1c2bu || pc == 0x1c61u || pc == 0x1eddu ||
-                    pc == 0x224cu || pc == 0x2301u || pc == 0x2374u;
+                    pc == 0x18dfu || pc == 0x18e1u || pc == 0x18ebu ||
+                    pc == 0x18f1u || pc == 0x18f7u || pc == 0x1901u ||
+                    pc == 0x1906u || pc == 0x1911u || pc == 0x191cu ||
+                    pc == 0x191eu || pc == 0x1920u || pc == 0x1923u ||
+                    pc == 0x1927u || pc == 0x1929u || pc == 0x192au ||
+                    pc == 0x192du || pc == 0x1938u || pc == 0x1942u ||
+                    pc == 0x1958u || pc == 0x195cu || pc == 0x195fu ||
+                    pc == 0x196bu || pc == 0x1975u || pc == 0x1978u ||
+                    pc == 0x197eu || pc == 0x1986u || pc == 0x1995u ||
+                    pc == 0x199cu || pc == 0x199fu || pc == 0x19a2u ||
+                    pc == 0x19a4u || pc == 0x19a7u || pc == 0x19b1u ||
+                    pc == 0x19b7u || pc == 0x19b9u || pc == 0x19bcu ||
+                    pc == 0x19c1u || pc == 0x19cdu || pc == 0x19d0u ||
+                    pc == 0x19d3u || pc == 0x19dbu || pc == 0x19e0u ||
+                    pc == 0x19e1u || pc == 0x19e4u || pc == 0x19e9u ||
+                    pc == 0x19efu || pc == 0x19f1u || pc == 0x19f8u ||
+                    pc == 0x19fbu || pc == 0x19feu || pc == 0x1a01u ||
+                    pc == 0x1a07u || pc == 0x1a11u || pc == 0x1a16u ||
+                    pc == 0x1a17u || pc == 0x1a1au || pc == 0x1a1du ||
+                    pc == 0x1a31u || pc == 0x1a3eu || pc == 0x1a4au ||
+                    pc == 0x1a4eu || pc == 0x1a50u || pc == 0x1a8cu ||
+                    pc == 0x1a8fu || pc == 0x1a99u || pc == 0x1a9fu ||
+                    pc == 0x1aa6u || pc == 0x1aa9u || pc == 0x1aafu ||
+                    pc == 0x1ab3u || pc == 0x1acbu || pc == 0x1ad4u ||
+                    pc == 0x1ae2u || pc == 0x1ae4u || pc == 0x1aeeu ||
+                    pc == 0x1af1u || pc == 0x1af4u ||
+                    pc == 0x1b00u || pc == 0x1b20u || pc == 0x1b40u ||
+                    pc == 0x1b60u || pc == 0x1b80u || pc == 0x1ba0u ||
+                    pc == 0x1bb1u || pc == 0x1c2bu || pc == 0x1c61u ||
+                    pc == 0x1eddu || pc == 0x224cu || pc == 0x2301u ||
+                    pc == 0x2374u;
                 if (!selectorPath && !repeatedNoteHandlerPath &&
                     !partHandlerDetailPath && !resourcePipelinePath &&
                     !streamInterpreterPath)
@@ -3233,7 +3251,7 @@ int main(int argc, char** argv) {
                                 "RAM2B/2C/2D/2E=%02X/%02X/%02X/%02X "
                                 "RAM36/37/38/39=%02X/%02X/%02X/%02X "
                                 "RAM3A/3B=%02X/%02X RAM41/43/44=%02X/%02X/%02X "
-                                "P2/P3=%02X/%02X\\n",
+                                "RAM20=%02X PSW=%02X P2/P3=%02X/%02X\\n",
                                 static_cast<unsigned>(pc),
                                 static_cast<unsigned>(event.returnPC),
                                 static_cast<unsigned>(event.accumulator),
@@ -3259,6 +3277,8 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned>(event.directRam41),
                                 static_cast<unsigned>(event.directRam43),
                                 static_cast<unsigned>(event.directRam44),
+                                static_cast<unsigned>(event.directRam20),
+                                static_cast<unsigned>(event.psw),
                                 static_cast<unsigned>(event.port2Latch),
                                 static_cast<unsigned>(event.port3Pins));
                 }
