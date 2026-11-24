@@ -30,11 +30,16 @@ The current path for a panel VALUE edit is:
 ```
 VALUE encoder (EDIT mode)
   -> selected Part + selected PartParameter
-  -> QuasimidiTechnoXAudioProcessor::setPartParameterRaw()
-  -> atomic Part state + Performance Part byte image
-  -> MASSAudioEngine::setPartParameter()
+  -> queuePanelPartParameterRaw()
+  -> canonical atomic Part value + bounded per-Performance mailbox
+  -> next processBlock() drains the mailbox
+  -> MASSAudioEngine::setPartParameter() on the audio thread
   -> active IMASSVoiceBackend
 ```
+
+The mailbox coalesces repeated drag updates to the latest raw value per Part parameter. This avoids a growing queue while audio is stopped and keeps the editor/message thread from touching VoiceManager/backend state. The LCD reads the canonical atomic Part value immediately; the engine consumes the same value on its next audio callback.
+
+Host Performance selection is similarly split: `setCurrentProgram()` changes the selected Performance index and sets a pending flag; the full Performance/Part image is synchronized to MASSAudioEngine at the start of the next `processBlock()`. This moves VoiceManager/backend mutations out of the host/message thread.
 
 Bank/Sound values are the bank/program identity used by the engine. `VoiceSlot` captures that identity for newly started voices, and the predecoded IC51 descriptor/command catalog is available to the backend.
 
@@ -62,14 +67,15 @@ For that reason, do not invent 8032 input-register writes or claim that the UI h
 
 Reachable IC4 v1.05 code contains actual external-pin scan routines. The evidence is documented in `docs/research/FRONT_PANEL_GPIO_SCAN.md`:
 
-- `0xA6FF` performs a four-pattern P1/P3.0 scan and samples P1.3/P1.7.
-- `0xA762` performs an additional two-entry scan using P3.0 and P1.5/P1.6/P1.7.
-- Both enqueue byte events through `0xA6D1`; `0xA6E7` reads the 16-byte internal-RAM event FIFO.
+- `0xA6FF` performs a four-pattern P1/P3.0 key-matrix scan and samples P1.3/P1.7.
+- `0xA762` performs a two-channel quadrature-style scan: P1.5 is the phase/strobe, P1.6 is sampled for direction, and P3.0 selects the two external input rows.
+- Exact FIFO codes are `BE/7E` for the P3.0-low channel and `BD/7D` for the P3.0-high channel.
+- Both scan routines enqueue bytes through `0xA6D1`; `0xA6E7` pops the 16-byte internal-RAM event FIFO.
 - The timer interrupt calls `0xA762`; several main-state routines call `0xA6FF`.
 
-The emulator already exposes `TechnoX8032Machine::setExternalPortInputs()`, which overrides sampled P1/P3 pin levels independently of the output latch. A regression test now exercises this input seam.
+The emulator has a P3.0-selected P1 input fixture seam, and the regression test executes the actual IC4 ROM at `0xA6A8` and `0xA762` to assert both channels, both direction codes, and no repeat while the phase remains held low. The test checks the ROM's own instruction path and FIFO output.
 
-This is the first confirmed firmware-level route for panel input. It is **not yet** a complete mapping from physical controls to UI labels: the exact PARAMETER/VALUE encoder signals, button matrix wiring, detent direction and event consumers must still be correlated. Do not synthesize guessed GPIO sequences.
+This is the first firmware-confirmed two-channel encoder scanner. The remaining mapping is from these firmware channels to the physical front-panel labels PARAMETER and VALUE, and the full downstream control semantics of each event. Do not assign those labels yet: the source proves two selected quadrature-style input channels and their byte pairs, but not which panel legend belongs to which row.
 
 ## 6. Required long-term architecture
 
