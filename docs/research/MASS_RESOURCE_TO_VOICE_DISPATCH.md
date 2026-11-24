@@ -82,14 +82,14 @@ This makes 0x2D80-0x2DF8 a firmware-side table/slot scan that can feed the 0x800
 
 ## 5. New instrumentation and differential stimulus
 
-The machine model now retains reads/writes to 0x2D00-0x2DFF and the existing 0x7BD4-0x7BD7 watch window. Each event includes:
+The machine model now retains reads/writes in the actual P2-selected XDATA windows 0x0100-0x02FF, plus the existing 0x7BD4-0x7BD7 watch window. The byte RAM[0x2D] is sampled as the P2 page selector; it is not itself an XDATA address. Each event includes:
 
 - address, value and read/write direction;
 - instruction PC and stack-top return-address snapshot;
 - P2 and P3 pin states;
 - SFR 0x8E mode and machine-cycle timestamp.
 
-The firmware regression now runs Program Change, Note On and Note Off as separate ACIA/MIDI stimuli after the same factory Performance initialization. For each stage it reports deltas for calls to 0x0DB7, 0x4256, 0x5671, 0x57A8, 0x16C3, 0x189D, 0x1009, 0x018D and adjacent helpers, plus 0x2Dxx and 0x7Cxx bus traces.
+The firmware regression now runs Program Change, Note On and Note Off as separate ACIA/MIDI stimuli after the same factory Performance initialization. For each stage it reports deltas for calls to 0x0DB7, 0x4256, 0x5671, 0x57A8, 0x16C3, 0x189D, 0x1009, 0x018D and adjacent helpers, plus selected-page 0x01xx/0x02xx and 0x7Cxx bus traces.
 
 These are diagnostic probes. Until the updated CI run passes and the emitted trace is inspected, no per-event packet count or note-trigger semantics are claimed.
 
@@ -114,3 +114,17 @@ An expanded Note 65 trace for selector values 2 and 3 captures the 8032 state at
 - The second event reaches 0x171D (call to 0x189D) with DPTR=0x274B, A=0x03, and R5=0x63; unlike the first event's interpreter entry (DPTR=0x26E2, A=0x16, R5=0x7A), the second event has not yet been observed returning to 0x1720 in that capture. This moves the next investigation into the second resource-stream interpreter context. The selected XDATA page should be traced using full addresses 0x0100–0x02FF, not the erroneous range 0x2D00–0x2DFF.
 
 The physical identity and meaning of the page contents are still open. This address correction does not identify the receiving IC or imply that the selected page is physically implemented as ordinary RAM in every P3/SFR 0x8E bus mode.
+
+## 8. Nested resource-list branch in the second Part stream
+
+The expanded Note 65 trace distinguishes the first and second active event streams. Event 0x0D enters 0x189D with descriptor pointer 0x274B, and after the stream header is consumed at 0x18D7–0x18DF the data cursor is 0x03AD. The first nested pointer pair read at 0x1906/0x190A is `0x06, 0x38`, producing the indirect table pointer `0x3806` used by the branch at 0x1A01.
+
+The current branch map is confirmed by disassembly:
+
+- 0x19FB tests internal bit address 0x06. If set, it jumps back to 0x18E1; if clear, it enters the indirect-table path at 0x1A01.
+- 0x1A01 loads DPTR from internal RAM[0x3A:0x3B], then 0x1A16 reads a table byte. At 0x1A17 the interpreter compares R3 with zero; for the zero case, 0x1A1A tests ACC.6 and may branch to 0x19E9.
+- The 0x19E9 cleanup path clears two selected-page staging bytes, then 0x19F8 returns to the loop at 0x18E1.
+- A non-empty nested record sets ACC.6 at 0x1A1D, fetches a four-byte tuple, and writes those bytes into the selected P2 page at 0x1A31–0x1A3D. The subsequent per-slot housekeeping path reaches 0x1AA6, which also returns to 0x18E1.
+- The common loop at 0x18E1 advances RAM[0x2E] by eight before testing its accumulator-bit boundary and loading the next stream cursor. Thus the 0x19FB/0x1A01 route is a nested descriptor/slot expansion path, not a second MIDI event or a second sound-host command protocol.
+
+The PC/register watch now includes the loop, empty-slot cleanup, nested-table read, and four-byte tuple writer. The exact purpose of the nested table values and their physical consumer remains unproven; no sample address or waveform interpretation is assigned here.
