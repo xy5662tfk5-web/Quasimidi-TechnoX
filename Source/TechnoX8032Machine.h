@@ -243,6 +243,26 @@ public:
         bool writeAccepted = true;
         std::uint64_t machineCycle = 0;
     };
+    struct MidiEventGateAccessEvent {
+        std::uint16_t address = 0;
+        std::uint8_t value = 0xff;
+        bool write = false;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        std::uint64_t machineCycle = 0;
+    };
+    struct DispatchFlagBackingWriteEvent {
+        std::uint8_t address = 0;
+        std::uint8_t previousValue = 0;
+        std::uint8_t currentValue = 0;
+        std::uint8_t opcode = 0;
+        std::uint8_t operand = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct SlotInterpolationDataAccessEvent {
         std::uint16_t address = 0;
         std::uint16_t instructionPC = 0;
@@ -372,6 +392,28 @@ public:
     const XdataWatchEvent& xdataWatchTraceAt(std::size_t index) const noexcept {
         return xdataWatchTrace_[index % xdataWatchTrace_.size()];
     }
+    void clearMidiEventGateTraceForTesting() noexcept {
+        midiEventGateTrace_.fill(MidiEventGateAccessEvent{});
+        midiEventGateTraceCount_ = 0;
+    }
+    std::size_t midiEventGateTraceCountForTesting() const noexcept {
+        return midiEventGateTraceCount_;
+    }
+    const MidiEventGateAccessEvent& midiEventGateTraceAtForTesting(
+        std::size_t index) const noexcept {
+        return midiEventGateTrace_[index % midiEventGateTrace_.size()];
+    }
+    void clearDispatchFlagWriteTraceForTesting() noexcept {
+        dispatchFlagWriteTrace_.fill(DispatchFlagBackingWriteEvent{});
+        dispatchFlagWriteTraceCount_ = 0;
+    }
+    std::size_t dispatchFlagWriteTraceCountForTesting() const noexcept {
+        return dispatchFlagWriteTraceCount_;
+    }
+    const DispatchFlagBackingWriteEvent& dispatchFlagWriteTraceAtForTesting(
+        std::size_t index) const noexcept {
+        return dispatchFlagWriteTrace_[index % dispatchFlagWriteTrace_.size()];
+    }
     std::size_t unmappedBusTraceCount() const noexcept { return unmappedBusTraceCount_; }
     const UnmappedBusEvent& unmappedBusTraceAt(std::size_t index) const noexcept {
         return unmappedBusTrace_[index % unmappedBusTrace_.size()];
@@ -437,6 +479,10 @@ public:
         ic51ReadTraceCount_ = 0;
         xdataWatchTrace_.fill(XdataWatchEvent{});
         xdataWatchTraceCount_ = 0;
+        midiEventGateTrace_.fill(MidiEventGateAccessEvent{});
+        midiEventGateTraceCount_ = 0;
+        dispatchFlagWriteTrace_.fill(DispatchFlagBackingWriteEvent{});
+        dispatchFlagWriteTraceCount_ = 0;
         internalFlagWriteTrace_.fill(InternalFlagWriteEvent{});
         internalFlagWriteTraceCount_ = 0;
         bulkTransferEntryTrace_.fill(BulkTransferEntryEvent{});
@@ -642,6 +688,16 @@ public:
             pc == 0x598au || pc == 0x598du || pc == 0x5999u ||
             pc == 0x599cu || pc == 0x59a8u || pc == 0x59abu ||
             pc == 0x59b7u ||
+            pc == 0x5697u || pc == 0x569au || pc == 0x569du ||
+            pc == 0x56a0u || pc == 0x56a1u || pc == 0x56a3u ||
+            pc == 0x56a5u || pc == 0x56a7u || pc == 0x56a9u ||
+            pc == 0x56acu || pc == 0x56afu || pc == 0x56b0u ||
+            pc == 0x56b2u || pc == 0x56b5u || pc == 0x56beu ||
+            pc == 0x56bfu || pc == 0x56c5u || pc == 0x56c8u ||
+            pc == 0x57a7u || pc == 0x9968u || pc == 0x9987u ||
+            pc == 0x9988u || pc == 0x9994u || pc == 0x9997u ||
+            pc == 0x99b5u || pc == 0x99b8u || pc == 0x99c5u ||
+            pc == 0x9a14u ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
             pc == 0x211fu || pc == 0x236bu) {
@@ -842,6 +898,8 @@ public:
         } else {
             const auto previousValue = internal_[address];
             internal_[address] = value;
+            if (address == 0x25u || address == 0x26u)
+                recordDispatchFlagBackingWrite(address, previousValue, value);
             if (address == 0x21u && ((previousValue ^ value) & 0x04u) != 0) {
                 const auto pcAfterFetch = cpu_.registers().pc;
                 const auto candidatePC = static_cast<std::uint16_t>(pcAfterFetch - 2u);
@@ -877,12 +935,19 @@ public:
     }
 
     void writeIndirect(std::uint8_t address, std::uint8_t value) noexcept override {
-        if (address < 0x80u) internal_[address] = value;
-        else upperIram_[address - 0x80u] = value;
+        if (address < 0x80u) {
+            const auto previousValue = internal_[address];
+            internal_[address] = value;
+            if (address == 0x25u || address == 0x26u)
+                recordDispatchFlagBackingWrite(address, previousValue, value);
+        } else {
+            upperIram_[address - 0x80u] = value;
+        }
     }
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
         const auto value = readExternalImpl(address);
+        recordMidiEventGateAccess(address, value, false);
         recordSlotInterpolationDataAccess(address, value, false);
         recordExecutionDataAccess(address, value, false);
         return value;
@@ -1127,6 +1192,7 @@ public:
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
         writeExternalImpl(address, value);
+        recordMidiEventGateAccess(address, value, true);
         recordSlotInterpolationDataAccess(address, value, true);
         recordExecutionDataAccess(address, value, true);
     }
@@ -1616,6 +1682,42 @@ public:
     }
 
 private:
+    void recordMidiEventGateAccess(std::uint16_t address, std::uint8_t value,
+                                   bool write) noexcept {
+        if (!((address >= 0x30e4u && address <= 0x30e7u) ||
+              address == 0x30f0u))
+            return;
+        auto& event = midiEventGateTrace_[
+            midiEventGateTraceCount_ % midiEventGateTrace_.size()];
+        event.address = address;
+        event.value = value;
+        event.write = write;
+        event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        event.stackReturnPC = currentStackReturnPC();
+        event.soundBusMode = internal_[0x8e];
+        event.ic51Selected = isIC51Selected();
+        event.machineCycle = elapsedMachineCycles_;
+        ++midiEventGateTraceCount_;
+    }
+
+    void recordDispatchFlagBackingWrite(std::uint8_t address,
+                                        std::uint8_t previousValue,
+                                        std::uint8_t currentValue) noexcept {
+        const auto pcAfterFetch = cpu_.registers().pc;
+        const auto instructionPC = static_cast<std::uint16_t>(pcAfterFetch - 2u);
+        auto& event = dispatchFlagWriteTrace_[
+            dispatchFlagWriteTraceCount_ % dispatchFlagWriteTrace_.size()];
+        event.address = address;
+        event.previousValue = previousValue;
+        event.currentValue = currentValue;
+        event.instructionPC = instructionPC;
+        event.opcode = readCode(instructionPC);
+        event.operand = readCode(static_cast<std::uint16_t>(instructionPC + 1u));
+        event.stackReturnPC = currentStackReturnPC();
+        event.machineCycle = elapsedMachineCycles_;
+        ++dispatchFlagWriteTraceCount_;
+    }
+
     void recordSlotInterpolationDataAccess(std::uint16_t address,
                                             std::uint8_t value,
                                             bool write) noexcept {
@@ -1743,7 +1845,7 @@ private:
     std::size_t internalFlagWriteTraceCount_ = 0;
     std::array<BulkTransferEntryEvent, 16> bulkTransferEntryTrace_{};
     std::size_t bulkTransferEntryCount_ = 0;
-    std::array<InstructionWatchEvent, 128> instructionWatchTrace_{};
+    std::array<InstructionWatchEvent, 512> instructionWatchTrace_{};
     std::size_t instructionWatchCount_ = 0;
     std::array<SlotInterpolationDataAccessEvent, 256> slotInterpolationDataAccessTrace_{};
     std::size_t slotInterpolationDataAccessTraceCount_ = 0;
@@ -1756,6 +1858,10 @@ private:
     bool executionTraceActive_ = false;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
+    std::array<MidiEventGateAccessEvent, 256> midiEventGateTrace_{};
+    std::size_t midiEventGateTraceCount_ = 0;
+    std::array<DispatchFlagBackingWriteEvent, 256> dispatchFlagWriteTrace_{};
+    std::size_t dispatchFlagWriteTraceCount_ = 0;
     std::array<UnmappedBusEvent, 4096> unmappedBusTrace_{};
     std::size_t unmappedBusTraceCount_ = 0;
     std::array<std::uint64_t, 0x1000> unmappedReadCounts7xxx_{};
