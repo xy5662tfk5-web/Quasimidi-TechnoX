@@ -87,6 +87,7 @@ private:
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
+    std::atomic<bool> pendingPerformanceSync{false};
     std::atomic<float> outputGain{0.8f};
     double firmwareCycleTarget = 0.0;
     std::array<std::atomic<int>, 4> partMidiChannels{};
