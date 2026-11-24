@@ -2925,6 +2925,9 @@ int main(int argc, char** argv) {
         assert(note65OffEntryCount == 2u);
         assert(note65OffBranchCount == 2u);
         assert(note65OffPageBranchCount == 2u);
+        std::printf("NOTE65 OFF DISPATCH: AC88=%zu ACA0=%zu ACB2=%zu\\n",
+                    note65OffEntryCount, note65OffBranchCount,
+                    note65OffPageBranchCount);
         for (std::size_t i = 0; i < note65OffEntryCount; ++i) {
             const auto eventId = static_cast<std::uint8_t>(i == 0u ? 0x0cu : 0x0du);
             technox::MASSNoteEventAddress address;
@@ -2936,6 +2939,13 @@ int main(int argc, char** argv) {
             assert(note65OffBranches[i].accumulator == 0x11u);
             assert(note65OffPageBranches[i].registers[0] == address.byteOffset);
             assert(note65OffPageBranches[i].port2Latch == 0x35u);
+            std::printf("  NOTE65 OFF[%zu]: event=%02X key=%02X byteOffset=%02X "
+                        "branchOffset=%02X page=%02X\\n",
+                        i, static_cast<unsigned>(eventId),
+                        static_cast<unsigned>(note65OffEntries[i].registers[5]),
+                        static_cast<unsigned>(address.byteOffset),
+                        static_cast<unsigned>(note65OffBranches[i].accumulator),
+                        static_cast<unsigned>(note65OffPageBranches[i].port2Latch));
         }
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
