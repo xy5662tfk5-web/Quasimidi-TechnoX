@@ -834,6 +834,37 @@ int main(int argc, char** argv) {
                 consumerMachine.soundHostWriteCount(),
                 consumerMachine.soundCommandPacketCount(),
                 consumerMachine.cpuFaulted() ? 1 : 0);
+            assert(reachedSoundHostWriter);
+            assert(voiceRecordPage == 0x00u);
+            assert(cpuRegisters.pc == 0x0a52u);
+            assert(!consumerMachine.cpuFaulted());
+            assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)) ==
+                   (sineStepCount == 0x01u ? 0x14u : 0x1fu));
+            assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u)) == 0x00u);
+            assert(consumerMachine.soundHostWriteCount() == 4u);
+            assert(consumerMachine.soundCommandPacketCount() == 1u);
+
+            const auto& sinePacket = consumerMachine.soundCommandPacketAt(0);
+            assert(sinePacket.bytes[0] == 0x01u);
+            assert(sinePacket.bytes[1] == (sineStepCount == 0x01u ? 0x03u : 0x04u));
+            assert(sinePacket.bytes[2] == 0x05u);
+            assert(sinePacket.bytes[3] == 0x00u);
+            assert(sinePacket.returnPC == 0x0a52u);
+            assert(sinePacket.deviceIndex == 0x01u);
+
+            constexpr std::array<std::uint8_t, 4> expectedHostRegisters{{0, 1, 2, 3}};
+            constexpr std::array<std::uint16_t, 4> expectedHostWriterPCs{{
+                0x0dbau, 0x0dbdu, 0x0dc0u, 0x0dc5u
+            }};
+            for (std::size_t index = 0; index < expectedHostRegisters.size(); ++index) {
+                const auto& event = consumerMachine.soundHostWriteAt(index);
+                assert(event.registerIndex == expectedHostRegisters[index]);
+                assert(event.instructionPC == expectedHostWriterPCs[index]);
+                assert(event.returnPC == 0x0a52u);
+                assert(event.deviceIndex == 0x01u);
+                assert(event.port2 == 0x80u);
+            }
+
             const auto hostTraceCount = consumerMachine.soundHostWriteCount();
             const auto firstHostTrace = hostTraceCount > 8u ? hostTraceCount - 8u : 0u;
             for (std::size_t eventIndex = firstHostTrace; eventIndex < hostTraceCount; ++eventIndex) {
@@ -872,6 +903,13 @@ int main(int argc, char** argv) {
         assert(slotConsumerDouble[0] == sineDoubleStep[2]);
         assert(slotConsumerSingle[1] != slotConsumerDouble[1] ||
                slotConsumerSingle[2] != slotConsumerDouble[2]);
+
+        // The alternate sine-derived consumer now reaches the real IC4
+        // four-register writer under the synthetic active-record fixture.
+        // One vs two phase steps produce distinct voice-record and payload
+        // bytes; the external device's response/meaning remains unmodelled.
+        assert(slotConsumerSingle[1] == 0x14u);
+        assert(slotConsumerDouble[1] == 0x1fu);
 
         // Also execute the alternate 0x28D8 coefficient-table page with
         // Part/slot index 1. XDATA 00FC selects slot 1; ACC.3 in 00FB selects
