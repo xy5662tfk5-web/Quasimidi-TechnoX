@@ -629,7 +629,7 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                 break;
             }
             case technox::PanelControlAction::selectSingleSound: {
-                const int maximumSound = selectedPart == 9 ? 7 : 127;
+                const int maximumSound = currentPartDisplayNumber() == 10 ? 7 : 127;
                 const int sound = juce::jlimit(0, maximumSound, next);
                 if (queueCurrentPartParameterRaw(technox::PartParameter::soundNumber, sound))
                     valueDialNormalized = static_cast<float>(sound)
