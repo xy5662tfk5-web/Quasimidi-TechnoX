@@ -1,8 +1,8 @@
 # IC4 v1.05 front-panel GPIO scan — verified code-level evidence
 
-Status: code-level scan routines identified; physical button/encoder assignment is not yet decoded.
+Status: IC4 scan routines and logical encoder roles decoded from reachable firmware paths; the physical PCB pin-to-encoder wiring remains unverified.
 
-This note records the reachable IC4 v1.05 instructions that sample 8032 port pins and queue input events. It intentionally does not assign front-panel labels or invent encoder direction semantics.
+This note records the reachable IC4 v1.05 instructions that sample 8032 port pins and queue input events. It separates firmware-derived logical encoder roles from physical board wiring, which has not yet been verified.
 
 ## 1. Four-pattern P1/P3 scan: 0xA6FF
 
@@ -36,7 +36,7 @@ The table bytes at `0xA6A4–0xA6A7` give an exact code mapping:
 | First channel (state `0xA4`, P3.0 low, table `0xA6A4`) | `BE` | `7E` |
 | Second channel (state `0xA5`, P3.0 high, table `0xA6A6`) | `BD` | `7D` |
 
-This is strong firmware evidence for **two independent rotary/encoder inputs with a phase/strobe and a direction sample**. The source does not yet identify which physical encoder is labelled PARAMETER versus VALUE, or whether the two values are increment/decrement codes in the eventual consumer; that remains a separate call-path correlation task.
+This is strong firmware evidence for **two independent rotary/encoder inputs with a phase/strobe and a direction sample**. The downstream consumer analysis below correlates the first code pair with changing the current selected value and the second pair with selection/navigation. The remaining uncertainty is the exact physical PCB wiring from these scanned rows to the two labelled encoder bodies.
 
 ## 3. Input event FIFO
 
@@ -69,7 +69,7 @@ A separate reachable handler at `0x2D6D–0x2DC5` reads:
 
 For the `BE/7E` branch, the handler converts the selected value using `0xEC30`, builds a record pointer from the converted result, and issues `EDCE` to page `0x33`, offset `0xD8`; it then sets `XDATA[0x2B94]=3`. The alternate branch calls `0x29AA`.
 
-This is a concrete correlation between the first encoder's two codes and a selected-parameter/value transaction path. However, the reachable listing does not yet prove that this branch is directly invoked by every `A762` event, nor does it tell whether the physical first encoder is labelled PARAMETER or VALUE. The second encoder's `BD/7D` handling also needs its downstream consumer traced before assigning its UI role.
+This is a concrete correlation between the first encoder's two codes and a selected-value transaction path. The queue consumer and scan are both reachable in the same IC4 firmware state machine. The physical first row's connection to the encoder labelled VALUE still needs confirmation from board wiring or a hardware capture.
 
 ## 5. FIFO consumer evidence: VALUE-edit path versus selection path
 
@@ -92,7 +92,7 @@ This is a strong firmware-level match for **changing the current selected value*
 
 When `0x2D6D` receives a code other than `BE/7E`, it falls through to `0x29AA`. The `0x29AA–0x2AB6` path reads status at `0x7D95`, reads current selection/index state around `0x62CB–0x62CC` and `0x307A`, and issues multiple page-`0x33` mailbox updates, including offsets `0x99`, `0xA6`, `0xAA`, `0xB1`, `0xBA`, and `0xBE`. Its alternate subpaths also read the selected Part record at `0x7C00 + 24*index + 0x15/0x16`.
 
-This is consistent with **selection/navigation feedback** rather than direct value editing, and therefore is the stronger candidate for the PARAMETER/SOUNDGROUP encoder. The exact menu/group step semantics and the meanings of each page-`0x33` field are not completely decoded yet.
+This is consistent with **selection/navigation feedback** rather than direct value editing, and therefore is the stronger firmware-derived match for the PARAMETER/SOUNDGROUP function. The exact menu/group step semantics and the meanings of each page-`0x33` field are not completely decoded yet.
 
 ### Current evidence-based logical assignment
 
@@ -101,7 +101,7 @@ This is consistent with **selection/navigation feedback** rather than direct val
 | P3.0 low / state `0xA4` | `BE/7E` | VALUE/SOUND — alters the currently selected value |
 | P3.0 high / state `0xA5` | `BD/7D` | PARAMETER/SOUNDGROUP — selection/navigation candidate |
 
-This assignment is firmware-derived from the event-code consumers, not yet verified against the physical PCB connector pinout. Keep the logical UI roles separate from the electrical pin numbers until a board capture confirms the wiring.
+This assignment is firmware-derived from the event-code consumers. Keep the logical UI roles separate from electrical pin numbers until a board capture confirms which P3.0-selected row connects to the physical PARAMETER and VALUE encoder bodies.
 
 ## 6. What this proves and what remains open
 
@@ -113,7 +113,7 @@ This assignment is firmware-derived from the event-code consumers, not yet verif
 - The event queue is a 16-byte FIFO in upper internal RAM.
 
 **Not proven yet:**
-- which of the two encoder channels is labelled PARAMETER and which is VALUE on the physical panel;
+- the physical PCB pin/connector wiring that associates P3.0-low/P3.0-high rows with the printed PARAMETER and VALUE legends;
 - the complete meaning of each direction code and its downstream update/selection semantics;
 - the exact meaning of queued codes `F0/F1` and the other table-derived bytes at every caller;
 - debounce timing, detent scaling, acceleration, and direction;
@@ -134,4 +134,4 @@ UI gesture -> typed panel event -> audio-thread handoff
            -> decode the verified consumer path
 ```
 
-The project should keep the PARAMETER/VALUE label mapping data-driven until a firmware consumer trace or hardware capture identifies the two physical encoder channels.
+The logical code mapping is now firmware-derived (`BE/7E` = VALUE/SOUND edit; `BD/7D` = PARAMETER/SOUNDGROUP navigation). Keep the electrical row-to-panel-label wiring data-driven until a board capture confirms which scanned row reaches which encoder.
