@@ -11,7 +11,9 @@ enum class PanelOperatingMode : std::uint8_t {
 
 enum class PanelEditPage : std::uint8_t {
     main,
-    editPart
+    editFunctionMenu,
+    editPart,
+    editSystem
 };
 
 enum class PanelAlphaDial : std::uint8_t {
@@ -25,12 +27,16 @@ enum class PanelKey : std::uint8_t {
 };
 
 enum class PanelControlAction : std::uint8_t {
+    none,
     selectPerformance,
     switchPerformanceBank,
     selectSoundGroup,
     selectSingleSound,
     selectPart,
+    selectEditFunction,
     selectEditParameter,
+    selectSystemParameter,
+    editSystemParameter,
     editSelectedParameter
 };
 
@@ -42,10 +48,18 @@ constexpr PanelControlAction panelAction(PanelOperatingMode mode,
                                          PanelEditPage page,
                                          PanelAlphaDial dial) noexcept
 {
+    if (page == PanelEditPage::editFunctionMenu)
+        return PanelControlAction::selectEditFunction;
+
     if (page == PanelEditPage::editPart)
         return dial == PanelAlphaDial::parameterSoundGroup
             ? PanelControlAction::selectEditParameter
             : PanelControlAction::editSelectedParameter;
+
+    if (page == PanelEditPage::editSystem)
+        return dial == PanelAlphaDial::parameterSoundGroup
+            ? PanelControlAction::selectSystemParameter
+            : PanelControlAction::editSystemParameter;
 
     if (mode == PanelOperatingMode::performance)
         return PanelControlAction::selectPerformance;
@@ -61,6 +75,9 @@ constexpr PanelControlAction panelAction(PanelOperatingMode mode,
 {
     if (page == PanelEditPage::editPart)
         return PanelControlAction::selectPart;
+
+    if (page != PanelEditPage::main)
+        return PanelControlAction::none;
 
     return mode == PanelOperatingMode::performance
         ? PanelControlAction::switchPerformanceBank
