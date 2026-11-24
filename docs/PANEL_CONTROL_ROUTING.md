@@ -4,24 +4,25 @@ Status: implementation checkpoint, 2026-11-24.
 
 This note separates the controls that are already connected to the project state from the original-firmware paths that are still unverified. It is deliberately not a claim that the original sound engine has been reconstructed.
 
-## 1. Two different kinds of preset selection
+## 1. Manual-confirmed operating modes and preset selection
 
-The interface exposes two independent levels of selection:
+The English TechnoX Owner's Manual, pages 6–9, defines two operating modes and the panel behavior in each mode. The plugin currently maps its existing routing states to those two UI modes:
 
-1. **Performance memory** — the processor has 50 factory Performance programs. JUCE host program selection calls `setCurrentProgram()`, selects one Performance record from the parsed factory bank, then copies its Common block and four stored Part blocks into the M.A.S.S. engine state.
-2. **Single sound on a Part** — each of the four stored Performance Parts is Parts 13–16. Its Bank Number and Sound Number are the Part parameters at offsets `0x00` and `0x01`. The manual specifies Bank 0–3 and Sound 0–127; together these select one of 512 single sounds. The editor's PARAMETER encoder chooses which Part parameter is being edited; VALUE changes that parameter while EDIT mode is active.
+| Plugin/UI state | Original mode | PARAMETER/SOUNDGROUP | VALUE/SOUND | PART/BANK |
+|---|---|---|---|---|
+| `performanceOmni` | Performance | Selects a Performance | Selects a Performance | Switches ROM/RAM Performance bank |
+| `partChannels` | Sequencer Multi | Selects a sound group | Selects a single sound | Selects a Part |
+| EDIT page | Part edit | Selects a Part parameter | Changes that parameter | Selects a Part |
 
-The LCD now reports the Performance slot, the selected Part/parameter, and the Part's Bank/Sound number plus catalog name. This distinguishes changing a whole Performance from changing the sound assigned to one Part.
+The manual states that both Alpha dials can select one of the 50 Performance memories in Performance mode; PART/BANK switches ROM and RAM. In Sequencer Multi mode the PARAMETER dial chooses the sound group, VALUE chooses the individual sound, and PART/BANK chooses the Part. In Edit mode PARAMETER navigates the edit parameters/menus and VALUE alters the selected parameter.
 
-## 2. Encoder interaction
+The plugin contains the 50 factory ROM Performance records. It does not yet contain a user RAM Performance dump or RAM-memory persistence, so selecting RAM currently displays `RAM-xx: EMPTY` and does not pretend that user Performances are available.
 
-- PARAMETER drag owns only the selected-parameter index.
-- VALUE drag owns only the selected Part parameter value, and is active only in EDIT mode.
-- Each encoder has a separate drag-start value.
-- The VALUE indicator is held steady while PARAMETER is being dragged. After the PARAMETER gesture ends, VALUE snaps to the stored value of the newly selected parameter. During VALUE editing, only the VALUE indicator moves.
-- The VALUE indicator is refreshed from canonical Part state when a host Performance/program change, external MIDI edit, or Part selection changes the underlying value.
+## 2. Current Sequencer Multi Part coverage
 
-Previously the VALUE pointer was derived directly from the raw value of whichever parameter happened to be selected on every paint. As the PARAMETER encoder selected a different parameter, the VALUE pointer immediately jumped to that parameter's raw value. That looked like both knobs were being turned together, even though only one drag target was active. The independent display state removes that visual coupling without falsifying the value shown in the LCD.
+The manual defines 16 Sequencer Multi Parts, but the current factory Performance parser stores four Part blocks per Performance: Parts 13–16 (runtime indices 12–15). The present editor therefore lets the user select the four stored Performance Parts 13–16 only. It must not display them as if all 16 Sequencer Multi Parts were already modelled. Full Parts 1–16 and saved Sequencer Multi setups remain a follow-up implementation.
+
+The sound-name catalog contains 4 banks × 128 names. In the current four-Part editor, PARAMETER writes the selected Part's Bank Number (0–3), and VALUE writes its Sound Number (0–127). The selected sound name is resolved through the catalog. The catalog contains names and IC51 resource metadata, not decoded waveforms.
 
 ## 3. What a panel edit reaches today
 
@@ -45,25 +46,15 @@ Bank/Sound values are the bank/program identity used by the engine. `VoiceSlot` 
 
 This is a real connection to the current engine state; the editor is not just moving a decorative knob. However, the active `BasicMASSVoiceBackend` remains a generic test oscillator. It is not the original M.A.S.S. synthesis implementation.
 
-## 4. What is not yet connected to the original firmware
+## 4. Current boundary between panel state, firmware and audio engine
 
-The processor currently sends **host/external MIDI bytes** into the emulated MC6850-compatible ACIA path and clocks the IC4 v1.05 8032 firmware. The editor's PARAMETER/VALUE mouse events do not yet enter a decoded firmware front-panel input/encoder scan path.
+The processor sends **host/external MIDI bytes** into the emulated MC6850-compatible ACIA path and clocks the IC4 v1.05 8032 firmware. Panel edits currently update the canonical Performance/Part model and are applied to MASSAudioEngine through a bounded mailbox drained by `processBlock()`. This prevents the GUI thread from mutating VoiceManager/backend state concurrently with audio rendering.
 
-The IC4 evidence currently establishes:
-- MIDI bytes reach the firmware through the ACIA path.
-- The Performance loader copies the selected record's name, Common bytes and stored Parts 13–16 into firmware-visible state.
-- Part Bank/Sound data can be resolved through the IC51 resource catalog.
-- The firmware reaches separate, still-unidentified external interfaces: the page-selected mailbox path and the fixed four-register write window at `0x8000–0x8003`.
+The panel's encoder events are not yet injected into the original IC4 GPIO scanner in the live plugin. A real-ROM regression test does, however, execute the actual `0xA6A8` FIFO initializer and `0xA762` encoder scan routine using P3.0-selected external P1 inputs, then checks the exact FIFO codes.
 
-It does **not** yet establish:
-- the physical panel encoder/button scan registers or their exact event format;
-- an authentic firmware command corresponding to a mouse drag of PARAMETER or VALUE;
-- the physical chip behind the external register window;
-- the final voice-start/sample-playback protocol or original DSP/sample decoding.
+The current active `BasicMASSVoiceBackend` remains a generic test oscillator, not the original M.A.S.S. synthesis implementation. The firmware's physical sound peripheral, final voice/sample command protocol, and PCM/sample decoding remain unresolved.
 
-For that reason, do not invent 8032 input-register writes or claim that the UI has already been routed through the original panel scanner. That connection requires a firmware trace or hardware capture for each physical encoder/button action.
-
-## 5. Original firmware panel-input path discovered
+## 5. Original firmware panel-input path and logical role correlation
 
 Reachable IC4 v1.05 code contains actual external-pin scan routines. The evidence is documented in `docs/research/FRONT_PANEL_GPIO_SCAN.md`:
 
@@ -73,9 +64,11 @@ Reachable IC4 v1.05 code contains actual external-pin scan routines. The evidenc
 - Both scan routines enqueue bytes through `0xA6D1`; `0xA6E7` pops the 16-byte internal-RAM event FIFO.
 - The timer interrupt calls `0xA762`; several main-state routines call `0xA6FF`.
 
-The emulator has a P3.0-selected P1 input fixture seam, and the regression test executes the actual IC4 ROM at `0xA6A8` and `0xA762` to assert both channels, both direction codes, and no repeat while the phase remains held low. The test checks the ROM's own instruction path and FIFO output.
+The ROM consumer evidence strengthens the logical role assignment:
+- `BE/7E` enters `0x2D6D`, which reads the current selected index at `0x307A`, obtains the current value from `0x3063 + index`, converts it through `0xEC30`, and sends a value update through the page-`0x33` mailbox at offset `0xD8`. This is the VALUE/SOUND function.
+- `BD/7D` falls through to `0x29AA`, which updates the current selection/display-related state using `0x307A`, the current Part data, and page-`0x33` mailbox fields. This is the PARAMETER/SOUNDGROUP navigation candidate.
 
-This is the first firmware-confirmed two-channel encoder scanner. The remaining mapping is from these firmware channels to the physical front-panel labels PARAMETER and VALUE, and the full downstream control semantics of each event. Do not assign those labels yet: the source proves two selected quadrature-style input channels and their byte pairs, but not which panel legend belongs to which row.
+The real-ROM regression executes `0xA6A8` and `0xA762` and verifies both channels, both direction codes, and no repeat while the phase remains held low. This proves the firmware's scan outputs and their logical consumer roles. The exact physical PCB traces from P1.5/P1.6/P3.0 to the two front-panel encoder bodies still require a board-level capture.
 
 ## 6. Required long-term architecture
 
