@@ -611,6 +611,7 @@ int main(int argc, char** argv) {
                 (static_cast<std::uint16_t>(schedulerPage) << 8u) | 0x00fau);
             assert(schedulerPage == 0x00u);
             assert(schedulerStatusAddress == 0x00fau);
+            registers.pc = 0x044cu;
             const auto executed = phaseMachine.runUntilProgramCounter(0x047du, 512u);
             std::fprintf(stderr,
                 "Periodic scheduler exit pc=%04X executed=%zu page=%02X P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\\n",
