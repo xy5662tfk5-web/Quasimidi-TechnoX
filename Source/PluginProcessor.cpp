@@ -10,6 +10,7 @@ constexpr int kStateMagicV2 = 0x54584E32; // TXN2: Part values + MIDI channels
 constexpr int kStateMagicV3 = 0x54584E33; // TXN3: Part + four Common values + MIDI channels
 constexpr int kStateMagicV4 = 0x54584E34; // TXN4: Part + five Common values + MIDI channels + routing mode
 constexpr int kStateMagicV5 = 0x54584E35; // TXN5: adds all 16 Sequencer-Multi Parts
+constexpr int kStateMagicV6 = 0x54584E36; // TXN6: stores Drum Set separately from Part Sound Number
 constexpr int kPartStateBytesV2 = 50 * 4 * 24 + 4;
 constexpr int kPartStateBytesV3 = 50 * 4 * 24 + 50 * 4 + 4;
 constexpr int kPartStateBytesV4 = 50 * 4 * 24 + 50 * 5 + 4 + 1;
@@ -17,6 +18,7 @@ constexpr int kSequencerChannelBytesV5 = 16;
 constexpr int kSequencerStateBytesV5 = 16 * 24;
 constexpr int kPartStateBytesV5 = kPartStateBytesV4 + (kSequencerChannelBytesV5 - 4)
     + kSequencerStateBytesV5;
+constexpr int kPartStateBytesV6 = kPartStateBytesV5 + 1;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -274,6 +276,7 @@ void QuasimidiTechnoXAudioProcessor::syncSequencerPartsToEngine() noexcept
                     static_cast<technox::PartParameter>(parameter), value);
         }
     }
+    massEngine.setDrumSet(9, getSequencerDrumSet());
 }
 
 bool QuasimidiTechnoXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -332,6 +335,10 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                 massEngine.setPartParameter(edit.partIndex, edit.parameter, edit.rawValue);
             });
     }
+
+    const int pendingDrumSet = pendingSequencerDrumSet.exchange(-1, std::memory_order_acq_rel);
+    if (pendingDrumSet >= 0)
+        massEngine.setDrumSet(9, pendingDrumSet);
 
     const int channelCount = buffer.getNumChannels();
     int renderedSamples = 0;
@@ -497,8 +504,18 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isProgramChange() && !omniPerformance) {
             for (int i = 0; i < targetCount; ++i) {
                 const int slot = targetSlots[static_cast<std::size_t>(i)];
-                setSequencerPartParameterRaw(slot, technox::PartParameter::soundNumber,
-                                             message.getProgramChangeNumber());
+                const int program = message.getProgramChangeNumber();
+                if (slot == 9) {
+                    // MIDI channel 10 addresses the dedicated Drum Set number
+                    // (manual SysEx address 02 7E 00), not Part Sound Number.
+                    if (program >= 0 && program <= 7) {
+                        sequencerDrumSet.store(program, std::memory_order_release);
+                        massEngine.setDrumSet(9, program);
+                    }
+                } else {
+                    setSequencerPartParameterRaw(
+                        slot, technox::PartParameter::soundNumber, program);
+                }
             }
         }
     };
@@ -610,12 +627,6 @@ bool QuasimidiTechnoXAudioProcessor::setSequencerPartParameterRaw(
         descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
         return false;
 
-    // The drum channel (Part 10) selects one of the eight manual-documented
-    // drum sets, not one of the 512 single-sound programs.
-    if (partIndex == 9 && parameter == technox::PartParameter::soundNumber &&
-        rawValue > 7)
-        return false;
-
     sequencerPartValues[static_cast<std::size_t>(partIndex)][parameterIndex]
         .store(rawValue, std::memory_order_release);
     massEngine.setPartParameter(partIndex, parameter, rawValue);
@@ -630,22 +641,33 @@ bool QuasimidiTechnoXAudioProcessor::queueSequencerPartParameterRaw(
     if (partIndex < 0 || partIndex >= static_cast<int>(sequencerPartValues.size()) ||
         descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
         return false;
-    if (partIndex == 9 && parameter == technox::PartParameter::soundNumber && rawValue > 7)
-        return false;
-
     sequencerPartValues[static_cast<std::size_t>(partIndex)][parameterIndex]
         .store(rawValue, std::memory_order_release);
     return panelSequencerPartEditMailbox.publish(partIndex, parameter, rawValue);
+}
+
+int QuasimidiTechnoXAudioProcessor::getSequencerDrumSet() const noexcept
+{
+    return juce::jlimit(0, 7, sequencerDrumSet.load(std::memory_order_acquire));
+}
+
+bool QuasimidiTechnoXAudioProcessor::queueSequencerDrumSet(int drumSet) noexcept
+{
+    if (drumSet < 0 || drumSet > 7)
+        return false;
+    sequencerDrumSet.store(drumSet, std::memory_order_release);
+    pendingSequencerDrumSet.store(drumSet, std::memory_order_release);
+    return true;
 }
 
 juce::String QuasimidiTechnoXAudioProcessor::getSequencerPartSoundName(int partIndex) const
 {
     if (partIndex < 0 || partIndex >= static_cast<int>(sequencerPartValues.size()))
         return "Part unavailable";
+    if (partIndex == 9)
+        return juce::String("DRUM SET ") + juce::String(getSequencerDrumSet() + 1);
     const int bank = getSequencerPartParameterRaw(partIndex, technox::PartParameter::bankNumber);
     const int sound = getSequencerPartParameterRaw(partIndex, technox::PartParameter::soundNumber);
-    if (partIndex == 9)
-        return juce::String("DRUM KIT ") + juce::String(sound + 1);
     return soundCatalog.nameFor(bank, sound);
 }
 
@@ -800,7 +822,7 @@ juce::AudioProcessorEditor* QuasimidiTechnoXAudioProcessor::createEditor()
 void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     juce::MemoryOutputStream stream(destData, false);
-    stream.writeInt(kStateMagicV5);
+    stream.writeInt(kStateMagicV6);
     stream.writeInt(getCurrentProgram());
     for (const auto& performance : partValues)
         for (const auto& part : performance)
@@ -815,6 +837,7 @@ void QuasimidiTechnoXAudioProcessor::getStateInformation(juce::MemoryBlock& dest
     for (const auto& part : sequencerPartValues)
         for (const auto& parameter : part)
             stream.writeByte(static_cast<char>(parameter.load(std::memory_order_acquire)));
+    stream.writeByte(static_cast<char>(getSequencerDrumSet()));
 }
 
 void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
@@ -829,11 +852,13 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         return;
     }
     if (magic != kStateMagicV2 && magic != kStateMagicV3 &&
-        magic != kStateMagicV4 && magic != kStateMagicV5)
+        magic != kStateMagicV4 && magic != kStateMagicV5 &&
+        magic != kStateMagicV6)
         return;
     const int requiredBytes = magic == kStateMagicV2 ? kPartStateBytesV2
         : (magic == kStateMagicV3 ? kPartStateBytesV3
-        : (magic == kStateMagicV4 ? kPartStateBytesV4 : kPartStateBytesV5));
+        : (magic == kStateMagicV4 ? kPartStateBytesV4
+        : (magic == kStateMagicV5 ? kPartStateBytesV5 : kPartStateBytesV6)));
     if (sizeInBytes < 8 + requiredBytes)
         return;
 
@@ -909,22 +934,36 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         midiRoutingMode.store(static_cast<int>(MidiRoutingMode::performanceOmni), std::memory_order_release);
     }
 
-    if (magic == kStateMagicV5) {
+    if (magic == kStateMagicV5 || magic == kStateMagicV6) {
         for (std::size_t partIndex = 0; partIndex < sequencerPartValues.size(); ++partIndex)
             for (std::size_t parameter = 0;
                  parameter < sequencerPartValues[partIndex].size(); ++parameter) {
                 const int value = static_cast<unsigned char>(stream.readByte());
-                const auto descriptorMaximum =
-                    technox::kPartParameterDescriptors[parameter].maximum;
-                const int maximum = partIndex == 9 &&
-                    parameter == static_cast<std::size_t>(technox::PartParameter::soundNumber)
-                        ? 7 : static_cast<int>(descriptorMaximum);
+                const auto maximum = technox::kPartParameterDescriptors[parameter].maximum;
                 sequencerPartValues[partIndex][parameter].store(
-                    juce::jlimit(0, maximum, value), std::memory_order_release);
+                    juce::jlimit(0, static_cast<int>(maximum), value), std::memory_order_release);
             }
+
+        if (magic == kStateMagicV5) {
+            // V5 stored the kit in Part 10's Sound Number. Migrate it to the
+            // dedicated Drum Set state introduced in V6.
+            const int legacyKit = sequencerPartValues[9]
+                [static_cast<std::size_t>(technox::PartParameter::soundNumber)]
+                    .load(std::memory_order_acquire);
+            sequencerDrumSet.store(juce::jlimit(0, 7, legacyKit), std::memory_order_release);
+            sequencerPartValues[9]
+                [static_cast<std::size_t>(technox::PartParameter::soundNumber)]
+                    .store(0, std::memory_order_release);
+        } else {
+            const int restoredDrumSet = static_cast<unsigned char>(stream.readByte());
+            sequencerDrumSet.store(juce::jlimit(0, 7, restoredDrumSet),
+                                   std::memory_order_release);
+        }
     } else {
         initialiseSequencerPartStates();
+        sequencerDrumSet.store(0, std::memory_order_release);
     }
+    pendingSequencerDrumSet.store(-1, std::memory_order_release);
 
     setCurrentProgram(program);
     if (getMidiRoutingMode() == MidiRoutingMode::performanceOmni) {
