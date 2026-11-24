@@ -4085,6 +4085,59 @@ int main(int argc, char** argv) {
         }
         assert(note72SubroutineInstructionCount > 0u);
 
+        // Pin the resource handler's final byte stores into the two independent
+        // interpolation triplets. The 1E60/1E63/1E66 sequence writes high,
+        // middle, then low bytes; the following 09B9 pass consumes low-to-high.
+        struct ExpectedNote72ResourceWrite {
+            std::uint16_t address;
+            std::uint8_t value;
+            std::uint16_t pc;
+        };
+        constexpr std::array<ExpectedNote72ResourceWrite, 6>
+            expectedNote72ResourceWrites{{
+                {0x0083u, 0xa1u, 0x1e60u},
+                {0x0082u, 0x80u, 0x1e63u},
+                {0x0081u, 0xbeu, 0x1e66u},
+                {0x0093u, 0x48u, 0x1e60u},
+                {0x0092u, 0x00u, 0x1e63u},
+                {0x0091u, 0x01u, 0x1e66u}
+            }};
+        for (const auto& expected : expectedNote72ResourceWrites) {
+            bool found = false;
+            for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
+                const auto& access =
+                    firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+                if (access.write && access.address == expected.address &&
+                    access.value == expected.value &&
+                    access.instructionPC == expected.pc &&
+                    access.stackReturnPC == 0x1720u) {
+                    found = true;
+                    break;
+                }
+            }
+            assert(found);
+        }
+
+        // Note 72 changes the pitch/interpolation packet but holds velocity at
+        // 100. The velocity-sensitive 0x2122 packet must therefore stay fixed.
+        constexpr std::array<std::array<std::uint8_t, 4>, 5>
+            expectedNote72Prefix{{
+                {{0x00u, 0xd1u, 0x80u, 0x01u}},
+                {{0x02u, 0x01u, 0x00u, 0x00u}},
+                {{0x05u, 0xfbu, 0xd0u, 0x03u}},
+                {{0x0au, 0x00u, 0x78u, 0x00u}},
+                {{0x0fu, 0x00u, 0x00u, 0x00u}}
+            }};
+        constexpr std::array<std::uint16_t, 5> expectedNote72ReturnPCs{{
+            0x0a52u, 0x0a52u, 0x22fbu, 0x2122u, 0x236eu
+        }};
+        for (std::size_t i = 0; i < expectedNote72Prefix.size(); ++i) {
+            const auto& packet =
+                firmwareMachine.soundCommandPacketAt(note72PacketStart + i);
+            assert(packet.bytes == expectedNote72Prefix[i]);
+            assert(packet.returnPC == expectedNote72ReturnPCs[i]);
+        }
+
         const auto& note72PitchPacket =
             firmwareMachine.soundCommandPacketAt(note72PacketStart);
         assert(note72PitchPacket.returnPC == 0x0a52u);
