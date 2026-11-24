@@ -120,4 +120,24 @@ constexpr int sequencerPartIndexForMidiChannel(
     return -1;
 }
 
+constexpr SequencerMidiChannelMap migrateLegacyPerformancePartChannels(
+    const std::array<int, 4>& legacyChannels) noexcept
+{
+    auto result = defaultSequencerMidiChannelMap();
+    std::array<bool, 17> used{};
+    for (int channel = 1; channel <= 12; ++channel)
+        used[static_cast<std::size_t>(channel)] = true;
+
+    for (const int channel : legacyChannels) {
+        if (channel < 13 || channel > 16 ||
+            used[static_cast<std::size_t>(channel)])
+            return defaultSequencerMidiChannelMap();
+        used[static_cast<std::size_t>(channel)] = true;
+    }
+
+    for (std::size_t slot = 0; slot < legacyChannels.size(); ++slot)
+        result[12 + slot] = legacyChannels[slot];
+    return result;
+}
+
 } // namespace technox
