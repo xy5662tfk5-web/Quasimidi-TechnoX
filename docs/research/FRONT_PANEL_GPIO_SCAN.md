@@ -19,17 +19,23 @@ The row pattern table values and exact pin operations are byte-for-byte visible 
 
 ## 2. Additional P1/P3 input scan: 0xA762
 
-The routine at `0xA762–0xA79F`:
+The routine at `0xA762–0xA79F` is a two-channel quadrature-style encoder scan:
 
-- saves P1;
-- samples P3.0 into internal bit `0x27`;
-- begins at `DPTR=0xA6A4` with two scan entries;
-- rotates the table byte through carry and writes the P3.0/P1 scan pattern;
-- samples P1.5 (bit address `0x95`) and P1.6 (bit address `0x96`) to choose a table-derived event byte;
-- queues selected events with `0xA6D1`;
-- samples P1.7 and restores P1.
+- saves P1 and samples P3.0 into internal bit `0x27`;
+- scans two independent state bytes at internal RAM `0xA4` and `0xA5`;
+- uses P1.5 (bit address `0x95`) as the strobe/phase input: a low transition from the released state emits one event and sets the per-channel state byte; a held-low phase does not repeat; a subsequent high phase clears the state and rearms the next edge;
+- samples P1.6 (bit address `0x96`) at the low-phase edge to select one of two direction codes from that channel's table pair;
+- queues the selected byte with `0xA6D1`, then scans the second channel;
+- restores P1 before returning.
 
-The table bytes at `0xA6A4–0xA6A7` are `BE 7E BD 7D`. This is a second GPIO scan path; it is not yet proven which controls it represents or whether it corresponds to the rotary encoders, pushbuttons, or another panel signal group.
+The table bytes at `0xA6A4–0xA6A7` give an exact code mapping:
+
+| Encoder scan state | P1.6 low | P1.6 high |
+|---|---:|---:|
+| First channel (state `0xA4`, table `0xA6A4`) | `BE` | `7E` |
+| Second channel (state `0xA5`, table `0xA6A6`) | `BD` | `7D` |
+
+This is strong firmware evidence for **two independent rotary/encoder inputs with a phase/strobe and a direction sample**. The source does not yet identify which physical encoder is labelled PARAMETER versus VALUE, or whether the two values are increment/decrement codes in the eventual consumer; that remains a separate call-path correlation task.
 
 ## 3. Input event FIFO
 
@@ -44,13 +50,14 @@ The event queue helpers are separate from the scan logic:
 
 **Proven from the reachable IC4 disassembly:**
 - The firmware actively drives P1 and P3.0 with scan patterns.
-- It samples P1.3, P1.5, P1.6, and P1.7, as well as P3.0.
+- The main scan samples P1.3/P1.7; the timer scan samples P1.5/P1.6 and uses P1.5 as an edge/strobe with P1.6 selecting direction.
+- The timer scan contains two independent state bytes and emits the exact pairs `BE/7E` and `BD/7D`.
 - The scan results are converted into queued byte events.
 - The event queue is a 16-byte FIFO in upper internal RAM.
 
 **Not proven yet:**
-- which row/column or pin corresponds to PARAMETER, VALUE, EDIT/OK, EXIT, or PART/BANK;
-- whether P1.5/P1.6 form a quadrature pair, a button pair, or another input encoding;
+- which of the two encoder channels is labelled PARAMETER and which is VALUE on the physical panel;
+- the complete meaning of each direction code and its downstream update/selection semantics;
 - the exact meaning of queued codes `F0/F1` and the other table-derived bytes at every caller;
 - debounce timing, detent scaling, acceleration, and direction;
 - the physical board wiring or whether external latches/shift registers sit between the CPU pins and panel controls.
