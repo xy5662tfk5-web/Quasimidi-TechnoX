@@ -1226,6 +1226,79 @@ int main(int argc, char** argv) {
         assert(alternateSlotDouble[1] == slotConsumerDouble[1]);
         assert(alternateSlotDouble[2] == slotConsumerDouble[2]);
 
+        // Sweep all 16 firmware parameter/modulation slots on both coefficient pages.
+        // The 16 indexed records are not the same thing as the 21-voice allocator.
+        // Each pass executes the real IC4 0x047E -> 0x0550 path with matched
+        // operands; only the slot selector and coefficient-table page vary.
+        std::size_t verifiedParameterSlotCases = 0;
+        for (std::uint8_t slot = 0; slot < 16u; ++slot) {
+            for (std::uint8_t coefficientPage = 0; coefficientPage < 2u; ++coefficientPage) {
+                TechnoX8032Machine slotMachine;
+                assert(slotMachine.loadIC4Rom(realRom.data(), realRom.size()));
+                slotMachine.reset();
+                auto& slotCPU = slotMachine.cpuForTesting().registersForTesting();
+
+                slotCPU.pc = 0x0148u;
+                assert(slotMachine.runUntilProgramCounter(0x0162u, 50000u) > 0u);
+                assert(slotCPU.pc == 0x0162u);
+                slotCPU.pc = 0x0130u;
+                assert(slotMachine.runUntilProgramCounter(0x0147u, 1000u) > 0u);
+                assert(slotCPU.pc == 0x0147u);
+                assert(slotMachine.xdataByteForTesting(0x2050u) == 0x3cu);
+
+                slotMachine.writeInternal(0x47u, 0x02u);
+                slotMachine.writeExternal(0x2064u, 0x01u);
+                slotCPU.pc = 0x044cu;
+                assert(slotMachine.runUntilProgramCounter(0x047du, 512u) > 0u);
+                assert(slotCPU.pc == 0x047du);
+                const auto expectedSine = slotMachine.xdataByteForTesting(0x2053u);
+                assert(expectedSine == sineDoubleStep[2]);
+
+                const auto slotNibble = static_cast<std::uint8_t>(slot << 4u);
+                slotMachine.writeExternal(0x00fbu,
+                    coefficientPage == 0u ? 0x00u : 0x08u);
+                slotMachine.writeExternal(0x00fcu, slotNibble);
+                slotMachine.writeExternal(0x00fdu, 0x00u);
+                slotMachine.writeExternal(0x00fau, 0x00u);
+
+                const auto coefficientAAddress = static_cast<std::uint16_t>(
+                    (coefficientPage == 0u ? 0x28c8u : 0x28d8u) + slot);
+                const auto coefficientBAddress = static_cast<std::uint16_t>(0x2888u + slot);
+                const auto coefficientCAddress = static_cast<std::uint16_t>(0x2898u + slot);
+                const auto multiplierAddress = static_cast<std::uint16_t>(0x2020u + slot);
+                const auto sineGainAddress = static_cast<std::uint16_t>(0x2b61u + slot);
+                const auto stateAddress = static_cast<std::uint16_t>(0x2000u + 2u * slot);
+
+                slotMachine.writeExternal(coefficientAAddress, 0x22u);
+                slotMachine.writeExternal(coefficientBAddress, 0x33u);
+                slotMachine.writeExternal(coefficientCAddress, 0x44u);
+                slotMachine.writeExternal(multiplierAddress, 0x05u);
+                slotMachine.writeExternal(sineGainAddress, 0x98u);
+                slotMachine.writeExternal(stateAddress, 0x00u);
+                slotMachine.writeExternal(static_cast<std::uint16_t>(stateAddress + 1u), 0x00u);
+                slotMachine.writeInternal(0x47u, 0x01u);
+                slotMachine.writeInternal(0x49u, 0x00u);
+
+                slotCPU.pc = 0x044cu;
+                assert(slotMachine.runUntilProgramCounter(0x0550u, 4096u) > 0u);
+                assert(slotCPU.pc == 0x0550u);
+                assert(!slotMachine.cpuFaulted());
+                assert(slotMachine.readInternal(0x30u) == slot);
+                assert(slotMachine.readInternal(0x45u) == 0x22u);
+                assert(slotMachine.readInternal(0x41u) == 0x33u);
+                assert(slotMachine.readInternal(0x05u) == 0x44u);
+                assert(slotMachine.readInternal(0x36u) == slotConsumerDouble[1]);
+                assert(slotMachine.readInternal(0x37u) == slotConsumerDouble[2]);
+                assert(slotMachine.soundCommandPacketCount() == 0u);
+                assert(slotMachine.soundHostWriteCount() == 0u);
+                assert(slotMachine.soundHostReadCount() == 0u);
+                ++verifiedParameterSlotCases;
+            }
+        }
+        assert(verifiedParameterSlotCases == 32u);
+        std::printf("IC4 parameter slot matrix: %zu/32 (16 slots x 2 coefficient pages) verified\\n",
+                    verifiedParameterSlotCases);
+
         // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
         // then resolve the two IC51 upload-stream formats associated with each FX1 entry.
         if (!realIC51.empty()) {
