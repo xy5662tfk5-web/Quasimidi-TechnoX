@@ -1,6 +1,7 @@
 #include "../Source/TechnoX8032Machine.h"
 #include "../Source/MASSResourceROM.h"
 #include "../Source/MASSAudioEngine.h"
+#include "../Source/MASSNoteEventAddressing.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -2936,8 +2937,6 @@ int main(int argc, char** argv) {
             assert(note65OffPageBranches[i].registers[0] == address.byteOffset);
             assert(note65OffPageBranches[i].port2Latch == 0x35u);
         }
-        const auto realPackets = firmwareMachine.soundCommandPacketCount();
-        const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
