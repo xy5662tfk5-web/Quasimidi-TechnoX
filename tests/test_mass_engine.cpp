@@ -1,5 +1,6 @@
 #include "../Source/MASSAudioEngine.h"
 #include "../Source/BasicMASSVoiceBackend.h"
+#include "../Source/MASSNoteEventAddressing.h"
 #include <cassert>
 #include <cmath>
 using namespace technox;
