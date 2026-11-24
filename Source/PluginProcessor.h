@@ -50,6 +50,10 @@ public:
     int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
     bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
     bool queuePanelPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    int getSequencerPartParameterRaw(int partIndex, technox::PartParameter parameter) const noexcept;
+    bool setSequencerPartParameterRaw(int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    bool queueSequencerPartParameterRaw(int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    juce::String getSequencerPartSoundName(int partIndex) const;
     int getCommonControlRaw(int performanceIndex, technox::MASSCommonControl control) const noexcept;
     bool setCommonControlRaw(int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept;
     bool getEditedPartSysEx(int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const;
@@ -84,17 +88,22 @@ private:
     std::unique_ptr<technox::IMASSVoiceBackend> voiceBackend;
     technox::MASSAudioEngine massEngine;
     technox::PanelPartEditMailbox panelPartEditMailbox;
+    technox::PanelSequencerPartEditMailbox panelSequencerPartEditMailbox;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
+    std::array<std::array<std::atomic<int>, 24>, 16> sequencerPartValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
     std::atomic<bool> pendingPerformanceSync{false};
+    std::atomic<bool> pendingSequencerSync{false};
     std::atomic<float> outputGain{0.8f};
     double firmwareCycleTarget = 0.0;
     std::array<std::atomic<int>, 4> partMidiChannels{};
 
     void initialisePartStates();
+    void initialiseSequencerPartStates() noexcept;
     void initialiseCommonControlsFromBank() noexcept;
     void syncCurrentPerformanceToEngine() noexcept;
+    void syncSequencerPartsToEngine() noexcept;
     int partSlotForMidiChannel(int channel) const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
