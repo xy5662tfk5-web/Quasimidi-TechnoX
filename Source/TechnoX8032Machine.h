@@ -237,6 +237,18 @@ public:
         bool writeAccepted = true;
         std::uint64_t machineCycle = 0;
     };
+    struct SlotInterpolationDataAccessEvent {
+        std::uint16_t address = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t value = 0xff;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool write = false;
+        bool ic51Selected = false;
+        std::uint64_t machineCycle = 0;
+    };
     struct UnmappedBusEvent {
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
@@ -406,6 +418,8 @@ public:
         watchedCallCounts_.fill(0);
         instructionWatchTrace_.fill(InstructionWatchEvent{});
         instructionWatchCount_ = 0;
+        slotInterpolationDataAccessTrace_.fill(SlotInterpolationDataAccessEvent{});
+        slotInterpolationDataAccessTraceCount_ = 0;
         executionInstructionTrace_.fill(ExecutionInstructionEvent{});
         executionInstructionTraceCount_ = 0;
         executionDataAccessTrace_.fill(ExecutionDataAccessEvent{});
@@ -492,6 +506,18 @@ public:
     const InstructionWatchEvent& instructionWatchAtForTesting(
         std::size_t index) const noexcept {
         return instructionWatchTrace_[index % instructionWatchTrace_.size()];
+    }
+    void clearSlotInterpolationDataAccessTraceForTesting() noexcept {
+        slotInterpolationDataAccessTrace_.fill(SlotInterpolationDataAccessEvent{});
+        slotInterpolationDataAccessTraceCount_ = 0;
+    }
+    std::size_t slotInterpolationDataAccessTraceCountForTesting() const noexcept {
+        return slotInterpolationDataAccessTraceCount_;
+    }
+    const SlotInterpolationDataAccessEvent& slotInterpolationDataAccessTraceAtForTesting(
+        std::size_t index) const noexcept {
+        return slotInterpolationDataAccessTrace_[
+            index % slotInterpolationDataAccessTrace_.size()];
     }
 
     // Arms capture only when firmware reaches 0x1FC9 or 0x2027, and each
@@ -834,6 +860,7 @@ public:
 
     std::uint8_t readExternal(std::uint16_t address) noexcept override {
         const auto value = readExternalImpl(address);
+        recordSlotInterpolationDataAccess(address, value, false);
         recordExecutionDataAccess(address, value, false);
         return value;
     }
@@ -1074,6 +1101,7 @@ public:
 
     void writeExternal(std::uint16_t address, std::uint8_t value) noexcept override {
         writeExternalImpl(address, value);
+        recordSlotInterpolationDataAccess(address, value, true);
         recordExecutionDataAccess(address, value, true);
     }
 
@@ -1559,6 +1587,28 @@ public:
     }
 
 private:
+    void recordSlotInterpolationDataAccess(std::uint16_t address,
+                                            std::uint8_t value,
+                                            bool write) noexcept {
+        const auto pc = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        if (pc < 0x09b9u || pc > 0x0a3du)
+            return;
+        auto& event = slotInterpolationDataAccessTrace_[
+            slotInterpolationDataAccessTraceCount_ %
+                slotInterpolationDataAccessTrace_.size()];
+        event.address = address;
+        event.instructionPC = pc;
+        event.stackReturnPC = currentStackReturnPC();
+        event.value = value;
+        event.port2 = portLatch_[2];
+        event.port3 = portPins_[3];
+        event.soundBusMode = internal_[0x8e];
+        event.write = write;
+        event.ic51Selected = isIC51Selected();
+        event.machineCycle = elapsedMachineCycles_;
+        ++slotInterpolationDataAccessTraceCount_;
+    }
+
     void recordExecutionDataAccess(std::uint16_t address, std::uint8_t value,
                                    bool write) noexcept {
         if (!executionTraceActive_)
@@ -1666,6 +1716,8 @@ private:
     std::size_t bulkTransferEntryCount_ = 0;
     std::array<InstructionWatchEvent, 32> instructionWatchTrace_{};
     std::size_t instructionWatchCount_ = 0;
+    std::array<SlotInterpolationDataAccessEvent, 256> slotInterpolationDataAccessTrace_{};
+    std::size_t slotInterpolationDataAccessTraceCount_ = 0;
     std::array<ExecutionInstructionEvent, 4096> executionInstructionTrace_{};
     std::size_t executionInstructionTraceCount_ = 0;
     std::array<ExecutionDataAccessEvent, 8192> executionDataAccessTrace_{};
