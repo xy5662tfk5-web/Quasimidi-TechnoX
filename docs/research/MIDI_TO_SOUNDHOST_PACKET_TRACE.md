@@ -243,3 +243,27 @@ This is a firmware command/initialization-style transfer pattern, not 544 decode
 - The regression now snapshots the first event's 544 packet bytes and return PCs immediately after that event, then compares the snapshot with the second event's live packets. This explicitly prevents ring-buffer wrap from corrupting the differential test.
 - Call deltas for both velocity events match: `0x0E3A=1`, `0x26A2=0`, `0x0E21=2`, and `0x0DF7=32`.
 - No DSP register meanings are assigned to these bytes.
+
+
+## Adjacent-semitone pitch-step differential — verified in run #1489
+
+The warm-state same-program/Part/velocity fixture now releases MIDI key 65, sends key 66 at the same velocity, and snapshots the first five note-associated packets separately from the 544-packet suffix. The first packet is emitted by the shared `0x0A4F` interpolation writer (immediate `0x0DB7` return PC `0x0A52`).
+
+Observed first-packet payload words, interpreted only as a 24-bit little-endian value for comparison:
+
+| MIDI key | First packet | 24-bit payload |
+|---:|---|---:|
+| 64 | `00 A9 E4 01` | `0x01E4A9` |
+| 65 | `00 71 01 02` | `0x020171` |
+| 66 | `00 F0 1F 02` | `0x021FF0` |
+
+The 65→66 ratio is `1.059395` (1,059,395 ppm), close to the equal-tempered semitone ratio `2^(1/12) ≈ 1.059463`. The 64→65 change is of the same order. This is strong evidence that this field is a pitch-step / phase-increment-like quantity. It is not yet proof of the physical DSP's fixed-point format, unit, clock basis, or register meaning; those names remain provisional until checked against the receiver or real audio.
+
+For the key-66 event:
+- exactly 549 complete four-byte transactions were observed;
+- the 544-packet suffix matched the saved key-64/key-65 reference suffix byte-for-byte and return-PC-for-return-PC;
+- the paired Note Off generated no writes to the `0x8000–0x8003` window and no `0x0DB7` calls in this fixture.
+
+The regression is in `tests/test_technox_8032_machine.cpp` and passed the unit-test job in run #1489. The test still uses the explicitly synthetic DSP-ready response. It establishes the original IC4 firmware's output construction, not an actual SAM/DSP response or confirmed audible playback.
+
+CI: [run #1489](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45458611160), commit `8b70481a0f65e0afeb161b9e59c119a05d6450a9`.
