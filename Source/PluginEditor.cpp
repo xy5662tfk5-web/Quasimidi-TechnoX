@@ -106,16 +106,24 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
     setSize(1200, 132);
     setResizable(false, false);
     lastRoutingMode = audioProcessor.getMidiRoutingMode();
+    lastPerformanceIndex = audioProcessor.getCurrentProgram();
     syncDialsFromCurrentSelection();
     startTimerHz(12);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
 {
-    const auto currentMode = audioProcessor.getMidiRoutingMode();
-    if (currentMode != lastRoutingMode && dragTarget == DragTarget::none) {
-        lastRoutingMode = currentMode;
-        syncDialsFromCurrentSelection();
+    // A host Program Change may update the Performance without a UI gesture.
+    // Keep both indicators and the LCD in sync, but never move the inactive
+    // dial during an in-progress gesture.
+    if (dragTarget == DragTarget::none) {
+        const auto currentMode = audioProcessor.getMidiRoutingMode();
+        const int currentProgram = audioProcessor.getCurrentProgram();
+        if (currentMode != lastRoutingMode || currentProgram != lastPerformanceIndex) {
+            lastRoutingMode = currentMode;
+            lastPerformanceIndex = currentProgram;
+            syncDialsFromCurrentSelection();
+        }
     }
     repaint();
 }
@@ -535,8 +543,10 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                 const int selection = juce::jlimit(0, maximumProgram, next);
                 if (ramPerformanceBank)
                     ramPerformanceSelection = selection;
-                else
+                else {
                     audioProcessor.setCurrentProgram(selection);
+                    lastPerformanceIndex = selection;
+                }
                 parameterDialNormalized = maximumProgram > 0
                     ? static_cast<float>(selection) / static_cast<float>(maximumProgram) : 0.0f;
                 break;
@@ -574,8 +584,10 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                 const int selection = juce::jlimit(0, maximumProgram, next);
                 if (ramPerformanceBank)
                     ramPerformanceSelection = selection;
-                else
+                else {
                     audioProcessor.setCurrentProgram(selection);
+                    lastPerformanceIndex = selection;
+                }
                 valueDialNormalized = maximumProgram > 0
                     ? static_cast<float>(selection) / static_cast<float>(maximumProgram) : 0.0f;
                 break;
