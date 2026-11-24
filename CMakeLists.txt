@@ -57,6 +57,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/BasicMASSVoiceBackend.h
     Source/MCS51Core.h
     Source/TechnoX8032Machine.h
+    Source/TechnoXPanelControlEvents.h
     Source/MCS51Timers.h
 )
 
@@ -159,5 +160,17 @@ if (BUILD_TESTING)
     target_compile_features(technox_basic_audio_backend_tests PRIVATE cxx_std_17)
     add_test(NAME technox_basic_audio_backend_tests
         COMMAND technox_basic_audio_backend_tests
+    )
+endif()
+
+# Dependency-free panel-to-audio edit mailbox tests.
+if (BUILD_TESTING)
+    add_executable(technox_panel_control_events_tests
+        tests/test_panel_control_events.cpp
+    )
+    target_compile_features(technox_panel_control_events_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_panel_control_events_tests PRIVATE -UNDEBUG)
+    add_test(NAME technox_panel_control_events_tests
+        COMMAND technox_panel_control_events_tests
     )
 endif()
