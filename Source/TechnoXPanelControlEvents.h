@@ -111,4 +111,77 @@ private:
         dirtyWords_{};
 };
 
+
+// Independent latest-value mailbox for the 16 live Sequencer-Multi Parts.
+// Unlike PerformancePartEditMailbox, this state is not indexed by a factory
+// Performance memory; it represents the current 16-channel Multi setup.
+class PanelSequencerPartEditMailbox {
+public:
+    static constexpr std::size_t kPartCount = 16;
+    static constexpr std::size_t kParameterCount = PartEditModel::kDataSize;
+    static constexpr std::size_t kEditCount = kPartCount * kParameterCount;
+    static constexpr std::size_t kWordCount = (kEditCount + 31u) / 32u;
+
+    struct Edit {
+        int partIndex = -1;
+        PartParameter parameter = PartParameter::bankNumber;
+        int rawValue = -1;
+    };
+
+    PanelSequencerPartEditMailbox() noexcept {
+        for (auto& value : pendingValues_)
+            value.store(-1, std::memory_order_relaxed);
+        for (auto& word : dirtyWords_)
+            word.store(0, std::memory_order_relaxed);
+    }
+
+    bool publish(int partIndex, PartParameter parameter, int rawValue) noexcept {
+        const auto parameterIndex = static_cast<std::size_t>(parameter);
+        const auto* descriptor = PartEditModel::descriptor(parameterIndex);
+        if (partIndex < 0 || partIndex >= static_cast<int>(kPartCount) ||
+            descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
+            return false;
+
+        const std::size_t editIndex =
+            static_cast<std::size_t>(partIndex) * kParameterCount + parameterIndex;
+        const std::size_t wordIndex = editIndex / 32u;
+        const std::uint32_t bit = std::uint32_t{1} << (editIndex % 32u);
+        pendingValues_[editIndex].store(rawValue, std::memory_order_release);
+        dirtyWords_[wordIndex].fetch_or(bit, std::memory_order_release);
+        return true;
+    }
+
+    template <typename Consumer>
+    void consume(Consumer&& consumer) noexcept {
+        for (std::size_t wordIndex = 0; wordIndex < kWordCount; ++wordIndex) {
+            std::uint32_t pending = dirtyWords_[wordIndex]
+                .exchange(0, std::memory_order_acq_rel);
+            while (pending != 0) {
+                const std::uint32_t lowestBit = pending & (~pending + 1u);
+                pending &= (pending - 1u);
+                std::size_t bitIndex = 0;
+                std::uint32_t scan = lowestBit;
+                while ((scan & 1u) == 0u) {
+                    scan >>= 1u;
+                    ++bitIndex;
+                }
+                const std::size_t editIndex = wordIndex * 32u + bitIndex;
+                if (editIndex >= kEditCount)
+                    continue;
+                const int value = pendingValues_[editIndex].load(std::memory_order_acquire);
+                if (value >= 0)
+                    consumer(Edit{
+                        static_cast<int>(editIndex / kParameterCount),
+                        static_cast<PartParameter>(editIndex % kParameterCount),
+                        value
+                    });
+            }
+        }
+    }
+
+private:
+    std::array<std::atomic<int>, kEditCount> pendingValues_{};
+    std::array<std::atomic<std::uint32_t>, kWordCount> dirtyWords_{};
+};
+
 } // namespace technox
