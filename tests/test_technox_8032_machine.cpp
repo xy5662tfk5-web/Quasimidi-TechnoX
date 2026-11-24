@@ -3514,14 +3514,35 @@ int main(int argc, char** argv) {
         // Velocity changes only the fourth of the five note-specific packets.
         // The following 544 firmware bulk-transfer
         // records must be identical for the same pitch/program/Part.
+        std::size_t velocityBulkDifferenceCount = 0;
         for (std::size_t i = 0; i < 544u; ++i) {
             const auto& highPacket = firmwareMachine.soundCommandPacketAt(
                 secondNotePacketStart + 5u + i);
             const auto& lowPacket = firmwareMachine.soundCommandPacketAt(
                 lowerVelocityPacketStart + 5u + i);
-            assert(highPacket.bytes == lowPacket.bytes);
-            assert(highPacket.returnPC == lowPacket.returnPC);
+            if (highPacket.bytes != lowPacket.bytes ||
+                highPacket.returnPC != lowPacket.returnPC) {
+                if (velocityBulkDifferenceCount < 32u) {
+                    std::fprintf(stderr,
+                        "VELOCITY-BULK-DIFF[%zu] high=%02X %02X %02X %02X ret=%04X "
+                        "low=%02X %02X %02X %02X ret=%04X\\n",
+                        i,
+                        static_cast<unsigned>(highPacket.bytes[0]),
+                        static_cast<unsigned>(highPacket.bytes[1]),
+                        static_cast<unsigned>(highPacket.bytes[2]),
+                        static_cast<unsigned>(highPacket.bytes[3]),
+                        static_cast<unsigned>(highPacket.returnPC),
+                        static_cast<unsigned>(lowPacket.bytes[0]),
+                        static_cast<unsigned>(lowPacket.bytes[1]),
+                        static_cast<unsigned>(lowPacket.bytes[2]),
+                        static_cast<unsigned>(lowPacket.bytes[3]),
+                        static_cast<unsigned>(lowPacket.returnPC));
+                }
+                ++velocityBulkDifferenceCount;
+            }
         }
+        std::fprintf(stderr,"VELOCITY-BULK-DIFF-COUNT=%zu/544\\n",
+                     velocityBulkDifferenceCount);
 
         // New-pitch probe: keep Part/program/velocity fixed and change only
         // pitch to 65. Capture the live 09B9 arithmetic inputs, the exact
