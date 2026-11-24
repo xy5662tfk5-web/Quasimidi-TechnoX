@@ -2635,6 +2635,46 @@ int main(int argc, char** argv) {
         const auto secondNotePacketCount =
             firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
         assert(secondNotePacketCount == 549u);
+
+        // The five event-specific command packets are followed by a repeatable
+        // 544-packet firmware-generated transfer: two 256-index passes from
+        // 0x0E6A, then two 16-entry groups from 0x0E1D. The external register
+        // meanings remain unknown; assert only the byte/PC pattern.
+        constexpr std::size_t kNoteSpecificPacketCount = 5u;
+        constexpr std::size_t kFullIndexPassPackets = 512u;
+        constexpr std::size_t kPagedTablePackets = 32u;
+        static_assert(kNoteSpecificPacketCount + kFullIndexPassPackets +
+                      kPagedTablePackets == 549u);
+        for (std::size_t i = 0; i < kFullIndexPassPackets; ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                secondNotePacketStart + kNoteSpecificPacketCount + i);
+            const auto offset = static_cast<unsigned>(i % 256u);
+            const auto expectedIndex = static_cast<std::uint8_t>(
+                offset == 0u ? 0u : 256u - offset);
+            const auto expectedFlag = static_cast<std::uint8_t>(
+                i < 256u ? 0x00u : 0x80u);
+            assert(packet.returnPC == 0x0e6au);
+            assert(packet.bytes[0] == expectedIndex);
+            assert(packet.bytes[1] == 0x00u);
+            assert(packet.bytes[2] == 0x00u);
+            assert(packet.bytes[3] == expectedFlag);
+        }
+        for (std::size_t i = 0; i < kPagedTablePackets; ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                secondNotePacketStart + kNoteSpecificPacketCount +
+                kFullIndexPassPackets + i);
+            const auto offset = static_cast<unsigned>(i % 16u);
+            const auto expectedIndex = static_cast<std::uint8_t>(
+                0x0fu + offset * 0x10u);
+            const auto expectedFlag = static_cast<std::uint8_t>(
+                i < 16u ? 0x07u : 0x87u);
+            assert(packet.returnPC == 0x0e1du);
+            assert(packet.bytes[0] == expectedIndex);
+            assert(packet.bytes[1] == 0xffu);
+            assert(packet.bytes[2] == 0xffu);
+            assert(packet.bytes[3] == expectedFlag);
+        }
+
         const auto secondNote1848Calls =
             firmwareMachine.watchedCallCount(0x1848u) - secondNote1848CallStart;
         assert(secondNote1848Calls == 2u);
