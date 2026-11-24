@@ -190,3 +190,10 @@ The CI trace now captures both entries into firmware helper `0x1848` for each ve
 For each corresponding call, A, B, R3 and R4 are identical across the two tests; **R2 is the only captured helper input that changes**. The regression now asserts this relationship and records the caller return address for both entries. This is stronger evidence that the velocity-dependent difference is already present at the input to the reconstructed 0x1848 arithmetic, before the later `0x210F/0x211F` packet-building sequence.
 
 The meaning of the resulting arithmetic value and its eventual DSP field is still unknown. The next trace will use the two recorded return addresses to follow the R2 producers and the post-return register flow toward the packet builder.
+
+
+## Velocity-sensitive command-byte path now traced through the packet builder
+
+- The successful 24 November Intel CI trace compares note 64 at velocities 100 and 50 and follows both calls to `0x1848` through the pre-`0x210F` instruction window.
+- The second `0x1848` return A=`0x0F` / `0x53` is transformed by `SWAP A` at `0x2089`, `RR A` at `0x208A`, `MOV R4,A` at `0x208B`, `ANL A,#0xF8` at `0x208C`, and `MOV R3,A` at `0x208E`. This yields R4/R3=`0x78/0x78` or `0x9A/0x98`, matching the fourth packet `0A 00 78 00` / `0A 00 98 02`.
+- This confirms the firmware byte path only; external DSP field semantics and the real ready/busy response remain unknown. Full trace and interpretation limits: `docs/research/VELOCITY_TO_COMMAND_BYTE_PATH.md`.
