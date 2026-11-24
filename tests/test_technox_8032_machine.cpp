@@ -2659,6 +2659,10 @@ int main(int argc, char** argv) {
             note65IndirectDispatchEvents{};
         std::array<TechnoX8032Machine::InstructionWatchEvent, 16>
             note65StreamEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note65OnAddressEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note65OnBranchEvents{};
         std::size_t note65SlotEntryCount = 0;
         std::size_t note65InterpolationCount = 0;
         std::size_t note65WriterCount = 0;
@@ -2666,6 +2670,8 @@ int main(int argc, char** argv) {
         std::size_t note65DescriptorCount = 0;
         std::size_t note65IndirectDispatchCount = 0;
         std::size_t note65StreamCount = 0;
+        std::size_t note65OnAddressCount = 0;
+        std::size_t note65OnBranchCount = 0;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
             const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
@@ -2687,6 +2693,12 @@ int main(int argc, char** argv) {
             } else if (event.instructionPC == 0xac00u) {
                 assert(note65IndirectDispatchCount < note65IndirectDispatchEvents.size());
                 note65IndirectDispatchEvents[note65IndirectDispatchCount++] = event;
+            } else if (event.instructionPC == 0xac16u) {
+                assert(note65OnAddressCount < note65OnAddressEvents.size());
+                note65OnAddressEvents[note65OnAddressCount++] = event;
+            } else if (event.instructionPC == 0xac25u) {
+                assert(note65OnBranchCount < note65OnBranchEvents.size());
+                note65OnBranchEvents[note65OnBranchCount++] = event;
             } else if (event.instructionPC == 0x189du) {
                 assert(note65StreamCount < note65StreamEvents.size());
                 note65StreamEvents[note65StreamCount++] = event;
@@ -2701,6 +2713,8 @@ int main(int argc, char** argv) {
         assert(note65InterpolationCount == 2u);
         assert(note65WriterCount == 2u);
         assert(note65PartDispatchCount == 2u);
+        assert(note65OnAddressCount == 2u);
+        assert(note65OnBranchCount == 2u);
         assert(note65PartDispatchEvents[0].returnPC == 0x56c8u);
         assert(note65PartDispatchEvents[1].returnPC == 0x56c8u);
         assert(note65PartDispatchEvents[0].registers[7] == 0x0cu);
@@ -2708,6 +2722,21 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < note65PartDispatchCount; ++i) {
             assert(note65PartDispatchEvents[i].registers[5] == 0x41u);
             assert(note65PartDispatchEvents[i].registers[3] == 0x64u);
+            const auto& addressing = i == 0u ? note65OnAddressEvents[0]
+                                               : note65OnAddressEvents[1];
+            const auto& branch = i == 0u ? note65OnBranchEvents[0]
+                                         : note65OnBranchEvents[1];
+            technox::MASSNoteEventAddress address;
+            assert(technox::MASSNoteEventAddressing::decode(
+                note65PartDispatchEvents[i].registers[7], 0x41u, address));
+            assert(address.byteOffset == addressing.registers[0]);
+            assert(address.noteOnDispatchOffset == 0x0eu);
+            assert(address.noteOffDispatchOffset == 0x11u);
+            assert(addressing.registers[0] == (i == 0u ? 0xc8u : 0xd8u));
+            assert(addressing.accumulator == 0x0eu);
+            assert(branch.registers[0] == addressing.registers[0]);
+            assert(branch.registers[7] == note65PartDispatchEvents[i].registers[7]);
+            assert(branch.port2Latch == 0x35u);
         }
         std::printf("NOTE65 PART DISPATCH: calls=%zu\\n", note65PartDispatchCount);
         for (std::size_t i = 0; i < note65PartDispatchCount; ++i) {
@@ -2724,13 +2753,27 @@ int main(int argc, char** argv) {
         std::printf("NOTE65 DESCRIPTOR/DISPATCH ENTRIES: 1494=%zu AC00=%zu 189D=%zu\\n",
                     note65DescriptorCount, note65IndirectDispatchCount,
                     note65StreamCount);
+        assert(note65DescriptorCount == 2u);
+        assert(note65DescriptorEvents[0].returnPC == 0x446au);
+        assert(note65DescriptorEvents[1].returnPC == 0x446au);
+        assert(note65DescriptorEvents[0].directRam28 == 0x0cu);
+        assert(note65DescriptorEvents[1].directRam28 == 0x0du);
+        assert(note65DescriptorEvents[0].directRam29 == 0x29u);
+        assert(note65DescriptorEvents[1].directRam29 == 0x29u);
+        assert(note65DescriptorEvents[0].directRam2A == 0x90u);
+        assert(note65DescriptorEvents[1].directRam2A == 0x9cu);
         for (std::size_t i = 0; i < note65DescriptorCount; ++i) {
             const auto& event = note65DescriptorEvents[i];
-            std::printf("  NOTE65 DESC[%zu]: cycle=%llu return=%04X A=%02X "
-                        "R0=%02X R1=%02X R2=%02X R3=%02X R4=%02X R5=%02X "
-                        "R6=%02X R7=%02X DPTR=%04X RAM2B=%02X\\n",
+            const auto base = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(event.directRam29) << 8u) |
+                event.directRam2A);
+            std::printf("  NOTE65 DESC[%zu]: cycle=%llu return=%04X ptr=%04X "
+                        "A=%02X R0=%02X R1=%02X R2=%02X R3=%02X R4=%02X "
+                        "R5=%02X R6=%02X R7=%02X DPTR=%04X RAM2B=%02X "
+                        "raw=",
                         i, static_cast<unsigned long long>(event.machineCycle),
                         static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(base),
                         static_cast<unsigned>(event.accumulator),
                         static_cast<unsigned>(event.registers[0]),
                         static_cast<unsigned>(event.registers[1]),
@@ -2742,6 +2785,11 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.registers[7]),
                         static_cast<unsigned>(event.dptr),
                         static_cast<unsigned>(event.directRam2B));
+            for (std::uint16_t offset = 0; offset < 12u; ++offset)
+                std::printf("%02X%s",
+                            static_cast<unsigned>(firmwareMachine.xdataByteForTesting(
+                                static_cast<std::uint16_t>(base + offset))),
+                            offset == 11u ? "\\n" : " ");
         }
         for (std::size_t i = 0; i < note65IndirectDispatchCount; ++i) {
             const auto& event = note65IndirectDispatchEvents[i];
@@ -2848,8 +2896,48 @@ int main(int argc, char** argv) {
                    static_cast<std::uint8_t>((expected.outputValue24 >> 16u) & 0x07u));
         }
 
-        runRealMidiStage("Note Off Part 1 after synthetic ready response",
-                         realNoteOff.data(), realNoteOff.size());
+        // Exercise the paired Note Off path for the same pitch and event slots.
+        const std::array<std::uint8_t, 3> note65Off{{0x80u, 0x41u, 0x40u}};
+        firmwareMachine.clearInstructionWatchForTesting();
+        runRealMidiStage("Note Off pitch 65 after synthetic ready response",
+                         note65Off.data(), note65Off.size());
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2> note65OffEntries{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2> note65OffBranches{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2> note65OffPageBranches{};
+        std::size_t note65OffEntryCount = 0;
+        std::size_t note65OffBranchCount = 0;
+        std::size_t note65OffPageBranchCount = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0xac88u) {
+                assert(note65OffEntryCount < note65OffEntries.size());
+                note65OffEntries[note65OffEntryCount++] = event;
+            } else if (event.instructionPC == 0xaca0u) {
+                assert(note65OffBranchCount < note65OffBranches.size());
+                note65OffBranches[note65OffBranchCount++] = event;
+            } else if (event.instructionPC == 0xacb2u) {
+                assert(note65OffPageBranchCount < note65OffPageBranches.size());
+                note65OffPageBranches[note65OffPageBranchCount++] = event;
+            }
+        }
+        assert(note65OffEntryCount == 2u);
+        assert(note65OffBranchCount == 2u);
+        assert(note65OffPageBranchCount == 2u);
+        for (std::size_t i = 0; i < note65OffEntryCount; ++i) {
+            const auto eventId = static_cast<std::uint8_t>(i == 0u ? 0x0cu : 0x0du);
+            technox::MASSNoteEventAddress address;
+            assert(technox::MASSNoteEventAddressing::decode(eventId, 0x41u, address));
+            assert(note65OffEntries[i].registers[7] == eventId);
+            assert(note65OffEntries[i].registers[5] == 0x41u);
+            assert(note65OffBranches[i].registers[7] == eventId);
+            assert(note65OffBranches[i].registers[0] == address.byteOffset);
+            assert(note65OffBranches[i].accumulator == 0x11u);
+            assert(note65OffPageBranches[i].registers[0] == address.byteOffset);
+            assert(note65OffPageBranches[i].port2Latch == 0x35u);
+        }
+        const auto realPackets = firmwareMachine.soundCommandPacketCount();
+        const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
