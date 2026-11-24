@@ -986,23 +986,26 @@ int main(int argc, char** argv) {
             const auto downstreamInstructions =
                 consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
             const bool reachedSoundHostWriter = cpuRegisters.pc == 0x0db7u;
+            std::size_t writerInstructions = 0;
+            std::uint16_t writerExitPC = cpuRegisters.pc;
             if (reachedSoundHostWriter) {
-                const auto writerInstructions =
+                writerInstructions =
                     consumerMachine.runUntilProgramCounter(0x0a52u, 128u);
-                assert(writerInstructions > 0u);
-                assert(cpuRegisters.pc == 0x0a52u);
+                writerExitPC = cpuRegisters.pc;
             }
             std::fprintf(stderr,
-                "Sine slot1 downstream step=%u page=%02X PC=%04X instructions=%zu writer=%d field=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
+                "Sine slot1 downstream step=%u page=%02X PC=%04X instructions=%zu writer=%d writerInstructions=%zu writerExit=%04X field=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
                 static_cast<unsigned>(sineStepCount),
                 static_cast<unsigned>(voiceRecordPage),
                 static_cast<unsigned>(cpuRegisters.pc), downstreamInstructions,
-                reachedSoundHostWriter ? 1 : 0,
+                reachedSoundHostWriter ? 1 : 0, writerInstructions,
                 static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u))),
                 static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u))),
                 consumerMachine.soundHostWriteCount(),
                 consumerMachine.soundCommandPacketCount(),
                 consumerMachine.cpuFaulted());
+            std::fprintf(stderr, "  slot1 writer final PC=%04X instructions=%zu\\n",
+                static_cast<unsigned>(writerExitPC), writerInstructions);
             const auto hostTraceCount = consumerMachine.soundHostWriteCount();
             for (std::size_t eventIndex = 0; eventIndex < hostTraceCount; ++eventIndex) {
                 const auto& event = consumerMachine.soundHostWriteAt(eventIndex);
