@@ -6,7 +6,6 @@
       .lbl { font: 900 7.5px 'Arial Black', sans-serif; letter-spacing: 0.5px; fill: #181a1c; }
       .lbl-sm { font: 900 6.8px 'Arial Black', sans-serif; letter-spacing: 0.4px; fill: #181a1c; }
       .circ { font: 900 8px 'Arial Black', sans-serif; letter-spacing: 1.6px; fill: #181a1c; }
-      .lcd { font: 700 17px 'Courier New', monospace; letter-spacing: 1px; fill: #142605; }
     ]]></style>
     <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#f0f2f4"/><stop offset="50%" stop-color="#d5d8dd"/><stop offset="100%" stop-color="#b4b9c0"/>
@@ -14,9 +13,6 @@
     <radialGradient id="knob" cx="42%" cy="38%" r="62%">
       <stop offset="0%" stop-color="#4e5156"/><stop offset="75%" stop-color="#222427"/><stop offset="100%" stop-color="#111214"/>
     </radialGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#65b849"/><stop offset="50%" stop-color="#75cc56"/><stop offset="100%" stop-color="#58a33e"/>
-    </linearGradient>
     <path id="arcTop" d="M 836,62 A 40,40 0 1,1 916,62"/>
     <path id="arcBot" d="M 916,74 A 40,40 0 1,1 836,74"/>
     <filter id="sh" x="-10%" y="-10%" width="130%" height="130%">
@@ -64,9 +60,6 @@
       <path d="M160,3 H165 V14 H160 Z"/>
     </g>
     <rect x="224" y="38" width="260" height="60" rx="28" fill="#191b1e" stroke="#454950" stroke-width="1.5"/>
-    <rect x="266" y="47" width="176" height="42" rx="3" fill="url(#glow)" stroke="#0e1012" stroke-width="2"/>
-    <text x="354" y="64" class="lcd" text-anchor="middle">TECHNOX</text>
-    <text x="354" y="82" class="lcd" text-anchor="middle">001 TECHNOBASS</text>
     <g transform="translate(354,115) scale(1.12,0.85)"><text class="sub" text-anchor="middle">16 PART MULTITIMBRAL SYNTHESIZER</text></g>
   </g>
   <g id="enc-param">
@@ -86,7 +79,6 @@
   <g id="buttons">
     <text x="756" y="34" class="lbl-sm" text-anchor="middle">EDIT / OK</text>
     <rect x="744" y="40" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#sh)"/>
-    <circle cx="775" cy="44" r="1.8" fill="#9e1b1b"/><circle cx="775" cy="51" r="1.8" fill="#9e1b1b"/>
     <text x="794" y="34" class="lbl-sm" text-anchor="middle">EXIT</text>
     <rect x="782" y="40" width="24" height="14" rx="2" fill="#1b1d20" stroke="#4a4e54" filter="url(#sh)"/>
     <polygon points="739,87 732,91 739,95" fill="#181a1c"/>
@@ -99,7 +91,21 @@
     <text class="circ"><textPath href="#arcTop" xlink:href="#arcTop" startOffset="50%" text-anchor="middle">TECHNO - RAVE</textPath></text>
     <text class="circ"><textPath href="#arcBot" xlink:href="#arcBot" startOffset="50%" text-anchor="middle">ELECTRONIC</textPath></text>
     <text x="964" y="21" class="lbl" text-anchor="middle">VOLUME</text>
-    <polygon points="946,35 982,27 982,35" fill="#181a1c"/>
+    <g stroke="#181a1c" stroke-width="1.5">
+      <line x1="946.5" y1="35" x2="946.5" y2="34.2"/>
+      <line x1="949.5" y1="35" x2="949.5" y2="33.5"/>
+      <line x1="952.5" y1="35" x2="952.5" y2="32.8"/>
+      <line x1="955.5" y1="35" x2="955.5" y2="32.1"/>
+      <line x1="958.5" y1="35" x2="958.5" y2="31.4"/>
+      <line x1="961.5" y1="35" x2="961.5" y2="30.7"/>
+      <line x1="964.5" y1="35" x2="964.5" y2="30"/>
+      <line x1="967.5" y1="35" x2="967.5" y2="29.3"/>
+      <line x1="970.5" y1="35" x2="970.5" y2="28.6"/>
+      <line x1="973.5" y1="35" x2="973.5" y2="27.9"/>
+      <line x1="976.5" y1="35" x2="976.5" y2="27.2"/>
+      <line x1="979.5" y1="35" x2="979.5" y2="26.5"/>
+      <line x1="982" y1="35" x2="982" y2="25.8"/>
+    </g>
     <circle cx="964" cy="68" r="18" fill="url(#knob)" stroke="#111" stroke-width="1.5" filter="url(#sh)"/>
     <line x1="964" y1="52" x2="964" y2="60" stroke="#222427" stroke-width="2" stroke-linecap="round"/>
     <text x="1031" y="21" class="lbl" text-anchor="middle">HEADPH.</text>
