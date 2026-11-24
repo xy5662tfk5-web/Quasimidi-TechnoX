@@ -36,7 +36,7 @@ jobs:
       - name: Compile and test panel edit mailbox (C++17)
         run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_panel_control_events.cpp -o /tmp/test_panel_control_events && /tmp/test_panel_control_events
       - name: Compile and test panel GPIO input injection (C++17)
-        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_panel_gpio_inputs.cpp -o /tmp/test_panel_gpio_inputs && /tmp/test_panel_gpio_inputs
+        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_panel_gpio_inputs.cpp -o /tmp/test_panel_gpio_inputs && /tmp/test_panel_gpio_inputs technox_IC4_mx27c1000_v105.bin
       - name: Compile and test Part editor model (C++17)
         if: hashFiles('tests/test_part_model.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_part_model.cpp -o /tmp/test_part_model && /tmp/test_part_model
