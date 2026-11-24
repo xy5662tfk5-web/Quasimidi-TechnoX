@@ -552,6 +552,21 @@ int main(int argc, char** argv) {
         // Exercise the real IC4 periodic scheduler (0x044C) and its
         // phase/sine updater (0x0C1A), independent of MIDI and DSP-host writes.
         // The test fixture makes the scheduler's external-ready input explicit.
+        // IC4 ROM 0x001E..0x005D is a 64-entry signed sine lookup.
+        constexpr std::array<std::uint8_t, 64> expectedSineTable{{
+            0x00, 0x0c, 0x19, 0x25, 0x31, 0x3c, 0x47, 0x51,
+            0x5a, 0x62, 0x6a, 0x70, 0x75, 0x7a, 0x7d, 0x7e,
+            0x7f, 0x7e, 0x7d, 0x7a, 0x75, 0x70, 0x6a, 0x62,
+            0x5a, 0x51, 0x47, 0x3c, 0x31, 0x25, 0x19, 0x0c,
+            0x00, 0xf4, 0xe7, 0xdb, 0xcf, 0xc4, 0xb9, 0xaf,
+            0xa6, 0x9e, 0x96, 0x90, 0x8b, 0x86, 0x83, 0x82,
+            0x81, 0x82, 0x83, 0x86, 0x8b, 0x90, 0x96, 0x9e,
+            0xa6, 0xaf, 0xb9, 0xc4, 0xcf, 0xdb, 0xe7, 0xf4
+        }};
+        for (std::size_t index = 0; index < expectedSineTable.size(); ++index)
+            assert(firmwareMachine.readCode(
+                static_cast<std::uint16_t>(0x001eu + index)) == expectedSineTable[index]);
+
         const auto runPeriodicSineStep = [&](std::uint8_t gate,
                                              std::uint8_t stepCount) {
             TechnoX8032Machine phaseMachine;
@@ -572,6 +587,8 @@ int main(int argc, char** argv) {
             const auto schedulerPage = phaseMachine.readCode(0x0078u);
             const auto schedulerStatusAddress = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(schedulerPage) << 8u) | 0x00fau);
+            assert(schedulerPage == 0x00u);
+            assert(schedulerStatusAddress == 0x00fau);
             phaseMachine.setTestExternalReadOverride(schedulerStatusAddress, 0x40u);
 
             auto& registers = phaseMachine.cpuForTesting().registersForTesting();
@@ -600,6 +617,30 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(registers.pc == 0x047du);
             assert(!phaseMachine.cpuFaulted());
+
+            std::array<std::size_t, 3> sineOutputWriteCounts{};
+            constexpr std::array<std::uint16_t, 3> sineOutputAddresses{{
+                0x2051u, 0x2052u, 0x2053u
+            }};
+            constexpr std::array<std::uint16_t, 3> sineOutputWriterPCs{{
+                0x0c49u, 0x0c4eu, 0x0c57u
+            }};
+            for (std::size_t traceIndex = 0;
+                 traceIndex < phaseMachine.xdataWatchTraceCount(); ++traceIndex) {
+                const auto& event = phaseMachine.xdataWatchTraceAt(traceIndex);
+                for (std::size_t output = 0; output < sineOutputAddresses.size(); ++output) {
+                    if (event.address != sineOutputAddresses[output] || !event.write)
+                        continue;
+                    ++sineOutputWriteCounts[output];
+                    assert(event.instructionPC == sineOutputWriterPCs[output]);
+                    assert(event.stackReturnPC == 0x0473u);
+                }
+            }
+            if (gate == 0u) {
+                assert((sineOutputWriteCounts == std::array<std::size_t, 3>{{0u, 0u, 0u}}));
+            } else {
+                assert((sineOutputWriteCounts == std::array<std::size_t, 3>{{1u, 1u, 1u}}));
+            }
 
             std::fprintf(stderr,
                 "Periodic sine probe gate=%02X step=%02X R47=%02X R48=%02X IRAM03=%02X PSW=%02X XDATA=%02X/%02X/%02X writes=%zu\\n",
