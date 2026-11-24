@@ -8,9 +8,12 @@ constexpr int kStateMagicV1 = 0x54584E50; // TXNP
 constexpr int kStateMagicV2 = 0x54584E32; // TXN2: Part values + MIDI channels
 constexpr int kStateMagicV3 = 0x54584E33; // TXN3: Part + four Common values + MIDI channels
 constexpr int kStateMagicV4 = 0x54584E34; // TXN4: Part + five Common values + MIDI channels + routing mode
+constexpr int kStateMagicV5 = 0x54584E35; // TXN5: adds all 16 Sequencer-Multi Parts
 constexpr int kPartStateBytesV2 = 50 * 4 * 24 + 4;
 constexpr int kPartStateBytesV3 = 50 * 4 * 24 + 50 * 4 + 4;
 constexpr int kPartStateBytesV4 = 50 * 4 * 24 + 50 * 5 + 4 + 1;
+constexpr int kSequencerStateBytesV5 = 16 * 24;
+constexpr int kPartStateBytesV5 = kPartStateBytesV4 + kSequencerStateBytesV5;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -22,6 +25,7 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
         for (auto& part : performance)
             for (auto& parameter : part)
                 parameter.store(0, std::memory_order_relaxed);
+    initialiseSequencerPartStates();
     for (auto& performance : commonValues)
         for (auto& value : performance)
             value.store(-1, std::memory_order_relaxed);
@@ -130,6 +134,22 @@ void QuasimidiTechnoXAudioProcessor::initialisePartStates()
     }
 }
 
+void QuasimidiTechnoXAudioProcessor::initialiseSequencerPartStates() noexcept
+{
+    for (std::size_t part = 0; part < sequencerPartValues.size(); ++part) {
+        for (std::size_t parameter = 0; parameter < sequencerPartValues[part].size(); ++parameter)
+            sequencerPartValues[part][parameter].store(0, std::memory_order_relaxed);
+
+        // Match the engine's neutral defaults for a new Sequencer-Multi Part.
+        sequencerPartValues[part][static_cast<std::size_t>(technox::PartParameter::trackMode)]
+            .store(1, std::memory_order_relaxed);
+        sequencerPartValues[part][static_cast<std::size_t>(technox::PartParameter::transpose)]
+            .store(24, std::memory_order_relaxed);
+        sequencerPartValues[part][static_cast<std::size_t>(technox::PartParameter::tune)]
+            .store(64, std::memory_order_relaxed);
+    }
+}
+
 void QuasimidiTechnoXAudioProcessor::initialiseCommonControlsFromBank() noexcept
 {
     for (std::size_t performanceIndex = 0; performanceIndex < 50; ++performanceIndex) {
@@ -221,6 +241,19 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
             massEngine.setCommonControl(controls[i], value);
         else
             massEngine.clearCommonControl(controls[i]);
+    }
+}
+
+void QuasimidiTechnoXAudioProcessor::syncSequencerPartsToEngine() noexcept
+{
+    for (int part = 0; part < 16; ++part) {
+        for (std::size_t parameter = 0; parameter < 24; ++parameter) {
+            const int value = getSequencerPartParameterRaw(
+                part, static_cast<technox::PartParameter>(parameter));
+            if (value >= 0)
+                massEngine.setPartParameter(part,
+                    static_cast<technox::PartParameter>(parameter), value);
+        }
     }
 }
 
