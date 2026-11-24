@@ -924,13 +924,17 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
     }
 
     if (magic == kStateMagicV5) {
-        for (auto& part : sequencerPartValues)
-            for (std::size_t parameter = 0; parameter < part.size(); ++parameter) {
+        for (std::size_t partIndex = 0; partIndex < sequencerPartValues.size(); ++partIndex)
+            for (std::size_t parameter = 0;
+                 parameter < sequencerPartValues[partIndex].size(); ++parameter) {
                 const int value = static_cast<unsigned char>(stream.readByte());
-                const auto maximum = technox::kPartParameterDescriptors[parameter].maximum;
-                part[parameter].store(
-                    juce::jlimit(0, static_cast<int>(maximum), value),
-                    std::memory_order_release);
+                const auto descriptorMaximum =
+                    technox::kPartParameterDescriptors[parameter].maximum;
+                const int maximum = partIndex == 9 &&
+                    parameter == static_cast<std::size_t>(technox::PartParameter::soundNumber)
+                        ? 7 : static_cast<int>(descriptorMaximum);
+                sequencerPartValues[partIndex][parameter].store(
+                    juce::jlimit(0, maximum, value), std::memory_order_release);
             }
     } else {
         initialiseSequencerPartStates();
