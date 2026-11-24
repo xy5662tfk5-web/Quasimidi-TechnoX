@@ -812,6 +812,12 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(voiceRecordAddress(0x8fu), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x96u), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x97u), 0x00u);
+            // Retain the firmware accesses only; the active record above is
+            // deliberately seeded test state, not a factory-populated voice.
+            const auto recordTraceStart = consumerMachine.xdataWatchTraceCount();
+            // Retain the firmware accesses only; the active record above is
+            // deliberately seeded test state, not a factory-populated voice.
+            const auto recordTraceStart = consumerMachine.xdataWatchTraceCount();
             const auto downstreamInstructions =
                 consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
             const bool reachedSoundHostWriter = cpuRegisters.pc == 0x0db7u;
@@ -835,7 +841,50 @@ int main(int argc, char** argv) {
                 consumerMachine.soundCommandPacketCount(),
                 consumerMachine.cpuFaulted() ? 1 : 0);
             assert(reachedSoundHostWriter);
-            assert(voiceRecordPage == 0x00u);
+            std::size_t record96Reads = 0;
+            std::size_t record96Writes = 0;
+            std::size_t record97Reads = 0;
+            std::size_t record97Writes = 0;
+            std::uint8_t record96LastWrite = 0;
+            for (std::size_t traceIndex = recordTraceStart;
+                 traceIndex < consumerMachine.xdataWatchTraceCount(); ++traceIndex) {
+                const auto& event = consumerMachine.xdataWatchTraceAt(traceIndex);
+                if (event.address < voiceRecordAddress(0x88u) ||
+                    event.address > voiceRecordAddress(0x97u))
+                    continue;
+                std::fprintf(stderr,
+                    "  record access addr=%04X value=%02X %s pc=%04X ret=%04X P2=%02X P3=%02X mode=%02X cycle=%llu\n",
+                    static_cast<unsigned>(event.address),
+                    static_cast<unsigned>(event.value), event.write ? "WRITE" : "READ",
+                    static_cast<unsigned>(event.instructionPC),
+                    static_cast<unsigned>(event.stackReturnPC),
+                    static_cast<unsigned>(event.port2),
+                    static_cast<unsigned>(event.port3),
+                    static_cast<unsigned>(event.soundBusMode),
+                    static_cast<unsigned long long>(event.machineCycle));
+                if (event.address == voiceRecordAddress(0x96u)) {
+                    if (event.write) {
+                        ++record96Writes;
+                        record96LastWrite = event.value;
+                    } else {
+                        ++record96Reads;
+                    }
+                }
+                if (event.address == voiceRecordAddress(0x97u)) {
+                    if (event.write) ++record97Writes;
+                    else ++record97Reads;
+                }
+            }
+            std::fprintf(stderr,
+                "  record +96 reads=%zu writes=%zu last=%02X; +97 reads=%zu writes=%zu\n",
+                record96Reads, record96Writes, static_cast<unsigned>(record96LastWrite),
+                record97Reads, record97Writes);
+            assert(record96Writes > 0u);
+            assert(record96LastWrite ==
+                   (sineStepCount == 0x01u ? 0x14u : 0x1fu));
+
+            std::fprintf(stderr,
+                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu writer=%d voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",            assert(voiceRecordPage == 0x00u);
             assert(cpuRegisters.pc == 0x0a52u);
             assert(!consumerMachine.cpuFaulted());
             assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)) ==
@@ -938,9 +987,11 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(0x00fcu, 0x10u); // high nibble: slot 1
             consumerMachine.writeExternal(0x00fdu, 0x00u);
             consumerMachine.writeExternal(0x00fau, 0x00u); // select alternate 0x047E path
-            consumerMachine.writeExternal(0x28d9u, 0x24u);
-            consumerMachine.writeExternal(0x2889u, 0x35u);
-            consumerMachine.writeExternal(0x2899u, 0x46u);
+            // Match slot-0 coefficient magnitudes exactly. This makes the
+            // selected slot/table page the only intended differential.
+            consumerMachine.writeExternal(0x28d9u, 0x22u);
+            consumerMachine.writeExternal(0x2889u, 0x33u);
+            consumerMachine.writeExternal(0x2899u, 0x44u);
             consumerMachine.writeExternal(0x2021u, 0x05u); // slot-1 multiplier input
             consumerMachine.writeExternal(0x2002u, 0x00u);
             consumerMachine.writeExternal(0x2003u, 0x00u);
@@ -1005,6 +1056,48 @@ int main(int argc, char** argv) {
                 consumerMachine.soundCommandPacketCount(),
                 consumerMachine.cpuFaulted() ? 1 : 0);
             assert(reachedSoundHostWriter);
+            std::size_t record96Reads = 0;
+            std::size_t record96Writes = 0;
+            std::size_t record97Reads = 0;
+            std::size_t record97Writes = 0;
+            std::uint8_t record96LastWrite = 0;
+            for (std::size_t traceIndex = recordTraceStart;
+                 traceIndex < consumerMachine.xdataWatchTraceCount(); ++traceIndex) {
+                const auto& event = consumerMachine.xdataWatchTraceAt(traceIndex);
+                if (event.address < voiceRecordAddress(0x88u) ||
+                    event.address > voiceRecordAddress(0x97u))
+                    continue;
+                std::fprintf(stderr,
+                    "  slot1 record access addr=%04X value=%02X %s pc=%04X ret=%04X P2=%02X P3=%02X mode=%02X cycle=%llu\n",
+                    static_cast<unsigned>(event.address),
+                    static_cast<unsigned>(event.value), event.write ? "WRITE" : "READ",
+                    static_cast<unsigned>(event.instructionPC),
+                    static_cast<unsigned>(event.stackReturnPC),
+                    static_cast<unsigned>(event.port2),
+                    static_cast<unsigned>(event.port3),
+                    static_cast<unsigned>(event.soundBusMode),
+                    static_cast<unsigned long long>(event.machineCycle));
+                if (event.address == voiceRecordAddress(0x96u)) {
+                    if (event.write) {
+                        ++record96Writes;
+                        record96LastWrite = event.value;
+                    } else {
+                        ++record96Reads;
+                    }
+                }
+                if (event.address == voiceRecordAddress(0x97u)) {
+                    if (event.write) ++record97Writes;
+                    else ++record97Reads;
+                }
+            }
+            std::fprintf(stderr,
+                "  slot1 record +96 reads=%zu writes=%zu last=%02X; +97 reads=%zu writes=%zu\n",
+                record96Reads, record96Writes, static_cast<unsigned>(record96LastWrite),
+                record97Reads, record97Writes);
+            assert(record96Writes > 0u);
+            assert(record96LastWrite ==
+                   (sineStepCount == 0x01u ? 0x14u : 0x1fu));
+
             assert(voiceRecordPage == 0x00u);
             assert(cpuRegisters.pc == 0x0a52u);
             assert(writerExitPC == 0x0a52u);
@@ -1077,6 +1170,12 @@ int main(int argc, char** argv) {
         assert(alternateSlotDouble[0] == sineDoubleStep[2]);
         assert(alternateSlotSingle[1] != alternateSlotDouble[1] ||
                alternateSlotSingle[2] != alternateSlotDouble[2]);
+        // With matched coefficients and slot-indexed state seeded equally,
+        // slots 0 and 1 must produce the same sine-derived arithmetic result.
+        assert(alternateSlotSingle[1] == slotConsumerSingle[1]);
+        assert(alternateSlotSingle[2] == slotConsumerSingle[2]);
+        assert(alternateSlotDouble[1] == slotConsumerDouble[1]);
+        assert(alternateSlotDouble[2] == slotConsumerDouble[2]);
 
         // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
         // then resolve the two IC51 upload-stream formats associated with each FX1 entry.
