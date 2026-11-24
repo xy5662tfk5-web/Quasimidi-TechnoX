@@ -3133,9 +3133,28 @@ int main(int argc, char** argv) {
             std::size_t pageCommitCount = 0;
             std::size_t pageSelectCount = 0;
             std::size_t pageStatusCount = 0;
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 32>
+                nestedSlotBoundaryEvents{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 8>
+                resetVectorEvents{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 8>
+                resetBootEvents{};
+            std::size_t nestedSlotBoundaryCount = 0;
+            std::size_t resetVectorCount = 0;
+            std::size_t resetBootCount = 0;
             for (std::size_t i = instructionWatchFirst;
                  i < instructionWatchCount; ++i) {
                 const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                if (event.instructionPC == 0x18ebu || event.instructionPC == 0x18eeu) {
+                    assert(nestedSlotBoundaryCount < nestedSlotBoundaryEvents.size());
+                    nestedSlotBoundaryEvents[nestedSlotBoundaryCount++] = event;
+                } else if (event.instructionPC == 0x0000u) {
+                    assert(resetVectorCount < resetVectorEvents.size());
+                    resetVectorEvents[resetVectorCount++] = event;
+                } else if (event.instructionPC == 0xeb32u) {
+                    assert(resetBootCount < resetBootEvents.size());
+                    resetBootEvents[resetBootCount++] = event;
+                }
                 if (event.instructionPC == 0x1742u) {
                     assert(pageQueueEntryCount < pageQueueEntryEvents.size());
                     pageQueueEntryEvents[pageQueueEntryCount++] = event;
@@ -3160,6 +3179,38 @@ int main(int argc, char** argv) {
                 assert(event.registers[3] == 0x64u);
             }
             assert(observedCount == partCalls);
+            std::size_t boundaryAt40 = 0;
+            std::size_t boundaryJumpToZero = 0;
+            for (std::size_t i = 0; i < nestedSlotBoundaryCount; ++i) {
+                const auto& event = nestedSlotBoundaryEvents[i];
+                if (event.instructionPC == 0x18ebu &&
+                    event.accumulator == 0x40u &&
+                    event.directRam2E == 0x40u)
+                    ++boundaryAt40;
+                if (event.instructionPC == 0x18eeu &&
+                    firmwareMachine.readCode(0x18eeu) == 0x02u &&
+                    firmwareMachine.readCode(0x18efu) == 0x00u &&
+                    firmwareMachine.readCode(0x18f0u) == 0x00u)
+                    ++boundaryJumpToZero;
+            }
+            std::printf("NOTE65 RESOURCE SLOT BOUNDARY selector=%u "
+                        "PC18EB=%zu at40=%zu PC18EE=%zu LJMP0000=%zu "
+                        "PC0000=%zu PC=EB32=%zu finalPC=%04X\\n",
+                        static_cast<unsigned>(selector),
+                        nestedSlotBoundaryCount, boundaryAt40,
+                        boundaryJumpToZero, resetVectorCount, resetBootCount,
+                        static_cast<unsigned>(firmwareMachine.cpu().registers().pc));
+            for (std::size_t i = 0; i < nestedSlotBoundaryCount; ++i) {
+                const auto& event = nestedSlotBoundaryEvents[i];
+                std::printf("  NOTE65 SLOT BOUNDARY PC=%04X A=%02X "
+                            "RAM2E=%02X RAM38/39=%02X/%02X ret=%04X\\n",
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.accumulator),
+                            static_cast<unsigned>(event.directRam2E),
+                            static_cast<unsigned>(event.directRam38),
+                            static_cast<unsigned>(event.directRam39),
+                            static_cast<unsigned>(event.returnPC));
+            }
             // 0x1742 dequeues a page into R4, the caller copies that result to
             // internal RAM[0x2D] at 0x16B0, then 0x16C3 writes it to SFR P2.
             // The selected page is dynamically allocated; it is not a fixed
