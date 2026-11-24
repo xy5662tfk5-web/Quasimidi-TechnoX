@@ -30,10 +30,10 @@ int main()
 
     // The input override does not replace the output latch or unrelated pins.
     machine.setExternalPortInputs(0x90u, 0x08u, 0x00u);
-    machine.writeInternal(0x90u, 0x55u);
+    machine.writeInternal(0x90u, 0xffu);
     p1 = machine.readInternal(0x90u);
     assert((p1 & 0x08u) == 0x00u);
-    assert((p1 & 0xF7u) == (0x55u & 0xF7u));
+    assert((p1 & 0xf7u) == 0xf7u);
 
     std::cout << "TechnoX front-panel GPIO input tests passed\\n";
     return 0;
