@@ -595,6 +595,17 @@ int main(int argc, char** argv) {
                     (static_cast<std::uint16_t>(page) << 8u) | 0x00fbu)) == 0x00u);
             }
 
+            // Run the real IC4 phase-table initializer at 0x0130. It enables
+            // the periodic gate and seeds the 16 slot multipliers to 0x98.
+            registers.pc = 0x0130u;
+            const auto sineInitialized = phaseMachine.runUntilProgramCounter(0x0147u, 1000u);
+            assert(sineInitialized > 0u);
+            assert(registers.pc == 0x0147u);
+            assert(phaseMachine.xdataByteForTesting(0x2050u) == 0x3cu);
+            for (std::size_t slot = 0; slot < 16u; ++slot)
+                assert(phaseMachine.xdataByteForTesting(
+                    static_cast<std::uint16_t>(0x2b61u + slot)) == 0x98u);
+
             // Scheduler state: R47 is copied to R48 at the first tick;
             // its counter increments from zero to one before comparing 0x2064.
             phaseMachine.writeInternal(0x47u, stepCount);
