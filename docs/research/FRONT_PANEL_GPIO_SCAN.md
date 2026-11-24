@@ -101,7 +101,7 @@ This is consistent with **selection/navigation feedback** rather than direct val
 | P3.0 low / state `0xA4` | `BE/7E` | VALUE/SOUND — alters the currently selected value |
 | P3.0 high / state `0xA5` | `BD/7D` | PARAMETER/SOUNDGROUP — selection/navigation candidate |
 
-This assignment is firmware-derived from the event-code consumers. Keep the logical UI roles separate from electrical pin numbers until a board capture confirms which P3.0-selected row connects to the physical PARAMETER and VALUE encoder bodies.
+This assignment is firmware-derived from the event-code consumers. The typed decoder in `Source/TechnoXFirmwarePanelEvents.h` now maps the four raw bytes into the logical roles while preserving the sampled P1.6 level. It deliberately does not call that level clockwise/counter-clockwise. Keep the logical UI roles separate from electrical pin numbers until a board capture confirms which P3.0-selected row connects to the physical PARAMETER and VALUE encoder bodies.
 
 ## 6. What this proves and what remains open
 
@@ -126,6 +126,8 @@ Do not connect UI gestures to guessed pins. First correlate one known control ac
 `TechnoX8032Machine::setExternalPortInputs(portAddress, mask, value)` supplies fixed external pin levels independently of the output latch. For the multiplexed encoder scan, the test fixture now also has a P3.0-selected P1 input seam: `setExternalPort1InputsByP3Bit0ForTesting()`. This lets the ROM test provide different P1.5/P1.6 levels for the two P3.0-selected rows without pretending that the physical board wiring is already known.
 
 The regression test loads the raw IC4 image, runs the actual `0xA6A8` FIFO initializer and `0xA762` scan code, and checks that the firmware queues `7E/BE` for the P3.0-low channel and `7D/BD` for the P3.0-high channel. It also verifies no repeated event while P1.5 remains low. This tests the firmware routine and queue, not just the host pin-injection helper.
+
+A second dependency-free test covers the typed decoder: `BE/7E` become VALUE/SOUND events, `BD/7D` become PARAMETER/SOUNDGROUP events, and the original P1.6 low/high sample is preserved. Unknown bytes (including the separate `F0/F1` matrix events) are rejected rather than being misclassified as encoder turns. The decoder is a firmware-evidence adapter building block; live mouse events are not yet injected through the IC4 scanner in the plugin.
 
 ```
 UI gesture -> typed panel event -> audio-thread handoff
