@@ -632,6 +632,12 @@ public:
             pc == 0x1494u || pc == 0xac00u || pc == 0xac16u ||
             pc == 0xac25u || pc == 0xac88u || pc == 0xaca0u ||
             pc == 0xacb2u || pc == 0x189du ||
+            pc == 0x593du || pc == 0x5940u || pc == 0x5941u ||
+            pc == 0x5942u || pc == 0x5945u || pc == 0x5948u ||
+            pc == 0x594cu || pc == 0x5958u || pc == 0x5962u ||
+            pc == 0x596cu || pc == 0x5976u || pc == 0x597eu ||
+            pc == 0x598au || pc == 0x5999u || pc == 0x59a8u ||
+            pc == 0x59b7u ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
             pc == 0x211fu || pc == 0x236bu) {
@@ -903,9 +909,12 @@ public:
             if ((address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) || address == 0x3098u ||
                 (address >= 0x0080u && address <= 0x00ffu) ||
+                (address >= 0x2800u && address <= 0x28ffu) ||
+                (address >= 0x2800u && address <= 0x28ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
-                (address >= 0x3700u && address <= 0x370fu)) {
+                (address >= 0x3700u && address <= 0x370fu) ||
+                (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& watch = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 watch.address = address;
                 watch.value = value;
@@ -1140,9 +1149,12 @@ public:
                 (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) || address == 0x3098u ||
                 (address >= 0x0080u && address <= 0x00ffu) ||
+                (address >= 0x2800u && address <= 0x28ffu) ||
+                (address >= 0x2800u && address <= 0x28ffu) ||
                 (address >= 0x2d00u && address <= 0x2dffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
-                (address >= 0x3700u && address <= 0x370fu) || address == 0x3098u) {
+                (address >= 0x3700u && address <= 0x370fu) || address == 0x3098u ||
+                (address >= 0x7bd4u && address <= 0x7bd7u)) {
                 auto& event = xdataWatchTrace_[xdataWatchTraceCount_ % xdataWatchTrace_.size()];
                 event.address = address;
                 event.value = value;
@@ -1724,7 +1736,7 @@ private:
     std::size_t internalFlagWriteTraceCount_ = 0;
     std::array<BulkTransferEntryEvent, 16> bulkTransferEntryTrace_{};
     std::size_t bulkTransferEntryCount_ = 0;
-    std::array<InstructionWatchEvent, 32> instructionWatchTrace_{};
+    std::array<InstructionWatchEvent, 128> instructionWatchTrace_{};
     std::size_t instructionWatchCount_ = 0;
     std::array<SlotInterpolationDataAccessEvent, 256> slotInterpolationDataAccessTrace_{};
     std::size_t slotInterpolationDataAccessTraceCount_ = 0;
