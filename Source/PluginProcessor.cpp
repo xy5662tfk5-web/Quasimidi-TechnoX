@@ -863,10 +863,18 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         initialiseCommonControlsFromBank();
     }
 
-    for (auto& channel : partMidiChannels) {
+    // V1–V4 states stored only the four Performance Part MIDI channels.
+    // V5 stores all 16 Sequencer-Multi channel assignments.
+    const std::size_t channelCountToRestore =
+        magic == kStateMagicV5 ? partMidiChannels.size() : 4u;
+    for (std::size_t channelIndex = 0; channelIndex < channelCountToRestore; ++channelIndex) {
         const int restoredChannel = static_cast<unsigned char>(stream.readByte());
         if (restoredChannel >= 1 && restoredChannel <= 16)
-            channel.store(restoredChannel, std::memory_order_release);
+            partMidiChannels[channelIndex].store(restoredChannel, std::memory_order_release);
+    }
+    if (magic != kStateMagicV5) {
+        for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
+            partMidiChannels[part].store(static_cast<int>(part + 1), std::memory_order_release);
     }
     if (magic == kStateMagicV4 || magic == kStateMagicV5) {
         const int mode = static_cast<unsigned char>(stream.readByte());
