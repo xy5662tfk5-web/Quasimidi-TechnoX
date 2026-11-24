@@ -68,6 +68,14 @@ int main() {
     assert(engine.getDrumParameter(9, 60, 0) == 48);
     assert(!engine.setDrumParameter(9, 60, 0, 49));
     assert(!engine.setDrumParameter(16, 60, 0, 1));
+    // Drum Set number is a separate 0..7 field, not Part 10's
+    // ordinary Sound Number parameter.
+    assert(engine.getDrumSet(9) == -1);
+    assert(engine.setDrumSet(9, 7));
+    assert(engine.getDrumSet(9) == 7);
+    assert(!engine.setDrumSet(9, 8));
+    assert(!engine.setDrumSet(9, -1));
+    assert(!engine.setDrumSet(16, 0));
     assert(engine.setModWheel(15, 127));
     assert(engine.getModWheel(15) == 127);
     assert(!engine.setModWheel(16, 127));
