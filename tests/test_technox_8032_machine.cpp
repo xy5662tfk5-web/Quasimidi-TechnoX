@@ -3067,6 +3067,8 @@ int main(int argc, char** argv) {
             firmwareMachine.setTestExternalReadOverride(0x7bd5u, selector);
             assert(firmwareMachine.readExternal(0x7bd5u) == selector);
             firmwareMachine.clearInstructionWatchForTesting();
+            firmwareMachine.clearMidiEventGateTraceForTesting();
+            firmwareMachine.clearDispatchFlagWriteTraceForTesting();
             const auto selectorWindowBefore = firmwareMachine.externalWindowTraceCount();
             const auto selectorXdataBefore = firmwareMachine.xdataWatchTraceCount();
             const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
@@ -3086,10 +3088,16 @@ int main(int argc, char** argv) {
             assert(descriptorCalls == partCalls);
             assert(streamCalls == partCalls);
             assert(noteMapCalls == partCalls);
+            const auto instructionWatchCount =
+                firmwareMachine.instructionWatchCountForTesting();
+            const auto instructionWatchFirst = instructionWatchCount > 512u
+                ? instructionWatchCount - 512u : 0u;
+            std::printf("NOTE65 WATCH CAPTURE: total=%zu retained=%zu\\n",
+                        instructionWatchCount, instructionWatchCount - instructionWatchFirst);
             std::array<std::uint8_t, 4> observedEventIds{};
             std::size_t observedCount = 0;
-            for (std::size_t i = 0;
-                 i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            for (std::size_t i = instructionWatchFirst;
+                 i < instructionWatchCount; ++i) {
                 const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
                 if (event.instructionPC != 0x4256u)
                     continue;
@@ -3105,8 +3113,8 @@ int main(int argc, char** argv) {
             std::size_t selectorCallsiteCount = 0;
             std::printf("NOTE65 593D DISPATCH TRACE selector=%u:\\n",
                         static_cast<unsigned>(selector));
-            for (std::size_t i = 0;
-                 i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            for (std::size_t i = instructionWatchFirst;
+                 i < instructionWatchCount; ++i) {
                 const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
                 const auto pc = event.instructionPC;
                 const bool selectorPath =
@@ -3117,7 +3125,14 @@ int main(int argc, char** argv) {
                     pc == 0x5671u || pc == 0x598au || pc == 0x598du ||
                     pc == 0x5999u || pc == 0x599cu || pc == 0x59a8u ||
                     pc == 0x59abu || pc == 0x59b7u;
-                if (!selectorPath)
+                const bool repeatedNoteHandlerPath =
+                    (pc >= 0x5697u && pc <= 0x56c8u) ||
+                    pc == 0x57a7u || pc == 0x9968u ||
+                    pc == 0x9987u || pc == 0x9988u ||
+                    pc == 0x9994u || pc == 0x9997u ||
+                    pc == 0x99b5u || pc == 0x99b8u ||
+                    pc == 0x99c5u || pc == 0x9a14u;
+                if (!selectorPath && !repeatedNoteHandlerPath)
                     continue;
                 if (pc == 0x5941u) ++selectorReadCount;
                 if (pc == 0x5958u || pc == 0x5962u ||
@@ -3147,6 +3162,38 @@ int main(int argc, char** argv) {
             std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
                         selectorReadCount, selectorBranchCount,
                         selectorCallsiteCount);
+            const auto gateAccessCount =
+                firmwareMachine.midiEventGateTraceCountForTesting();
+            std::printf("NOTE65 REPEATED-NOTE GATE XDATA: count=%zu\\n",
+                        gateAccessCount);
+            for (std::size_t i = 0; i < gateAccessCount; ++i) {
+                const auto& access = firmwareMachine.midiEventGateTraceAtForTesting(i);
+                std::printf("  GATE-XDATA %c %04X=%02X pc=%04X ret=%04X "
+                            "mode=%u IC51=%u\\n",
+                            access.write ? 'W' : 'R',
+                            static_cast<unsigned>(access.address),
+                            static_cast<unsigned>(access.value),
+                            static_cast<unsigned>(access.instructionPC),
+                            static_cast<unsigned>(access.stackReturnPC),
+                            static_cast<unsigned>(access.soundBusMode),
+                            static_cast<unsigned>(access.ic51Selected));
+            }
+            const auto flagWriteCount =
+                firmwareMachine.dispatchFlagWriteTraceCountForTesting();
+            std::printf("NOTE65 DISPATCH FLAG BACKING WRITES: count=%zu\\n",
+                        flagWriteCount);
+            for (std::size_t i = 0; i < flagWriteCount; ++i) {
+                const auto& write = firmwareMachine.dispatchFlagWriteAtForTesting(i);
+                std::printf("  FLAG-RAM W %02X %02X->%02X opcode=%02X operand=%02X "
+                            "pc=%04X ret=%04X\\n",
+                            static_cast<unsigned>(write.address),
+                            static_cast<unsigned>(write.previousValue),
+                            static_cast<unsigned>(write.currentValue),
+                            static_cast<unsigned>(write.opcode),
+                            static_cast<unsigned>(write.operand),
+                            static_cast<unsigned>(write.instructionPC),
+                            static_cast<unsigned>(write.stackReturnPC));
+            }
             const auto selectorWindowAfter = firmwareMachine.externalWindowTraceCount();
             const auto selectorWindowFirst = selectorWindowAfter > 1024u
                 ? selectorWindowAfter - 1024u : 0u;
