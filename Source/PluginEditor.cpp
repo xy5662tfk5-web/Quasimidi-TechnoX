@@ -307,6 +307,8 @@ int QuasimidiTechnoXAudioProcessorEditor::currentPartParameterRaw(
     if (panelOperatingMode() == technox::PanelOperatingMode::performance)
         return audioProcessor.getPartParameterRaw(
             audioProcessor.getCurrentProgram(), selectedPart, parameter);
+    if (selectedSequencerPart == 9 && parameter == technox::PartParameter::soundNumber)
+        return audioProcessor.getSequencerDrumSet();
     return audioProcessor.getSequencerPartParameterRaw(selectedSequencerPart, parameter);
 }
 
@@ -316,6 +318,8 @@ bool QuasimidiTechnoXAudioProcessorEditor::queueCurrentPartParameterRaw(
     if (panelOperatingMode() == technox::PanelOperatingMode::performance)
         return audioProcessor.queuePanelPartParameterRaw(
             audioProcessor.getCurrentProgram(), selectedPart, parameter, rawValue);
+    if (selectedSequencerPart == 9 && parameter == technox::PartParameter::soundNumber)
+        return audioProcessor.queueSequencerDrumSet(rawValue);
     return audioProcessor.queueSequencerPartParameterRaw(selectedSequencerPart, parameter, rawValue);
 }
 
@@ -361,9 +365,13 @@ void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
         }
         const int raw = currentPartParameterRaw(
             static_cast<technox::PartParameter>(selectedParameter));
+        const int maximum = panelOperatingMode() == technox::PanelOperatingMode::sequencerMulti &&
+            selectedSequencerPart == 9 &&
+            selectedParameter == static_cast<int>(technox::PartParameter::soundNumber)
+                ? 7 : static_cast<int>(descriptor->maximum);
         valueDialNormalized = raw < 0 ? 0.0f
-            : static_cast<float>(juce::jlimit(0, static_cast<int>(descriptor->maximum), raw))
-                / static_cast<float>(descriptor->maximum);
+            : static_cast<float>(juce::jlimit(0, maximum, raw))
+                / static_cast<float>(maximum);
     } else if (page == EditorPage::editFunctionMenu) {
         valueDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
     } else if (page == EditorPage::editSystem) {
@@ -656,12 +664,15 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                 const auto* descriptor = technox::PartEditModel::descriptor(
                     static_cast<std::size_t>(selectedParameter));
                 if (descriptor != nullptr) {
-                    const int value = juce::jlimit(0, static_cast<int>(descriptor->maximum), next);
+                    const int maximum = mode == technox::PanelOperatingMode::sequencerMulti &&
+                        selectedSequencerPart == 9 &&
+                        selectedParameter == static_cast<int>(technox::PartParameter::soundNumber)
+                            ? 7 : static_cast<int>(descriptor->maximum);
+                    const int value = juce::jlimit(0, maximum, next);
                     if (queueCurrentPartParameterRaw(
                             static_cast<technox::PartParameter>(selectedParameter), value)) {
-                        valueDialNormalized = descriptor->maximum > 0
-                            ? static_cast<float>(value) / static_cast<float>(descriptor->maximum)
-                            : 0.0f;
+                        valueDialNormalized = maximum > 0
+                            ? static_cast<float>(value) / static_cast<float>(maximum) : 0.0f;
                     }
                 }
                 break;
