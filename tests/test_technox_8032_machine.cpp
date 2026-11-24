@@ -3263,7 +3263,7 @@ int main(int argc, char** argv) {
             constexpr std::array<ExpectedPostprocessWrite, 5>
                 nestedPostprocessWrites{{
                     {0x1a44u, 0x04u, 0x00u},
-                    {0x1a57u, 0x03u, 0x7fu},
+                    {0x1a57u, 0x03u, 0x00u},
                     {0x1a82u, 0x05u, 0x80u},
                     {0x1a88u, 0x06u, 0x00u},
                     {0x1aa5u, 0x04u, 0x00u}
@@ -3308,8 +3308,21 @@ int main(int argc, char** argv) {
             const auto* nestedFlagField = captureInstruction(0x1a82u, 0x380au);
             const auto* nestedFlagTail = captureInstruction(0x1a88u, 0x380au);
             const auto* nestedClearTail = captureInstruction(0x1aa5u, 0x380au);
+            const auto* nestedMetadataBranch = captureInstruction(0x1a4eu, 0x380au);
+            const auto* nestedMetadataClear = captureInstruction(0x1a8cu, 0x380au);
+            const auto* nestedMetadataWrite = captureInstruction(0x1a57u, 0x380au);
             assert(nestedR4Branch && nestedRotate && nestedFlagField &&
-                   nestedFlagTail && nestedClearTail);
+                   nestedFlagTail && nestedClearTail && nestedMetadataBranch &&
+                   nestedMetadataClear && nestedMetadataWrite);
+            // The second byte of the nested tuple is R2=0x16. At 1A4E
+            // A is still 0x16, so JNZ takes 1A8C, clears A, and the
+            // following XCH at 1A55 makes the conditional 1A57 write zero.
+            // 0x7F is only written on the opposite (A==0) branch.
+            assert(nestedMetadataBranch->accumulator == 0x16u);
+            assert(nestedMetadataBranch->registers[2] == 0x16u);
+            assert(nestedMetadataClear->accumulator == 0x16u);
+            assert(nestedMetadataWrite->accumulator == 0x00u);
+            assert(nestedMetadataWrite->registers[2] == 0x16u);
             assert(nestedR4Branch->registers[4] == 0x00u);
             assert(nestedR4Branch->accumulator == 0x40u);
             assert(nestedRotate->accumulator == 0x40u);
@@ -3321,7 +3334,7 @@ int main(int argc, char** argv) {
             assert(nestedClearTail->registers[1] == 0x04u);
 
             std::printf("NOTE65 NESTED IC51 POSTPROCESS: "
-                        "slot+3=7F slot+4=00 slot+5=80 slot+6=00\\n");
+                        "slot+3=00 (R2!=0) slot+4=00 slot+5=80 slot+6=00\\n");
             std::printf("NOTE65 NESTED IC51 RECORD: bank1[03AF..03B0]=06 38 "
                         "ptr=3806 raw=A4 16 A3 40 acc6=A4->E4 page=%02X "
                         "writes=E4 16 A3 40\\n",
