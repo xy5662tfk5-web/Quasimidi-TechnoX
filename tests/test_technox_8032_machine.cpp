@@ -2763,6 +2763,36 @@ int main(int argc, char** argv) {
         assert(note65DescriptorEvents[1].directRam29 == 0x29u);
         assert(note65DescriptorEvents[0].directRam2A == 0x90u);
         assert(note65DescriptorEvents[1].directRam2A == 0x9cu);
+        assert(note65IndirectDispatchCount == 2u);
+        assert(note65IndirectDispatchEvents[0].returnPC == 0x4340u);
+        assert(note65IndirectDispatchEvents[1].returnPC == 0x4340u);
+        assert(note65IndirectDispatchEvents[0].registers[7] == 0x0cu);
+        assert(note65IndirectDispatchEvents[1].registers[7] == 0x0du);
+        assert(note65IndirectDispatchEvents[0].dptr == 0x2b83u);
+        assert(note65IndirectDispatchEvents[1].dptr == 0x2b84u);
+        assert(note65StreamCount == 2u);
+        assert(note65StreamEvents[0].returnPC == 0x1720u);
+        assert(note65StreamEvents[1].returnPC == 0x1720u);
+        assert(note65StreamEvents[0].registers[7] == 0x0cu);
+        assert(note65StreamEvents[1].registers[7] == 0x0du);
+        assert(note65StreamEvents[0].registers[5] == 0x7au);
+        assert(note65StreamEvents[1].registers[5] == 0x63u);
+        assert(note65StreamEvents[0].dptr == 0x26e2u);
+        assert(note65StreamEvents[1].dptr == 0x274bu);
+        constexpr std::array<std::array<std::uint8_t, 12>, 2> expectedNote65SelectionRecords{{
+            {{0x00u, 0x00u, 0x20u, 0x00u, 0x80u, 0x54u, 0x02u, 0x00u, 0x00u, 0x06u, 0x7fu, 0x00u}},
+            {{0x00u, 0x00u, 0x00u, 0x00u, 0x80u, 0x58u, 0xfau, 0x00u, 0x00u, 0x06u, 0x7fu, 0x0fu}}
+        }};
+        for (std::size_t i = 0; i < note65DescriptorCount; ++i) {
+            const auto base = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(note65DescriptorEvents[i].directRam29) << 8u) |
+                note65DescriptorEvents[i].directRam2A);
+            for (std::size_t offset = 0; offset < expectedNote65SelectionRecords[i].size(); ++offset) {
+                assert(firmwareMachine.xdataByteForTesting(static_cast<std::uint16_t>(
+                    base + static_cast<std::uint16_t>(offset))) ==
+                    expectedNote65SelectionRecords[i][offset]);
+            }
+        }
         for (std::size_t i = 0; i < note65DescriptorCount; ++i) {
             const auto& event = note65DescriptorEvents[i];
             const auto base = static_cast<std::uint16_t>(
