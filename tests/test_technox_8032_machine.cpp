@@ -2653,10 +2653,19 @@ int main(int argc, char** argv) {
             note65WriterEvents{};
         std::array<TechnoX8032Machine::InstructionWatchEvent, 16>
             note65PartDispatchEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 16>
+            note65DescriptorEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 16>
+            note65IndirectDispatchEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 16>
+            note65StreamEvents{};
         std::size_t note65SlotEntryCount = 0;
         std::size_t note65InterpolationCount = 0;
         std::size_t note65WriterCount = 0;
         std::size_t note65PartDispatchCount = 0;
+        std::size_t note65DescriptorCount = 0;
+        std::size_t note65IndirectDispatchCount = 0;
+        std::size_t note65StreamCount = 0;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
             const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
@@ -2672,6 +2681,15 @@ int main(int argc, char** argv) {
             } else if (event.instructionPC == 0x4256u) {
                 assert(note65PartDispatchCount < note65PartDispatchEvents.size());
                 note65PartDispatchEvents[note65PartDispatchCount++] = event;
+            } else if (event.instructionPC == 0x1494u) {
+                assert(note65DescriptorCount < note65DescriptorEvents.size());
+                note65DescriptorEvents[note65DescriptorCount++] = event;
+            } else if (event.instructionPC == 0xac00u) {
+                assert(note65IndirectDispatchCount < note65IndirectDispatchEvents.size());
+                note65IndirectDispatchEvents[note65IndirectDispatchCount++] = event;
+            } else if (event.instructionPC == 0x189du) {
+                assert(note65StreamCount < note65StreamEvents.size());
+                note65StreamEvents[note65StreamCount++] = event;
             }
         }
         std::printf("NOTE65 09B9 trace: packets=%zu entry=%zu multiply=%zu writer=%zu "
@@ -2682,17 +2700,72 @@ int main(int argc, char** argv) {
         assert(note65SlotEntryCount == 2u);
         assert(note65InterpolationCount == 2u);
         assert(note65WriterCount == 2u);
-        assert(note65PartDispatchCount > 0u);
+        assert(note65PartDispatchCount == 2u);
+        assert(note65PartDispatchEvents[0].returnPC == 0x56c8u);
+        assert(note65PartDispatchEvents[1].returnPC == 0x56c8u);
+        assert(note65PartDispatchEvents[0].registers[7] == 0x0cu);
+        assert(note65PartDispatchEvents[1].registers[7] == 0x0du);
+        for (std::size_t i = 0; i < note65PartDispatchCount; ++i) {
+            assert(note65PartDispatchEvents[i].registers[5] == 0x41u);
+            assert(note65PartDispatchEvents[i].registers[3] == 0x64u);
+        }
         std::printf("NOTE65 PART DISPATCH: calls=%zu\\n", note65PartDispatchCount);
         for (std::size_t i = 0; i < note65PartDispatchCount; ++i) {
             const auto& event = note65PartDispatchEvents[i];
-            std::printf("  NOTE65 PART EVENT[%zu]: return=%04X R7(event)=%02X "
-                        "R5(class)=%02X R3(data)=%02X RAM2B=%02X\\n",
-                        i, static_cast<unsigned>(event.returnPC),
+            std::printf("  NOTE65 PART EVENT[%zu]: cycle=%llu return=%04X "
+                        "R7(event)=%02X R5(class/key)=%02X R3(velocity)=%02X RAM2B=%02X\\n",
+                        i, static_cast<unsigned long long>(event.machineCycle),
+                        static_cast<unsigned>(event.returnPC),
                         static_cast<unsigned>(event.registers[7]),
                         static_cast<unsigned>(event.registers[5]),
                         static_cast<unsigned>(event.registers[3]),
                         static_cast<unsigned>(event.directRam2B));
+        }
+        std::printf("NOTE65 DESCRIPTOR/DISPATCH ENTRIES: 1494=%zu AC00=%zu 189D=%zu\\n",
+                    note65DescriptorCount, note65IndirectDispatchCount,
+                    note65StreamCount);
+        for (std::size_t i = 0; i < note65DescriptorCount; ++i) {
+            const auto& event = note65DescriptorEvents[i];
+            std::printf("  NOTE65 DESC[%zu]: cycle=%llu return=%04X A=%02X "
+                        "R0=%02X R1=%02X R2=%02X R3=%02X R4=%02X R5=%02X "
+                        "R6=%02X R7=%02X DPTR=%04X RAM2B=%02X\\n",
+                        i, static_cast<unsigned long long>(event.machineCycle),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.accumulator),
+                        static_cast<unsigned>(event.registers[0]),
+                        static_cast<unsigned>(event.registers[1]),
+                        static_cast<unsigned>(event.registers[2]),
+                        static_cast<unsigned>(event.registers[3]),
+                        static_cast<unsigned>(event.registers[4]),
+                        static_cast<unsigned>(event.registers[5]),
+                        static_cast<unsigned>(event.registers[6]),
+                        static_cast<unsigned>(event.registers[7]),
+                        static_cast<unsigned>(event.dptr),
+                        static_cast<unsigned>(event.directRam2B));
+        }
+        for (std::size_t i = 0; i < note65IndirectDispatchCount; ++i) {
+            const auto& event = note65IndirectDispatchEvents[i];
+            std::printf("  NOTE65 AC00[%zu]: cycle=%llu return=%04X "
+                        "R0=%02X R5=%02X R7=%02X A=%02X DPTR=%04X\\n",
+                        i, static_cast<unsigned long long>(event.machineCycle),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.registers[0]),
+                        static_cast<unsigned>(event.registers[5]),
+                        static_cast<unsigned>(event.registers[7]),
+                        static_cast<unsigned>(event.accumulator),
+                        static_cast<unsigned>(event.dptr));
+        }
+        for (std::size_t i = 0; i < note65StreamCount; ++i) {
+            const auto& event = note65StreamEvents[i];
+            std::printf("  NOTE65 189D[%zu]: cycle=%llu return=%04X "
+                        "R0=%02X R5=%02X R7=%02X A=%02X DPTR=%04X\\n",
+                        i, static_cast<unsigned long long>(event.machineCycle),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.registers[0]),
+                        static_cast<unsigned>(event.registers[5]),
+                        static_cast<unsigned>(event.registers[7]),
+                        static_cast<unsigned>(event.accumulator),
+                        static_cast<unsigned>(event.dptr));
         }
 
         const auto interpolationAccessCount =
