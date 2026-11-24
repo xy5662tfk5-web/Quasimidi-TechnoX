@@ -694,6 +694,16 @@ public:
             pc == 0x56acu || pc == 0x56afu || pc == 0x56b0u ||
             pc == 0x56b2u || pc == 0x56b5u || pc == 0x56beu ||
             pc == 0x56bfu || pc == 0x56c5u || pc == 0x56c8u ||
+            pc == 0x4323u || pc == 0x4340u || pc == 0x434bu ||
+            pc == 0x4375u || pc == 0x438bu || pc == 0x43a1u ||
+            pc == 0x43b1u || pc == 0x43c7u || pc == 0x43d0u ||
+            pc == 0x43d3u || pc == 0x43d5u || pc == 0x43e0u ||
+            pc == 0x43e8u || pc == 0x43ebu || pc == 0x43f2u ||
+            pc == 0x4403u || pc == 0x4406u || pc == 0x4407u ||
+            pc == 0x4417u || pc == 0x442cu || pc == 0x442fu ||
+            pc == 0x4430u || pc == 0x4440u || pc == 0x4455u ||
+            pc == 0x4458u || pc == 0x4459u || pc == 0x4467u ||
+            pc == 0x446au ||
             pc == 0x57a7u || pc == 0x9968u || pc == 0x9987u ||
             pc == 0x9988u || pc == 0x9994u || pc == 0x9997u ||
             pc == 0x99b5u || pc == 0x99b8u || pc == 0x99c5u ||
