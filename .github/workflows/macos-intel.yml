@@ -35,6 +35,8 @@ jobs:
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_mass_engine.cpp -o /tmp/test_mass_engine && /tmp/test_mass_engine
       - name: Compile and test panel edit mailbox (C++17)
         run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_panel_control_events.cpp -o /tmp/test_panel_control_events && /tmp/test_panel_control_events
+      - name: Compile and test panel GPIO input injection (C++17)
+        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_panel_gpio_inputs.cpp -o /tmp/test_panel_gpio_inputs && /tmp/test_panel_gpio_inputs
       - name: Compile and test Part editor model (C++17)
         if: hashFiles('tests/test_part_model.cpp') != ''
         run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_part_model.cpp -o /tmp/test_part_model && /tmp/test_part_model
@@ -143,7 +145,7 @@ jobs:
         run: cmake --build build --config Release --parallel 4
       - name: Build and run Intel C++ regression tests
         run: |
-          cmake --build build --config Release --parallel 4 --target technox_mcs51_core_tests technox_8032_machine_tests technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests technox_panel_control_events_tests
+          cmake --build build --config Release --parallel 4 --target technox_mcs51_core_tests technox_8032_machine_tests technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests technox_panel_control_events_tests technox_panel_gpio_input_tests
           ctest --test-dir build -C Release --output-on-failure
       - name: Verify Catalina (10.15) deployment target
         run: |
