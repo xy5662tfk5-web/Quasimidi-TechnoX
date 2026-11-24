@@ -5,7 +5,7 @@
       .sub { font: 900 8px 'Arial Black', sans-serif; letter-spacing: 1px; fill: #181a1c; }
       .lbl { font: 900 7.5px 'Arial Black', sans-serif; letter-spacing: 0.5px; fill: #181a1c; }
       .lbl-sm { font: 900 6.8px 'Arial Black', sans-serif; letter-spacing: 0.4px; fill: #181a1c; }
-      .circ { font: 900 8px 'Arial Black', sans-serif; letter-spacing: 0.35px; fill: #181a1c; }
+      .circ { font: 900 8px 'Arial Black', sans-serif; letter-spacing: 1.6px; fill: #181a1c; }
     ]]></style>
     <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#f0f2f4"/><stop offset="50%" stop-color="#d5d8dd"/><stop offset="100%" stop-color="#b4b9c0"/>
@@ -121,6 +121,7 @@
       <path d="M89,3 H93.5 L102.5,11.5 V3 H107 V16 H102.5 L93.5,7.5 V16 H89 Z"/>
       <path d="M110,5.5 A2.5,2.5 0 0,1 112.5,3 H126.5 A2.5,2.5 0 0,1 129,5.5 V13.5 A2.5,2.5 0 0,1 126.5,16 H112.5 A2.5,2.5 0 0,1 110,13.5 Z M114.5,6 V13 H124.5 V6 Z" fill-rule="evenodd"/>
       <path d="M132,-2 H138.5 L147,6 L156.5,-2 H163 L151,8.5 L165,20.5 H158 L147,11 L136,20.5 H129.5 L143,8.5 Z"/>
+      <rect x="26" y="18.2" width="110" height="2.3"/>
     </g>
   </g>
 
