@@ -3230,13 +3230,15 @@ int main(int argc, char** argv) {
                     return nullptr;
                 };
                 const auto* entry = captureType08(0x1c61u, 0x1bc3u);
-                const auto* readTag = captureType08(0x1c76u, 0x160cu);
-                const auto* readByte1 = captureType08(0x1c7au, 0x160du);
-                const auto* readByte2 = captureType08(0x1c7du, 0x160eu);
-                const auto* readByte3 = captureType08(0x1c80u, 0x160fu);
-                const auto* readByte4 = captureType08(0x1c83u, 0x1610u);
-                const auto* readByte5 = captureType08(0x1c86u, 0x1611u);
-                const auto* readByte6 = captureType08(0x1c89u, 0x1612u);
+                // The watch runs before each instruction. Capture the
+                // instruction after MOVX A,@DPTR so A contains the fetched byte.
+                const auto* readTag = captureType08(0x1c77u, 0x160cu);
+                const auto* readByte1 = captureType08(0x1c7bu, 0x160du);
+                const auto* readByte2 = captureType08(0x1c7eu, 0x160eu);
+                const auto* readByte3 = captureType08(0x1c81u, 0x160fu);
+                const auto* readByte4 = captureType08(0x1c84u, 0x1610u);
+                const auto* readByte5 = captureType08(0x1c87u, 0x1611u);
+                const auto* readByte6 = captureType08(0x1c8au, 0x1612u);
                 const auto* firstWrite = captureType08(0x1c9cu, 0u);
                 const auto* secondWrite = captureType08(0x1cabu, 0u);
                 const auto* nextMarker = captureType08(0x1986u, 0x1613u, 0x88u);
@@ -3770,9 +3772,12 @@ int main(int argc, char** argv) {
                     pc == 0x1b00u || pc == 0x1b20u || pc == 0x1b40u ||
                     pc == 0x1b60u || pc == 0x1b80u || pc == 0x1ba0u ||
                     pc == 0x1bb1u || pc == 0x1c2bu || pc == 0x1c61u ||
-                    pc == 0x1c76u || pc == 0x1c7au || pc == 0x1c7du ||
-                    pc == 0x1c80u || pc == 0x1c83u || pc == 0x1c86u ||
-                    pc == 0x1c89u || pc == 0x1c91u || pc == 0x1c97u ||
+                    pc == 0x1c76u || pc == 0x1c77u || pc == 0x1c7au ||
+                    pc == 0x1c7bu || pc == 0x1c7du || pc == 0x1c7eu ||
+                    pc == 0x1c80u || pc == 0x1c81u || pc == 0x1c83u ||
+                    pc == 0x1c84u || pc == 0x1c86u || pc == 0x1c87u ||
+                    pc == 0x1c89u || pc == 0x1c8au ||
+                    pc == 0x1c91u || pc == 0x1c97u ||
                     pc == 0x1c9bu || pc == 0x1c9cu || pc == 0x1c9eu ||
                     pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
                     pc == 0x1ca8u || pc == 0x1caau || pc == 0x1cabu ||

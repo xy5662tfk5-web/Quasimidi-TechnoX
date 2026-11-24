@@ -812,9 +812,12 @@ public:
             pc == 0x1b00u || pc == 0x1b20u || pc == 0x1b40u ||
             pc == 0x1b60u || pc == 0x1b80u || pc == 0x1ba0u ||
             pc == 0x1bb1u || pc == 0x1bc3u || pc == 0x1c2bu ||
-            pc == 0x1c61u || pc == 0x1c76u || pc == 0x1c7au ||
-            pc == 0x1c7du || pc == 0x1c80u || pc == 0x1c83u ||
-            pc == 0x1c86u || pc == 0x1c89u || pc == 0x1c91u ||
+            pc == 0x1c61u || pc == 0x1c76u || pc == 0x1c77u ||
+            pc == 0x1c7au || pc == 0x1c7bu || pc == 0x1c7du ||
+            pc == 0x1c7eu || pc == 0x1c80u || pc == 0x1c81u ||
+            pc == 0x1c83u || pc == 0x1c84u || pc == 0x1c86u ||
+            pc == 0x1c87u || pc == 0x1c89u || pc == 0x1c8au ||
+            pc == 0x1c91u ||
             pc == 0x1c97u || pc == 0x1c9bu || pc == 0x1c9cu || pc == 0x1c9eu ||
             pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
             pc == 0x1ca8u || pc == 0x1caau || pc == 0x1cabu ||
