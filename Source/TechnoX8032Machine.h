@@ -737,6 +737,8 @@ public:
             pc == 0x598au || pc == 0x598du || pc == 0x5999u ||
             pc == 0x599cu || pc == 0x59a8u || pc == 0x59abu ||
             pc == 0x59b7u ||
+            pc == 0x18ebu || pc == 0x18eeu ||
+            pc == 0x0000u || pc == 0xeb32u ||
             pc == 0x5697u || pc == 0x569au || pc == 0x569du ||
             pc == 0x56a0u || pc == 0x56a1u || pc == 0x56a3u ||
             pc == 0x56a5u || pc == 0x56a7u || pc == 0x56a9u ||
