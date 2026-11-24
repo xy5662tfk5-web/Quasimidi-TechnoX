@@ -97,7 +97,7 @@ private:
     std::atomic<bool> pendingSequencerSync{false};
     std::atomic<float> outputGain{0.8f};
     double firmwareCycleTarget = 0.0;
-    std::array<std::atomic<int>, 4> partMidiChannels{};
+    std::array<std::atomic<int>, 16> partMidiChannels{};
 
     void initialisePartStates();
     void initialiseSequencerPartStates() noexcept;
