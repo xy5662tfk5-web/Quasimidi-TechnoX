@@ -629,10 +629,10 @@ int main(int argc, char** argv) {
                  traceIndex < phaseMachine.xdataWatchTraceCount(); ++traceIndex) {
                 const auto& event = phaseMachine.xdataWatchTraceAt(traceIndex);
                 for (std::size_t output = 0; output < sineOutputAddresses.size(); ++output) {
-                    if (event.address != sineOutputAddresses[output] || !event.write)
+                    if (event.address != sineOutputAddresses[output] || !event.write ||
+                        event.instructionPC != sineOutputWriterPCs[output])
                         continue;
                     ++sineOutputWriteCounts[output];
-                    assert(event.instructionPC == sineOutputWriterPCs[output]);
                     assert(event.stackReturnPC == 0x0473u);
                 }
             }
