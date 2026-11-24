@@ -4022,10 +4022,13 @@ int main(int argc, char** argv) {
             const auto producerIndex = static_cast<std::size_t>(
                 found - std::begin(note72ResourceProducerPCs));
             note72SawResourceProducer[producerIndex] = true;
-            std::printf("  PC=%04X ret=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
+            std::printf("  PC=%04X bytes=%02X/%02X/%02X ret=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
                         "R0-R7=%02X/%02X/%02X/%02X/%02X/%02X/%02X/%02X "
                         "RAM2B/2D/2E=%02X/%02X/%02X P2/P3=%02X/%02X\\n",
                         static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(firmwareMachine.readCode(event.instructionPC)),
+                        static_cast<unsigned>(firmwareMachine.readCode(static_cast<std::uint16_t>(event.instructionPC + 1u))),
+                        static_cast<unsigned>(firmwareMachine.readCode(static_cast<std::uint16_t>(event.instructionPC + 2u))),
                         static_cast<unsigned>(event.returnPC),
                         static_cast<unsigned>(event.accumulator),
                         static_cast<unsigned>(event.b),
