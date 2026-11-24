@@ -3114,9 +3114,9 @@ int main(int argc, char** argv) {
                     pc == 0x5942u || pc == 0x5945u || pc == 0x5948u ||
                     pc == 0x594cu || pc == 0x5958u || pc == 0x5962u ||
                     pc == 0x596cu || pc == 0x5976u || pc == 0x597eu ||
-                    pc == 0x598au || pc == 0x598du || pc == 0x5999u ||
-                    pc == 0x599cu || pc == 0x59a8u || pc == 0x59abu ||
-                    pc == 0x59b7u;
+                    pc == 0x5671u || pc == 0x598au || pc == 0x598du ||
+                    pc == 0x5999u || pc == 0x599cu || pc == 0x59a8u ||
+                    pc == 0x59abu || pc == 0x59b7u;
                 if (!selectorPath)
                     continue;
                 if (pc == 0x5941u) ++selectorReadCount;
@@ -3126,24 +3126,28 @@ int main(int argc, char** argv) {
                 if (pc == 0x598au || pc == 0x5999u ||
                     pc == 0x59a8u || pc == 0x59b7u)
                     ++selectorCallsiteCount;
+                const auto bit2F = (event.directRam25 >> 7u) & 1u;
+                const auto bit30 = event.directRam26 & 1u;
+                const auto bit31 = (event.directRam26 >> 1u) & 1u;
+                const auto bit32 = (event.directRam26 >> 2u) & 1u;
                 std::printf("  PC=%04X A=%02X DPTR=%04X P3=%02X ret=%04X "
-                            "R7=%02X flags[2F/30/31/32]=%u/%u/%u/%u "
-                            "RAM28=%02X\\n",
+                            "R7=%02X bits[2F/30/31/32]=%u/%u/%u/%u "
+                            "IRAM25=%02X IRAM26=%02X RAM28=%02X\\n",
                             static_cast<unsigned>(pc),
                             static_cast<unsigned>(event.accumulator),
                             static_cast<unsigned>(event.dptr),
                             static_cast<unsigned>(event.port3Pins),
                             static_cast<unsigned>(event.returnPC),
                             static_cast<unsigned>(event.registers[7]),
-                            static_cast<unsigned>(event.directRam2F & 1u),
-                            static_cast<unsigned>(event.directRam30 & 1u),
-                            static_cast<unsigned>(event.directRam31 & 1u),
-                            static_cast<unsigned>(event.directRam32 & 1u),
+                            bit2F, bit30, bit31, bit32,
+                            static_cast<unsigned>(event.directRam25),
+                            static_cast<unsigned>(event.directRam26),
                             static_cast<unsigned>(event.directRam28));
             }
             std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
                         selectorReadCount, selectorBranchCount,
                         selectorCallsiteCount);
+            std::printf("  override-backed 7BD5 reads=%zu\\n", selectorOverrideReads);
             const auto selectorWindowAfter = firmwareMachine.externalWindowTraceCount();
             const auto selectorWindowFirst = selectorWindowAfter > 1024u
                 ? selectorWindowAfter - 1024u : 0u;
