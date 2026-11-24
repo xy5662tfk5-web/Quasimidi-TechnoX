@@ -50,7 +50,8 @@ private:
     int selectedEditFunction = 2; // <2> Edit Part is the implemented default.
     int selectedSystemParameter = 0; // 0 = Mode (Perform / Sequencer Multi).
     bool menuNotImplemented = false;
-    int selectedPart = 0;
+    int selectedPart = 0; // Performance's stored Part blocks 13–16.
+    int selectedSequencerPart = 0; // Sequencer Multi Parts 1–16.
     int selectedParameter = 3;
     bool buttonFlash = false;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessorEditor)
