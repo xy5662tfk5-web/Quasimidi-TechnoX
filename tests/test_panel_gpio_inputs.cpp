@@ -26,12 +26,13 @@ void initialisePanelScanner(technox::TechnoX8032Machine& machine)
 }
 
 std::size_t runEncoderScan(technox::TechnoX8032Machine& machine,
-                           std::uint8_t phaseAndDirection)
+                           std::uint8_t p1WhenP3Low,
+                           std::uint8_t p1WhenP3High)
 {
-    // P1.5 is the encoder strobe/phase input. P1.6 is sampled as direction.
-    machine.setExternalPortInputs(0x90u, 0x60u, phaseAndDirection);
-    // The scan routine also samples P3.0 while it multiplexes the P1 outputs.
-    machine.setExternalPortInputs(0xB0u, 0x01u, 0x01u);
+    // The IC4 scan toggles P3.0 to select two external input rows.
+    // P1.5 is the encoder strobe/phase; P1.6 is sampled as direction.
+    machine.setExternalPort1InputsByP3Bit0ForTesting(
+        0x60u, p1WhenP3Low, p1WhenP3High);
 
     auto& cpu = machine.cpuForTesting().registersForTesting();
     cpu.pc = 0xA762; // Actual Timer-1 front-panel encoder scan routine in IC4.
@@ -77,23 +78,26 @@ int main(int argc, char** argv)
 
     // First establish both encoder strobe latches in the released/high state.
     initialisePanelScanner(machine);
-    assert(runEncoderScan(machine, 0x60u) == 0u);
+    assert(runEncoderScan(machine, 0x60u, 0x60u) == 0u);
 
-    // Pull P1.5 low while P1.6 is high: the ROM emits 7E (encoder 1)
-    // followed by 7D (encoder 2).
-    const auto highDirectionCount = runEncoderScan(machine, 0x40u);
-    assert(highDirectionCount == 2u);
+    // P3.0 selects the first row when low. Its phase falls while direction is
+    // high; the second row stays released. Only encoder channel 1 emits 7E.
+    assert(runEncoderScan(machine, 0x40u, 0x60u) == 1u);
     assert(machine.readIndirect(0xa6u) == 0x7eu);
-    assert(machine.readIndirect(0xa7u) == 0x7du);
 
-    // A held-low phase is not repeated as a second detent.
-    assert(runEncoderScan(machine, 0x40u) == 2u);
+    // A held-low phase is not repeated as another detent.
+    assert(runEncoderScan(machine, 0x40u, 0x60u) == 1u);
 
-    // Release both strobe inputs, then assert the opposite direction.
-    assert(runEncoderScan(machine, 0x60u) == 2u);
-    const auto nextHighCount = runEncoderScan(machine, 0x00u);
-    assert(nextHighCount == 4u);
-    assert(machine.readIndirect(0xa8u) == 0xbeu);
+    // Release channel 1, then produce the opposite direction only on channel 1.
+    assert(runEncoderScan(machine, 0x60u, 0x60u) == 1u);
+    assert(runEncoderScan(machine, 0x00u, 0x60u) == 2u);
+    assert(machine.readIndirect(0xa7u) == 0xbeu);
+
+    // Now keep channel 1 released and pulse only the P3.0-high row (channel 2).
+    assert(runEncoderScan(machine, 0x60u, 0x40u) == 3u);
+    assert(machine.readIndirect(0xa8u) == 0x7du);
+    assert(runEncoderScan(machine, 0x60u, 0x60u) == 3u);
+    assert(runEncoderScan(machine, 0x60u, 0x00u) == 4u);
     assert(machine.readIndirect(0xa9u) == 0xbdu);
 
     std::cout << "TechnoX IC4 panel GPIO and quadrature scan tests passed\\n";
