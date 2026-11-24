@@ -158,21 +158,18 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     const auto* descriptor = technox::PartEditModel::descriptor(
         static_cast<std::size_t>(selectedParameter));
     const int performanceIndex = audioProcessor.getCurrentProgram();
-    const int bank = audioProcessor.getPartParameterRaw(
-        performanceIndex, selectedPart, technox::PartParameter::bankNumber);
-    const int sound = audioProcessor.getPartParameterRaw(
-        performanceIndex, selectedPart, technox::PartParameter::soundNumber);
-    const juce::String soundName = audioProcessor.getCurrentPartSoundName(selectedPart);
+    const int bank = currentPartParameterRaw(technox::PartParameter::bankNumber);
+    const int sound = currentPartParameterRaw(technox::PartParameter::soundNumber);
+    const juce::String soundName = currentPartSoundName();
 
     juce::String line1;
     juce::String line2;
     if (page == EditorPage::editPart) {
-        const int raw = audioProcessor.getPartParameterRaw(
-            performanceIndex, selectedPart,
+        const int raw = currentPartParameterRaw(
             static_cast<technox::PartParameter>(selectedParameter));
         const int shown = raw < 0 || descriptor == nullptr
             ? 0 : raw + descriptor->displayOffset;
-        line1 = "PART " + juce::String(selectedPart + 13) + " "
+        line1 = "PART " + juce::String(currentPartDisplayNumber()) + " "
             + (descriptor != nullptr ? juce::String(descriptor->name) : juce::String("PARAM"));
         line2 = juce::String(shown) + " " + soundName;
     } else if (page == EditorPage::editFunctionMenu) {
@@ -198,13 +195,19 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
             line2 = "ROM-" + juce::String(performanceIndex + 1).paddedLeft('0', 2)
                 + ": " + audioProcessor.getCurrentPerformanceName();
     } else {
-        line1 = "SEQUENCER MULTI";
-        const juce::String bankLetter = bank >= 0 && bank < 4
-            ? juce::String::charToString(static_cast<juce::juce_wchar>('A' + bank))
-            : juce::String("?");
-        line2 = juce::String(selectedPart + 13) + ":" + bankLetter
-            + juce::String(sound < 0 ? 0 : sound).paddedLeft('0', 3)
-            + " " + soundName;
+        line1 = "TECHNOX";
+        if (selectedPart == 9) {
+            const int kit = juce::jlimit(1, 8, sound + 1);
+            line2 = "10:DRUM" + juce::String(kit).paddedLeft('0', 2);
+        } else {
+            const juce::String bankLetter = bank >= 0 && bank < 4
+                ? juce::String::charToString(static_cast<juce::juce_wchar>('A' + bank))
+                : juce::String("?");
+            // Match the manual's two-row LCD example: "1:A001 _303Lead".
+            line2 = juce::String(currentPartDisplayNumber()) + ":" + bankLetter
+                + juce::String(sound < 0 ? 0 : sound).paddedLeft('0', 3)
+                + " _" + soundName;
+        }
     }
 
     // The hardware display is 2 x 16 characters. Keep the original fixed-width
