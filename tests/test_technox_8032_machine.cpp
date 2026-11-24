@@ -3205,8 +3205,15 @@ int main(int argc, char** argv) {
             const auto* nestedSetBit = captureInstruction(0x1a1du, 0x3806u);
             const auto* nestedPostSetBit = captureInstruction(0x1a1fu, 0x3806u);
             const auto* nestedTupleLoad = captureInstruction(0x1a31u, 0x380au);
+            const auto* nestedPostprocessEnd = captureInstruction(0x1aa5u, 0x380au);
             assert(nestedSourceByte && nestedSetBit && nestedPostSetBit &&
-                   nestedTupleLoad);
+                   nestedTupleLoad && nestedPostprocessEnd);
+            const auto nestedPostprocessStartCycle = nestedTupleLoad->machineCycle;
+            // The end instruction is captured before its MOVX bus cycle.
+            // Allow that instruction to complete but exclude later loop passes
+            // that may reuse the same interpreter PC and page.
+            const auto nestedPostprocessEndCycle =
+                nestedPostprocessEnd->machineCycle + 16u;
             assert(nestedSourceByte->accumulator == 0xa4u);
             assert(nestedSourceByte->registers[3] == 0x86u);
             assert(nestedSetBit->accumulator == 0xa4u);
@@ -3275,7 +3282,9 @@ int main(int argc, char** argv) {
                     firmwareMachine.resourceTupleWriteTraceAtForTesting(i);
                 if (write.port2 != secondEventPage ||
                     write.stackReturnPC != 0x1720u ||
-                    write.port3 != 0xfeu)
+                    write.port3 != 0xfeu ||
+                    write.machineCycle < nestedPostprocessStartCycle ||
+                    write.machineCycle > nestedPostprocessEndCycle)
                     continue;
                 for (std::size_t expectedIndex = 0;
                      expectedIndex < nestedPostprocessWrites.size(); ++expectedIndex) {
