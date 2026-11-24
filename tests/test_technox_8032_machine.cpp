@@ -796,6 +796,64 @@ int main(int argc, char** argv) {
         assert(slotConsumerSingle[1] != slotConsumerDouble[1] ||
                slotConsumerSingle[2] != slotConsumerDouble[2]);
 
+        // Also execute the alternate 0x28D8 coefficient-table page with
+        // Part/slot index 1. XDATA 00FC selects slot 1; ACC.3 in 00FB selects
+        // D8 instead of C8, so the operands must come from 28D9/2889/2899.
+        const auto runAlternateSlotOne = [&](std::uint8_t sineStepCount) {
+            TechnoX8032Machine consumerMachine;
+            assert(consumerMachine.loadIC4Rom(realRom.data(), realRom.size()));
+            consumerMachine.reset();
+            auto& cpuRegisters = consumerMachine.cpuForTesting().registersForTesting();
+
+            cpuRegisters.pc = 0x0148u;
+            assert(consumerMachine.runUntilProgramCounter(0x0162u, 50000u) > 0u);
+            assert(cpuRegisters.pc == 0x0162u);
+            cpuRegisters.pc = 0x0130u;
+            assert(consumerMachine.runUntilProgramCounter(0x0147u, 1000u) > 0u);
+            assert(cpuRegisters.pc == 0x0147u);
+
+            consumerMachine.writeInternal(0x47u, sineStepCount);
+            consumerMachine.writeExternal(0x2064u, 0x01u);
+            cpuRegisters.pc = 0x044cu;
+            assert(consumerMachine.runUntilProgramCounter(0x047du, 512u) > 0u);
+            assert(cpuRegisters.pc == 0x047du);
+            const auto sineSample = consumerMachine.xdataByteForTesting(0x2053u);
+
+            consumerMachine.writeExternal(0x00fbu, 0x08u); // ACC.3: use 0x28D8 page
+            consumerMachine.writeExternal(0x00fcu, 0x10u); // high nibble: slot 1
+            consumerMachine.writeExternal(0x00fdu, 0x00u);
+            consumerMachine.writeExternal(0x28d9u, 0x24u);
+            consumerMachine.writeExternal(0x2889u, 0x35u);
+            consumerMachine.writeExternal(0x2899u, 0x46u);
+            consumerMachine.writeExternal(0x2021u, 0x05u); // slot-1 multiplier input
+            consumerMachine.writeExternal(0x2002u, 0x00u);
+            consumerMachine.writeExternal(0x2003u, 0x00u);
+
+            cpuRegisters.pc = 0x047eu;
+            assert(consumerMachine.runUntilProgramCounter(0x0550u, 4096u) > 0u);
+            assert(cpuRegisters.pc == 0x0550u);
+            assert(!consumerMachine.cpuFaulted());
+            assert(consumerMachine.readInternal(0x30u) == 0x01u);
+            assert(consumerMachine.readInternal(0x45u) == 0x24u);
+            assert(consumerMachine.readInternal(0x41u) == 0x35u);
+            assert(consumerMachine.readInternal(0x05u) == 0x46u);
+            assert(consumerMachine.soundCommandPacketCount() == 0u);
+            assert(consumerMachine.soundHostWriteCount() == 0u);
+            assert(consumerMachine.soundHostReadCount() == 0u);
+            return std::array<std::uint8_t, 3>{{
+                sineSample,
+                consumerMachine.readInternal(0x36u),
+                consumerMachine.readInternal(0x37u)
+            }};
+        };
+
+        const auto alternateSlotSingle = runAlternateSlotOne(0x01u);
+        const auto alternateSlotDouble = runAlternateSlotOne(0x02u);
+        assert(alternateSlotSingle[0] == sineSingleStep[2]);
+        assert(alternateSlotDouble[0] == sineDoubleStep[2]);
+        assert(alternateSlotSingle[1] != alternateSlotDouble[1] ||
+               alternateSlotSingle[2] != alternateSlotDouble[2]);
+
         // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
         // then resolve the two IC51 upload-stream formats associated with each FX1 entry.
         if (!realIC51.empty()) {
