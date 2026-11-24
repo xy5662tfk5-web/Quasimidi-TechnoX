@@ -793,28 +793,36 @@ int main(int argc, char** argv) {
             // field is initially zero, so the sine-derived target must pass
             // through 0x09B9 and on to 0x0DB7 if the firmware's record state
             // chooses the non-equal branch.
-            consumerMachine.writeExternal(0x0000u, 0xffu);
-            consumerMachine.writeExternal(0x0030u, 0xffu);
-            consumerMachine.writeExternal(0x0031u, 0xffu);
-            consumerMachine.writeExternal(0x0070u, 0x01u);
-            consumerMachine.writeExternal(0x0088u, 0x00u);
-            consumerMachine.writeExternal(0x0089u, 0x03u);
-            consumerMachine.writeExternal(0x008au, 0x05u);
-            consumerMachine.writeExternal(0x008bu, 0x08u);
-            consumerMachine.writeExternal(0x008cu, 0x00u);
-            consumerMachine.writeExternal(0x008du, 0x00u);
-            consumerMachine.writeExternal(0x008eu, 0x00u);
-            consumerMachine.writeExternal(0x008fu, 0x00u);
-            consumerMachine.writeExternal(0x0096u, 0x00u);
-            consumerMachine.writeExternal(0x0097u, 0x00u);
+            const auto voiceRecordPage = consumerMachine.readPortLatch(0xa0u);
+            const auto voiceRecordAddress = [voiceRecordPage](std::uint8_t offset) {
+                return static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(voiceRecordPage) << 8u) | offset);
+            };
+            consumerMachine.writeExternal(voiceRecordAddress(0x00u), 0xffu);
+            consumerMachine.writeExternal(voiceRecordAddress(0x30u), 0xffu);
+            consumerMachine.writeExternal(voiceRecordAddress(0x31u), 0xffu);
+            consumerMachine.writeExternal(voiceRecordAddress(0x70u), 0x01u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x88u), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x89u), 0x03u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8au), 0x05u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8bu), 0x08u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8cu), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8du), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8eu), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8fu), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x96u), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x97u), 0x00u);
             const auto downstreamInstructions =
                 consumerMachine.runUntilProgramCounter(0x084cu, 8192u);
             std::fprintf(stderr,
-                "Sine slot downstream step=%u PC=%04X instructions=%zu voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
+                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
                 static_cast<unsigned>(sineStepCount),
+                static_cast<unsigned>(voiceRecordPage),
+                static_cast<unsigned>(consumerMachine.readPortLatch(0xb0u)),
+                static_cast<unsigned>(consumerMachine.readInternal(0x8eu)),
                 static_cast<unsigned>(cpuRegisters.pc), downstreamInstructions,
-                static_cast<unsigned>(consumerMachine.xdataByteForTesting(0x0096u)),
-                static_cast<unsigned>(consumerMachine.xdataByteForTesting(0x0097u)),
+                static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u))),
+                static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u))),
                 consumerMachine.soundHostWriteCount(),
                 consumerMachine.soundCommandPacketCount(),
                 consumerMachine.cpuFaulted() ? 1 : 0);
