@@ -3056,6 +3056,68 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(singleMidB->value),
                     static_cast<unsigned>(singleHighB->value));
 
+        // Exercise the remaining Common layer selectors using the same note.
+        // Each probe first releases the note using the previously selected mode,
+        // then changes only the synthetic Common selector byte and captures
+        // the actual runtime event IDs that reach 0x4256.
+        const std::array<std::uint8_t, 3> note65Off{{0x80u, 0x41u, 0x40u}};
+        const auto probeCommonLayerSelector = [&](std::uint8_t selector,
+                                                   const char* label) {
+            runRealMidiStage("Note Off key 65 before Common layer probe",
+                             note65Off.data(), note65Off.size());
+            firmwareMachine.setTestExternalReadOverride(0x7bd5u, selector);
+            assert(firmwareMachine.readExternal(0x7bd5u) == selector);
+            firmwareMachine.clearInstructionWatchForTesting();
+            const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
+            const auto descriptorBefore = firmwareMachine.watchedCallCount(0x1494u);
+            const auto streamBefore = firmwareMachine.watchedCallCount(0x189du);
+            const auto noteMapBefore = firmwareMachine.watchedCallCount(0xac00u);
+            runRealMidiStage(label, note65On.data(), note65On.size());
+            const auto partCalls =
+                firmwareMachine.watchedCallCount(0x4256u) - partBefore;
+            const auto descriptorCalls =
+                firmwareMachine.watchedCallCount(0x1494u) - descriptorBefore;
+            const auto streamCalls =
+                firmwareMachine.watchedCallCount(0x189du) - streamBefore;
+            const auto noteMapCalls =
+                firmwareMachine.watchedCallCount(0xac00u) - noteMapBefore;
+            assert(partCalls > 0u && partCalls <= static_cast<std::size_t>(selector + 1u));
+            assert(descriptorCalls == partCalls);
+            assert(streamCalls == partCalls);
+            assert(noteMapCalls == partCalls);
+            std::array<std::uint8_t, 4> observedEventIds{};
+            std::size_t observedCount = 0;
+            for (std::size_t i = 0;
+                 i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+                const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                if (event.instructionPC != 0x4256u)
+                    continue;
+                assert(observedCount < observedEventIds.size());
+                observedEventIds[observedCount++] = event.registers[7];
+                assert(event.registers[5] == 0x41u);
+                assert(event.registers[3] == 0x64u);
+            }
+            assert(observedCount == partCalls);
+            for (std::size_t i = 0; i < observedCount; ++i) {
+                assert(observedEventIds[i] >= 0x0cu);
+                assert(observedEventIds[i] <= static_cast<std::uint8_t>(0x0cu + selector));
+                for (std::size_t j = i + 1u; j < observedCount; ++j)
+                    assert(observedEventIds[i] != observedEventIds[j]);
+            }
+            std::printf("NOTE65 LAYER SELECTOR: value=%u 4256=%zu 1494=%zu "
+                        "189D=%zu AC00=%zu events=",
+                        static_cast<unsigned>(selector), partCalls,
+                        descriptorCalls, streamCalls, noteMapCalls);
+            for (std::size_t i = 0; i < observedCount; ++i)
+                std::printf("%s%02X", i == 0u ? "" : ",",
+                            static_cast<unsigned>(observedEventIds[i]));
+            std::printf("\\n");
+        };
+        probeCommonLayerSelector(0x02u,
+            "Note On pitch 65 with synthetic Common Layer 3 selector");
+        probeCommonLayerSelector(0x03u,
+            "Note On pitch 65 with synthetic Common Layer 4 selector");
+
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
