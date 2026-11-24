@@ -484,6 +484,10 @@ public:
         portPins_.fill(0xff);
         externalPortInputMask_.fill(0);
         externalPortInputValue_.fill(0xff);
+        externalPort1P3Mask_ = 0;
+        externalPort1P3LowValue_ = 0xff;
+        externalPort1P3HighValue_ = 0xff;
+        externalPort1P3SelectEnabled_ = false;
         commandPort_.fill(0);
         soundHostCommandLatch_ = 0;
         soundHostWords_.fill(0);
@@ -1007,10 +1011,24 @@ public:
         const int port = portIndex(address);
         if (port < 0) return internal_[address];
         const auto index = static_cast<std::size_t>(port);
-        const auto mask = externalPortInputMask_[index];
+        auto mask = externalPortInputMask_[index];
+        auto inputValue = externalPortInputValue_[index];
+
+        // Optional test seam for multiplexed panel hardware: some external
+        // input bits can depend on the P3.0 select state driven by IC4.
+        // This is deliberately a fixture hook, not an assumed board decode.
+        if (port == 1 && externalPort1P3SelectEnabled_) {
+            const bool p3SelectHigh = (portPins_[3] & 0x01u) != 0;
+            const auto dynamicValue = p3SelectHigh
+                ? externalPort1P3HighValue_ : externalPort1P3LowValue_;
+            mask = static_cast<std::uint8_t>(mask | externalPort1P3Mask_);
+            inputValue = static_cast<std::uint8_t>(
+                (inputValue & static_cast<std::uint8_t>(~externalPort1P3Mask_)) |
+                (dynamicValue & externalPort1P3Mask_));
+        }
         const auto value = static_cast<std::uint8_t>(
             (portPins_[index] & static_cast<std::uint8_t>(~mask)) |
-            (externalPortInputValue_[index] & mask));
+            (inputValue & mask));
         auto& event = portReadTrace_[portReadCount_ % portReadTrace_.size()];
         event.port = static_cast<std::uint8_t>(port);
         event.value = value;
@@ -1026,6 +1044,23 @@ public:
         const auto index = static_cast<std::size_t>(port);
         externalPortInputMask_[index] = mask;
         externalPortInputValue_[index] = value;
+    }
+
+    // Test fixture for multiplexed external inputs whose returned levels
+    // depend on the P3.0 selector driven by firmware scan code. The two values
+    // model different external rows without assigning physical chip semantics.
+    void setExternalPort1InputsByP3Bit0ForTesting(
+        std::uint8_t mask, std::uint8_t whenP3Low,
+        std::uint8_t whenP3High) noexcept {
+        externalPort1P3Mask_ = mask;
+        externalPort1P3LowValue_ = whenP3Low;
+        externalPort1P3HighValue_ = whenP3High;
+        externalPort1P3SelectEnabled_ = true;
+    }
+
+    void clearExternalPort1InputsByP3Bit0ForTesting() noexcept {
+        externalPort1P3Mask_ = 0;
+        externalPort1P3SelectEnabled_ = false;
     }
 
     void writeInternal(std::uint8_t address, std::uint8_t value) noexcept override {
@@ -2057,6 +2092,10 @@ private:
     std::array<std::uint8_t, 4> portPins_{{0xff, 0xff, 0xff, 0xff}};
     std::array<std::uint8_t, 4> externalPortInputMask_{};
     std::array<std::uint8_t, 4> externalPortInputValue_{{0xff, 0xff, 0xff, 0xff}};
+    std::uint8_t externalPort1P3Mask_ = 0;
+    std::uint8_t externalPort1P3LowValue_ = 0xff;
+    std::uint8_t externalPort1P3HighValue_ = 0xff;
+    bool externalPort1P3SelectEnabled_ = false;
     std::array<std::uint8_t, 4> commandPort_{};
     std::uint8_t soundHostCommandLatch_ = 0;
     std::array<std::uint16_t, 256> soundHostWords_{};
