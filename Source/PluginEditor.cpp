@@ -294,6 +294,37 @@ int QuasimidiTechnoXAudioProcessorEditor::selectedPerformanceForDial() const noe
         : audioProcessor.getCurrentProgram();
 }
 
+int QuasimidiTechnoXAudioProcessorEditor::currentPartParameterRaw(
+    technox::PartParameter parameter) const noexcept
+{
+    if (panelOperatingMode() == technox::PanelOperatingMode::performance)
+        return audioProcessor.getPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart, parameter);
+    return audioProcessor.getSequencerPartParameterRaw(selectedPart, parameter);
+}
+
+bool QuasimidiTechnoXAudioProcessorEditor::queueCurrentPartParameterRaw(
+    technox::PartParameter parameter, int rawValue) noexcept
+{
+    if (panelOperatingMode() == technox::PanelOperatingMode::performance)
+        return audioProcessor.queuePanelPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart, parameter, rawValue);
+    return audioProcessor.queueSequencerPartParameterRaw(selectedPart, parameter, rawValue);
+}
+
+juce::String QuasimidiTechnoXAudioProcessorEditor::currentPartSoundName() const
+{
+    if (panelOperatingMode() == technox::PanelOperatingMode::performance)
+        return audioProcessor.getCurrentPartSoundName(selectedPart);
+    return audioProcessor.getSequencerPartSoundName(selectedPart);
+}
+
+int QuasimidiTechnoXAudioProcessorEditor::currentPartDisplayNumber() const noexcept
+{
+    return panelOperatingMode() == technox::PanelOperatingMode::performance
+        ? selectedPart + 13 : selectedPart + 1;
+}
+
 void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noexcept
 {
     const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
