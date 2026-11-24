@@ -3952,6 +3952,51 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.soundCommandPacketCount() == note66OffPacketStart);
         assert(firmwareMachine.watchedCallCount(0x0db7u) == note66OffWriterStart);
 
+        // Octave probe: key 72 is one octave above key 60 and six semitones
+        // above key 66. Keep the same Part, program and velocity, then check
+        // that the first note-specific 24-bit word doubles relative to key 66.
+        const std::array<std::uint8_t, 3> note72On{{0x90u, 0x48u, 0x64u}};
+        const auto note72PacketStart = firmwareMachine.soundCommandPacketCount();
+        runRealMidiStage("Note On pitch 72 after releasing pitch 66",
+                         note72On.data(), note72On.size());
+        const auto note72PacketCount =
+            firmwareMachine.soundCommandPacketCount() - note72PacketStart;
+        assert(note72PacketCount == 549u);
+        const auto& note72PitchPacket =
+            firmwareMachine.soundCommandPacketAt(note72PacketStart);
+        assert(note72PitchPacket.returnPC == 0x0a52u);
+        assert(note72PitchPacket.bytes[0] == 0x00u);
+        const auto note72PitchStep = static_cast<std::uint32_t>(
+            note72PitchPacket.bytes[1] |
+            (static_cast<std::uint32_t>(note72PitchPacket.bytes[2]) << 8u) |
+            (static_cast<std::uint32_t>(note72PitchPacket.bytes[3]) << 16u));
+        constexpr std::uint32_t note66PitchStep = 0x021ff0u;
+        const auto octaveRatioPPM =
+            (static_cast<std::uint64_t>(note72PitchStep) * 1000000u +
+             note66PitchStep / 2u) / note66PitchStep;
+        assert(octaveRatioPPM >= 1990000u);
+        assert(octaveRatioPPM <= 2010000u);
+        for (std::size_t i = 0; i < secondNoteBulkPacketBytes.size(); ++i) {
+            const auto& packet = firmwareMachine.soundCommandPacketAt(
+                note72PacketStart + kNoteSpecificPacketCount + i);
+            assert(packet.bytes == secondNoteBulkPacketBytes[i]);
+            assert(packet.returnPC == secondNoteBulkReturnPCs[i]);
+        }
+        std::printf("NOTE72 OCTAVE STEP: word=%06X note66=%06X ratio_ppm=%llu "
+                    "packets=%zu bulk=544/544 identical\\n",
+                    static_cast<unsigned>(note72PitchStep),
+                    static_cast<unsigned>(note66PitchStep),
+                    static_cast<unsigned long long>(octaveRatioPPM),
+                    note72PacketCount);
+
+        const std::array<std::uint8_t, 3> note72Off{{0x80u, 0x48u, 0x40u}};
+        const auto note72OffPacketStart = firmwareMachine.soundCommandPacketCount();
+        const auto note72OffWriterStart = firmwareMachine.watchedCallCount(0x0db7u);
+        runRealMidiStage("Note Off pitch 72 after octave probe",
+                         note72Off.data(), note72Off.size());
+        assert(firmwareMachine.soundCommandPacketCount() == note72OffPacketStart);
+        assert(firmwareMachine.watchedCallCount(0x0db7u) == note72OffWriterStart);
+
         // Differentially change only the Common mode selector. The earlier
         // Layer 2 pass used a synthetic read override at 0x7BD5=1 and produced
         // event IDs 0x0C/0x0D. Single mode must retain only event 0x0C.
