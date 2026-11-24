@@ -1992,7 +1992,8 @@ private:
                                       bool write) noexcept {
         const bool pitchSourceAddress =
             (address >= 0x0081u && address <= 0x0083u) ||
-            (address >= 0x0091u && address <= 0x0093u);
+            (address >= 0x0091u && address <= 0x0093u) ||
+            address == 0x2018u || address == 0x2019u;
         if (!pitchSourceAddress)
             return;
         auto& event = pitchSourceDataAccessTrace_[
