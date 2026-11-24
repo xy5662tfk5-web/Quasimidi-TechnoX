@@ -854,6 +854,7 @@ public:
             pc == 0x1e5eu || pc == 0x1e60u ||
             pc == 0x1e61u || pc == 0x1e62u || pc == 0x1e63u ||
             pc == 0x1e64u || pc == 0x1e65u || pc == 0x1e66u ||
+            (pc >= 0x1e00u && pc <= 0x1e5fu) ||
             pc == 0x1eddu || pc == 0x224cu ||
             pc == 0x2301u || pc == 0x2374u ||
             pc == 0x09b9u || pc == 0x09dau ||
