@@ -3511,8 +3511,8 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.returnPC));
         }
 
-        // Velocity changes only the fifth? no: only the fourth of the five
-        // note-specific packets. The following 544 firmware bulk-transfer
+        // Velocity changes only the fourth of the five note-specific packets.
+        // The following 544 firmware bulk-transfer
         // records must be identical for the same pitch/program/Part.
         for (std::size_t i = 0; i < 544u; ++i) {
             const auto& highPacket = firmwareMachine.soundCommandPacketAt(
