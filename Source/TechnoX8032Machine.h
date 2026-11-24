@@ -1035,7 +1035,7 @@ public:
                 (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2800u && address <= 0x28ffu) ||
                 (address >= 0x2800u && address <= 0x28ffu) ||
-                (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x0100u && address <= 0x02ffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
@@ -1159,7 +1159,7 @@ public:
             if ((address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) || address == 0x3098u ||
                 (address >= 0x0080u && address <= 0x00ffu) ||
-                (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x0100u && address <= 0x02ffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
@@ -1276,7 +1276,7 @@ public:
                 (address >= 0x0080u && address <= 0x00ffu) ||
                 (address >= 0x2800u && address <= 0x28ffu) ||
                 (address >= 0x2800u && address <= 0x28ffu) ||
-                (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x0100u && address <= 0x02ffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) || address == 0x3098u ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
@@ -1306,7 +1306,7 @@ public:
                 (address >= 0x2900u && address <= 0x2bffu &&
                  address != 0x2b8bu && address != 0x2b8du) || address == 0x3098u ||
                 (address >= 0x0080u && address <= 0x00ffu) ||
-                (address >= 0x2d00u && address <= 0x2dffu) ||
+                (address >= 0x0100u && address <= 0x02ffu) ||
                 (address >= 0x2e00u && address <= 0x2fffu) ||
                 (address >= 0x3700u && address <= 0x370fu) || address == 0x3098u ||
                 (address >= 0x7bd4u && address <= 0x7bd7u)) {
