@@ -1,6 +1,6 @@
 # Sine-derived slot-1 path into the SoundHost writer
 
-Status: reproduced by the real IC4 v1.05 8032 machine test and passing Intel macOS CI run 1464 (commit 1c202e42ca774b901cd14a37c8b3305f6923c09e). This is a firmware execution trace with a seeded synthetic active-record fixture; it is not a capture from the physical sound device.
+Status: reproduced by the real IC4 v1.05 8032 machine test and expanded by Intel macOS CI run 1468 (commit 2a3ce0a3344605039e40b75820471a663d250217). This is a firmware execution trace with a seeded synthetic active-record fixture; it is not a capture from the physical sound device.
 
 ## 1. Slot-1 selection and coefficient inputs
 
@@ -8,11 +8,11 @@ The test first executes the actual IC4 initialization and periodic sine update, 
 
 - `0x00FB = 0x08`: ACC.3 selects the alternate coefficient-table page.
 - `0x00FC = 0x10`: high nibble selects slot index 1.
-- `0x28D9 = 0x24`, `0x2889 = 0x35`, `0x2899 = 0x46`: nonzero operands for the alternate page.
+- `0x28D9 = 0x22`, `0x2889 = 0x33`, `0x2899 = 0x44`: operands matched to the Slot-0 coefficient bytes for a controlled cross-slot comparison.
 - `0x2021 = 0x05`: slot-1 multiplier input.
 - `0x2002–0x2003 = 0x0000`: seeded slot state.
 
-The firmware runs from `0x044C` through the fixed-point scratch stage to `0x0550`. Assertions verify the selected slot marker in direct RAM (`RAM[0x30]=0x01)), the coefficient bytes copied to `RAM[0x45]`, `RAM[0x41]`, and `RAM[0x05]`, and that this stage itself emits no SoundHost reads or writes.
+The firmware runs from `0x044C` through the fixed-point scratch stage to `0x0550`. Assertions verify the selected slot marker in direct RAM (`RAM[0x30]=0x01`), the matched coefficient bytes copied to `RAM[0x45]`, `RAM[0x41]`, and `RAM[0x05]`, and that this stage itself emits no SoundHost reads or writes.
 
 The selected P2 page is then seeded with one synthetic active record so the outer record scan reaches the real downstream writer. This setup deliberately isolates the consumer path; the seeded record is not claimed to be a factory preset or a hardware-populated voice.
 
@@ -49,7 +49,7 @@ Every event has caller return PC `0x0A52`, captured device index `0x01`, and P2 
 
 ## 4. What the differential establishes
 
-- The alternate coefficient-page path selects slot index 1 and reaches the same outer record-list consumer and four-byte writer used by the slot-0 probe.
+- The alternate coefficient-page path selects slot index 1 and reaches the same outer record-list consumer and four-byte writer used by the slot-0 probe. The matched Slot-0/Slot-1 coefficient tests produce equal `RAM[0x36/0x37]` scratch results for both one-step and two-step cases.
 - With all other test inputs held fixed, changing the sine-step count changes the record field at page offset `+0x96` from `0x14` to `0x1F`.
 - The same differential changes only byte 1 of the observed four-byte packet, from `0x03` to `0x04`; bytes 0, 2 and 3 remain fixed.
 - The selected slot's arithmetic/record update is therefore causally upstream of a reproducible SoundHost packet change in this controlled firmware fixture.
