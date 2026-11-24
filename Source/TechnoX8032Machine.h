@@ -164,6 +164,10 @@ public:
         std::uint8_t directRam2F = 0;
         std::uint8_t directRam2A = 0;
         std::uint8_t directRam2B = 0;
+        std::uint8_t directRam6E = 0;
+        std::uint8_t directRam6F = 0;
+        std::uint8_t directRam70 = 0;
+        std::uint8_t directRam71 = 0;
         std::uint8_t directRam30 = 0;
         std::uint8_t directRam31 = 0;
         std::uint8_t directRam32 = 0;
@@ -730,6 +734,10 @@ public:
             event.directRam2F = readInternal(0x2fu);
             event.directRam2A = readInternal(0x2au);
             event.directRam2B = readInternal(0x2bu);
+            event.directRam6E = readInternal(0x6eu);
+            event.directRam6F = readInternal(0x6fu);
+            event.directRam70 = readInternal(0x70u);
+            event.directRam71 = readInternal(0x71u);
             event.directRam30 = readInternal(0x30u);
             event.directRam31 = readInternal(0x31u);
             event.directRam32 = readInternal(0x32u);
