@@ -537,6 +537,65 @@ bool QuasimidiTechnoXAudioProcessor::queuePanelPartParameterRaw(
     return panelPartEditMailbox.publish(performanceIndex, partIndex, parameter, rawValue);
 }
 
+int QuasimidiTechnoXAudioProcessor::getSequencerPartParameterRaw(
+    int partIndex, technox::PartParameter parameter) const noexcept
+{
+    const auto parameterIndex = static_cast<std::size_t>(parameter);
+    if (partIndex < 0 || partIndex >= static_cast<int>(sequencerPartValues.size()) ||
+        parameterIndex >= 24)
+        return -1;
+    return sequencerPartValues[static_cast<std::size_t>(partIndex)][parameterIndex]
+        .load(std::memory_order_acquire);
+}
+
+bool QuasimidiTechnoXAudioProcessor::setSequencerPartParameterRaw(
+    int partIndex, technox::PartParameter parameter, int rawValue) noexcept
+{
+    const auto parameterIndex = static_cast<std::size_t>(parameter);
+    const auto* descriptor = technox::PartEditModel::descriptor(parameterIndex);
+    if (partIndex < 0 || partIndex >= static_cast<int>(sequencerPartValues.size()) ||
+        descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
+        return false;
+
+    // The drum channel (Part 10) selects one of the eight manual-documented
+    // drum sets, not one of the 512 single-sound programs.
+    if (partIndex == 9 && parameter == technox::PartParameter::soundNumber &&
+        rawValue > 7)
+        return false;
+
+    sequencerPartValues[static_cast<std::size_t>(partIndex)][parameterIndex]
+        .store(rawValue, std::memory_order_release);
+    massEngine.setPartParameter(partIndex, parameter, rawValue);
+    return true;
+}
+
+bool QuasimidiTechnoXAudioProcessor::queueSequencerPartParameterRaw(
+    int partIndex, technox::PartParameter parameter, int rawValue) noexcept
+{
+    const auto parameterIndex = static_cast<std::size_t>(parameter);
+    const auto* descriptor = technox::PartEditModel::descriptor(parameterIndex);
+    if (partIndex < 0 || partIndex >= static_cast<int>(sequencerPartValues.size()) ||
+        descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
+        return false;
+    if (partIndex == 9 && parameter == technox::PartParameter::soundNumber && rawValue > 7)
+        return false;
+
+    sequencerPartValues[static_cast<std::size_t>(partIndex)][parameterIndex]
+        .store(rawValue, std::memory_order_release);
+    return panelSequencerPartEditMailbox.publish(partIndex, parameter, rawValue);
+}
+
+juce::String QuasimidiTechnoXAudioProcessor::getSequencerPartSoundName(int partIndex) const
+{
+    if (partIndex < 0 || partIndex >= static_cast<int>(sequencerPartValues.size()))
+        return "Part unavailable";
+    const int bank = getSequencerPartParameterRaw(partIndex, technox::PartParameter::bankNumber);
+    const int sound = getSequencerPartParameterRaw(partIndex, technox::PartParameter::soundNumber);
+    if (partIndex == 9)
+        return juce::String("DRUM KIT ") + juce::String(sound + 1);
+    return soundCatalog.nameFor(bank, sound);
+}
+
 int QuasimidiTechnoXAudioProcessor::getCommonControlRaw(
     int performanceIndex, technox::MASSCommonControl control) const noexcept
 {
@@ -597,6 +656,10 @@ MidiRoutingMode QuasimidiTechnoXAudioProcessor::getMidiRoutingMode() const noexc
 void QuasimidiTechnoXAudioProcessor::setMidiRoutingMode(MidiRoutingMode mode) noexcept
 {
     midiRoutingMode.store(static_cast<int>(mode), std::memory_order_release);
+    if (mode == MidiRoutingMode::performanceOmni)
+        pendingPerformanceSync.store(true, std::memory_order_release);
+    else
+        pendingSequencerSync.store(true, std::memory_order_release);
 }
 
 bool QuasimidiTechnoXAudioProcessor::isPerformancePartActive(int partIndex) const noexcept
@@ -613,10 +676,8 @@ bool QuasimidiTechnoXAudioProcessor::isPerformancePartActive(int partIndex) cons
 
 int QuasimidiTechnoXAudioProcessor::partSlotForMidiChannel(int channel) const noexcept
 {
-    for (int slot = 0; slot < 4; ++slot)
-        if (getPartMidiChannel(slot) == channel)
-            return slot;
-    return -1;
+    // In Sequencer Multi, Part N is fixed to MIDI channel N by the manual.
+    return channel >= 1 && channel <= 16 ? channel - 1 : -1;
 }
 
 bool QuasimidiTechnoXAudioProcessor::getEditedPartSysEx(
