@@ -11,7 +11,7 @@ The real firmware calls `0x4256` twice for the same key/velocity pair. Both call
 | 1 | `0x0C` | `0x41` (65) | `0x64` (100) | 12 | Part 13 |
 | 2 | `0x0D` | `0x41` (65) | `0x64` (100) | 13 | Part 14 |
 
-The Part numbering is not inferred from the two calls alone. It follows the independent address correlation in `MIDI_EVENT_TO_PERFORMANCE_PART_MAPPING.md`: the Performance loader copies Part selectors 1–4 into runtime records 12–15, and event IDs 12–15 address those same records using `0x7C15 + 24*eventID`.
+The Part numbering is not inferred from the two calls alone. It follows the independent address correlation in `MIDI_EVENT_TO_PERFORMANCE_PART_MAPPING.md`: the Performance loader copies Part selectors 1–4 into runtime records 12–15, and event IDs 12–15 address those same records using `0x7C15 + 24*eventID`. The test's Common selector at XDATA `0x7BD5` is `1` (Layer 2). Firmware routine `0x593D` expands this selector into event IDs `0x0C` and `0x0D`, matching the two observed calls.
 
 ## 2. Two separate note-state maps and branch offsets
 
@@ -49,7 +49,20 @@ The same Note 65 stimulus visits the `0x09B9` interpolation route twice, both fr
 
 The order and counts agree with the two Part-event dispatches, but the semantic units of these 24-bit values remain unknown. They are not declared sample addresses or DSP pitch words.
 
-## 6. What this establishes—and what remains open
+## 6. Common layer selector explains the two event calls
+
+Routine `0x593D` reads the Common selector at XDATA `0x7BD5`, then sets internal event-enable bits before calling `0x5671`:
+
+| `0x7BD5` | Performance mode | Event IDs enabled by `0x593D` |
+|---:|---|---|
+| `0` | Single | `0x0C` |
+| `1` | Layer 2 | `0x0C`, `0x0D` |
+| `2` | Layer 3 | `0x0C`, `0x0D`, `0x0E` |
+| `3` | Layer 4 | `0x0C`, `0x0D`, `0x0E`, `0x0F` |
+
+The current real-ROM fixture reads `0x7BD5=1`, and the firmware test now asserts that value next to the two Note 65 dispatches. This explains the two event calls in this run: the Common selector requests Layer 2. Per-Part enable/Track Mode checks still apply, so the table describes the candidate event IDs selected by the layer mode, not an unconditional promise that every candidate always reaches `0x4256`.
+
+## 7. What this establishes—and what remains open
 
 Established by real-ROM execution and passing regressions:
 - One key 65 / velocity 100 MIDI Note On reaches event IDs `0x0C` and `0x0D` separately.
@@ -59,9 +72,9 @@ Established by real-ROM execution and passing regressions:
 - The interpolation handler reads two different 24-bit XDATA source triplets and produces distinct results.
 
 Still open:
-- Why this test's current Performance/Multi setup enables exactly these two event slots, rather than one, three or four. That must be traced from the selected Common mode and each Part's Track Mode, not inferred from the duplicate calls.
+- Whether the same selector-to-event expansion is identical in all Performance and Sequencer Multi states, and how Track Mode/Part enable bits suppress individual event IDs in each operating mode.
 - The complete descriptor/command-stream memory ownership and the meaning of the `0x189D` entry registers.
 - The physical device behind the `0x8000–0x8003` port, its actual response/handshake, and the semantics of its command bytes.
 - The sample/waveform memory format and the original M.A.S.S. oscillator/voice algorithm.
 
-Next probe: change only the active Performance Common layer count or the Track Mode of Part 14, rerun the same Note 65 stimulus, and check whether event `0x0D`, its `0x299C` record and its `0x0091–0x0093` interpolation triplet disappear while event `0x0C` remains. Do not yet turn the two-pass behavior into a generic two-voice assumption.
+Next probe: change only the Common selector from Layer 2 (`0x7BD5=1`) to Single (`0x7BD5=0`), rerun the same Note 65 stimulus, and check whether event `0x0D`, its `0x299C` record and its `0x0091–0x0093` interpolation triplet disappear while event `0x0C` remains. Then repeat with selector values 2 and 3 to validate the three- and four-layer cases. Do not yet turn Layer 2 into a claim about the external processor's voice count.
