@@ -197,3 +197,11 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - The successful 24 November Intel CI trace compares note 64 at velocities 100 and 50 and follows both calls to `0x1848` through the pre-`0x210F` instruction window.
 - The second `0x1848` return A=`0x0F` / `0x53` is transformed by `SWAP A` at `0x2089`, `RR A` at `0x208A`, `MOV R4,A` at `0x208B`, `ANL A,#0xF8` at `0x208C`, and `MOV R3,A` at `0x208E`. This yields R4/R3=`0x78/0x78` or `0x9A/0x98`, matching the fourth packet `0A 00 78 00` / `0A 00 98 02`.
 - This confirms the firmware byte path only; external DSP field semantics and the real ready/busy response remain unknown. Full trace and interpretation limits: `docs/research/VELOCITY_TO_COMMAND_BYTE_PATH.md`.
+
+
+## Note-pitch interpolation sources now traced at XDATA-byte level
+
+- A passing real-ROM note-65 differential run records two visits to the `0x09B9` interpolation route, both with caller return PC `0x1E6A`.
+- The arithmetic body reads two separate 24-bit operand triplets from XDATA `0x0081–0x0083` (`57 01 A2`) and `0x0091–0x0093` (`01 00 48`), with the same positive step `0x000D`.
+- After the firmware's 3-bit top-byte mask, the operands are `0x020157` and `0x000001`; the reconstructed `MASS09B9SlotInterpolationArithmetic` returns `0x020171` and `0x000001`, matching the live `0x0A4F` writer registers (`71 01 02` and `01 00 00`).
+- This identifies the two XDATA source triplets and exact arithmetic path, but does not assign their physical or musical units. They are not the Performance Part records or the `0x8000–0x8003` command port. Details: `docs/research/PITCH_INTERPOLATION_SLOT_TRACE.md`.
