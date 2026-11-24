@@ -3287,6 +3287,13 @@ int main(int argc, char** argv) {
                         (static_cast<std::uint16_t>(secondEventPage) << 8u) +
                         expected.offset);
                     assert(write.address == expectedAddress);
+                    std::fprintf(stderr,
+                                 "NESTED POSTWRITE pc=%04X page=%02X addr=%04X value=%02X expected=%02X\\n",
+                                 static_cast<unsigned>(write.instructionPC),
+                                 static_cast<unsigned>(write.port2),
+                                 static_cast<unsigned>(write.address),
+                                 static_cast<unsigned>(write.value),
+                                 static_cast<unsigned>(expected.value));
                     assert(write.value == expected.value);
                     nestedPostprocessSeen[expectedIndex] = true;
                     ++nestedPostprocessCount;
