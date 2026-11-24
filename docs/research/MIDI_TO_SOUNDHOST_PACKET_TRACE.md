@@ -240,3 +240,10 @@ This is a firmware command/initialization-style transfer pattern, not 544 decode
 - The first five note-associated packets are compared separately; only byte positions 2 and 3 of the fourth one change for the tested velocity pair.
 - A provisional assertion that all following 544 packets are byte-identical was too strict and failed in CI. It has been replaced temporarily by a bounded mismatch report (first 32 differences plus total count) so the real firmware-produced deltas can be classified before pinning the invariant.
 - The exact 544-packet byte pattern is still asserted for the velocity-100 reference event. No semantics are assigned to any register bytes.
+
+
+## Bulk transfer caller correlation — added to regression fixture
+
+- The 544-byte-pattern probe demonstrated that a byte-for-byte equality assumption across velocity changes is not yet safe. The test now prints each differing packet index (bounded to the first 32) and the total number of mismatches rather than asserting equality prematurely.
+- Added instruction-call counters for IC4 targets `0x0E3A`, `0x26A2`, `0x0E21`, and `0x0DF7`. The warm-state velocity-100 and velocity-50 stages now report the deltas independently.
+- This will establish whether the bulk phase is re-entered through `0x0E3A` on each event and whether differences originate in the 544-packet producer or in a shifted trace window.
