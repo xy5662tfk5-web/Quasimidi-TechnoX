@@ -14,17 +14,27 @@ The English TechnoX Owner's Manual, pages 6–9, defines two operating modes and
 | `partChannels` | Sequencer Multi | Selects a sound group | Selects a single sound | Selects a Part |
 | EDIT page | Part edit | Selects a Part parameter | Changes that parameter | Selects a Part |
 
-The manual states that both Alpha dials can select one of the 50 Performance memories in Performance mode; PART/BANK switches ROM and RAM. In Sequencer Multi mode the PARAMETER dial chooses the sound group, VALUE chooses the individual sound, and PART/BANK chooses the Part. In Edit mode PARAMETER navigates the edit parameters/menus and VALUE alters the selected parameter.
+The manual states that both Alpha dials can select one of the 50 Performance memories in Performance mode; PART/BANK switches ROM and RAM. In Sequencer Multi mode the PARAMETER dial chooses the sound group, VALUE chooses the individual sound, and PART/BANK chooses the Part. Pressing EDIT opens the Edit Function menu; the Alpha dials navigate it, OK enters the highlighted function, and EXIT returns to the main page. In the Edit pages PARAMETER chooses the field and VALUE changes it.
 
 The plugin contains the 50 factory ROM Performance records. It does not yet contain a user RAM Performance dump or RAM-memory persistence, so selecting RAM currently displays `RAM-xx: EMPTY` and does not pretend that user Performances are available.
 
-## 2. Current Sequencer Multi Part coverage
+## 2. Implemented panel pages
+
+- **Main / Performance:** both dials select a factory ROM Performance; the inactive dial indicator stays still during a drag and follows the same selected Performance when the gesture ends. PART/BANK left selects ROM and right selects RAM.
+- **Main / Sequencer Multi:** PARAMETER selects Bank/Sound Group A–D (currently backed by the Part Bank field), VALUE selects Sound 000–127, and PART/BANK changes among the four currently stored Performance Parts 13–16.
+- **Edit Function:** EDIT opens the menu, both dials navigate the highlighted function, OK confirms, EXIT leaves the menu. `Edit Part` and `Edit System` are implemented; other entries display `MENU NOT BUILT` rather than invoking placeholder behavior.
+- **Edit Part:** PARAMETER selects one of the documented 24 Part fields; VALUE edits its documented raw range. The edit is queued into the audio-thread mailbox.
+- **Edit System:** the first implemented item is Mode (Perform / Sequencer Multi). VALUE switches the plugin's canonical MIDI routing mode. This currently updates the plugin's state model; the exact original IC4 System-Edit SysEx/write transaction is not yet connected.
+
+
+
+## 3. Current Sequencer Multi Part coverage
 
 The manual defines 16 Sequencer Multi Parts, but the current factory Performance parser stores four Part blocks per Performance: Parts 13–16 (runtime indices 12–15). The present editor therefore lets the user select the four stored Performance Parts 13–16 only. It must not display them as if all 16 Sequencer Multi Parts were already modelled. Full Parts 1–16 and saved Sequencer Multi setups remain a follow-up implementation.
 
 The sound-name catalog contains 4 banks × 128 names. In the current four-Part editor, PARAMETER writes the selected Part's Bank Number (0–3), and VALUE writes its Sound Number (0–127). The selected sound name is resolved through the catalog. The catalog contains names and IC51 resource metadata, not decoded waveforms.
 
-## 3. What a panel edit reaches today
+## 4. What a panel edit reaches today
 
 The current path for a panel VALUE edit is:
 
@@ -46,7 +56,7 @@ Bank/Sound values are the bank/program identity used by the engine. `VoiceSlot` 
 
 This is a real connection to the current engine state; the editor is not just moving a decorative knob. However, the active `BasicMASSVoiceBackend` remains a generic test oscillator. It is not the original M.A.S.S. synthesis implementation.
 
-## 4. Current boundary between panel state, firmware and audio engine
+## 5. Current boundary between panel state, firmware and audio engine
 
 The processor sends **host/external MIDI bytes** into the emulated MC6850-compatible ACIA path and clocks the IC4 v1.05 8032 firmware. Panel edits currently update the canonical Performance/Part model and are applied to MASSAudioEngine through a bounded mailbox drained by `processBlock()`. This prevents the GUI thread from mutating VoiceManager/backend state concurrently with audio rendering.
 
@@ -54,7 +64,7 @@ The panel's encoder events are not yet injected into the original IC4 GPIO scann
 
 The current active `BasicMASSVoiceBackend` remains a generic test oscillator, not the original M.A.S.S. synthesis implementation. The firmware's physical sound peripheral, final voice/sample command protocol, and PCM/sample decoding remain unresolved.
 
-## 5. Original firmware panel-input path and logical role correlation
+## 6. Original firmware panel-input path and logical role correlation
 
 Reachable IC4 v1.05 code contains actual external-pin scan routines. The evidence is documented in `docs/research/FRONT_PANEL_GPIO_SCAN.md`:
 
@@ -70,7 +80,7 @@ The ROM consumer evidence strengthens the logical role assignment:
 
 The real-ROM regression executes `0xA6A8` and `0xA762` and verifies both channels, both direction codes, and no repeat while the phase remains held low. This proves the firmware's scan outputs and their logical consumer roles. The exact physical PCB traces from P1.5/P1.6/P3.0 to the two front-panel encoder bodies still require a board-level capture.
 
-## 6. Required long-term architecture
+## 7. Required long-term architecture
 
 Keep one canonical Performance/Part state and one typed control-event boundary:
 
@@ -86,13 +96,13 @@ Panel input
 
 The firmware adapter and audio backend must not become two independent sources of truth. A confirmed firmware response should update the canonical model; the backend should consume that same model or the verified firmware-produced resource/command stream. Unknown bytes and SysEx fields must continue to be preserved.
 
-## 7. Important distinctions for later implementation
+## 8. Important distinctions for later implementation
 
 - **Performance index** is the selected one of 50 factory Performance memories.
 - **Part number** is user-facing Parts 13–16 for the four stored Performance blocks; runtime firmware event IDs/record indices use zero-based values 12–15.
 - **Bank/Sound** selects one of 512 single sounds assigned to a Part.
 - **MIDI Program Change** is not the same as selecting one of the 50 Performance memories. The current processor applies Program Change to the Part Sound Number in Sequencer Multi/Part Channels mode; in Performance Omni mode the current MIDI handler does not apply Program Change to a Part. Keep this behavior explicit until the manual's mode-specific Program Change behavior and the firmware path are implemented and regression-tested.
 
-## 8. Evidence boundary
+## 9. Evidence boundary
 
 Manual-confirmed ranges, firmware-derived record layout, and the current project implementation are distinct evidence layers. The control UI should follow the manual's documented parameter ranges, the firmware's verified Part/Performance mapping, and only verified hardware input/command semantics. No panel control should be wired to guessed DSP registers.
