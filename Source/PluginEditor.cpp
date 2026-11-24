@@ -587,9 +587,7 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
             }
             case technox::PanelControlAction::selectSoundGroup: {
                 const int bank = juce::jlimit(0, 3, next);
-                if (audioProcessor.queuePanelPartParameterRaw(
-                        audioProcessor.getCurrentProgram(), selectedPart,
-                        technox::PartParameter::bankNumber, bank))
+                if (queueCurrentPartParameterRaw(technox::PartParameter::bankNumber, bank))
                     parameterDialNormalized = static_cast<float>(bank) / 3.0f;
                 break;
             }
@@ -627,11 +625,11 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                 break;
             }
             case technox::PanelControlAction::selectSingleSound: {
-                const int sound = juce::jlimit(0, 127, next);
-                if (audioProcessor.queuePanelPartParameterRaw(
-                        audioProcessor.getCurrentProgram(), selectedPart,
-                        technox::PartParameter::soundNumber, sound))
-                    valueDialNormalized = static_cast<float>(sound) / 127.0f;
+                const int maximumSound = selectedPart == 9 ? 7 : 127;
+                const int sound = juce::jlimit(0, maximumSound, next);
+                if (queueCurrentPartParameterRaw(technox::PartParameter::soundNumber, sound))
+                    valueDialNormalized = static_cast<float>(sound)
+                        / static_cast<float>(maximumSound);
                 break;
             }
             case technox::PanelControlAction::selectEditFunction:
@@ -652,8 +650,7 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                     static_cast<std::size_t>(selectedParameter));
                 if (descriptor != nullptr) {
                     const int value = juce::jlimit(0, static_cast<int>(descriptor->maximum), next);
-                    if (audioProcessor.queuePanelPartParameterRaw(
-                            audioProcessor.getCurrentProgram(), selectedPart,
+                    if (queueCurrentPartParameterRaw(
                             static_cast<technox::PartParameter>(selectedParameter), value)) {
                         valueDialNormalized = descriptor->maximum > 0
                             ? static_cast<float>(value) / static_cast<float>(descriptor->maximum)
