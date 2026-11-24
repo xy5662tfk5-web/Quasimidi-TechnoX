@@ -3132,8 +3132,39 @@ int main(int argc, char** argv) {
                     pc == 0x9994u || pc == 0x9997u ||
                     pc == 0x99b5u || pc == 0x99b8u ||
                     pc == 0x99c5u || pc == 0x9a14u;
-                if (!selectorPath && !repeatedNoteHandlerPath)
+                const bool partHandlerDetailPath =
+                    pc == 0x4256u || pc == 0x4323u || pc == 0x4340u ||
+                    pc == 0x434bu || pc == 0x4375u || pc == 0x438bu ||
+                    pc == 0x43a1u || pc == 0x43b1u || pc == 0x43c7u ||
+                    pc == 0x43d0u || pc == 0x43d3u || pc == 0x43d5u ||
+                    pc == 0x43e0u || pc == 0x43e8u || pc == 0x43ebu ||
+                    pc == 0x43f2u || pc == 0x4403u || pc == 0x4406u ||
+                    pc == 0x4407u || pc == 0x4417u || pc == 0x442cu ||
+                    pc == 0x442fu || pc == 0x4430u || pc == 0x4440u ||
+                    pc == 0x4455u || pc == 0x4458u || pc == 0x4459u ||
+                    pc == 0x4467u || pc == 0x446au;
+                if (!selectorPath && !repeatedNoteHandlerPath &&
+                    !partHandlerDetailPath)
                     continue;
+                if (partHandlerDetailPath) {
+                    std::printf("  PART-ROUTE PC=%04X ret=%04X event=%02X "
+                                "key=%02X velocity=%02X state71=%02X "
+                                "A=%02X DPTR=%04X R5=%02X R7=%02X "
+                                "PartFields[28/29/2A]=%02X/%02X/%02X\\n",
+                                static_cast<unsigned>(pc),
+                                static_cast<unsigned>(event.returnPC),
+                                static_cast<unsigned>(event.directRam6E),
+                                static_cast<unsigned>(event.directRam6F),
+                                static_cast<unsigned>(event.directRam70),
+                                static_cast<unsigned>(event.directRam71),
+                                static_cast<unsigned>(event.accumulator),
+                                static_cast<unsigned>(event.dptr),
+                                static_cast<unsigned>(event.registers[5]),
+                                static_cast<unsigned>(event.registers[7]),
+                                static_cast<unsigned>(event.directRam28),
+                                static_cast<unsigned>(event.directRam29),
+                                static_cast<unsigned>(event.directRam2A));
+                }
                 if (pc == 0x5941u) ++selectorReadCount;
                 if (pc == 0x5958u || pc == 0x5962u ||
                     pc == 0x596cu || pc == 0x5976u)
