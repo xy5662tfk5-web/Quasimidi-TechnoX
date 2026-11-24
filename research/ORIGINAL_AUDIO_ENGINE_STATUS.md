@@ -216,3 +216,10 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - Details: `docs/research/NOTE65_TWO_PART_EVENT_TRACE.md`. Selector-to-event expansion is established by the 0..3 firmware branches; the Layer 2→Single test compares two specific override values. Per-Part enable/Track Mode gating and downstream resource/command semantics still require differential tests.
 
 - A Single-mode differential changes only the synthetic Common selector override from `0x7BD5=1` to `0x7BD5=0`: the Note On path contracts to one Part event (`0x0C`) and one `0x1494`/`0x189D`/`0xAC00` path, while the `0x09B9` interpolation stage remains two passes and reads both pitch triplets. This proves the two interpolation lanes are not one-to-one with the two active Part events. Details: `docs/research/PITCH_INTERPOLATION_SLOT_TRACE.md`.
+## Nested IC51 record copied through the allocated Part page
+
+- The Note 65 second-event trace follows IC51 bank 1 source pointer `0x03AF–0x03B0` (`06 38`) to record `0x3806`.
+- The bank-1 IC51 bytes at `0x3806–0x3809` are `A4 16 A3 40`. With `R3=0x86`, firmware branches from `0x1A17` to `0x1A1D`; `SETB ACC.6` changes the first byte to `E4` before copying.
+- The interpreter loads `R0/R2/R6/B = E4/16/A3/40` and writes the tuple to offsets `0x00–0x03` of the dynamically allocated P2 page using `MOVX @R1` at PCs `0x1A32`, `0x1A35`, `0x1A38` and `0x1A3C`.
+- A new focused trace retains those four writes separately from the broad XDATA ring, and CI regression asserts their exact addresses, byte values, writer PCs, P2 page and caller return PC.
+- This establishes an IC51 nested-record-to-page transfer, not the record's DSP or sample semantics. It must not be described as PCM or waveform data until its downstream consumer is identified. Details: `docs/research/MASS_RESOURCE_TO_VOICE_DISPATCH.md`.
