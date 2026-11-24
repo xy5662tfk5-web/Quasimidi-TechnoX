@@ -758,17 +758,22 @@ int main(int argc, char** argv) {
                     ((consumerMachine.xdataByteForTesting(0x2052u) >> 1u) & 0x3fu))));
 
             // Select slot 0, choose the 0x28C8 table page (ACC.3 clear), and
-            // provide non-zero fixed-point base/coefficient operands.
+            // provide non-zero fixed-point base/coefficient operands. Re-enter
+            // via 0x044C with status 00FA=0 so the firmware itself restores P2
+            // from CODE[0x0078] before its MOVX @R1 slot reads.
             consumerMachine.writeExternal(0x00fbu, 0x00u);
             consumerMachine.writeExternal(0x00fcu, 0x00u);
             consumerMachine.writeExternal(0x00fdu, 0x00u);
+            consumerMachine.writeExternal(0x00fau, 0x00u);
             consumerMachine.writeExternal(0x28c8u, 0x22u);
             consumerMachine.writeExternal(0x2888u, 0x33u);
             consumerMachine.writeExternal(0x2898u, 0x44u);
             consumerMachine.writeExternal(0x2020u, 0x05u);
             consumerMachine.writeExternal(0x2021u, 0x00u);
+            consumerMachine.writeInternal(0x47u, 0x01u);
+            consumerMachine.writeInternal(0x49u, 0x00u);
 
-            cpuRegisters.pc = 0x047eu;
+            cpuRegisters.pc = 0x044cu;
             const auto consumerInstructions =
                 consumerMachine.runUntilProgramCounter(0x0550u, 4096u);
             assert(consumerInstructions > 0u);
@@ -822,14 +827,17 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(0x00fbu, 0x08u); // ACC.3: use 0x28D8 page
             consumerMachine.writeExternal(0x00fcu, 0x10u); // high nibble: slot 1
             consumerMachine.writeExternal(0x00fdu, 0x00u);
+            consumerMachine.writeExternal(0x00fau, 0x00u); // select alternate 0x047E path
             consumerMachine.writeExternal(0x28d9u, 0x24u);
             consumerMachine.writeExternal(0x2889u, 0x35u);
             consumerMachine.writeExternal(0x2899u, 0x46u);
             consumerMachine.writeExternal(0x2021u, 0x05u); // slot-1 multiplier input
             consumerMachine.writeExternal(0x2002u, 0x00u);
             consumerMachine.writeExternal(0x2003u, 0x00u);
+            consumerMachine.writeInternal(0x47u, 0x01u);
+            consumerMachine.writeInternal(0x49u, 0x00u);
 
-            cpuRegisters.pc = 0x047eu;
+            cpuRegisters.pc = 0x044cu;
             assert(consumerMachine.runUntilProgramCounter(0x0550u, 4096u) > 0u);
             assert(cpuRegisters.pc == 0x0550u);
             assert(!consumerMachine.cpuFaulted());
