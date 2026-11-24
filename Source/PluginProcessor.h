@@ -7,6 +7,7 @@
 #include "MASSResourceROM.h"
 #include "BasicMASSVoiceBackend.h"
 #include "TechnoX8032Machine.h"
+#include "TechnoXPanelControlEvents.h"
 #include <array>
 #include <atomic>
 #include <vector>
@@ -48,6 +49,7 @@ public:
     juce::String getCurrentPartResourceSummary(int partIndex) const;
     int getPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter) const noexcept;
     bool setPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
+    bool queuePanelPartParameterRaw(int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
     int getCommonControlRaw(int performanceIndex, technox::MASSCommonControl control) const noexcept;
     bool setCommonControlRaw(int performanceIndex, technox::MASSCommonControl control, int rawValue) noexcept;
     bool getEditedPartSysEx(int performanceIndex, int partIndex, std::vector<std::uint8_t>& destination) const;
@@ -81,6 +83,7 @@ private:
     technox::MidiControlRouter midiControlRouter;
     std::unique_ptr<technox::IMASSVoiceBackend> voiceBackend;
     technox::MASSAudioEngine massEngine;
+    technox::PanelPartEditMailbox panelPartEditMailbox;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
     std::atomic<int> midiRoutingMode{static_cast<int>(MidiRoutingMode::performanceOmni)};
