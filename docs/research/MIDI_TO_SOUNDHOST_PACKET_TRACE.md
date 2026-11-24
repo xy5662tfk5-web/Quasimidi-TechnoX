@@ -213,3 +213,10 @@ The live 8032 instruction-watch trace now records the outer stack return address
 
 The regression now asserts that both `0x0A4F` snapshots have the same outer return PC `0x1E6A`. This rejects the earlier unverified theory that the two packets came from separate callers. The evidence instead places both writes under the same `0x1E67` / `0x09B9` pitch-handler call path, with the same static callsite being reached twice during the note processing. The two packet bytes remain individually asserted, and their payload meanings remain unassigned.
 
+
+
+## Command-field projection model
+
+- `MASS1848CommandFieldProjection` models the observed `SWAP A; RR A` sequence at IC4 `0x2089..0x208A`, followed by the `R4` store and `R3 = A & 0xF8` mask at `0x208B..0x208E`.
+- Pure unit tests cover the two captured values (`0x0F -> R3/R4 0x78/0x78`, `0x53 -> 0x98/0x9A`) and the full 8-bit input domain.
+- The real-8032 test compares this helper with the captured register state before the `0x210F` writer. It remains a register-projection model only, not a DSP command decoder.
