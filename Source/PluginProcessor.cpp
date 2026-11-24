@@ -287,20 +287,32 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
     // the full Performance image/voice-state replacement until this audio
     // callback so MASSAudioEngine's VoiceManager/backend are never mutated
     // concurrently with render().
-    if (pendingPerformanceSync.exchange(false, std::memory_order_acq_rel))
-        syncCurrentPerformanceToEngine();
+    const auto activeRoutingMode = getMidiRoutingMode();
+    if (activeRoutingMode == MidiRoutingMode::performanceOmni) {
+        if (pendingPerformanceSync.exchange(false, std::memory_order_acq_rel))
+            syncCurrentPerformanceToEngine();
+    } else {
+        if (pendingSequencerSync.exchange(false, std::memory_order_acq_rel))
+            syncSequencerPartsToEngine();
+    }
 
     const int performanceIndex = getCurrentProgram();
 
-    // GUI-originated edits are applied only on the audio thread. The editor
-    // publishes latest values into a bounded per-Performance mailbox; this
-    // avoids touching VoiceManager/backend state from the message thread.
-    panelPartEditMailbox.consume(performanceIndex,
-        [this](const technox::PanelPartEditMailbox::Edit& edit) {
-            massEngine.setPartParameter(12 + edit.partIndex, edit.parameter, edit.rawValue);
-            massEngine.setPerformancePartByte(edit.partIndex,
-                static_cast<int>(edit.parameter), edit.rawValue);
-        });
+    if (activeRoutingMode == MidiRoutingMode::performanceOmni) {
+        // GUI-originated Performance Part edits are drained on the audio thread.
+        panelPartEditMailbox.consume(performanceIndex,
+            [this](const technox::PanelPartEditMailbox::Edit& edit) {
+                massEngine.setPartParameter(12 + edit.partIndex, edit.parameter, edit.rawValue);
+                massEngine.setPerformancePartByte(edit.partIndex,
+                    static_cast<int>(edit.parameter), edit.rawValue);
+            });
+    } else {
+        // Sequencer Multi has a separate live 16-Part state and mailbox.
+        panelSequencerPartEditMailbox.consume(
+            [this](const technox::PanelSequencerPartEditMailbox::Edit& edit) {
+                massEngine.setPartParameter(edit.partIndex, edit.parameter, edit.rawValue);
+            });
+    }
 
     const int channelCount = buffer.getNumChannels();
     int renderedSamples = 0;
@@ -346,7 +358,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                 setMidiRoutingMode(MidiRoutingMode::performanceOmni);
         }
         const bool omniPerformance = getMidiRoutingMode() == MidiRoutingMode::performanceOmni;
-        std::array<int, 4> targetSlots{};
+        std::array<int, 16> targetSlots{};
         int targetCount = 0;
         if (omniPerformance) {
             for (int slot = 0; slot < 4; ++slot)
@@ -361,7 +373,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         if (message.isNoteOn()) {
             for (int i = 0; i < targetCount; ++i) {
                 const int slot = targetSlots[static_cast<std::size_t>(i)];
-                massEngine.noteOn(static_cast<std::uint8_t>(12 + slot),
+                const int enginePart = omniPerformance ? 12 + slot : slot;
+                massEngine.noteOn(static_cast<std::uint8_t>(enginePart),
                                   static_cast<std::uint8_t>(message.getChannel()),
                                   static_cast<std::uint8_t>(message.getNoteNumber()),
                                   static_cast<std::uint8_t>(message.getVelocity()));
@@ -376,11 +389,15 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isPitchWheel()) {
             const int bend = message.getPitchWheelValue() - 8192;
             for (int i = 0; i < targetCount; ++i)
-                massEngine.setPitchBend(12 + targetSlots[static_cast<std::size_t>(i)], bend);
+                massEngine.setPitchBend(getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+                    ? 12 + targetSlots[static_cast<std::size_t>(i)]
+                    : targetSlots[static_cast<std::size_t>(i)], bend);
         } else if (message.isChannelPressure()) {
             const int pressure = message.getChannelPressureValue();
             for (int i = 0; i < targetCount; ++i)
-                massEngine.setAftertouch(12 + targetSlots[static_cast<std::size_t>(i)], pressure);
+                massEngine.setAftertouch(getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+                    ? 12 + targetSlots[static_cast<std::size_t>(i)]
+                    : targetSlots[static_cast<std::size_t>(i)], pressure);
         } else if (message.isController()) {
             const int controller = message.getControllerNumber();
             const int value = message.getControllerValue();
@@ -411,12 +428,23 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 
             for (int i = 0; i < targetCount; ++i) {
                 const int slot = targetSlots[static_cast<std::size_t>(i)];
-                const int enginePart = 12 + slot;
-                if (bankSelectChange.has_value())
-                    setPartParameterRaw(performanceIndex, slot, technox::PartParameter::bankNumber,
-                                         bankSelectChange->bankNumber);
-                if (partChange.has_value())
-                    setPartParameterRaw(performanceIndex, slot, partChange->parameter, partChange->rawValue);
+                const int enginePart = omniPerformance ? 12 + slot : slot;
+                if (bankSelectChange.has_value()) {
+                    if (omniPerformance)
+                        setPartParameterRaw(performanceIndex, slot,
+                            technox::PartParameter::bankNumber, bankSelectChange->bankNumber);
+                    else
+                        setSequencerPartParameterRaw(slot,
+                            technox::PartParameter::bankNumber, bankSelectChange->bankNumber);
+                }
+                if (partChange.has_value()) {
+                    if (omniPerformance)
+                        setPartParameterRaw(performanceIndex, slot,
+                            partChange->parameter, partChange->rawValue);
+                    else
+                        setSequencerPartParameterRaw(slot,
+                            partChange->parameter, partChange->rawValue);
+                }
                 if (controller == 1)
                     massEngine.setModWheel(enginePart, value);
                 else if (controller == 11)
@@ -444,8 +472,8 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         } else if (message.isProgramChange() && !omniPerformance) {
             for (int i = 0; i < targetCount; ++i) {
                 const int slot = targetSlots[static_cast<std::size_t>(i)];
-                setPartParameterRaw(performanceIndex, slot, technox::PartParameter::soundNumber,
-                                    message.getProgramChangeNumber());
+                setSequencerPartParameterRaw(slot, technox::PartParameter::soundNumber,
+                                             message.getProgramChangeNumber());
             }
         }
     };
