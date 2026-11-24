@@ -1337,7 +1337,14 @@ public:
             static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
         // Keep exact writes from the interpreter's four-byte nested-record
         // copier even if the broad 8192-entry XDATA ring wraps later in the test.
-        if (instructionPC >= 0x1a32u && instructionPC <= 0x1a3cu &&
+        const bool nestedResourceWritePC =
+            instructionPC == 0x1a32u || instructionPC == 0x1a35u ||
+            instructionPC == 0x1a38u || instructionPC == 0x1a3cu ||
+            instructionPC == 0x1a44u || instructionPC == 0x1a57u ||
+            instructionPC == 0x1a82u || instructionPC == 0x1a88u ||
+            instructionPC == 0x1a9bu || instructionPC == 0x1a9eu ||
+            instructionPC == 0x1aa5u;
+        if (nestedResourceWritePC &&
             address >= 0x0100u && address <= 0x02ffu) {
             auto& event = resourceTupleWriteTrace_[
                 resourceTupleWriteTraceCount_ % resourceTupleWriteTrace_.size()];
