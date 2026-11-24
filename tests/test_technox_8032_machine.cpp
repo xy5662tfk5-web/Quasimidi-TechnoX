@@ -566,7 +566,13 @@ int main(int argc, char** argv) {
             phaseMachine.writeExternal(0x2051u, 0x00u);
             phaseMachine.writeExternal(0x2052u, 0x00u);
             phaseMachine.writeExternal(0x2053u, 0xccu);
-            phaseMachine.setTestExternalReadOverride(0xfffau, 0x40u);
+            // The scheduler fetches CODE[0x0079], selects that page on P2,
+            // then reads MOVX @R1 where R1=0xFA. Target the actual selected
+            // address instead of assuming a fixed 0xFFFA page.
+            const auto schedulerPage = phaseMachine.readCode(0x0079u);
+            const auto schedulerStatusAddress = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(schedulerPage) << 8u) | 0x00fau);
+            phaseMachine.setTestExternalReadOverride(schedulerStatusAddress, 0x40u);
 
             auto& registers = phaseMachine.cpuForTesting().registersForTesting();
             registers.pc = 0x044cu;
