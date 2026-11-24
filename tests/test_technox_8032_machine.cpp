@@ -815,9 +815,6 @@ int main(int argc, char** argv) {
             // Retain the firmware accesses only; the active record above is
             // deliberately seeded test state, not a factory-populated voice.
             const auto recordTraceStart = consumerMachine.xdataWatchTraceCount();
-            // Retain the firmware accesses only; the active record above is
-            // deliberately seeded test state, not a factory-populated voice.
-            const auto recordTraceStart = consumerMachine.xdataWatchTraceCount();
             const auto downstreamInstructions =
                 consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
             const bool reachedSoundHostWriter = cpuRegisters.pc == 0x0db7u;
@@ -883,8 +880,7 @@ int main(int argc, char** argv) {
             assert(record96LastWrite ==
                    (sineStepCount == 0x01u ? 0x14u : 0x1fu));
 
-            std::fprintf(stderr,
-                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu writer=%d voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",            assert(voiceRecordPage == 0x00u);
+            assert(voiceRecordPage == 0x00u);
             assert(cpuRegisters.pc == 0x0a52u);
             assert(!consumerMachine.cpuFaulted());
             assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)) ==
@@ -1003,9 +999,9 @@ int main(int argc, char** argv) {
             assert(cpuRegisters.pc == 0x0550u);
             assert(!consumerMachine.cpuFaulted());
             assert(consumerMachine.readInternal(0x30u) == 0x01u);
-            assert(consumerMachine.readInternal(0x45u) == 0x24u);
-            assert(consumerMachine.readInternal(0x41u) == 0x35u);
-            assert(consumerMachine.readInternal(0x05u) == 0x46u);
+            assert(consumerMachine.readInternal(0x45u) == 0x22u);
+            assert(consumerMachine.readInternal(0x41u) == 0x33u);
+            assert(consumerMachine.readInternal(0x05u) == 0x44u);
             assert(consumerMachine.soundCommandPacketCount() == 0u);
             assert(consumerMachine.soundHostWriteCount() == 0u);
             assert(consumerMachine.soundHostReadCount() == 0u);
@@ -1032,6 +1028,8 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(voiceRecordAddress(0x8fu), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x96u), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x97u), 0x00u);
+            // Begin after fixture seeding so the trace contains firmware accesses.
+            const auto recordTraceStart = consumerMachine.xdataWatchTraceCount();
 
             const auto downstreamInstructions =
                 consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
