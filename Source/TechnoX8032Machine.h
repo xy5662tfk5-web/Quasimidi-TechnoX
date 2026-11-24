@@ -173,6 +173,8 @@ public:
         std::uint8_t directRam3E = 0;
         std::uint8_t directRam3F = 0;
         std::uint8_t directRam45 = 0;
+        std::uint8_t directRam4E = 0;
+        std::uint8_t directRam4F = 0;
         std::uint8_t directRam50 = 0;
         std::uint8_t directRam51 = 0;
         std::uint8_t directRam52 = 0;
@@ -812,6 +814,8 @@ public:
             event.directRam3E = readInternal(0x3eu);
             event.directRam3F = readInternal(0x3fu);
             event.directRam45 = readInternal(0x45u);
+            event.directRam4E = readInternal(0x4eu);
+            event.directRam4F = readInternal(0x4fu);
             event.directRam50 = readInternal(0x50u);
             event.directRam51 = readInternal(0x51u);
             event.directRam52 = readInternal(0x52u);
