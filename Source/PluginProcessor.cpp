@@ -863,18 +863,57 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         initialiseCommonControlsFromBank();
     }
 
-    // V1–V4 states stored only the four Performance Part MIDI channels.
-    // V5 stores all 16 Sequencer-Multi channel assignments.
-    const std::size_t channelCountToRestore =
-        magic == kStateMagicV5 ? partMidiChannels.size() : 4u;
-    for (std::size_t channelIndex = 0; channelIndex < channelCountToRestore; ++channelIndex) {
-        const int restoredChannel = static_cast<unsigned char>(stream.readByte());
-        if (restoredChannel >= 1 && restoredChannel <= 16)
-            partMidiChannels[channelIndex].store(restoredChannel, std::memory_order_release);
-    }
-    if (magic != kStateMagicV5) {
+    // V1–V4 stored four channels for the old four-slot editor. V5 stores
+    // all 16 Sequencer-Multi channel assignments. Read the old fields to keep
+    // stream alignment, but only migrate them to Parts 13–16 when they form a
+    // valid, unique map that does not collide with the default Part 1–12 map.
+    if (magic == kStateMagicV5) {
+        std::array<int, 16> restoredChannels{};
+        bool validChannelMap = true;
+        std::array<bool, 17> usedChannels{};
+        for (std::size_t channelIndex = 0; channelIndex < restoredChannels.size(); ++channelIndex) {
+            const int value = static_cast<unsigned char>(stream.readByte());
+            restoredChannels[channelIndex] = value;
+            if (value < 1 || value > 16 || usedChannels[static_cast<std::size_t>(
+                    juce::jlimit(1, 16, value))]) {
+                validChannelMap = false;
+            } else {
+                usedChannels[static_cast<std::size_t>(value)] = true;
+            }
+        }
+        if (validChannelMap) {
+            for (std::size_t channelIndex = 0; channelIndex < restoredChannels.size(); ++channelIndex)
+                partMidiChannels[channelIndex].store(
+                    restoredChannels[channelIndex], std::memory_order_release);
+        } else {
+            for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
+                partMidiChannels[part].store(static_cast<int>(part + 1), std::memory_order_release);
+        }
+    } else {
+        std::array<int, 4> legacyChannels{};
+        for (auto& value : legacyChannels)
+            value = static_cast<unsigned char>(stream.readByte());
+
         for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
             partMidiChannels[part].store(static_cast<int>(part + 1), std::memory_order_release);
+
+        bool validLegacyMap = true;
+        std::array<bool, 17> usedChannels{};
+        for (int channel = 1; channel <= 12; ++channel)
+            usedChannels[static_cast<std::size_t>(channel)] = true;
+        for (const int value : legacyChannels) {
+            if (value < 13 || value > 16 || usedChannels[static_cast<std::size_t>(
+                    juce::jlimit(1, 16, value))]) {
+                validLegacyMap = false;
+                break;
+            }
+            usedChannels[static_cast<std::size_t>(value)] = true;
+        }
+        if (validLegacyMap) {
+            for (std::size_t slot = 0; slot < legacyChannels.size(); ++slot)
+                partMidiChannels[12 + slot].store(
+                    legacyChannels[slot], std::memory_order_release);
+        }
     }
     if (magic == kStateMagicV4 || magic == kStateMagicV5) {
         const int mode = static_cast<unsigned char>(stream.readByte());
