@@ -3147,7 +3147,6 @@ int main(int argc, char** argv) {
             std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
                         selectorReadCount, selectorBranchCount,
                         selectorCallsiteCount);
-            std::printf("  override-backed 7BD5 reads=%zu\\n", selectorOverrideReads);
             const auto selectorWindowAfter = firmwareMachine.externalWindowTraceCount();
             const auto selectorWindowFirst = selectorWindowAfter > 1024u
                 ? selectorWindowAfter - 1024u : 0u;
@@ -3162,6 +3161,7 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.value),
                             static_cast<unsigned long long>(event.machineCycle));
             }
+            std::printf("  override-backed 7BD5 reads=%zu\\n", selectorOverrideReads);
             const auto selectorXdataAfter = firmwareMachine.xdataWatchTraceCount();
             const auto selectorXdataFirst = selectorXdataAfter > 8192u
                 ? selectorXdataAfter - 8192u : 0u;
