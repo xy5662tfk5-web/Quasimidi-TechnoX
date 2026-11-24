@@ -3511,6 +3511,18 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.returnPC));
         }
 
+        // Velocity changes only the fifth? no: only the fourth of the five
+        // note-specific packets. The following 544 firmware bulk-transfer
+        // records must be identical for the same pitch/program/Part.
+        for (std::size_t i = 0; i < 544u; ++i) {
+            const auto& highPacket = firmwareMachine.soundCommandPacketAt(
+                secondNotePacketStart + 5u + i);
+            const auto& lowPacket = firmwareMachine.soundCommandPacketAt(
+                lowerVelocityPacketStart + 5u + i);
+            assert(highPacket.bytes == lowPacket.bytes);
+            assert(highPacket.returnPC == lowPacket.returnPC);
+        }
+
         // New-pitch probe: keep Part/program/velocity fixed and change only
         // pitch to 65. Capture the live 09B9 arithmetic inputs, the exact
         // MOVX bytes consumed by 09DA, and the resulting 0A4F writer registers.
