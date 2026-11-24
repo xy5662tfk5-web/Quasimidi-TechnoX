@@ -157,6 +157,9 @@ public:
         std::uint8_t psw = 0;
         std::uint8_t registerBankBase = 0;
         std::array<std::uint8_t, 8> registers{};
+        std::uint8_t directRam28 = 0;
+        std::uint8_t directRam29 = 0;
+        std::uint8_t directRam2A = 0;
         std::uint8_t directRam2B = 0;
         std::uint8_t directRam30 = 0;
         std::uint8_t directRam31 = 0;
@@ -626,7 +629,9 @@ public:
         if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
             pc == 0x5671u || pc == 0x4256u ||
-            pc == 0x1494u || pc == 0xac00u || pc == 0x189du ||
+            pc == 0x1494u || pc == 0xac00u || pc == 0xac16u ||
+            pc == 0xac25u || pc == 0xac88u || pc == 0xaca0u ||
+            pc == 0xacb2u || pc == 0x189du ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
             pc == 0x211fu || pc == 0x236bu) {
@@ -642,6 +647,9 @@ public:
             for (std::size_t index = 0; index < event.registers.size(); ++index)
                 event.registers[index] = readInternal(static_cast<std::uint8_t>(
                     event.registerBankBase + index));
+            event.directRam28 = readInternal(0x28u);
+            event.directRam29 = readInternal(0x29u);
+            event.directRam2A = readInternal(0x2au);
             event.directRam2B = readInternal(0x2bu);
             event.directRam30 = readInternal(0x30u);
             event.directRam31 = readInternal(0x31u);
