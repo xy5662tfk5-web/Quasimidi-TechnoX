@@ -3162,8 +3162,25 @@ int main(int argc, char** argv) {
                     pc == 0x1817u || pc == 0x1818u || pc == 0x182bu ||
                     pc == 0x1834u || pc == 0x1837u || pc == 0x183bu ||
                     pc == 0x183cu || pc == 0x1841u || pc == 0x1848u;
+                const bool streamInterpreterPath =
+                    pc == 0x189du || pc == 0x18a6u || pc == 0x18b8u ||
+                    pc == 0x18c0u || pc == 0x18d7u || pc == 0x18dbu ||
+                    pc == 0x18dfu || pc == 0x195fu || pc == 0x1975u ||
+                    pc == 0x1986u || pc == 0x1995u || pc == 0x199cu ||
+                    pc == 0x19a2u || pc == 0x19a4u || pc == 0x19bdu ||
+                    pc == 0x19c1u || pc == 0x19bcu || pc == 0x19cdu ||
+                    pc == 0x19e1u || pc == 0x19fbu || pc == 0x1a01u ||
+                    pc == 0x1a16u || pc == 0x1a1fu || pc == 0x1a31u ||
+                    pc == 0x1a3eu || pc == 0x1a4au || pc == 0x1a8fu ||
+                    pc == 0x1a9fu || pc == 0x1aa6u || pc == 0x1aacu ||
+                    pc == 0x1acbu || pc == 0x1ad4u || pc == 0x1b00u ||
+                    pc == 0x1b20u || pc == 0x1b40u || pc == 0x1b60u ||
+                    pc == 0x1b80u || pc == 0x1ba0u || pc == 0x1bb1u ||
+                    pc == 0x1c2bu || pc == 0x1c61u || pc == 0x1eddu ||
+                    pc == 0x224cu || pc == 0x2301u || pc == 0x2374u;
                 if (!selectorPath && !repeatedNoteHandlerPath &&
-                    !partHandlerDetailPath && !resourcePipelinePath)
+                    !partHandlerDetailPath && !resourcePipelinePath &&
+                    !streamInterpreterPath)
                     continue;
                 if (partHandlerDetailPath) {
                     std::printf("  PART-ROUTE PC=%04X ret=%04X event=%02X "
@@ -3207,6 +3224,41 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned>(event.directRam50),
                                 static_cast<unsigned>(event.directRam51),
                                 static_cast<unsigned>(event.directRam52),
+                                static_cast<unsigned>(event.port2Latch),
+                                static_cast<unsigned>(event.port3Pins));
+                }
+                if (streamInterpreterPath) {
+                    std::printf("  STREAM-VM PC=%04X ret=%04X A=%02X DPTR=%04X "
+                                "R0/R1/R2/R3/R4/R5/R6/R7=%02X/%02X/%02X/%02X/%02X/%02X/%02X/%02X "
+                                "RAM2B/2C/2D/2E=%02X/%02X/%02X/%02X "
+                                "RAM36/37/38/39=%02X/%02X/%02X/%02X "
+                                "RAM3A/3B=%02X/%02X RAM41/43/44=%02X/%02X/%02X "
+                                "P2/P3=%02X/%02X\\n",
+                                static_cast<unsigned>(pc),
+                                static_cast<unsigned>(event.returnPC),
+                                static_cast<unsigned>(event.accumulator),
+                                static_cast<unsigned>(event.dptr),
+                                static_cast<unsigned>(event.registers[0]),
+                                static_cast<unsigned>(event.registers[1]),
+                                static_cast<unsigned>(event.registers[2]),
+                                static_cast<unsigned>(event.registers[3]),
+                                static_cast<unsigned>(event.registers[4]),
+                                static_cast<unsigned>(event.registers[5]),
+                                static_cast<unsigned>(event.registers[6]),
+                                static_cast<unsigned>(event.registers[7]),
+                                static_cast<unsigned>(event.directRam2B),
+                                static_cast<unsigned>(event.directRam2C),
+                                static_cast<unsigned>(event.directRam2D),
+                                static_cast<unsigned>(event.directRam2E),
+                                static_cast<unsigned>(event.directRam36),
+                                static_cast<unsigned>(event.directRam37),
+                                static_cast<unsigned>(event.directRam38),
+                                static_cast<unsigned>(event.directRam39),
+                                static_cast<unsigned>(event.directRam3A),
+                                static_cast<unsigned>(event.directRam3B),
+                                static_cast<unsigned>(event.directRam41),
+                                static_cast<unsigned>(event.directRam43),
+                                static_cast<unsigned>(event.directRam44),
                                 static_cast<unsigned>(event.port2Latch),
                                 static_cast<unsigned>(event.port3Pins));
                 }
@@ -3256,14 +3308,7 @@ int main(int argc, char** argv) {
                     continue;
                 if (access.write) ++resourcePageWrites;
                 else ++resourcePageReads;
-                const bool stagingField = offset == 0x60u || offset == 0x61u ||
-                    offset == 0x62u || offset == 0xf8u || offset == 0xfbu ||
-                    offset == 0xfcu || offset == 0xfdu || offset == 0xfeu ||
-                    offset == 0xffu;
-                const bool streamSlotWrite = access.write &&
-                    offset >= 0x80u && offset <= 0xf8u;
-                const bool slotIdentifier = offset >= 0x70u && offset <= 0x7fu;
-                if (stagingField || streamSlotWrite || slotIdentifier) {
+                if (offset >= 0x60u) {
                     std::printf("  RESOURCE-XDATA %c %04X=%02X pc=%04X ret=%04X "
                                 "P2=%02X P3=%02X mode=%u cycle=%llu\\n",
                                 access.write ? 'W' : 'R',
