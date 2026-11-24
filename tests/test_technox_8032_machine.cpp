@@ -2684,7 +2684,8 @@ int main(int argc, char** argv) {
             const auto nextPassCycle = pass + 1u < note65InterpolationCount
                 ? note65InterpolationEvents[pass + 1u].machineCycle
                 : std::numeric_limits<std::uint64_t>::max();
-            const auto findRead = [&](std::uint16_t pc) {
+            const auto findAccess = [&](std::uint16_t pc)
+                -> const TechnoX8032Machine::SlotInterpolationDataAccessEvent* {
                 for (std::size_t i = 0; i < interpolationAccessCount; ++i) {
                     const auto& access =
                         firmwareMachine.slotInterpolationDataAccessTraceAtForTesting(i);
@@ -2692,16 +2693,17 @@ int main(int argc, char** argv) {
                         access.stackReturnPC == input.returnPC &&
                         access.machineCycle >= input.machineCycle &&
                         access.machineCycle < nextPassCycle)
-                        return access.value;
+                        return &access;
                 }
-                return static_cast<std::uint8_t>(0xffu);
+                return nullptr;
             };
-            const auto valueLow = findRead(0x09dfu);
-            const auto valueMiddle = findRead(0x09e6u);
-            const auto valueHigh = findRead(0x0a00u);
-            assert(valueLow != 0xffu);
-            assert(valueMiddle != 0xffu);
-            assert(valueHigh != 0xffu);
+            const auto* lowRead = findAccess(0x09dfu);
+            const auto* middleRead = findAccess(0x09e6u);
+            const auto* highRead = findAccess(0x0a00u);
+            assert(lowRead && middleRead && highRead);
+            const auto valueLow = lowRead->value;
+            const auto valueMiddle = middleRead->value;
+            const auto valueHigh = highRead->value;
             const auto stepMagnitude = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(input.registers[5]) << 8u) |
                 input.registers[4]);
@@ -2709,10 +2711,19 @@ int main(int argc, char** argv) {
             const auto expected = technox::MASS09B9SlotInterpolationArithmetic::apply(
                 valueLow, valueMiddle, valueHigh, stepMagnitude, negativeStep);
             const auto& writer = note65WriterEvents[pass];
-            std::printf("NOTE65 PASS%zu: slot=%02X %02X %02X step=%04X neg=%u "
-                        "result=%06X writer=%02X %02X %02X\n",
-                        pass + 1u, static_cast<unsigned>(valueLow),
+            std::printf("NOTE65 PASS%zu: ret=%04X entryR=%02X/%02X/%02X/%02X "
+                        "slot=%04X:%02X %04X:%02X %04X:%02X step=%04X neg=%u "
+                        "result=%06X writer=%02X %02X %02X\\n",
+                        pass + 1u, static_cast<unsigned>(input.returnPC),
+                        static_cast<unsigned>(input.registers[2]),
+                        static_cast<unsigned>(input.registers[3]),
+                        static_cast<unsigned>(input.registers[4]),
+                        static_cast<unsigned>(input.registers[5]),
+                        static_cast<unsigned>(lowRead->address),
+                        static_cast<unsigned>(valueLow),
+                        static_cast<unsigned>(middleRead->address),
                         static_cast<unsigned>(valueMiddle),
+                        static_cast<unsigned>(highRead->address),
                         static_cast<unsigned>(valueHigh),
                         static_cast<unsigned>(stepMagnitude),
                         negativeStep ? 1u : 0u,
