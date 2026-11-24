@@ -549,9 +549,9 @@ int main(int argc, char** argv) {
         assertObservedBulkLoadCall(0x37a1u);
         assertObservedBulkLoadCall(0x38f1u);
 
-        // Exercise the real IC4 periodic scheduler (0x044C) and its
-        // phase/sine updater (0x0C1A), independent of MIDI and DSP-host writes.
-        // The test fixture makes the scheduler's external-ready input explicit.
+        // Exercise the real IC4 periodic scheduler (0x044C), its own
+        // XDATA status-page initializer (0x0148), and phase/sine updater (0x0C1A).
+        // No external ready-response override is needed: firmware seeds the map.
         // IC4 ROM 0x001E..0x005D is a 64-entry signed sine lookup.
         constexpr std::array<std::uint8_t, 64> expectedSineTable{{
             0x00, 0x0c, 0x19, 0x25, 0x31, 0x3c, 0x47, 0x51,
@@ -573,6 +573,28 @@ int main(int argc, char** argv) {
             assert(phaseMachine.loadIC4Rom(realRom.data(), realRom.size()));
             phaseMachine.reset();
 
+            // Run the actual IC4 status-map initialization. It clears 32
+            // P2-selected 256-byte pages and writes 0x40 at each page's +FA.
+            // The page order comes from CODE[0x0078..0x0097].
+            auto& registers = phaseMachine.cpuForTesting().registersForTesting();
+            registers.pc = 0x0148u;
+            const auto initialized = phaseMachine.runUntilProgramCounter(0x0162u, 50000u);
+            assert(initialized > 0u);
+            assert(registers.pc == 0x0162u);
+
+            std::array<bool, 256> initializedPages{};
+            for (std::size_t pageIndex = 0; pageIndex < 32u; ++pageIndex) {
+                const auto page = phaseMachine.readCode(static_cast<std::uint16_t>(
+                    0x0078u + pageIndex));
+                assert(!initializedPages[page]);
+                initializedPages[page] = true;
+                const auto statusAddress = static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(page) << 8u) | 0x00fau);
+                assert(phaseMachine.readExternal(statusAddress) == 0x40u);
+                assert(phaseMachine.readExternal(static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(page) << 8u) | 0x00fbu)) == 0x00u);
+            }
+
             // Scheduler state: R47 is copied to R48 at the first tick;
             // its counter increments from zero to one before comparing 0x2064.
             phaseMachine.writeInternal(0x47u, stepCount);
@@ -581,18 +603,14 @@ int main(int argc, char** argv) {
             phaseMachine.writeExternal(0x2051u, 0x00u);
             phaseMachine.writeExternal(0x2052u, 0x00u);
             phaseMachine.writeExternal(0x2053u, 0xccu);
-            // At the first tick A still contains R49's pre-increment value
-            // (zero): INC 0x49 updates RAM, not A. MOVC therefore reads
+            // At the first tick ACC still contains R49's pre-increment value
+            // (zero): INC 0x49 updates RAM, not ACC. MOVC therefore reads
             // CODE[0x0078], selects P2=0x00, then polls XDATA 0x00FA.
             const auto schedulerPage = phaseMachine.readCode(0x0078u);
             const auto schedulerStatusAddress = static_cast<std::uint16_t>(
                 (static_cast<std::uint16_t>(schedulerPage) << 8u) | 0x00fau);
             assert(schedulerPage == 0x00u);
             assert(schedulerStatusAddress == 0x00fau);
-            phaseMachine.setTestExternalReadOverride(schedulerStatusAddress, 0x40u);
-
-            auto& registers = phaseMachine.cpuForTesting().registersForTesting();
-            registers.pc = 0x044cu;
             const auto executed = phaseMachine.runUntilProgramCounter(0x047du, 512u);
             std::fprintf(stderr,
                 "Periodic scheduler exit pc=%04X executed=%zu page=%02X P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\\n",
@@ -617,6 +635,10 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(registers.pc == 0x047du);
             assert(!phaseMachine.cpuFaulted());
+            assert(phaseMachine.readExternal(0x00fau) == 0x40u);
+            assert(phaseMachine.soundCommandPacketCount() == 0u);
+            assert(phaseMachine.soundHostWriteCount() == 0u);
+            assert(phaseMachine.soundHostReadCount() == 0u);
 
             std::array<std::size_t, 3> sineOutputWriteCounts{};
             constexpr std::array<std::uint16_t, 3> sineOutputAddresses{{
