@@ -47,7 +47,7 @@ The later real-ROM Note 72 probe holds MIDI velocity at 100 while changing the n
 
 The first packet differs from the Note 65 reference because the resource-derived interpolation input differs. The fourth packet, emitted by the 0x210F builder, remains `0A 00 78 00`, the same value observed for Note 65 at velocity 100. Together with the same-note velocity-100/50 differential above, this separates two tested influences: the first packet changes in the cross-pitch probe, while the fourth packet changes in the same-pitch cross-velocity probe.
 
-The regression now asserts the Note 72 packet prefix and the six resource-handler writes that populate interpolation slots 0x0081–0x0083 and 0x0091–0x0093. This makes the independence observed in the two controlled comparisons executable. It still does not establish what the external device calls these command fields or prove that the fourth packet directly encodes amplitude.
+The regression now asserts the Note 72 packet prefix, the six resource-handler writes that populate interpolation slots 0x0081–0x0083 and 0x0091–0x0093, and the two-byte zero/nonzero guard at 0x1E53–0x1E54. It also captures the second fixed-point helper return and the complete instruction window through 0x210F. At the same velocity 100, Note 64 and Note 72 both return A=`0x0F` at 0x2027 and reach the packet builder with R3/R4=`0x78/0x78` and RAM[0x2B]=`0x0A`. The test checks the live opcodes at 0x2089, 0x208A, 0x208B, 0x208C and 0x208E in order, so the cross-pitch separation is now asserted inside the firmware path, not inferred only from equal packet bytes. It still does not establish what the external device calls these command fields or prove that the fourth packet directly encodes amplitude.
 
 ## Interpretation boundary
 

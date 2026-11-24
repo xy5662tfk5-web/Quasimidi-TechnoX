@@ -31,9 +31,13 @@ The resulting low/middle/high bytes at the two 0x0A4F writer snapshots are respe
 The follow-up Note 72 run now captures the resource-handler writes that populate the two interpolation triplets before the 0x09B9 arithmetic. The call returns to 0x1720, within the selected IC4 resource-command processing path. The captured data accesses and instruction snapshots establish the following sequence for this fixture:
 
 1. At 0x1E4B, `MOVX A,@DPTR` reads XDATA 0x2019. At 0x1E4C, opcode `CC` exchanges A with R4; at 0x1E4D, `MOV B,A` puts the caller's prior R4 value into B. The trace shows B=0x01 for the first lane and B=0x00 for the second.
-2. The routine decrements DPL at 0x1E4F and reads XDATA 0x2018 at 0x1E51. It copies that byte to R5 and compares it with R4 at 0x1E53. In the captured Note 72 passes the comparison is nonzero, so execution reaches the slot writer.
+2. The routine decrements DPL at 0x1E4F and reads XDATA 0x2018 at 0x1E51. It copies that byte to R5; at 0x1E53, `ORL A,R4` combines the 0x2018 byte in A with the 0x2019 byte now in R4. The following `JZ` at 0x1E54 takes the alternate path only when both bytes are zero. In the Note 72 fixture the pair is `00 06`, so the OR result is `0x06` and the slot writer is reached.
 3. At 0x1E5B, `MOVX A,@R1` reads the existing high byte of the selected triplet. At 0x1E5C, `ANL A,#0xF8` clears its low three bits; at 0x1E5E, `ORL A,B` reinserts the saved low-bit field. The result is written at 0x1E60.
 4. The following instructions write R3 at 0x1E63 and R2 at 0x1E66 while decrementing R1 after each write. Thus the firmware writes high, middle, low bytes; the later 0x09B9 consumer reads low, middle, high.
+
+The 0x2018/0x2019 pair is a **zero/nonzero guard in this path**, not a 16-bit number added to the pitch triplet. The byte at 0x2019 is exchanged into R4, while the previous R4 value is saved through A into B. The byte at 0x2018 is then ORed with the 0x2019 byte solely for the zero test. On the nonzero path, B supplies the low three bits merged into the existing high byte; the numerical value 0x06 itself is not copied into the triplet.
+
+The disassembly also identifies a generic writer for this pair. IC4 routine 0x02D1 performs its arithmetic using one of two four-byte code tables at 0x0098/0x00C8 and funnels the two-byte result through 0x0392; 0x039E and 0x03A2 are the final MOVX writes to the indexed 0x2000 XDATA region. In the Note 72 trace, writes to 0x2018/0x2019 from those PCs occur later in the drain (cycles 107,980,804 onward), after the resource handler's reads at cycles 105,107,166/171. This pins a writer path but does not yet prove which earlier operation supplied the `00 06` pair consumed by this Note 72 event.
 
 The real-ROM trace asserts these six writes for the Note 72 fixture:
 

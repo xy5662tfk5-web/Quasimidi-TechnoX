@@ -3978,14 +3978,128 @@ int main(int argc, char** argv) {
         // changes can be distinguished from the interpolation arithmetic.
         const std::array<std::uint8_t, 3> note72On{{0x90u, 0x48u, 0x64u}};
         const auto note72PacketStart = firmwareMachine.soundCommandPacketCount();
+        const auto note72VelocityHelperCallStart =
+            firmwareMachine.watchedCallCount(0x1848u);
         firmwareMachine.clearInstructionWatchForTesting();
         firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
         firmwareMachine.clearPitchSourceDataAccessTraceForTesting();
+        firmwareMachine.clearExecutionTraceForTesting();
         runRealMidiStage("Note On pitch 72 after releasing pitch 66",
                          note72On.data(), note72On.size());
+        firmwareMachine.disableExecutionTraceForTesting();
         const auto note72PacketCount =
             firmwareMachine.soundCommandPacketCount() - note72PacketStart;
         assert(note72PacketCount == 549u);
+
+        // Cross-pitch control: pitch 64 and pitch 72 use the same velocity 100.
+        // Follow the live arithmetic projection all the way to the 0x210F builder.
+        const auto note72VelocityHelperCalls =
+            firmwareMachine.watchedCallCount(0x1848u) -
+            note72VelocityHelperCallStart;
+        assert(note72VelocityHelperCalls == 2u);
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note72VelocityHelperInputs{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note72VelocityHelperReturns{};
+        TechnoX8032Machine::InstructionWatchEvent note72PacketBuilder{};
+        std::size_t note72VelocityInputCount = 0;
+        std::size_t note72VelocityReturnCount = 0;
+        std::size_t note72GuardORCount = 0;
+        std::size_t note72GuardBranchCount = 0;
+        bool foundNote72PacketBuilder = false;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x1848u) {
+                assert(note72VelocityInputCount < note72VelocityHelperInputs.size());
+                note72VelocityHelperInputs[note72VelocityInputCount++] = event;
+            } else if (event.instructionPC == 0x1fc9u ||
+                       event.instructionPC == 0x2027u) {
+                assert(note72VelocityReturnCount < note72VelocityHelperReturns.size());
+                note72VelocityHelperReturns[note72VelocityReturnCount++] = event;
+            } else if (event.instructionPC == 0x210fu) {
+                note72PacketBuilder = event;
+                foundNote72PacketBuilder = true;
+            } else if (event.instructionPC == 0x1e53u &&
+                       event.returnPC == 0x1720u) {
+                // ORL A,R4: 0x2018 is in A and 0x2019 is in R4.
+                assert(event.accumulator == 0x00u);
+                assert(event.registers[4] == 0x06u);
+                ++note72GuardORCount;
+            } else if (event.instructionPC == 0x1e54u &&
+                       event.returnPC == 0x1720u) {
+                // JZ sees the OR result 0x06, so the slot writer is taken.
+                assert(event.accumulator == 0x06u);
+                ++note72GuardBranchCount;
+            }
+        }
+        assert(note72VelocityInputCount == 2u);
+        assert(note72VelocityReturnCount == 2u);
+        assert(note72VelocityHelperReturns[0].instructionPC == 0x1fc9u);
+        assert(note72VelocityHelperReturns[1].instructionPC == 0x2027u);
+        assert(note72GuardORCount == 2u);
+        assert(note72GuardBranchCount == 2u);
+        assert(foundNote72PacketBuilder);
+        assert(note72VelocityHelperReturns[1].accumulator ==
+               secondNote1848Returns[1].accumulator);
+        assert(note72VelocityHelperReturns[1].accumulator == 0x0fu);
+        const auto note72Swapped = static_cast<std::uint8_t>(
+            static_cast<std::uint8_t>(
+                note72VelocityHelperReturns[1].accumulator << 4u) |
+            (note72VelocityHelperReturns[1].accumulator >> 4u));
+        const auto note72Packed = static_cast<std::uint8_t>(
+            (note72Swapped >> 1u) | (note72Swapped << 7u));
+        assert(note72Packed == 0x78u);
+        assert(note72PacketBuilder.registers[3] == 0x78u);
+        assert(note72PacketBuilder.registers[4] == 0x78u);
+        assert(note72PacketBuilder.directRam2B == 0x0au);
+        assert(note72PacketBuilder.registers[3] ==
+               secondNoteInstructionWatch.registers[3]);
+        assert(note72PacketBuilder.registers[4] ==
+               secondNoteInstructionWatch.registers[4]);
+        assert(note72PacketBuilder.directRam2B ==
+               secondNoteInstructionWatch.directRam2B);
+
+        const auto note72ExecutionTraceCount =
+            firmwareMachine.executionInstructionTraceCountForTesting();
+        const auto note72ExecutionTraceRetained =
+            firmwareMachine.executionInstructionTraceRetainedCountForTesting();
+        assert(note72ExecutionTraceCount > 0u);
+        const std::array<std::uint16_t, 6> expectedVelocityProjectionPCs{{
+            0x2089u, 0x208au, 0x208bu, 0x208cu, 0x208eu, 0x210fu
+        }};
+        std::array<std::size_t, 6> velocityProjectionPositions{};
+        velocityProjectionPositions.fill(
+            std::numeric_limits<std::size_t>::max());
+        for (std::size_t absolute = note72ExecutionTraceCount -
+                 note72ExecutionTraceRetained;
+             absolute < note72ExecutionTraceCount; ++absolute) {
+            const auto& event =
+                firmwareMachine.executionInstructionTraceAtForTesting(absolute);
+            for (std::size_t i = 0; i < expectedVelocityProjectionPCs.size(); ++i) {
+                if (event.instructionPC == expectedVelocityProjectionPCs[i] &&
+                    velocityProjectionPositions[i] ==
+                        std::numeric_limits<std::size_t>::max())
+                    velocityProjectionPositions[i] = absolute;
+            }
+            if (event.instructionPC == 0x2089u)
+                assert(event.opcodeBytes[0] == 0xc4u);
+            else if (event.instructionPC == 0x208au)
+                assert(event.opcodeBytes[0] == 0x03u);
+            else if (event.instructionPC == 0x208bu)
+                assert(event.opcodeBytes[0] == 0xfcu);
+            else if (event.instructionPC == 0x208cu)
+                assert(event.opcodeBytes[0] == 0x54u);
+            else if (event.instructionPC == 0x208eu)
+                assert(event.opcodeBytes[0] == 0xfbu);
+        }
+        for (std::size_t i = 0; i < velocityProjectionPositions.size(); ++i)
+            assert(velocityProjectionPositions[i] !=
+                   std::numeric_limits<std::size_t>::max());
+        for (std::size_t i = 1; i < velocityProjectionPositions.size(); ++i)
+            assert(velocityProjectionPositions[i - 1u] <
+                   velocityProjectionPositions[i]);
+
         const auto note72PitchSourceAccessCount =
             firmwareMachine.pitchSourceDataAccessTraceCountForTesting();
         const auto hasNote72ResourceRead = [&](std::uint16_t address,
