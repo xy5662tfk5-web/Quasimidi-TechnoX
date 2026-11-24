@@ -577,6 +577,17 @@ int main(int argc, char** argv) {
             auto& registers = phaseMachine.cpuForTesting().registersForTesting();
             registers.pc = 0x044cu;
             const auto executed = phaseMachine.runUntilProgramCounter(0x047du, 512u);
+            std::fprintf(stderr,
+                "Periodic scheduler exit pc=%04X executed=%zu P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\\n",
+                static_cast<unsigned>(registers.pc), executed,
+                static_cast<unsigned>(phaseMachine.readPortLatch(0xa0u)),
+                static_cast<unsigned>(phaseMachine.readInternal(0x47u)),
+                static_cast<unsigned>(phaseMachine.readInternal(0x48u)),
+                static_cast<unsigned>(phaseMachine.readInternal(0x49u)),
+                static_cast<unsigned>(schedulerStatusAddress),
+                static_cast<unsigned>(phaseMachine.readExternal(schedulerStatusAddress)),
+                static_cast<unsigned>(phaseMachine.readExternal(0x2064u)),
+                phaseMachine.cpuFaulted() ? 1 : 0);
             assert(executed > 0u);
             assert(registers.pc == 0x047du);
             assert(!phaseMachine.cpuFaulted());
