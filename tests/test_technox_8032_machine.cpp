@@ -3237,7 +3237,11 @@ int main(int argc, char** argv) {
                     write.address >= static_cast<std::uint16_t>(pageBase + 4u))
                     continue;
                 const auto offset = static_cast<std::size_t>(write.address - pageBase);
-                assert(offset < nestedWritePCs.size());
+                // This first pass is only the four source-tuple MOVX writes.
+                // Later metadata writes may reuse offset +3, so distinguish by PC.
+                if (offset >= nestedWritePCs.size() ||
+                    write.instructionPC != nestedWritePCs[offset])
+                    continue;
                 assert(!nestedWriteSeen[offset]);
                 assert(write.instructionPC == nestedWritePCs[offset]);
                 assert(write.stackReturnPC == 0x1720u);
@@ -3250,6 +3254,67 @@ int main(int argc, char** argv) {
             assert(nestedWriteCount == 4u);
             for (const auto seen : nestedWriteSeen)
                 assert(seen);
+
+            struct ExpectedPostprocessWrite {
+                std::uint16_t pc;
+                std::uint8_t offset;
+                std::uint8_t value;
+            };
+            constexpr std::array<ExpectedPostprocessWrite, 5>
+                nestedPostprocessWrites{{
+                    {0x1a44u, 0x04u, 0x00u},
+                    {0x1a57u, 0x03u, 0x7fu},
+                    {0x1a82u, 0x05u, 0x80u},
+                    {0x1a88u, 0x06u, 0x00u},
+                    {0x1aa5u, 0x04u, 0x00u}
+                }};
+            std::array<bool, nestedPostprocessWrites.size()> nestedPostprocessSeen{};
+            std::size_t nestedPostprocessCount = 0;
+            for (std::size_t i = 0; i < nestedTraceCount; ++i) {
+                const auto& write =
+                    firmwareMachine.resourceTupleWriteTraceAtForTesting(i);
+                if (write.port2 != secondEventPage ||
+                    write.stackReturnPC != 0x1720u ||
+                    write.port3 != 0xfeu)
+                    continue;
+                for (std::size_t expectedIndex = 0;
+                     expectedIndex < nestedPostprocessWrites.size(); ++expectedIndex) {
+                    const auto& expected = nestedPostprocessWrites[expectedIndex];
+                    if (write.instructionPC != expected.pc)
+                        continue;
+                    assert(!nestedPostprocessSeen[expectedIndex]);
+                    const auto expectedAddress = static_cast<std::uint16_t>(
+                        (static_cast<std::uint16_t>(secondEventPage) << 8u) +
+                        expected.offset);
+                    assert(write.address == expectedAddress);
+                    assert(write.value == expected.value);
+                    nestedPostprocessSeen[expectedIndex] = true;
+                    ++nestedPostprocessCount;
+                }
+            }
+            assert(nestedPostprocessCount == nestedPostprocessWrites.size());
+            for (const auto seen : nestedPostprocessSeen)
+                assert(seen);
+
+            const auto* nestedR4Branch = captureInstruction(0x1a5au, 0x380au);
+            const auto* nestedRotate = captureInstruction(0x1a76u, 0x380au);
+            const auto* nestedFlagField = captureInstruction(0x1a82u, 0x380au);
+            const auto* nestedFlagTail = captureInstruction(0x1a88u, 0x380au);
+            const auto* nestedClearTail = captureInstruction(0x1aa5u, 0x380au);
+            assert(nestedR4Branch && nestedRotate && nestedFlagField &&
+                   nestedFlagTail && nestedClearTail);
+            assert(nestedR4Branch->registers[4] == 0x00u);
+            assert(nestedR4Branch->accumulator == 0x40u);
+            assert(nestedRotate->accumulator == 0x40u);
+            assert(nestedFlagField->accumulator == 0x80u);
+            assert(nestedFlagField->registers[1] == 0x05u);
+            assert(nestedFlagTail->accumulator == 0x00u);
+            assert(nestedFlagTail->registers[1] == 0x06u);
+            assert(nestedClearTail->accumulator == 0x00u);
+            assert(nestedClearTail->registers[1] == 0x04u);
+
+            std::printf("NOTE65 NESTED IC51 POSTPROCESS: "
+                        "slot+3=7F slot+4=00 slot+5=80 slot+6=00\\n");
             std::printf("NOTE65 NESTED IC51 RECORD: bank1[03AF..03B0]=06 38 "
                         "ptr=3806 raw=A4 16 A3 40 acc6=A4->E4 page=%02X "
                         "writes=E4 16 A3 40\\n",
