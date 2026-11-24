@@ -45,12 +45,18 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     const auto line2 = raw < 0 ? juce::String("No part data") :
         juce::String(shown) + "  " + audioProcessor.getCurrentPartSoundName(selectedPart);
 
+    // The new SVG bezel is 260x60 at (224,38). Keep an even 8 px inset
+    // on all four sides so the active LCD follows the same rounded contour.
+    // Preserve the existing Courier New bold 13 pt display typography.
+    const juce::Rectangle<float> lcdBounds(232.0f, 46.0f, 244.0f, 44.0f);
     g.setColour(juce::Colour(0xff75cc56));
-    g.fillRoundedRectangle(266.0f, 47.0f, 176.0f, 42.0f, 2.0f);
+    g.fillRoundedRectangle(lcdBounds, 20.0f);
+    g.setColour(juce::Colour(0xff203b16));
+    g.drawRoundedRectangle(lcdBounds, 20.0f, 1.0f);
     g.setColour(juce::Colour(0xff142605));
     g.setFont(juce::Font("Courier New", 13.0f, juce::Font::bold));
-    g.drawText(line1.substring(0, 22), 272, 49, 164, 16, juce::Justification::centredLeft);
-    g.drawText(line2.substring(0, 22), 272, 68, 164, 16, juce::Justification::centredLeft);
+    g.drawText(line1.substring(0, 22), 243, 50, 220, 16, juce::Justification::centredLeft);
+    g.drawText(line2.substring(0, 22), 243, 68, 220, 16, juce::Justification::centredLeft);
 
     const auto drawPointer = [&g](float x, float value, float radius) {
         const float angle = juce::degreesToRadians(-135.0f + juce::jlimit(0.0f, 1.0f, value) * 270.0f);
