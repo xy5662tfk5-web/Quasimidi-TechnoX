@@ -3238,8 +3238,8 @@ int main(int argc, char** argv) {
                 const auto* readByte4 = captureType08(0x1c83u, 0x1610u);
                 const auto* readByte5 = captureType08(0x1c86u, 0x1611u);
                 const auto* readByte6 = captureType08(0x1c89u, 0x1612u);
-                const auto* firstWrite = captureType08(0x1c9bu, 0u);
-                const auto* secondWrite = captureType08(0x1caau, 0u);
+                const auto* firstWrite = captureType08(0x1c9cu, 0u);
+                const auto* secondWrite = captureType08(0x1cabu, 0u);
                 const auto* nextMarker = captureType08(0x1986u, 0x1613u, 0x88u);
                 assert(entry && readTag && readByte1 && readByte2 && readByte3 &&
                        readByte4 && readByte5 && readByte6 && firstWrite &&
@@ -3766,12 +3766,13 @@ int main(int argc, char** argv) {
                     pc == 0x1c76u || pc == 0x1c7au || pc == 0x1c7du ||
                     pc == 0x1c80u || pc == 0x1c83u || pc == 0x1c86u ||
                     pc == 0x1c89u || pc == 0x1c91u || pc == 0x1c97u ||
-                    pc == 0x1c9bu || pc == 0x1c9eu || pc == 0x1ca0u ||
-                    pc == 0x1ca3u || pc == 0x1ca6u || pc == 0x1ca8u ||
-                    pc == 0x1caau || pc == 0x1cabu || pc == 0x1caeu ||
-                    pc == 0x1cb0u || pc == 0x1cb2u || pc == 0x1cb3u ||
+                    pc == 0x1c9bu || pc == 0x1c9cu || pc == 0x1c9eu ||
+                    pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
+                    pc == 0x1ca8u || pc == 0x1caau || pc == 0x1cabu ||
+                    pc == 0x1caeu || pc == 0x1cb0u || pc == 0x1cb1u ||
+                    pc == 0x1cb2u || pc == 0x1cb3u || pc == 0x1cb4u ||
                     pc == 0x1cb5u || pc == 0x1cb6u || pc == 0x1cb7u ||
-                    pc == 0x1cbeu || pc == 0x1cc1u || pc == 0x1cc4u ||
+                    pc == 0x1cbeu || pc == 0x1cbfu || pc == 0x1cc1u || pc == 0x1cc4u ||
                     pc == 0x1ccbu || pc == 0x1eddu || pc == 0x224cu ||
                     pc == 0x2301u || pc == 0x2374u;
                 if (!selectorPath && !repeatedNoteHandlerPath &&

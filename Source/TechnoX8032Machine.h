@@ -815,12 +815,12 @@ public:
             pc == 0x1c61u || pc == 0x1c76u || pc == 0x1c7au ||
             pc == 0x1c7du || pc == 0x1c80u || pc == 0x1c83u ||
             pc == 0x1c86u || pc == 0x1c89u || pc == 0x1c91u ||
-            pc == 0x1c97u || pc == 0x1c9bu || pc == 0x1c9eu ||
+            pc == 0x1c97u || pc == 0x1c9bu || pc == 0x1c9cu || pc == 0x1c9eu ||
             pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
             pc == 0x1ca8u || pc == 0x1caau || pc == 0x1cabu ||
-            pc == 0x1caeu || pc == 0x1cb0u || pc == 0x1cb2u ||
-            pc == 0x1cb3u || pc == 0x1cb5u || pc == 0x1cb6u ||
-            pc == 0x1cb7u || pc == 0x1cbeu || pc == 0x1cc1u ||
+            pc == 0x1caeu || pc == 0x1cb0u || pc == 0x1cb1u || pc == 0x1cb2u ||
+            pc == 0x1cb3u || pc == 0x1cb4u || pc == 0x1cb5u || pc == 0x1cb6u ||
+            pc == 0x1cb7u || pc == 0x1cbeu || pc == 0x1cbfu || pc == 0x1cc1u ||
             pc == 0x1cc4u || pc == 0x1ccbu ||
             pc == 0x1eddu || pc == 0x224cu ||
             pc == 0x2301u || pc == 0x2374u ||
@@ -1359,9 +1359,9 @@ public:
             instructionPC == 0x1a82u || instructionPC == 0x1a88u ||
             instructionPC == 0x1a9bu || instructionPC == 0x1a9eu ||
             instructionPC == 0x1aa5u ||
-            instructionPC == 0x1c9bu || instructionPC == 0x1caau ||
-            instructionPC == 0x1cb0u || instructionPC == 0x1cb3u ||
-            instructionPC == 0x1cb6u || instructionPC == 0x1cbeu;
+            instructionPC == 0x1c9cu || instructionPC == 0x1cabu ||
+            instructionPC == 0x1cb1u || instructionPC == 0x1cb4u ||
+            instructionPC == 0x1cb7u || instructionPC == 0x1cbfu;
         if (nestedResourceWritePC &&
             address >= 0x0100u && address <= 0x02ffu) {
             auto& event = resourceTupleWriteTrace_[
