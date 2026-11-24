@@ -131,7 +131,6 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    needs: unit-tests
     timeout-minutes: 60
     runs-on: macos-15-intel
     steps:
