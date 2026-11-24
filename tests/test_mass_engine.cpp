@@ -37,6 +37,7 @@ int main() {
     assert(engine.voiceManager().activeVoiceCount() == 1);
     assert(engine.voiceManager().voices()[0].bankNumber == 2);
     assert(engine.voiceManager().voices()[0].soundNumber == 10);
+    assert(engine.voiceManager().voices()[0].drumSetNumber == 0xff);
     assert(engine.setPartParameter(12, PartParameter::soundNumber, 93));
     engine.noteOn(12, 13, 62, 100);
     bool capturedUpdatedProgram = false;
@@ -74,6 +75,7 @@ int main() {
     assert(engine.setDrumSet(9, 7));
     assert(engine.getDrumSet(9) == 7);
     assert(!engine.setDrumSet(9, 8));
+    assert(engine.getDrumSet(9) == 7);
     assert(!engine.setDrumSet(9, -1));
     assert(!engine.setDrumSet(16, 0));
     engine.noteOn(9, 10, 60, 100);
