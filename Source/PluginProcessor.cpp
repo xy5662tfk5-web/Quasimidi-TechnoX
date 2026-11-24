@@ -904,7 +904,7 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
     // all 16 Sequencer-Multi channel assignments. Read the old fields to keep
     // stream alignment, but only migrate them to Parts 13–16 when they form a
     // valid, unique map that does not collide with the default Part 1–12 map.
-    if (magic == kStateMagicV5) {
+    if (magic == kStateMagicV5 || magic == kStateMagicV6) {
         technox::SequencerMidiChannelMap restoredChannels{};
         for (auto& value : restoredChannels)
             value = static_cast<unsigned char>(stream.readByte());
@@ -927,7 +927,8 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
             partMidiChannels[part].store(
                 migratedChannels[part], std::memory_order_release);
     }
-    if (magic == kStateMagicV4 || magic == kStateMagicV5) {
+    if (magic == kStateMagicV4 || magic == kStateMagicV5 ||
+        magic == kStateMagicV6) {
         const int mode = static_cast<unsigned char>(stream.readByte());
         midiRoutingMode.store(mode == 1 ? 1 : 0, std::memory_order_release);
     } else {
