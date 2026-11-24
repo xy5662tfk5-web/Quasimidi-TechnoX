@@ -174,3 +174,15 @@ if (BUILD_TESTING)
         COMMAND technox_panel_control_events_tests
     )
 endif()
+
+# Dependency-free tests for injected external P1/P3 panel input levels.
+if (BUILD_TESTING)
+    add_executable(technox_panel_gpio_input_tests
+        tests/test_panel_gpio_inputs.cpp
+    )
+    target_compile_features(technox_panel_gpio_input_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_panel_gpio_input_tests PRIVATE -UNDEBUG)
+    add_test(NAME technox_panel_gpio_input_tests
+        COMMAND technox_panel_gpio_input_tests
+    )
+endif()
