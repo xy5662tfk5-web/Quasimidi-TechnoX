@@ -16,6 +16,7 @@ public:
 
 private:
     enum class DragTarget { none, volume, parameter, value };
+    enum class EditorPage { main, editFunctionMenu, editPart, editSystem };
     void timerCallback() override;
     void updateFromDrag(float y);
     void selectNextParameter(int delta);
@@ -24,6 +25,7 @@ private:
     void syncParameterDialFromSelection() noexcept;
     void syncDialsFromCurrentSelection() noexcept;
     technox::PanelOperatingMode panelOperatingMode() const noexcept;
+    technox::PanelEditPage panelEditPage() const noexcept;
     int selectedPerformanceForDial() const noexcept;
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
@@ -39,9 +41,12 @@ private:
     bool ramPerformanceBank = false;
     int ramPerformanceSelection = 0;
     MidiRoutingMode lastRoutingMode = MidiRoutingMode::performanceOmni;
+    EditorPage page = EditorPage::main;
+    int selectedEditFunction = 2; // <2> Edit Part is the implemented default.
+    int selectedSystemParameter = 0; // 0 = Mode (Perform / Sequencer Multi).
+    bool menuNotImplemented = false;
     int selectedPart = 0;
     int selectedParameter = 3;
-    bool editMode = false;
     bool buttonFlash = false;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessorEditor)
 };
