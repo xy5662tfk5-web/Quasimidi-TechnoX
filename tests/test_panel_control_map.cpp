@@ -30,6 +30,27 @@ int main()
                        PanelKey::partBankPrevious) ==
            PanelControlAction::selectPart);
 
+    // The Edit/Function menu is navigated with either Alpha dial.
+    for (const mode : {PanelOperatingMode::performance,
+                       PanelOperatingMode::sequencerMulti}) {
+        assert(panelAction(mode, PanelEditPage::editFunctionMenu,
+                           PanelAlphaDial::parameterSoundGroup) ==
+               PanelControlAction::selectEditFunction);
+        assert(panelAction(mode, PanelEditPage::editFunctionMenu,
+                           PanelAlphaDial::valueSound) ==
+               PanelControlAction::selectEditFunction);
+        assert(panelAction(mode, PanelEditPage::editFunctionMenu,
+                           PanelKey::partBankNext) == PanelControlAction::none);
+    }
+
+    // Edit System uses PARAMETER for a system item and VALUE for its value.
+    assert(panelAction(PanelOperatingMode::performance, PanelEditPage::editSystem,
+                       PanelAlphaDial::parameterSoundGroup) ==
+           PanelControlAction::selectSystemParameter);
+    assert(panelAction(PanelOperatingMode::performance, PanelEditPage::editSystem,
+                       PanelAlphaDial::valueSound) ==
+           PanelControlAction::editSystemParameter);
+
     // In Part Edit, the two Alpha dials have different edit roles in either
     // operating mode: select a parameter, then change its value.
     for (const auto mode : {PanelOperatingMode::performance,
