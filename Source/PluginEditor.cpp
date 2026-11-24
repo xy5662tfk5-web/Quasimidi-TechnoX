@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
 #include "TechnoXPartModel.h"
+#include "TechnoXPanelControlMap.h"
 #include <cmath>
 
 namespace {
@@ -104,16 +105,18 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
         frontPanel = juce::Drawable::createFromSVG(*svg);
     setSize(1200, 132);
     setResizable(false, false);
-    syncValueDialFromSelection();
+    lastRoutingMode = audioProcessor.getMidiRoutingMode();
+    syncDialsFromCurrentSelection();
     startTimerHz(12);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
 {
-    // Follow host program changes and external MIDI edits, but never let a
-    // PARAMETER-selection drag move the VALUE indicator at the same time.
-    if (dragTarget != DragTarget::parameter)
-        syncValueDialFromSelection();
+    const auto currentMode = audioProcessor.getMidiRoutingMode();
+    if (currentMode != lastRoutingMode && dragTarget == DragTarget::none) {
+        lastRoutingMode = currentMode;
+        syncDialsFromCurrentSelection();
+    }
     repaint();
 }
 
@@ -143,29 +146,47 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     drawTrackedText(g, "VOLUME", 964.0f, 21.0f, 7.5f, 0.5f);
     drawTrackedText(g, "HEADPH.", 1031.0f, 21.0f, 7.5f, 0.5f);
 
+    const auto mode = panelOperatingMode();
     const auto* descriptor = technox::PartEditModel::descriptor(
         static_cast<std::size_t>(selectedParameter));
-    const int raw = audioProcessor.getPartParameterRaw(
-        audioProcessor.getCurrentProgram(), selectedPart,
-        static_cast<technox::PartParameter>(selectedParameter));
+    const int performanceIndex = audioProcessor.getCurrentProgram();
     const int bank = audioProcessor.getPartParameterRaw(
-        audioProcessor.getCurrentProgram(), selectedPart, technox::PartParameter::bankNumber);
+        performanceIndex, selectedPart, technox::PartParameter::bankNumber);
     const int sound = audioProcessor.getPartParameterRaw(
-        audioProcessor.getCurrentProgram(), selectedPart, technox::PartParameter::soundNumber);
-    auto line1 = juce::String("PRF")
-        + juce::String(audioProcessor.getCurrentProgram() + 1).paddedLeft('0', 2)
-        + "/" + juce::String(audioProcessor.getNumPrograms()).paddedLeft('0', 2)
-        + " P" + juce::String(selectedPart + 13) + " "
-        + (descriptor != nullptr ? juce::String(descriptor->name) : juce::String("PARAM"));
-    if (editMode)
-        line1 = "EDIT " + line1;
-    const auto line2 = juce::String("B")
-        + (bank >= 0 ? juce::String(bank) : juce::String("-"))
-        + " S" + (sound >= 0 ? juce::String(sound).paddedLeft('0', 3) : juce::String("---"))
-        + " " + audioProcessor.getCurrentPartSoundName(selectedPart);
+        performanceIndex, selectedPart, technox::PartParameter::soundNumber);
+    const juce::String soundName = audioProcessor.getCurrentPartSoundName(selectedPart);
 
-    // Centre the active LCD in the original 260x60 bezel at (224,38):
-    // 12 px horizontal and 6 px vertical inset on every side.
+    juce::String line1;
+    juce::String line2;
+    if (editMode) {
+        const int raw = audioProcessor.getPartParameterRaw(
+            performanceIndex, selectedPart,
+            static_cast<technox::PartParameter>(selectedParameter));
+        const int shown = raw < 0 || descriptor == nullptr
+            ? 0 : raw + descriptor->displayOffset;
+        line1 = "PART " + juce::String(selectedPart + 13) + " "
+            + (descriptor != nullptr ? juce::String(descriptor->name) : juce::String("PARAM"));
+        line2 = juce::String(shown) + " " + soundName;
+    } else if (mode == technox::PanelOperatingMode::performance) {
+        line1 = "TECHNOX";
+        const int slot = selectedPerformanceForDial() + 1;
+        if (ramPerformanceBank)
+            line2 = "RAM-" + juce::String(slot).paddedLeft('0', 2) + ": EMPTY";
+        else
+            line2 = "ROM-" + juce::String(performanceIndex + 1).paddedLeft('0', 2)
+                + ": " + audioProcessor.getCurrentPerformanceName();
+    } else {
+        line1 = "SEQUENCER MULTI";
+        const juce::String bankLetter = bank >= 0 && bank < 4
+            ? juce::String::charToString(static_cast<juce::juce_wchar>('A' + bank))
+            : juce::String("?");
+        line2 = juce::String(selectedPart + 13) + ":" + bankLetter
+            + juce::String(sound < 0 ? 0 : sound).paddedLeft('0', 3)
+            + " " + soundName;
+    }
+
+    // The hardware display is 2 x 16 characters. Keep the original fixed-width
+    // character-cell presentation instead of squeezing extra UI text into it.
     const juce::Rectangle<float> lcdBounds(236.0f, 44.0f, 236.0f, 48.0f);
     g.setColour(juce::Colour(0xff75cc56));
     g.fillRoundedRectangle(lcdBounds, 20.0f);
@@ -173,8 +194,8 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawRoundedRectangle(lcdBounds, 20.0f, 1.0f);
     g.setColour(juce::Colour(0xff142605));
     g.setFont(juce::Font("Courier New", 13.0f, juce::Font::bold));
-    g.drawText(line1.substring(0, 22), 248, 50, 212, 18, juce::Justification::centredLeft);
-    g.drawText(line2.substring(0, 22), 248, 68, 212, 18, juce::Justification::centredLeft);
+    g.drawText(line1.substring(0, 16), 248, 50, 212, 18, juce::Justification::centredLeft);
+    g.drawText(line2.substring(0, 16), 248, 68, 212, 18, juce::Justification::centredLeft);
 
     const auto drawPointer = [&g](float x, float value, float radius) {
         const float angle = juce::degreesToRadians(-135.0f + juce::jlimit(0.0f, 1.0f, value) * 270.0f);
@@ -189,7 +210,7 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         g.drawLine(c.x, c.y, tip.x, tip.y, 3.5f);
         g.fillEllipse(tip.x - 2.0f, tip.y - 2.0f, 4.0f, 4.0f);
     };
-    drawPointer(kParameterX, static_cast<float>(selectedParameter) / 23.0f, 21.0f);
+    drawPointer(kParameterX, parameterDialNormalized, 21.0f);
     drawPointer(kValueX, valueDialNormalized, 21.0f);
     drawPointer(kVolumeX, audioProcessor.getOutputGain(), 14.0f);
 
