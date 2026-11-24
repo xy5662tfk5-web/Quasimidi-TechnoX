@@ -2544,6 +2544,39 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(low.registers[2]),
                         static_cast<unsigned>(low.psw));
         }
+        // Pin the exact firmware transform from the second 0x1848 return
+        // into the two velocity-sensitive bytes consumed by the 0x0DB7 writer.
+        const auto traceAt = [](const auto& trace, std::uint16_t pc)
+            -> const TechnoX8032Machine::ExecutionInstructionEvent* {
+            const auto found = std::find_if(trace.begin(), trace.end(),
+                [pc](const auto& event) { return event.instructionPC == pc; });
+            return found == trace.end() ? nullptr : &*found;
+        };
+        const auto* highSwap = traceAt(secondNoteExecutionTrace, 0x2089u);
+        const auto* lowSwap = traceAt(lowerVelocityExecutionTrace, 0x2089u);
+        const auto* highRotate = traceAt(secondNoteExecutionTrace, 0x208au);
+        const auto* lowRotate = traceAt(lowerVelocityExecutionTrace, 0x208au);
+        const auto* highR4Store = traceAt(secondNoteExecutionTrace, 0x208bu);
+        const auto* lowR4Store = traceAt(lowerVelocityExecutionTrace, 0x208bu);
+        const auto* highMask = traceAt(secondNoteExecutionTrace, 0x208cu);
+        const auto* lowMask = traceAt(lowerVelocityExecutionTrace, 0x208cu);
+        const auto* highR3Store = traceAt(secondNoteExecutionTrace, 0x208eu);
+        const auto* lowR3Store = traceAt(lowerVelocityExecutionTrace, 0x208eu);
+        const auto* highPacketInputs = traceAt(secondNoteExecutionTrace, 0x208fu);
+        const auto* lowPacketInputs = traceAt(lowerVelocityExecutionTrace, 0x208fu);
+        assert(highSwap && lowSwap && highRotate && lowRotate &&
+               highR4Store && lowR4Store && highMask && lowMask &&
+               highR3Store && lowR3Store && highPacketInputs && lowPacketInputs);
+        assert(highSwap->accumulator == 0x0fu && lowSwap->accumulator == 0x53u);
+        assert(highRotate->accumulator == 0xf0u && lowRotate->accumulator == 0x35u);
+        assert(highR4Store->accumulator == 0x78u && lowR4Store->accumulator == 0x9au);
+        assert(highMask->registers[4] == 0x78u && lowMask->registers[4] == 0x9au);
+        assert(highR3Store->accumulator == 0x78u && lowR3Store->accumulator == 0x98u);
+        assert(highPacketInputs->registers[3] == 0x78u &&
+               lowPacketInputs->registers[3] == 0x98u);
+        assert(highPacketInputs->registers[4] == 0x78u &&
+               lowPacketInputs->registers[4] == 0x9au);
+
         const auto comparableVelocityPackets =
             std::min<std::size_t>(referenceVelocityPackets.size(), lowerVelocityPacketCount);
         assert(comparableVelocityPackets == referenceVelocityPackets.size());
