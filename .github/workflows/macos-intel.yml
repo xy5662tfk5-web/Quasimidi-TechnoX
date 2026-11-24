@@ -1,5 +1,6 @@
 name: macOS Intel build
 # Research branch verifies raw ROM size, CRC32 and SHA-1 before further analysis.
+# Keep the Intel build at four parallel jobs to shorten panel verification turnaround.
 
 on:
   push:
