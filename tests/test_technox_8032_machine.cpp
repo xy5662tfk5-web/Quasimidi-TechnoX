@@ -978,7 +978,7 @@ int main(int argc, char** argv) {
                changedRecordByte1[4] == 0x05u && changedRecordByte1[5] == 0x00u);
         assert(changedRecordByte2[3] == 0x06u &&
                changedRecordByte2[4] == 0x0fu && changedRecordByte2[5] == 0x00u);
-        assert(changedRecordByte3[3] == 0x42u &&
+        assert(changedRecordByte3[3] == 0x43u &&
                changedRecordByte3[4] == 0x05u && changedRecordByte3[5] == 0x01u);
 
         // Also execute the alternate 0x28D8 coefficient-table page with
