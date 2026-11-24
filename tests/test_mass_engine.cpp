@@ -5,6 +5,30 @@
 #include <cmath>
 using namespace technox;
 int main() {
+    // IC4 0xAC00/0xAC88 address one 16-byte event page per runtime event.
+    // Each byte contains eight note lanes; the jump-table stride differs by path.
+    MASSNoteEventAddress noteEventAddress;
+    assert(MASSNoteEventAddressing::decode(0x0cu, 65u, noteEventAddress));
+    assert(noteEventAddress.byteOffset == 0xc8u);
+    assert(noteEventAddress.bitIndex == 1u);
+    assert(noteEventAddress.noteOnDispatchOffset == 0x0eu);
+    assert(noteEventAddress.noteOffDispatchOffset == 0x11u);
+    assert(MASSNoteEventAddressing::decode(0x0du, 65u, noteEventAddress));
+    assert(noteEventAddress.byteOffset == 0xd8u);
+    assert(noteEventAddress.bitIndex == 1u);
+    assert(noteEventAddress.noteOnDispatchOffset == 0x0eu);
+    assert(noteEventAddress.noteOffDispatchOffset == 0x11u);
+    assert(MASSNoteEventAddressing::decode(0u, 0u, noteEventAddress));
+    assert(noteEventAddress.byteOffset == 0u && noteEventAddress.bitIndex == 0u);
+    assert(noteEventAddress.noteOnDispatchOffset == 0u &&
+           noteEventAddress.noteOffDispatchOffset == 0u);
+    assert(MASSNoteEventAddressing::decode(15u, 127u, noteEventAddress));
+    assert(noteEventAddress.byteOffset == 0xffu && noteEventAddress.bitIndex == 7u);
+    assert(noteEventAddress.noteOnDispatchOffset == 0x62u);
+    assert(noteEventAddress.noteOffDispatchOffset == 0x77u);
+    assert(!MASSNoteEventAddressing::decode(16u, 0u, noteEventAddress));
+    assert(!MASSNoteEventAddressing::decode(0u, 128u, noteEventAddress));
+
     MASSAudioEngine engine;
     engine.prepare(44100.0, 512);
     assert(engine.setPartParameter(12, PartParameter::bankNumber, 2));
