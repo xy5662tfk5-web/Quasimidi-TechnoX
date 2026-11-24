@@ -211,9 +211,11 @@ void QuasimidiTechnoXAudioProcessorEditor::changeSelectedValue(int delta)
                                                             selectedPart, parameter);
     if (current < 0) return;
     const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum), current + delta);
-    audioProcessor.setPartParameterRaw(audioProcessor.getCurrentProgram(), selectedPart, parameter, next);
-    valueDialNormalized = descriptor->maximum > 0
-        ? static_cast<float>(next) / static_cast<float>(descriptor->maximum) : 0.0f;
+    if (audioProcessor.queuePanelPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart, parameter, next)) {
+        valueDialNormalized = descriptor->maximum > 0
+            ? static_cast<float>(next) / static_cast<float>(descriptor->maximum) : 0.0f;
+    }
     repaint();
 }
 
@@ -319,10 +321,12 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
         if (descriptor != nullptr) {
             const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum),
                 static_cast<int>(std::lround(valueDragStartRaw + delta)));
-            audioProcessor.setPartParameterRaw(audioProcessor.getCurrentProgram(), selectedPart,
-                static_cast<technox::PartParameter>(selectedParameter), next);
-            valueDialNormalized = descriptor->maximum > 0
-                ? static_cast<float>(next) / static_cast<float>(descriptor->maximum) : 0.0f;
+            if (audioProcessor.queuePanelPartParameterRaw(
+                    audioProcessor.getCurrentProgram(), selectedPart,
+                    static_cast<technox::PartParameter>(selectedParameter), next)) {
+                valueDialNormalized = descriptor->maximum > 0
+                    ? static_cast<float>(next) / static_cast<float>(descriptor->maximum) : 0.0f;
+            }
         }
     }
     repaint();
