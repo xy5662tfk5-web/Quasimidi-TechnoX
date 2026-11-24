@@ -31,7 +31,7 @@ int main()
            PanelControlAction::selectPart);
 
     // The Edit/Function menu is navigated with either Alpha dial.
-    for (const mode : {PanelOperatingMode::performance,
+    for (const auto mode : {PanelOperatingMode::performance,
                        PanelOperatingMode::sequencerMulti}) {
         assert(panelAction(mode, PanelEditPage::editFunctionMenu,
                            PanelAlphaDial::parameterSoundGroup) ==
