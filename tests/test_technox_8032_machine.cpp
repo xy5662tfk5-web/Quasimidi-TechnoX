@@ -3069,6 +3069,7 @@ int main(int argc, char** argv) {
             firmwareMachine.clearInstructionWatchForTesting();
             firmwareMachine.clearMidiEventGateTraceForTesting();
             firmwareMachine.clearDispatchFlagWriteTraceForTesting();
+            firmwareMachine.clearResourceTupleWriteTraceForTesting();
             const auto selectorWindowBefore = firmwareMachine.externalWindowTraceCount();
             const auto selectorXdataBefore = firmwareMachine.xdataWatchTraceCount();
             const auto partBefore = firmwareMachine.watchedCallCount(0x4256u);
@@ -3173,6 +3174,85 @@ int main(int argc, char** argv) {
                 std::printf("%s%02X", i == 0u ? "" : ",",
                             static_cast<unsigned>(allocatedPages[i]));
             std::printf("\\n");
+
+            // The second active Part (event 0x0D) resolves an IC51 bank-1
+            // nested resource pointer at 0x03AF/0x03B0 -> 0x3806. Its raw
+            // four-byte record is A4 16 A3 40. Firmware sets ACC.6 at 1A1D,
+            // so the first stored byte is E4, then copies the tuple to the
+            // freshly allocated page via MOVX @R1 at 1A32/35/38/3C.
+            assert(partCalls == 2u);
+            const auto secondEventPage = allocatedPages[1];
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x03afu) == 0x06u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x03b0u) == 0x38u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3806u) == 0xa4u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3807u) == 0x16u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3808u) == 0xa3u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3809u) == 0x40u);
+
+            const auto captureInstruction = [&](std::uint16_t pc,
+                                                std::uint16_t dptr)
+                -> const TechnoX8032Machine::InstructionWatchEvent* {
+                for (std::size_t i = instructionWatchFirst;
+                     i < instructionWatchCount; ++i) {
+                    const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                    if (event.instructionPC == pc && event.dptr == dptr &&
+                        event.port2Latch == secondEventPage)
+                        return &event;
+                }
+                return nullptr;
+            };
+            const auto* nestedSourceByte = captureInstruction(0x1a17u, 0x3806u);
+            const auto* nestedSetBit = captureInstruction(0x1a1du, 0x3806u);
+            const auto* nestedPostSetBit = captureInstruction(0x1a1fu, 0x3806u);
+            const auto* nestedTupleLoad = captureInstruction(0x1a31u, 0x380au);
+            assert(nestedSourceByte && nestedSetBit && nestedPostSetBit &&
+                   nestedTupleLoad);
+            assert(nestedSourceByte->accumulator == 0xa4u);
+            assert(nestedSourceByte->registers[3] == 0x86u);
+            assert(nestedSetBit->accumulator == 0xa4u);
+            assert(nestedPostSetBit->accumulator == 0xe4u);
+            assert(nestedPostSetBit->registers[0] == 0xe4u);
+            assert(nestedTupleLoad->registers[0] == 0xe4u);
+            assert(nestedTupleLoad->registers[2] == 0x16u);
+            assert(nestedTupleLoad->registers[6] == 0xa3u);
+            assert(nestedTupleLoad->b == 0x40u);
+
+            constexpr std::array<std::uint16_t, 4> nestedWritePCs{{
+                0x1a32u, 0x1a35u, 0x1a38u, 0x1a3cu
+            }};
+            constexpr std::array<std::uint8_t, 4> nestedWriteBytes{{
+                0xe4u, 0x16u, 0xa3u, 0x40u
+            }};
+            std::array<bool, 4> nestedWriteSeen{};
+            std::size_t nestedWriteCount = 0;
+            const auto nestedTraceCount =
+                firmwareMachine.resourceTupleWriteTraceCountForTesting();
+            for (std::size_t i = 0; i < nestedTraceCount; ++i) {
+                const auto& write =
+                    firmwareMachine.resourceTupleWriteTraceAtForTesting(i);
+                const auto pageBase = static_cast<std::uint16_t>(
+                    static_cast<std::uint16_t>(secondEventPage) << 8u);
+                if (write.address < pageBase ||
+                    write.address >= static_cast<std::uint16_t>(pageBase + 4u))
+                    continue;
+                const auto offset = static_cast<std::size_t>(write.address - pageBase);
+                assert(offset < nestedWritePCs.size());
+                assert(!nestedWriteSeen[offset]);
+                assert(write.instructionPC == nestedWritePCs[offset]);
+                assert(write.stackReturnPC == 0x1720u);
+                assert(write.port2 == secondEventPage);
+                assert(write.port3 == 0xfeu);
+                assert(write.value == nestedWriteBytes[offset]);
+                nestedWriteSeen[offset] = true;
+                ++nestedWriteCount;
+            }
+            assert(nestedWriteCount == 4u);
+            for (const auto seen : nestedWriteSeen)
+                assert(seen);
+            std::printf("NOTE65 NESTED IC51 RECORD: bank1[03AF..03B0]=06 38 "
+                        "ptr=3806 raw=A4 16 A3 40 acc6=A4->E4 page=%02X "
+                        "writes=E4 16 A3 40\\n",
+                        static_cast<unsigned>(secondEventPage));
 
             std::size_t selectorReadCount = 0;
             std::size_t selectorBranchCount = 0;
