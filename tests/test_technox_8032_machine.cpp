@@ -3095,10 +3095,41 @@ int main(int argc, char** argv) {
             std::printf("NOTE65 WATCH CAPTURE: total=%zu retained=%zu\\n",
                         instructionWatchCount, instructionWatchCount - instructionWatchFirst);
             std::array<std::uint8_t, 4> observedEventIds{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 4>
+                pageQueueEntryEvents{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 4>
+                pageQueueReturnEvents{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 4>
+                pageCommitEvents{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 4>
+                pageSelectEvents{};
+            std::array<TechnoX8032Machine::InstructionWatchEvent, 4>
+                pageStatusEvents{};
             std::size_t observedCount = 0;
+            std::size_t pageQueueEntryCount = 0;
+            std::size_t pageQueueReturnCount = 0;
+            std::size_t pageCommitCount = 0;
+            std::size_t pageSelectCount = 0;
+            std::size_t pageStatusCount = 0;
             for (std::size_t i = instructionWatchFirst;
                  i < instructionWatchCount; ++i) {
                 const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                if (event.instructionPC == 0x1742u) {
+                    assert(pageQueueEntryCount < pageQueueEntryEvents.size());
+                    pageQueueEntryEvents[pageQueueEntryCount++] = event;
+                } else if (event.instructionPC == 0x177eu) {
+                    assert(pageQueueReturnCount < pageQueueReturnEvents.size());
+                    pageQueueReturnEvents[pageQueueReturnCount++] = event;
+                } else if (event.instructionPC == 0x16b0u) {
+                    assert(pageCommitCount < pageCommitEvents.size());
+                    pageCommitEvents[pageCommitCount++] = event;
+                } else if (event.instructionPC == 0x16c3u) {
+                    assert(pageSelectCount < pageSelectEvents.size());
+                    pageSelectEvents[pageSelectCount++] = event;
+                } else if (event.instructionPC == 0x16cau) {
+                    assert(pageStatusCount < pageStatusEvents.size());
+                    pageStatusEvents[pageStatusCount++] = event;
+                }
                 if (event.instructionPC != 0x4256u)
                     continue;
                 assert(observedCount < observedEventIds.size());
@@ -3107,6 +3138,41 @@ int main(int argc, char** argv) {
                 assert(event.registers[3] == 0x64u);
             }
             assert(observedCount == partCalls);
+            // 0x1742 dequeues a page into R4, the caller copies that result to
+            // internal RAM[0x2D] at 0x16B0, then 0x16C3 writes it to SFR P2.
+            // The selected page is dynamically allocated; it is not a fixed
+            // property of the event/Performance Part number.
+            assert(pageQueueEntryCount == partCalls);
+            assert(pageQueueReturnCount == partCalls);
+            assert(pageCommitCount == partCalls);
+            assert(pageSelectCount == partCalls);
+            assert(pageStatusCount == partCalls);
+            std::array<std::uint8_t, 4> allocatedPages{};
+            for (std::size_t i = 0; i < partCalls; ++i) {
+                assert(pageQueueEntryEvents[i].returnPC == 0x16aau);
+                assert(pageQueueReturnEvents[i].returnPC == 0x16aau);
+                assert(pageQueueReturnEvents[i].registers[4] < 0x10u);
+                assert(pageQueueReturnEvents[i].registers[4] ==
+                       pageCommitEvents[i].accumulator);
+                assert(pageCommitEvents[i].returnPC == 0x446au);
+                assert(pageSelectEvents[i].returnPC == 0x446au);
+                assert(pageStatusEvents[i].returnPC == 0x446au);
+                assert(pageSelectEvents[i].directRam2D ==
+                       pageCommitEvents[i].accumulator);
+                assert(pageStatusEvents[i].directRam2D ==
+                       pageCommitEvents[i].accumulator);
+                assert(pageStatusEvents[i].port2Latch ==
+                       pageCommitEvents[i].accumulator);
+                allocatedPages[i] = pageCommitEvents[i].accumulator;
+                for (std::size_t j = 0; j < i; ++j)
+                    assert(allocatedPages[j] != allocatedPages[i]);
+            }
+            std::printf("NOTE65 RESOURCE PAGE QUEUE: events=%zu pages=",
+                        partCalls);
+            for (std::size_t i = 0; i < partCalls; ++i)
+                std::printf("%s%02X", i == 0u ? "" : ",",
+                            static_cast<unsigned>(allocatedPages[i]));
+            std::printf("\\n");
 
             std::size_t selectorReadCount = 0;
             std::size_t selectorBranchCount = 0;
