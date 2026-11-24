@@ -161,7 +161,7 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         line1 = "EDIT " + line1;
     const auto line2 = juce::String("B")
         + (bank >= 0 ? juce::String(bank) : juce::String("-"))
-        + " S" + (sound >= 0 ? juce::String(sound).paddedLeft('3', '0') : juce::String("---"))
+        + " S" + (sound >= 0 ? juce::String(sound).paddedLeft('0', 3) : juce::String("---"))
         + " " + audioProcessor.getCurrentPartSoundName(selectedPart);
 
     // Centre the active LCD in the original 260x60 bezel at (224,38):
