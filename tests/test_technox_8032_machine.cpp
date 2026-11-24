@@ -958,6 +958,76 @@ int main(int argc, char** argv) {
             assert(consumerMachine.soundCommandPacketCount() == 0u);
             assert(consumerMachine.soundHostWriteCount() == 0u);
             assert(consumerMachine.soundHostReadCount() == 0u);
+
+            // Seed one active voice record in the P2 page left by the real
+            // slot-1 consumer. The same 0x88 record list/offset is then
+            // consumed by the firmware's outer voice-record scan.
+            const auto voiceRecordPage = consumerMachine.readPortLatch(0xa0u);
+            const auto voiceRecordAddress = [voiceRecordPage](std::uint8_t offset) {
+                return static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(voiceRecordPage) << 8u) | offset);
+            };
+            consumerMachine.writeExternal(voiceRecordAddress(0x00u), 0xffu);
+            consumerMachine.writeExternal(voiceRecordAddress(0x30u), 0xffu);
+            consumerMachine.writeExternal(voiceRecordAddress(0x31u), 0xffu);
+            consumerMachine.writeExternal(voiceRecordAddress(0x70u), 0x01u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x88u), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x89u), 0x03u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8au), 0x05u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8bu), 0x08u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8cu), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8du), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8eu), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8fu), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x96u), 0x00u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x97u), 0x00u);
+
+            cpuRegisters.pc = 0x044cu;
+            const auto downstreamInstructions =
+                consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
+            const bool reachedSoundHostWriter = cpuRegisters.pc == 0x0db7u;
+            if (reachedSoundHostWriter) {
+                const auto writerInstructions =
+                    consumerMachine.runUntilProgramCounter(0x0a52u, 128u);
+                assert(writerInstructions > 0u);
+                assert(cpuRegisters.pc == 0x0a52u);
+            }
+            std::fprintf(stderr,
+                "Sine slot1 downstream step=%u page=%02X PC=%04X instructions=%zu writer=%d field=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
+                static_cast<unsigned>(sineStepCount),
+                static_cast<unsigned>(voiceRecordPage),
+                static_cast<unsigned>(cpuRegisters.pc), downstreamInstructions,
+                reachedSoundHostWriter ? 1 : 0,
+                static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u))),
+                static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u))),
+                consumerMachine.soundHostWriteCount(),
+                consumerMachine.soundCommandPacketCount(),
+                consumerMachine.cpuFaulted());
+            const auto hostTraceCount = consumerMachine.soundHostWriteCount();
+            for (std::size_t eventIndex = 0; eventIndex < hostTraceCount; ++eventIndex) {
+                const auto& event = consumerMachine.soundHostWriteAt(eventIndex);
+                std::fprintf(stderr,
+                    "  slot1 SoundHost reg=%u value=%02X pc=%04X ret=%04X device=%02X P2=%02X\\n",
+                    static_cast<unsigned>(event.registerIndex),
+                    static_cast<unsigned>(event.value),
+                    static_cast<unsigned>(event.instructionPC),
+                    static_cast<unsigned>(event.returnPC),
+                    static_cast<unsigned>(event.deviceIndex),
+                    static_cast<unsigned>(event.port2));
+            }
+            for (std::size_t packetIndex = 0;
+                 packetIndex < consumerMachine.soundCommandPacketCount(); ++packetIndex) {
+                const auto& packet = consumerMachine.soundCommandPacketAt(packetIndex);
+                std::fprintf(stderr,
+                    "  slot1 SoundHost packet=%02X %02X %02X %02X ret=%04X device=%02X\\n",
+                    static_cast<unsigned>(packet.bytes[0]),
+                    static_cast<unsigned>(packet.bytes[1]),
+                    static_cast<unsigned>(packet.bytes[2]),
+                    static_cast<unsigned>(packet.bytes[3]),
+                    static_cast<unsigned>(packet.returnPC),
+                    static_cast<unsigned>(packet.deviceIndex));
+            }
+
             return std::array<std::uint8_t, 3>{{
                 sineSample,
                 consumerMachine.readInternal(0x36u),
