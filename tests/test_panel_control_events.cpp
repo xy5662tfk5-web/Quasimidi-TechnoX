@@ -92,6 +92,31 @@ int main()
     assert(preservedOtherPerformance);
 
     mailbox.consume(0, [&](const Edit&) { assert(false); });
+
+    // Sequencer Multi owns a separate 16-Part mailbox. Verify Part 1, drum
+    // Part 10 and Part 16 remain independent of factory Performance Parts.
+    technox::PanelSequencerPartEditMailbox sequencerMailbox;
+    assert(sequencerMailbox.publish(0, PartParameter::bankNumber, 0));
+    assert(sequencerMailbox.publish(9, PartParameter::soundNumber, 7));
+    assert(sequencerMailbox.publish(15, PartParameter::soundNumber, 127));
+    std::array<bool, 3> multiSeen{};
+    sequencerMailbox.consume([&](const technox::PanelSequencerPartEditMailbox::Edit& edit) {
+        if (edit.partIndex == 0 && edit.parameter == PartParameter::bankNumber) {
+            assert(edit.rawValue == 0);
+            multiSeen[0] = true;
+        } else if (edit.partIndex == 9 && edit.parameter == PartParameter::soundNumber) {
+            assert(edit.rawValue == 7);
+            multiSeen[1] = true;
+        } else if (edit.partIndex == 15 && edit.parameter == PartParameter::soundNumber) {
+            assert(edit.rawValue == 127);
+            multiSeen[2] = true;
+        } else {
+            assert(false);
+        }
+    });
+    for (bool seen : multiSeen) assert(seen);
+    assert(!sequencerMailbox.publish(16, PartParameter::level, 1));
+
     std::cout << "TechnoX panel edit mailbox tests passed\\n";
     return 0;
 }
