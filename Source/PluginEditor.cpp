@@ -10,6 +10,40 @@ constexpr float kVolumeX = 964.0f;
 constexpr float kKnobY = 68.0f;
 constexpr int kPartFirstParameter = 0;
 
+void drawTrackedText(juce::Graphics& g, const juce::String& text,
+                     float centreX, float baselineY, float fontHeight,
+                     float letterSpacing, float scaleX = 1.0f, float scaleY = 1.0f)
+{
+    // The original SVG uses Arial Black with explicit 8/7.5/6.8 px sizing
+    // and tracking. JUCE's SVG parser ignores letter-spacing and SVG font
+    // shorthand, so place the same glyphs with the original metrics here.
+    const juce::Font font(juce::FontOptions{}.withName("Arial Black")
+                                             .withPointHeight(fontHeight));
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText(font, text, 0.0f, 0.0f);
+
+    const int count = glyphs.getNumGlyphs();
+    if (count == 0)
+        return;
+
+    const float textWidth = juce::GlyphArrangement::getStringWidth(font, text)
+        + letterSpacing * static_cast<float>(juce::jmax(0, count - 1));
+    const float left = centreX - textWidth * scaleX * 0.5f;
+
+    g.setColour(juce::Colour(0xff181a1c));
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& glyph = glyphs.getGlyph(i);
+        const float x = left
+            + (glyph.getLeft() + letterSpacing * static_cast<float>(i)) * scaleX;
+        const auto transform = juce::AffineTransform::translation(
+                -glyph.getLeft(), -glyph.getBaselineY())
+            .scaled(scaleX, scaleY)
+            .translated(x, baselineY);
+        glyph.draw(g, transform);
+    }
+}
+
 void drawOriginalCurvedLabel(juce::Graphics& g, const juce::String& text,
                              juce::Point<float> centre, float radius,
                              bool lowerArc)
@@ -82,9 +116,24 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         frontPanel->drawWithin(g, getLocalBounds().toFloat(),
                                juce::RectanglePlacement::stretchToFit, 1.0f);
 
-    // These labels use the exact source-SVG font, size, tracking and arc geometry.
+    // Static panel lettering follows the original SVG's exact coordinates,
+    // font sizes and tracking. Drawn here because JUCE 8.0.13 doesn't apply
+    // SVG text shorthand/letter-spacing consistently.
+    drawTrackedText(g, "MADE IN GERMANY", 56.0f, 81.0f, 6.8f, 0.4f);
+    drawTrackedText(g, "POWER", 138.0f, 34.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "16 PART MULTITIMBRAL SYNTHESIZER",
+                    354.0f, 115.0f, 8.0f, 1.0f, 1.12f, 0.85f);
+    drawTrackedText(g, "PARAMETER", 568.0f, 30.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "SOUNDGROUP", 568.0f, 114.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "VALUE", 674.0f, 30.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "SOUND", 674.0f, 114.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "EDIT / OK", 756.0f, 34.0f, 6.8f, 0.4f);
+    drawTrackedText(g, "EXIT", 794.0f, 34.0f, 6.8f, 0.4f);
+    drawTrackedText(g, "PART / BANK", 775.0f, 112.0f, 6.8f, 0.4f);
     drawOriginalCurvedLabel(g, "TECHNO - RAVE", { 876.0f, 62.0f }, 40.0f, false);
     drawOriginalCurvedLabel(g, "ELECTRONIC", { 876.0f, 74.0f }, 40.0f, true);
+    drawTrackedText(g, "VOLUME", 964.0f, 21.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "HEADPH.", 1031.0f, 21.0f, 7.5f, 0.5f);
 
     const auto* descriptor = technox::PartEditModel::descriptor(
         static_cast<std::size_t>(selectedParameter));
@@ -97,18 +146,17 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     const auto line2 = raw < 0 ? juce::String("No part data") :
         juce::String(shown) + "  " + audioProcessor.getCurrentPartSoundName(selectedPart);
 
-    // The new SVG bezel is 260x60 at (224,38). Keep an even 8 px inset
-    // on all four sides so the active LCD follows the same rounded contour.
-    // Preserve the existing Courier New bold 13 pt display typography.
-    const juce::Rectangle<float> lcdBounds(232.0f, 46.0f, 244.0f, 44.0f);
+    // Centre the active LCD in the original 260x60 bezel at (224,38):
+    // 12 px horizontal and 6 px vertical inset on every side.
+    const juce::Rectangle<float> lcdBounds(236.0f, 44.0f, 236.0f, 48.0f);
     g.setColour(juce::Colour(0xff75cc56));
     g.fillRoundedRectangle(lcdBounds, 20.0f);
     g.setColour(juce::Colour(0xff203b16));
     g.drawRoundedRectangle(lcdBounds, 20.0f, 1.0f);
     g.setColour(juce::Colour(0xff142605));
     g.setFont(juce::Font("Courier New", 13.0f, juce::Font::bold));
-    g.drawText(line1.substring(0, 22), 243, 50, 220, 16, juce::Justification::centredLeft);
-    g.drawText(line2.substring(0, 22), 243, 68, 220, 16, juce::Justification::centredLeft);
+    g.drawText(line1.substring(0, 22), 248, 50, 212, 18, juce::Justification::centredLeft);
+    g.drawText(line2.substring(0, 22), 248, 68, 212, 18, juce::Justification::centredLeft);
 
     const auto drawPointer = [&g](float x, float value, float radius) {
         const float angle = juce::degreesToRadians(-135.0f + juce::jlimit(0.0f, 1.0f, value) * 270.0f);
@@ -128,11 +176,6 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         ? static_cast<float>(juce::jmax(0, raw)) / static_cast<float>(descriptor->maximum) : 0.0f, 21.0f);
     drawPointer(kVolumeX, audioProcessor.getOutputGain(), 14.0f);
 
-    g.setColour(editMode ? juce::Colour(0xff1c7a27) : juce::Colour(0xff25282b));
-    g.setFont(juce::Font(8.5f, juce::Font::bold));
-    g.drawText(editMode ? "EDIT" : "PLAY", 740, 56, 32, 10, juce::Justification::centred);
-    g.drawText(juce::String(static_cast<int>(std::lround(audioProcessor.getOutputGain() * 100.0f))) + "%",
-               940, 91, 48, 11, juce::Justification::centred);
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::selectNextParameter(int delta)
