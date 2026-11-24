@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "TechnoXPerformanceLayers.h"
+#include "TechnoXPanelControlMap.h"
 #include "BinaryData.h"
 
 namespace {
