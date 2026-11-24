@@ -3342,6 +3342,221 @@ int main(int argc, char** argv) {
             assert(nestedClearTail->accumulator == 0x00u);
             assert(nestedClearTail->registers[1] == 0x04u);
 
+            // The event-0D nested resource stream is a sequence of 8-byte
+            // page slots. Each slot consumes a two-byte IC51 pointer, loads
+            // the target's first byte, and either copies a 4-byte tuple or
+            // takes the empty-record path at 0x19E9.
+            struct ExpectedNestedSlot {
+                std::uint8_t slotOffset;
+                std::uint8_t pointerLow;
+                std::uint8_t pointerHigh;
+                std::uint16_t nextCursor;
+                std::uint16_t target;
+                std::uint8_t firstByte;
+                std::uint8_t entryR3;
+                bool active;
+            };
+            constexpr std::array<ExpectedNestedSlot, 8> expectedNestedSlots{{
+                {0x00u, 0x06u, 0x38u, 0x03b1u, 0x3806u, 0xa4u, 0x86u, true},
+                {0x08u, 0x50u, 0x10u, 0x03b3u, 0x1050u, 0xabu, 0x00u, false},
+                {0x10u, 0x10u, 0x10u, 0x03b5u, 0x1010u, 0x9fu, 0x00u, false},
+                {0x18u, 0x10u, 0x9bu, 0x03b7u, 0x9b10u, 0x00u, 0x00u, false},
+                {0x20u, 0x9bu, 0x7cu, 0x03b9u, 0x7c9bu, 0x00u, 0x00u, false},
+                {0x28u, 0x10u, 0x3cu, 0x03bbu, 0x3c10u, 0x51u, 0x00u, true},
+                {0x30u, 0x7du, 0x37u, 0x03bdu, 0x377du, 0x00u, 0x00u, false},
+                {0x38u, 0x10u, 0x7eu, 0x03bfu, 0x7e10u, 0x00u, 0x00u, false}
+            }};
+            const auto captureNestedSlotInstruction = [&](
+                std::uint16_t pc, std::uint8_t slotOffset,
+                std::uint16_t expectedDptr = 0u)
+                -> const TechnoX8032Machine::InstructionWatchEvent* {
+                for (std::size_t i = instructionWatchFirst;
+                     i < instructionWatchCount; ++i) {
+                    const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                    if (event.instructionPC != pc ||
+                        event.returnPC != 0x1720u ||
+                        event.port2Latch != secondEventPage ||
+                        event.directRam2E != slotOffset ||
+                        (expectedDptr != 0u && event.dptr != expectedDptr))
+                        continue;
+                    return &event;
+                }
+                return nullptr;
+            };
+            std::size_t activeNestedSlotCount = 0;
+            std::size_t emptyNestedSlotCount = 0;
+            for (const auto& expected : expectedNestedSlots) {
+                const auto pointerAddress = static_cast<std::uint16_t>(
+                    0x03afu + expected.slotOffset / 4u);
+                assert(firmwareMachine.ic51RomByteForTesting(
+                           1u, pointerAddress) == expected.pointerLow);
+                assert(firmwareMachine.ic51RomByteForTesting(
+                           1u, static_cast<std::uint16_t>(pointerAddress + 1u)) ==
+                       expected.pointerHigh);
+                assert(firmwareMachine.ic51RomByteForTesting(
+                           1u, expected.target) == expected.firstByte);
+
+                const auto* pointerRead = captureNestedSlotInstruction(
+                    0x191cu, expected.slotOffset, expected.nextCursor);
+                const auto* targetSelect = captureNestedSlotInstruction(
+                    0x1a16u, expected.slotOffset, expected.target);
+                const auto* targetFirstByte = captureNestedSlotInstruction(
+                    0x1a17u, expected.slotOffset, expected.target);
+                assert(pointerRead && targetSelect && targetFirstByte);
+                assert(pointerRead->directRam3A == expected.pointerLow);
+                assert(pointerRead->directRam3B == expected.pointerHigh);
+                assert(pointerRead->directRam36 ==
+                       static_cast<std::uint8_t>(expected.nextCursor & 0xffu));
+                assert(pointerRead->directRam37 ==
+                       static_cast<std::uint8_t>(expected.nextCursor >> 8u));
+                assert(targetFirstByte->accumulator == expected.firstByte);
+                assert(targetFirstByte->registers[3] == expected.entryR3);
+
+                const bool firmwareSelectsTuple =
+                    expected.entryR3 != 0u || (expected.firstByte & 0x40u) != 0u;
+                assert(firmwareSelectsTuple == expected.active);
+                const auto* emptyBranch = captureNestedSlotInstruction(
+                    0x19e9u, expected.slotOffset, expected.target);
+                const auto* emptyTest = captureNestedSlotInstruction(
+                    0x1a1au, expected.slotOffset, expected.target);
+                const auto* tupleCopy = expected.active
+                    ? captureNestedSlotInstruction(
+                        0x1a31u, expected.slotOffset,
+                        static_cast<std::uint16_t>(expected.target + 4u))
+                    : nullptr;
+                if (expected.active) {
+                    ++activeNestedSlotCount;
+                    assert(!emptyBranch && !emptyTest && tupleCopy);
+                    assert(tupleCopy->registers[1] == expected.slotOffset);
+                } else {
+                    ++emptyNestedSlotCount;
+                    assert(emptyBranch && emptyTest && !tupleCopy);
+                }
+            }
+            assert(activeNestedSlotCount == 2u);
+            assert(emptyNestedSlotCount == 6u);
+
+            // The second active slot points to bank-1 IC51 address 0x3C10.
+            // Unlike the 0x3806 tuple, its control byte is already bit-6 set
+            // and its second byte is zero, selecting the opposite 0x1A4E path.
+            const auto* secondTupleLoad = captureNestedSlotInstruction(
+                0x1a31u, 0x28u, 0x3c14u);
+            const auto* secondTupleEnd = captureNestedSlotInstruction(
+                0x1aa5u, 0x28u);
+            const auto* secondMetadataBranch = captureNestedSlotInstruction(
+                0x1a4eu, 0x28u, 0x3c14u);
+            const auto* secondMetadataWrite = captureNestedSlotInstruction(
+                0x1a57u, 0x28u, 0x3c14u);
+            const auto* secondMetadataHigh = captureNestedSlotInstruction(
+                0x1a82u, 0x28u, 0x3c14u);
+            const auto* secondMetadataLow = captureNestedSlotInstruction(
+                0x1a88u, 0x28u, 0x3c14u);
+            assert(secondTupleLoad && secondTupleEnd &&
+                   secondMetadataBranch && secondMetadataWrite &&
+                   secondMetadataHigh && secondMetadataLow);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3c10u) == 0x51u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3c11u) == 0x00u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3c12u) == 0x00u);
+            assert(firmwareMachine.ic51RomByteForTesting(1u, 0x3c13u) == 0x29u);
+            assert(secondTupleLoad->registers[0] == 0x51u);
+            assert(secondTupleLoad->registers[1] == 0x28u);
+            assert(secondTupleLoad->registers[2] == 0x00u);
+            assert(secondTupleLoad->registers[6] == 0x00u);
+            assert(secondTupleLoad->b == 0x29u);
+            assert(secondMetadataBranch->accumulator == 0x00u);
+            assert(secondMetadataBranch->registers[2] == 0x00u);
+            assert(secondMetadataWrite->accumulator == 0x7fu);
+            assert(secondMetadataWrite->registers[1] == 0x2bu);
+            assert(secondMetadataHigh->accumulator == 0x50u);
+            assert(secondMetadataHigh->registers[1] == 0x2du);
+            assert(secondMetadataLow->accumulator == 0x00u);
+            assert(secondMetadataLow->registers[1] == 0x2eu);
+
+            constexpr std::array<std::uint16_t, 4> secondTupleWritePCs{{
+                0x1a32u, 0x1a35u, 0x1a38u, 0x1a3cu
+            }};
+            constexpr std::array<std::uint8_t, 4> secondTupleWriteBytes{{
+                0x51u, 0x00u, 0x00u, 0x29u
+            }};
+            std::array<bool, 4> secondTupleWritesSeen{};
+            std::size_t secondTupleWriteCount = 0;
+            const auto secondTupleEndCycle = secondTupleEnd->machineCycle + 16u;
+            for (std::size_t i = 0; i < nestedTraceCount; ++i) {
+                const auto& write =
+                    firmwareMachine.resourceTupleWriteTraceAtForTesting(i);
+                if (write.port2 != secondEventPage ||
+                    write.port3 != 0xfeu ||
+                    write.stackReturnPC != 0x1720u ||
+                    write.machineCycle < secondTupleLoad->machineCycle ||
+                    write.machineCycle > secondTupleEndCycle)
+                    continue;
+                for (std::size_t byte = 0; byte < secondTupleWritePCs.size(); ++byte) {
+                    if (write.instructionPC != secondTupleWritePCs[byte])
+                        continue;
+                    assert(write.address == static_cast<std::uint16_t>(
+                        (static_cast<std::uint16_t>(secondEventPage) << 8u) +
+                        0x28u + byte));
+                    assert(write.value == secondTupleWriteBytes[byte]);
+                    assert(!secondTupleWritesSeen[byte]);
+                    secondTupleWritesSeen[byte] = true;
+                    ++secondTupleWriteCount;
+                }
+            }
+            assert(secondTupleWriteCount == 4u);
+            for (const auto seen : secondTupleWritesSeen)
+                assert(seen);
+
+            struct ExpectedSecondSlotMetadataWrite {
+                std::uint16_t pc;
+                std::uint8_t offset;
+                std::uint8_t value;
+            };
+            constexpr std::array<ExpectedSecondSlotMetadataWrite, 5>
+                expectedSecondSlotMetadataWrites{{
+                    {0x1a44u, 0x2cu, 0x00u},
+                    {0x1a57u, 0x2bu, 0x7fu},
+                    {0x1a82u, 0x2du, 0x50u},
+                    {0x1a88u, 0x2eu, 0x00u},
+                    {0x1aa5u, 0x2cu, 0x00u}
+                }};
+            std::array<bool, expectedSecondSlotMetadataWrites.size()>
+                secondSlotMetadataWritesSeen{};
+            std::size_t secondSlotMetadataWriteCount = 0;
+            for (std::size_t i = 0; i < nestedTraceCount; ++i) {
+                const auto& write =
+                    firmwareMachine.resourceTupleWriteTraceAtForTesting(i);
+                if (write.port2 != secondEventPage ||
+                    write.port3 != 0xfeu ||
+                    write.stackReturnPC != 0x1720u ||
+                    write.machineCycle < secondTupleLoad->machineCycle ||
+                    write.machineCycle > secondTupleEndCycle)
+                    continue;
+                for (std::size_t expectedIndex = 0;
+                     expectedIndex < expectedSecondSlotMetadataWrites.size();
+                     ++expectedIndex) {
+                    const auto& expected =
+                        expectedSecondSlotMetadataWrites[expectedIndex];
+                    if (write.instructionPC != expected.pc)
+                        continue;
+                    assert(write.address == static_cast<std::uint16_t>(
+                        (static_cast<std::uint16_t>(secondEventPage) << 8u) +
+                        expected.offset));
+                    assert(write.value == expected.value);
+                    assert(!secondSlotMetadataWritesSeen[expectedIndex]);
+                    secondSlotMetadataWritesSeen[expectedIndex] = true;
+                    ++secondSlotMetadataWriteCount;
+                }
+            }
+            assert(secondSlotMetadataWriteCount ==
+                   expectedSecondSlotMetadataWrites.size());
+            for (const auto seen : secondSlotMetadataWritesSeen)
+                assert(seen);
+
+            std::printf("NOTE65 NESTED SLOT MAP: slots=8 active=00,28 empty=6 "
+                        "source=03AF..03BE\\n");
+            std::printf("NOTE65 SLOT 28: raw=51 00 00 29 copy=51 00 00 29 "
+                        "metadata=00 7F 50 00\\n");
+
             std::printf("NOTE65 NESTED IC51 POSTPROCESS: "
                         "slot+3=00 (R2!=0) slot+4=00 slot+5=80 slot+6=00\\n");
             std::printf("NOTE65 NESTED IC51 RECORD: bank1[03AF..03B0]=06 38 "
