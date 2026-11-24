@@ -163,6 +163,9 @@ public:
         std::uint8_t directRam32 = 0;
         std::uint8_t directRam36 = 0;
         std::uint8_t directRam37 = 0;
+        std::uint8_t directRam20 = 0;
+        std::uint8_t port2Latch = 0xff;
+        std::uint8_t port3Pins = 0xff;
         std::uint64_t machineCycle = 0;
     };
     // Bounded execution trace from the two firmware helper-return sites to the
@@ -596,6 +599,7 @@ public:
         }
         if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
+            pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
             pc == 0x211fu || pc == 0x236bu) {
             const auto& registers = cpu_.registers();
@@ -616,6 +620,9 @@ public:
             event.directRam32 = readInternal(0x32u);
             event.directRam36 = readInternal(0x36u);
             event.directRam37 = readInternal(0x37u);
+            event.directRam20 = readInternal(0x20u);
+            event.port2Latch = portLatch_[2];
+            event.port3Pins = portPins_[3];
             const auto stackPointer = registers.sp;
             const auto returnHigh = readIndirect(stackPointer);
             const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
