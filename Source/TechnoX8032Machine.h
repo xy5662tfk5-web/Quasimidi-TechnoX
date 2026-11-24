@@ -267,6 +267,18 @@ public:
         bool writeAccepted = true;
         std::uint64_t machineCycle = 0;
     };
+    // Narrow, non-wrapping-in-normal-note-use trace for the four-byte nested
+    // resource tuple written by IC4 0x1A32/0x1A35/0x1A38/0x1A3C. The general
+    // XDATA trace is deliberately broad and can roll over during long MIDI tests.
+    struct ResourceTupleWriteEvent {
+        std::uint16_t address = 0;
+        std::uint8_t value = 0xff;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint64_t machineCycle = 0;
+    };
     struct MidiEventGateAccessEvent {
         std::uint16_t address = 0;
         std::uint8_t value = 0xff;
@@ -416,6 +428,17 @@ public:
     const XdataWatchEvent& xdataWatchTraceAt(std::size_t index) const noexcept {
         return xdataWatchTrace_[index % xdataWatchTrace_.size()];
     }
+    void clearResourceTupleWriteTraceForTesting() noexcept {
+        resourceTupleWriteTrace_.fill(ResourceTupleWriteEvent{});
+        resourceTupleWriteTraceCount_ = 0;
+    }
+    std::size_t resourceTupleWriteTraceCountForTesting() const noexcept {
+        return resourceTupleWriteTraceCount_;
+    }
+    const ResourceTupleWriteEvent& resourceTupleWriteTraceAtForTesting(
+        std::size_t index) const noexcept {
+        return resourceTupleWriteTrace_[index % resourceTupleWriteTrace_.size()];
+    }
     void clearMidiEventGateTraceForTesting() noexcept {
         midiEventGateTrace_.fill(MidiEventGateAccessEvent{});
         midiEventGateTraceCount_ = 0;
@@ -503,6 +526,8 @@ public:
         ic51ReadTraceCount_ = 0;
         xdataWatchTrace_.fill(XdataWatchEvent{});
         xdataWatchTraceCount_ = 0;
+        resourceTupleWriteTrace_.fill(ResourceTupleWriteEvent{});
+        resourceTupleWriteTraceCount_ = 0;
         midiEventGateTrace_.fill(MidiEventGateAccessEvent{});
         midiEventGateTraceCount_ = 0;
         dispatchFlagWriteTrace_.fill(DispatchFlagBackingWriteEvent{});
@@ -1307,6 +1332,23 @@ public:
     }
 
     void writeExternalImpl(std::uint16_t address, std::uint8_t value) noexcept {
+        const auto instructionPC =
+            static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        // Keep exact writes from the interpreter's four-byte nested-record
+        // copier even if the broad 8192-entry XDATA ring wraps later in the test.
+        if (instructionPC >= 0x1a32u && instructionPC <= 0x1a3cu &&
+            address >= 0x0100u && address <= 0x02ffu) {
+            auto& event = resourceTupleWriteTrace_[
+                resourceTupleWriteTraceCount_ % resourceTupleWriteTrace_.size()];
+            event.address = address;
+            event.value = value;
+            event.instructionPC = instructionPC;
+            event.stackReturnPC = currentStackReturnPC();
+            event.port2 = portPins_[2];
+            event.port3 = portPins_[3];
+            event.machineCycle = elapsedMachineCycles_;
+            ++resourceTupleWriteTraceCount_;
+        }
         const bool ramMode = (internal_[0x8e] & 0x03u) == 0x02u;
         const bool ic51Selected = isIC51Selected();
         if (address == 0xff10u) {
@@ -1967,6 +2009,8 @@ private:
     bool executionTraceActive_ = false;
     std::array<XdataWatchEvent, 8192> xdataWatchTrace_{};
     std::size_t xdataWatchTraceCount_ = 0;
+    std::array<ResourceTupleWriteEvent, 128> resourceTupleWriteTrace_{};
+    std::size_t resourceTupleWriteTraceCount_ = 0;
     std::array<MidiEventGateAccessEvent, 256> midiEventGateTrace_{};
     std::size_t midiEventGateTraceCount_ = 0;
     std::array<DispatchFlagBackingWriteEvent, 256> dispatchFlagWriteTrace_{};
