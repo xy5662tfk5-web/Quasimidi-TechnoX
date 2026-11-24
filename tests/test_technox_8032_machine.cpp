@@ -3060,7 +3060,6 @@ int main(int argc, char** argv) {
         // Each probe first releases the note using the previously selected mode,
         // then changes only the synthetic Common selector byte and captures
         // the actual runtime event IDs that reach 0x4256.
-        const std::array<std::uint8_t, 3> note65Off{{0x80u, 0x41u, 0x40u}};
         const auto probeCommonLayerSelector = [&](std::uint8_t selector,
                                                    const char* label) {
             runRealMidiStage("Note Off key 65 before Common layer probe",
