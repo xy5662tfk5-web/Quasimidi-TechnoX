@@ -896,26 +896,11 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
         for (auto& value : legacyChannels)
             value = static_cast<unsigned char>(stream.readByte());
 
-        for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
-            partMidiChannels[part].store(static_cast<int>(part + 1), std::memory_order_release);
-
-        bool validLegacyMap = true;
-        std::array<bool, 17> usedChannels{};
-        for (int channel = 1; channel <= 12; ++channel)
-            usedChannels[static_cast<std::size_t>(channel)] = true;
-        for (const int value : legacyChannels) {
-            if (value < 13 || value > 16 || usedChannels[static_cast<std::size_t>(
-                    juce::jlimit(1, 16, value))]) {
-                validLegacyMap = false;
-                break;
-            }
-            usedChannels[static_cast<std::size_t>(value)] = true;
-        }
-        if (validLegacyMap) {
-            for (std::size_t slot = 0; slot < legacyChannels.size(); ++slot)
-                partMidiChannels[12 + slot].store(
-                    legacyChannels[slot], std::memory_order_release);
-        }
+        const auto migratedChannels =
+            technox::migrateLegacyPerformancePartChannels(legacyChannels);
+        for (std::size_t part = 0; part < migratedChannels.size(); ++part)
+            partMidiChannels[part].store(
+                migratedChannels[part], std::memory_order_release);
     }
     if (magic == kStateMagicV4 || magic == kStateMagicV5) {
         const int mode = static_cast<unsigned char>(stream.readByte());
