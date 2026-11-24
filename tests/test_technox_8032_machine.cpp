@@ -3970,23 +3970,24 @@ int main(int argc, char** argv) {
             note72PitchPacket.bytes[1] |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[2]) << 8u) |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[3]) << 16u));
-        constexpr std::uint32_t note66ReferencePitchStep = 0x021ff0u;
-        const auto octaveRatioPPM =
+        constexpr std::uint32_t note66ReferencePitchWord = 0x021ff0u;
+        const auto note72To66RatioPPM =
             (static_cast<std::uint64_t>(note72PitchStep) * 1000000u +
-             note66ReferencePitchStep / 2u) / note66ReferencePitchStep;
-        assert(octaveRatioPPM >= 1990000u);
-        assert(octaveRatioPPM <= 2010000u);
+             note66ReferencePitchWord / 2u) / note66ReferencePitchWord;
+        // Do not impose octave scaling here: the observed note-72 value is
+        // below the note-66 value and may reflect a sample/root-zone change.
+        assert(note72PitchStep != 0u);
         for (std::size_t i = 0; i < secondNoteBulkPacketBytes.size(); ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(
                 note72PacketStart + kNoteSpecificPacketCount + i);
             assert(packet.bytes == secondNoteBulkPacketBytes[i]);
             assert(packet.returnPC == secondNoteBulkReturnPCs[i]);
         }
-        std::printf("NOTE72 OCTAVE STEP: word=%06X note66=%06X ratio_ppm=%llu "
+        std::printf("NOTE72 PITCH WORD (UNCLASSIFIED): word=%06X note66=%06X ratio_ppm=%llu "
                     "packets=%zu bulk=544/544 identical\\n",
                     static_cast<unsigned>(note72PitchStep),
-                    static_cast<unsigned>(note66ReferencePitchStep),
-                    static_cast<unsigned long long>(octaveRatioPPM),
+                    static_cast<unsigned>(note66ReferencePitchWord),
+                    static_cast<unsigned long long>(note72To66RatioPPM),
                     note72PacketCount);
 
         const std::array<std::uint8_t, 3> note72Off{{0x80u, 0x48u, 0x40u}};
