@@ -11,7 +11,7 @@ The real firmware calls `0x4256` twice for the same key/velocity pair. Both call
 | 1 | `0x0C` | `0x41` (65) | `0x64` (100) | 12 | Part 13 |
 | 2 | `0x0D` | `0x41` (65) | `0x64` (100) | 13 | Part 14 |
 
-The Part numbering is not inferred from the two calls alone. It follows the independent address correlation in `MIDI_EVENT_TO_PERFORMANCE_PART_MAPPING.md`: the Performance loader copies Part selectors 1–4 into runtime records 12–15, and event IDs 12–15 address those same records using `0x7C15 + 24*eventID`. The test's Common selector at XDATA `0x7BD5` is `1` (Layer 2). Firmware routine `0x593D` expands this selector into event IDs `0x0C` and `0x0D`, matching the two observed calls.
+The Part numbering is not inferred from the two calls alone. It follows the independent address correlation in `MIDI_EVENT_TO_PERFORMANCE_PART_MAPPING.md`: the Performance loader copies Part selectors 1–4 into runtime records 12–15, and event IDs 12–15 address those same records using `0x7C15 + 24*eventID`. For this experiment the test deliberately installs a synthetic read override at Common selector XDATA `0x7BD5` with value `1` (Layer 2); that value is not being claimed as a read from the factory Performance dump. Firmware routine `0x593D` expands the overridden selector into event IDs `0x0C` and `0x0D`, matching the two observed calls.
 
 ## 2. Two separate note-state maps and branch offsets
 
@@ -62,7 +62,13 @@ Routine `0x593D` reads the Common selector at XDATA `0x7BD5`, then sets internal
 
 The current real-ROM fixture reads `0x7BD5=1`, and the firmware test now asserts that value next to the two Note 65 dispatches. This explains the two event calls in this run: the Common selector requests Layer 2. Per-Part enable/Track Mode checks still apply, so the table describes the candidate event IDs selected by the layer mode, not an unconditional promise that every candidate always reaches `0x4256`.
 
-## 7. What this establishes—and what remains open
+## 7. Layer 2 to Single differential
+
+The follow-up regression changes only the same Common selector read-override from `1` to `0`, then repeats the same Note On (key `0x41`, velocity `0x64`) through the real ACIA/IC4 path. It asserts exactly one call each to `0x4256`, `0x1494`, `0x189D` and `0xAC00`, and pins the sole event ID to `0x0C`. Event `0x0D`, its `0x299C` selection record and its second Note On processing pass are no longer entered. This directly verifies the selector-driven expansion from two candidate Part events to one.
+
+Both selector values are test overrides. The experiment verifies IC4's behavior when Common mode is set to Layer 2 or Single; it does not establish which mode is stored in any factory Performance's actual Common data.
+
+## 8. What this establishes—and what remains open
 
 Established by real-ROM execution and passing regressions:
 - One key 65 / velocity 100 MIDI Note On reaches event IDs `0x0C` and `0x0D` separately.
@@ -77,4 +83,4 @@ Still open:
 - The physical device behind the `0x8000–0x8003` port, its actual response/handshake, and the semantics of its command bytes.
 - The sample/waveform memory format and the original M.A.S.S. oscillator/voice algorithm.
 
-Next probe: change only the Common selector from Layer 2 (`0x7BD5=1`) to Single (`0x7BD5=0`), rerun the same Note 65 stimulus, and check whether event `0x0D`, its `0x299C` record and its `0x0091–0x0093` interpolation triplet disappear while event `0x0C` remains. Then repeat with selector values 2 and 3 to validate the three- and four-layer cases. Do not yet turn Layer 2 into a claim about the external processor's voice count.
+Next probe: repeat the differential with selector values `2` and `3` to validate the three- and four-layer event sets while keeping the same Note 65 stimulus. Do not turn the number of firmware Part events into a claim about the external processor's voice count.

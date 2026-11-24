@@ -2980,6 +2980,43 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(note65OffBranches[i].accumulator),
                         static_cast<unsigned>(note65OffPageBranches[i].port2Latch));
         }
+        // Differentially change only the Common mode selector. The earlier
+        // Layer 2 pass used a synthetic read override at 0x7BD5=1 and produced
+        // event IDs 0x0C/0x0D. Single mode must retain only event 0x0C.
+        firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x00u);
+        assert(firmwareMachine.readExternal(0x7bd5u) == 0x00u);
+        firmwareMachine.clearInstructionWatchForTesting();
+        const auto singleModePartCallsBefore = firmwareMachine.watchedCallCount(0x4256u);
+        const auto singleModeDescriptorCallsBefore = firmwareMachine.watchedCallCount(0x1494u);
+        const auto singleModeStreamCallsBefore = firmwareMachine.watchedCallCount(0x189du);
+        const auto singleModeNoteMapCallsBefore = firmwareMachine.watchedCallCount(0xac00u);
+        runRealMidiStage("Note On pitch 65 with synthetic Common Single selector",
+                         note65On.data(), note65On.size());
+        assert(firmwareMachine.watchedCallCount(0x4256u) - singleModePartCallsBefore == 1u);
+        assert(firmwareMachine.watchedCallCount(0x1494u) - singleModeDescriptorCallsBefore == 1u);
+        assert(firmwareMachine.watchedCallCount(0x189du) - singleModeStreamCallsBefore == 1u);
+        assert(firmwareMachine.watchedCallCount(0xac00u) - singleModeNoteMapCallsBefore == 1u);
+        std::size_t singleModeDispatchCount = 0;
+        TechnoX8032Machine::InstructionWatchEvent singleModeDispatch{};
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC != 0x4256u)
+                continue;
+            ++singleModeDispatchCount;
+            singleModeDispatch = event;
+        }
+        assert(singleModeDispatchCount == 1u);
+        assert(singleModeDispatch.registers[7] == 0x0cu);
+        assert(singleModeDispatch.registers[5] == 0x41u);
+        assert(singleModeDispatch.registers[3] == 0x64u);
+        std::printf("NOTE65 SINGLE MODE: CommonOverride=00 4256=%zu 1494=%zu 189D=%zu AC00=%zu event=%02X\\n",
+                    firmwareMachine.watchedCallCount(0x4256u) - singleModePartCallsBefore,
+                    firmwareMachine.watchedCallCount(0x1494u) - singleModeDescriptorCallsBefore,
+                    firmwareMachine.watchedCallCount(0x189du) - singleModeStreamCallsBefore,
+                    firmwareMachine.watchedCallCount(0xac00u) - singleModeNoteMapCallsBefore,
+                    static_cast<unsigned>(singleModeDispatch.registers[7]));
+
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
