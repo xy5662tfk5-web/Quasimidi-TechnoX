@@ -4006,11 +4006,11 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(access.ic51Selected),
                         static_cast<unsigned long long>(access.machineCycle));
         }
-        constexpr std::array<std::uint16_t, 13> note72ResourceProducerPCs{{
+        constexpr std::array<std::uint16_t, 11> note72ResourceProducerPCs{{
             0x1cabu,
-            0x1e5bu, 0x1e5cu, 0x1e5du, 0x1e5eu, 0x1e5fu,
-            0x1e60u, 0x1e61u, 0x1e62u, 0x1e63u, 0x1e64u,
-            0x1e65u, 0x1e66u
+            0x1e5bu, 0x1e5cu, 0x1e5eu,
+            0x1e60u, 0x1e61u, 0x1e62u, 0x1e63u,
+            0x1e64u, 0x1e65u, 0x1e66u
         }};
         std::array<bool, note72ResourceProducerPCs.size()> note72SawResourceProducer{};
         std::printf("NOTE72 RESOURCE-TO-PITCH PRODUCER TRACE:\\n");
