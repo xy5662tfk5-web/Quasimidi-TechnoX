@@ -2729,6 +2729,24 @@ int main(int argc, char** argv) {
             const auto expected = technox::MASS09B9SlotInterpolationArithmetic::apply(
                 valueLow, valueMiddle, valueHigh, stepMagnitude, negativeStep);
             const auto& writer = note65WriterEvents[pass];
+            assert(input.returnPC == 0x1e6au);
+            assert(stepMagnitude == 0x000du);
+            assert(!negativeStep);
+            if (pass == 0u) {
+                assert(lowRead->address == 0x0081u && valueLow == 0x57u);
+                assert(middleRead->address == 0x0082u && valueMiddle == 0x01u);
+                assert(highRead->address == 0x0083u && valueHigh == 0xa2u);
+                assert(expected.inputValue24 == 0x020157u);
+                assert(expected.incrementMagnitude24 == 0x00001au);
+                assert(expected.outputValue24 == 0x020171u);
+            } else {
+                assert(lowRead->address == 0x0091u && valueLow == 0x01u);
+                assert(middleRead->address == 0x0092u && valueMiddle == 0x00u);
+                assert(highRead->address == 0x0093u && valueHigh == 0x48u);
+                assert(expected.inputValue24 == 0x000001u);
+                assert(expected.incrementMagnitude24 == 0x000000u);
+                assert(expected.outputValue24 == 0x000001u);
+            }
             std::printf("NOTE65 PASS%zu: ret=%04X entryR=%02X/%02X/%02X/%02X "
                         "slot=%04X:%02X %04X:%02X %04X:%02X step=%04X neg=%u "
                         "result=%06X writer=%02X %02X %02X\\n",
