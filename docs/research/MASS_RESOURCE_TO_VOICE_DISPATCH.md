@@ -2,7 +2,7 @@
 
 ## Scope and key distinction
 
-The IC4 firmware uses XDATA page 0x2D as a staging/control structure while preparing M.A.S.S. resource commands. These 0x2Dxx addresses are CPU external-memory addresses in the current machine map; they are **not** identified physical DSP register addresses. The separate 0x8000-0x8003 command port remains the observed external command interface, and its device identity and payload semantics remain unknown.
+The IC4 firmware uses internal RAM byte 0x2D as the selector for a P2-addressed XDATA workspace while preparing M.A.S.S. resource commands. It is not itself an XDATA page number or an address range 0x2D00–0x2DFF: routine 0x16C3 loads P2 from RAM[0x2D], and the observed Note 65 trace selects pages 0x01 and 0x02 for the two runtime Part events. The per-page offsets 0x60–0xFF hold staging/slot data. These are CPU external-memory addresses, not identified physical DSP register addresses. The separate 0x8000–0x8003 command port remains the observed external command interface, and its device identity and payload semantics remain unknown.
 
 This note consolidates the earlier instruction-level trace of routines 0x1494, 0x16C3, 0x189D and 0x1009. The new machine trace records 0x2D00-0x2DFF reads/writes with instruction PC, stack-top return snapshot, P2/P3 and SFR 0x8E so these paths can be rechecked under isolated MIDI stimuli.
 
@@ -24,7 +24,7 @@ The values may be changed by the intervening command-stream preparation path; th
 
 ## 2. Routine 0x16C3: staged resource/voice command preparation
 
-The routine selects XDATA page 0x2D through P2, then operates on the following offsets:
+The routine selects P2 from internal RAM byte 0x2D (the selected page number), then operates on these offsets within that page:
 
 | Offset | Observed firmware operation | Interpretation status |
 |---|---|---|
@@ -102,3 +102,15 @@ These are diagnostic probes. Until the updated CI run passes and the emitted tra
 5. Decode the IC51/resource bytes only when a concrete descriptor-to-waveform address path is established.
 
 No authentic sample playback, DSP model, sample codec, or complete original audio engine is implemented yet.
+
+## 7. Correction: RAM[0x2D] is a P2 page selector, not page 0x2D
+
+An expanded Note 65 trace for selector values 2 and 3 captures the 8032 state at 0x16A4–0x171D. This corrects the earlier shorthand in this file:
+
+- 0x16C3 begins with P2 pointing at 0x29, the per-Part descriptor-selection record area.
+- The preparation path then writes RAM[0x2D] to P2. For the first active event (runtime ID 0x0C) the observed selected page is 0x01; for the second event (0x0D) it is 0x02.
+- At 0x16CA, 0x16E4, and 0x16E6, P2 is 0x01 for event 0x0C and 0x02 for event 0x0D. The code is addressing offsets such as 0xFB, 0xFC, and 0xFE/0xFF on those pages. The stream interpreter then uses that same page with offsets 0x80..0xF8.
+- The queue routine 0x1742 does return in both traces. In the second event it reads the queue counter from RAM[0x52] (0x13), returns via 0x177E with RAM[0x52] decremented to 0x12, then execution continues into 0x16C3. This rules out the queue drain as the immediate reason why the selector-2/3 probe records only event IDs 0x0C and 0x0D.
+- The second event reaches 0x171D (call to 0x189D) with DPTR=0x274B, A=0x03, and R5=0x63; unlike the first event's interpreter entry (DPTR=0x26E2, A=0x16, R5=0x7A), the second event has not yet been observed returning to 0x1720 in that capture. This moves the next investigation into the second resource-stream interpreter context. The selected XDATA page should be traced using full addresses 0x0100–0x02FF, not the erroneous range 0x2D00–0x2DFF.
+
+The physical identity and meaning of the page contents are still open. This address correction does not identify the receiving IC or imply that the selected page is physically implemented as ordinary RAM in every P3/SFR 0x8E bus mode.
