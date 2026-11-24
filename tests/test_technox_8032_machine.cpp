@@ -3183,7 +3183,7 @@ int main(int argc, char** argv) {
             std::printf("NOTE65 DISPATCH FLAG BACKING WRITES: count=%zu\\n",
                         flagWriteCount);
             for (std::size_t i = 0; i < flagWriteCount; ++i) {
-                const auto& write = firmwareMachine.dispatchFlagWriteAtForTesting(i);
+                const auto& write = firmwareMachine.dispatchFlagWriteTraceAtForTesting(i);
                 std::printf("  FLAG-RAM W %02X %02X->%02X opcode=%02X operand=%02X "
                             "pc=%04X ret=%04X\\n",
                             static_cast<unsigned>(write.address),
