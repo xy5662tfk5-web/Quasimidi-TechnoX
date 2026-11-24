@@ -728,7 +728,10 @@ int main(int argc, char** argv) {
         // Differentially execute the alternate 0x047E consumer branch.
         // Keep Part/slot inputs fixed and vary only the real sine updater's
         // output byte; the two internal fixed-point scratch bytes must respond.
-        const auto runSineSlotConsumer = [&](std::uint8_t sineStepCount) {
+        const auto runSineSlotConsumer = [&](std::uint8_t sineStepCount,
+                                               std::uint8_t recordByte1,
+                                               std::uint8_t recordByte2,
+                                               std::uint8_t recordByte3) {
             TechnoX8032Machine consumerMachine;
             assert(consumerMachine.loadIC4Rom(realRom.data(), realRom.size()));
             consumerMachine.reset();
@@ -803,9 +806,9 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(voiceRecordAddress(0x31u), 0xffu);
             consumerMachine.writeExternal(voiceRecordAddress(0x70u), 0x01u);
             consumerMachine.writeExternal(voiceRecordAddress(0x88u), 0x00u);
-            consumerMachine.writeExternal(voiceRecordAddress(0x89u), 0x03u);
-            consumerMachine.writeExternal(voiceRecordAddress(0x8au), 0x05u);
-            consumerMachine.writeExternal(voiceRecordAddress(0x8bu), 0x08u);
+            consumerMachine.writeExternal(voiceRecordAddress(0x89u), recordByte1);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8au), recordByte2);
+            consumerMachine.writeExternal(voiceRecordAddress(0x8bu), recordByte3);
             consumerMachine.writeExternal(voiceRecordAddress(0x8cu), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x8du), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x8eu), 0x00u);
@@ -935,15 +938,18 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(packet.returnPC),
                     static_cast<unsigned>(packet.deviceIndex));
             }
-            return std::array<std::uint8_t, 3>{{
+            return std::array<std::uint8_t, 6>{{
                 sineSample,
                 consumerMachine.readInternal(0x36u),
-                consumerMachine.readInternal(0x37u)
+                consumerMachine.readInternal(0x37u),
+                sinePacket.bytes[1],
+                sinePacket.bytes[2],
+                sinePacket.bytes[3]
             }};
         };
 
-        const auto slotConsumerSingle = runSineSlotConsumer(0x01u);
-        const auto slotConsumerDouble = runSineSlotConsumer(0x02u);
+        const auto slotConsumerSingle = runSineSlotConsumer(0x01u, 0x03u, 0x05u, 0x08u);
+        const auto slotConsumerDouble = runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x08u);
         assert(slotConsumerSingle[0] == sineSingleStep[2]);
         assert(slotConsumerDouble[0] == sineDoubleStep[2]);
         assert(slotConsumerSingle[1] != slotConsumerDouble[1] ||
@@ -955,6 +961,26 @@ int main(int argc, char** argv) {
         // bytes; the external device's response/meaning remains unmodelled.
         assert(slotConsumerSingle[1] == 0x14u);
         assert(slotConsumerDouble[1] == 0x1fu);
+        assert(slotConsumerSingle[3] == 0x03u &&
+               slotConsumerSingle[4] == 0x05u && slotConsumerSingle[5] == 0x00u);
+        assert(slotConsumerDouble[3] == 0x04u &&
+               slotConsumerDouble[4] == 0x05u && slotConsumerDouble[5] == 0x00u);
+
+        // Change one of the three record bytes at a time. The 0x09DA–0x0A55
+        // routine uses bytes +1/+2/+3 as a 24-bit base and scales it by the
+        // branch-adjusted 16-bit value cached at +0x0E/+0x0F.
+        const auto changedRecordByte1 =
+            runSineSlotConsumer(0x02u, 0x83u, 0x05u, 0x08u);
+        const auto changedRecordByte2 =
+            runSineSlotConsumer(0x02u, 0x03u, 0x0fu, 0x08u);
+        const auto changedRecordByte3 =
+            runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x09u);
+        assert(changedRecordByte1[3] == 0x84u &&
+               changedRecordByte1[4] == 0x05u && changedRecordByte1[5] == 0x00u);
+        assert(changedRecordByte2[3] == 0x06u &&
+               changedRecordByte2[4] == 0x0fu && changedRecordByte2[5] == 0x00u);
+        assert(changedRecordByte3[3] == 0x42u &&
+               changedRecordByte3[4] == 0x05u && changedRecordByte3[5] == 0x01u);
 
         // Also execute the alternate 0x28D8 coefficient-table page with
         // Part/slot index 1. XDATA 00FC selects slot 1; ACC.3 in 00FB selects
