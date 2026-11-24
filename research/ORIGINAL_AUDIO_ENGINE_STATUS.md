@@ -237,3 +237,13 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - This explains the missing later event `0x0E`/`0x0F` calls in those test runs: the second Part event reaches the interpreter's nested-slot boundary and branches to the reset vector before returning to `0x593D`. The selector logic itself sets the candidate flags.
 - Limitation: Common selector and ready-response values are synthetic test overrides. The nested list's expected termination marker and the role of the two active tuples remain unidentified; no conclusion is made that physical hardware resets in normal playback.
 - Full trace and exact bytes: `docs/research/NOTE65_TWO_PART_EVENT_TRACE.md`, section 10.
+
+
+## Slot-1 sine-derived record reaches the SoundHost writer
+
+- The alternate coefficient-page probe selects slot index 1 with `0x00FB=0x08` and `0x00FC=0x10`, then runs the real IC4 path through `0x0550` before seeding one synthetic active record for the downstream scan.
+- The one-step/two-step sine differential changes the selected record byte at page offset `+0x96` from `0x14` to `0x1F`; `+0x97` remains zero.
+- Both runs reach `0x0DB7`, return to `0x0A52), execute the writer for 16 instructions, and emit exactly one four-byte transaction. Packets are `01 03 05 00` and `01 04 05 00`; only byte 1 changes.
+- The four writes are pinned at PCs `0x0DBA/0x0DBD/0x0DC0/0x0DC5`, caller return `0x0A52`, P2 `0x80`, captured device index `0x01`. This is a passing firmware-level regression, not a physical-device capture.
+- The test proves a controlled sine/slot-dependent change propagates through a record field into one SoundHost packet byte. It does not name that byte's hardware or musical meaning. The active record is explicitly seeded by the test.
+- Details and exact next differential tasks: `docs/research/SINE_SLOT1_SOUNDHOST_WRITER_TRACE.md`.
