@@ -3970,10 +3970,10 @@ int main(int argc, char** argv) {
             note72PitchPacket.bytes[1] |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[2]) << 8u) |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[3]) << 16u));
-        constexpr std::uint32_t note66PitchStep = 0x021ff0u;
+        constexpr std::uint32_t note66ReferencePitchStep = 0x021ff0u;
         const auto octaveRatioPPM =
             (static_cast<std::uint64_t>(note72PitchStep) * 1000000u +
-             note66PitchStep / 2u) / note66PitchStep;
+             note66ReferencePitchStep / 2u) / note66ReferencePitchStep;
         assert(octaveRatioPPM >= 1990000u);
         assert(octaveRatioPPM <= 2010000u);
         for (std::size_t i = 0; i < secondNoteBulkPacketBytes.size(); ++i) {
@@ -3985,7 +3985,7 @@ int main(int argc, char** argv) {
         std::printf("NOTE72 OCTAVE STEP: word=%06X note66=%06X ratio_ppm=%llu "
                     "packets=%zu bulk=544/544 identical\\n",
                     static_cast<unsigned>(note72PitchStep),
-                    static_cast<unsigned>(note66PitchStep),
+                    static_cast<unsigned>(note66ReferencePitchStep),
                     static_cast<unsigned long long>(octaveRatioPPM),
                     note72PacketCount);
 
