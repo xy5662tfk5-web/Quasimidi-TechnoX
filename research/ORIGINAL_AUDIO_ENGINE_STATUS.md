@@ -247,3 +247,20 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - The four writes are pinned at PCs `0x0DBA/0x0DBD/0x0DC0/0x0DC5`, caller return `0x0A52`, P2 `0x80`, captured device index `0x01`. This is a passing firmware-level regression, not a physical-device capture.
 - The test proves a controlled sine/slot-dependent change propagates through a record field into one SoundHost packet byte. It does not name that byte's hardware or musical meaning. The active record is explicitly seeded by the test.
 - Details and exact next differential tasks: `docs/research/SINE_SLOT1_SOUNDHOST_WRITER_TRACE.md`.
+
+
+## Matched Slot 0/Slot 1 and 16-bit record-state trace
+
+- The isolated sine consumer test now compares Slot 0 and Slot 1 using matched coefficient magnitudes: `22/33/44`, slot-indexed multiplier input `05`, and two-byte slot state `0000`. The alternate slot-1 page still uses its real slot-indexed addresses.
+- With those matched inputs, the firmware's `RAM[0x36/0x37]` scratch outputs are equal for Slot 0 and Slot 1 at both one and two sine steps. Both paths then produce the same record pair (`14 00` / `1F 00`) and SoundHost packet (`01 03 05 00` / `01 04 05 00`).
+- New XDATA access trace pins the cursor `RAM[0x2E]=0x88` fixture's `+0x0E/+0x0F` field to `0x0096/0x0097`: read low/high at IC4 PCs `0x09BF/0x09C3`, then conditionally write high/low at `0x09CA/0x09CD`. All four accesses have stack return PC `0x09A7`.
+- ROM disassembly establishes the structural behavior: `0x08A2–0x08A6` passes scratch bytes `0x36/0x37` in `R4/R5` to `0x09B9`. That helper compares the stored 16-bit pair with the incoming pair and skips rewriting when equal; otherwise it writes `R5` to the high byte and `R4` to the low byte. The following fixed-point path consumes three adjacent record bytes at cursor offsets `+1,+2,+3` and reaches the four-byte writer at `0x0DB7`.
+- This identifies a cached/previous 16-bit state pair and its fixed-point processing role, but not its musical parameter name, scale, or hardware meaning. The active record remains a synthetic test fixture and the physical sound processor response remains unknown.
+- Detailed trace: `docs/research/SINE_SLOT_RECORD_ACCUMULATOR_TRACE.md`. Updated Slot-1 comparison: `docs/research/SINE_SLOT1_SOUNDHOST_WRITER_TRACE.md`.
+
+## Immediate next investigation
+
+1. Decode the complete `0x09DA–0x0A55` fixed-point expression into named, neutral-width arithmetic stages, retaining exact byte order and carry/sign handling.
+2. Run one-coefficient-at-a-time tests for record bytes `+1/+2/+3` and the source coefficients at `0x28C8/0x2888/0x2898` (plus slot-1 equivalents), checking which intermediate/output bytes change.
+3. Trace the producer of `RAM[0x36/0x37]` backwards into the `0x04B5–0x0550` sine/slot consumer to connect each multiplier operand and saturation rule.
+4. Keep SoundHost byte meaning and the physical DSP protocol explicitly unresolved until supported by external documentation or a hardware capture.
