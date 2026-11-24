@@ -181,7 +181,11 @@ The regression now compares the live IC4 return state at both callers with the i
 
 At `0x1FC9`, B also changes from `0xEA` (velocity 100) to `0xE2` (velocity 50), while the carry/overflow flags match the C++ arithmetic model. At `0x2027`, B is `0x00` in both runs. These are register-level arithmetic facts; the semantic units of the values remain unknown.
 
-The second helper result is therefore not itself the velocity-sensitive packet byte: its output A is `0x0F` / `0x53`, while the later packet builder at `0x210F` sees R3/R4 = `0x78/0x78` or `0x98/0x9A`. The remaining task is to capture the instruction stream and register state between each helper return and the next consumer, including writes to R3, R4, RAM[0x2B], and any indirect/XDATA operands. Do not infer a direct A-to-packet mapping.
+The second helper result is therefore not itself the velocity-sensitive packet byte: its output A is `0x0F` / `0x53`, while the later packet builder at `0x210F` sees R3/R4 = `0x78/0x78` or `0x98/0x9A`. The bounded instruction trace now closes this gap for the exercised branch. At `0x2089` the firmware executes `SWAP A`; at `0x208A` it executes `RR A`; `0x208B` stores that byte in R4; `0x208C` masks A with `0xF8`; and `0x208E` stores the masked value in R3. Thus:
+- `A=0x0F` becomes swapped `0xF0`, rotated `0x78`, so `R3=0x78`, `R4=0x78`.
+- `A=0x53` becomes swapped `0x35`, rotated `0x9A`, so `R3=0x98`, `R4=0x9A`.
+
+The subsequent `0x211F` writer receives the four-byte form `[RAM[0x2B], 0, R3, R4 & 7]`, yielding the observed packets `0A 00 78 00` and `0A 00 98 02`. The new `MASS1848CommandFieldProjection` helper models only this verified register projection, and the live-machine regression compares its output against the original 8032 snapshots. It does not assign meanings such as amplitude, sample address, or envelope to those bytes.
 
 ### Instrumentation implementation: bounded 8032 execution trace
 
@@ -192,20 +196,16 @@ The next trace slice is now implemented in `Source/TechnoX8032Machine.h` and exe
 - A separate bounded event stream records each MOVX/XDATA read and write during the same active window: instruction PC, stack return PC, address, value, direction, machine cycle, P2/P3, bus mode and IC51-select state.
 - The test captures the same note/Part/program at velocity 100 and 50, then reports the first instruction-path divergence, first CPU-state divergence, and first XDATA access divergence. It deliberately does not assign semantic names to the changed values.
 
-This is instrumentation and a regression comparison, not yet a decoded trace result. The newly added test has not yet been confirmed by a completed CI run in this checkpoint. Once it runs, the first divergent state/write can be inspected to identify the firmware transformation between the arithmetic helpers and the packet builder. The test-only synthetic ready response remains in use; no external processor behavior or audio output is inferred.
+The bounded trace has now run successfully in macOS Intel CI (run #1476). It captured 80 instructions from `0x1FC9` through the pre-execution snapshot at `0x210F`, with identical PC/opcode flow for velocity 100 and 50. The first CPU-state difference is the return snapshot at `0x1FC9`: A/B/R2 are `10/EA/11` versus `59/E2/63`. The first MOVX difference is the write at PC `0x2005` to neutral XDATA address `0x00D1`: `0x10` versus `0x59`. The other seven observed MOVX accesses in this slice match between the two runs. The later `0x2027` return and `0x2089..0x208E` projection produce the R3/R4 values documented above. A follow-up regression now asserts the first CPU-state and XDATA divergence explicitly; its CI run is tracked separately. The test fixture's synthetic DSP-ready response is not a hardware capture, and no physical processor response or audible output is inferred.
 
 ### Remaining reverse-engineering work
 
+1. Repeat the same-note velocity differential with another pitch, another active Part, and additional velocity points. This tests whether the `0x2089..0x208E` projection is shared across resource/Part contexts.
+2. Trace the earlier producers of the `0x1848` inputs and selected resource bytes back through `0x189D`, `0x1494`, and the IC51 descriptor stream. Preserve raw values until their units are proven.
+3. Compare isolated Program Change, Note On, Note Off and controller events from identical machine snapshots; classify the five note-associated commands separately from the 544-command configuration sweep.
+4. Identify the physical receiver for `0x8000–0x8003` and validate its ready/ack behavior against a real hardware capture.
 
-1. Add a bounded instruction trace for the two dynamic return addresses captured at `0x1848`, starting at each return PC (`0x1FC9` and `0x2027`) and ending at the next relevant consumer / `0x210F` packet builder.
-2. For each instruction record PC, opcode bytes, A/B/PSW, active R0-R7 bank, DPTR, P2/P3, current stack return PC, and the values of RAM[0x2B], RAM[0x30..0x37]. Record XDATA reads/writes in the same cycle window.
-3. Run the same-note velocity 100/50 pair and compare the two traces instruction-by-instruction. The first divergent input or write should identify where the velocity-dependent path is introduced or transformed.
-4. Repeat with a second pitch and a second Part before assigning a field name. Then classify the first five Note On commands separately from the 544-command configuration sweep.
-
-The current fixture still uses a synthetic ready response. These traces establish firmware behavior only; they do not identify the external processor or prove audible sample playback.
-5. Obtain and inspect the CI execution trace for the two velocity runs; use the first divergent PC/state/XDATA operand to trace the producer of R3/R4.
-6. Repeat with another pitch and a second Part, then classify all five Note On-associated commands independently from the 544-command configuration sweep.
-
+The current fixture still uses an explicitly synthetic ready-response path for the warm-state differential. These results establish the 8032's command construction, not the external processor's response or audible sample playback.
 
 ## Shared caller confirmed for the two 0x0A4F pitch packets
 

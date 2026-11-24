@@ -576,6 +576,20 @@ void testMASS1848Arithmetic() {
     const auto clampNegative = MASS1848Arithmetic::execute(0x80, 0x81, 0x81);
     assert(clampNegative.value == 0x81 && clampNegative.carryOut &&
            clampNegative.overflow && clampNegative.saturated);
+
+    // The live IC4 path at 0x2089..0x208E turns the second 0x1848
+    // accumulator result into the R3/R4 fields used by the command builder.
+    const auto velocity100Fields = MASS1848CommandFieldProjection::apply(0x0f);
+    assert(velocity100Fields.r3 == 0x78 && velocity100Fields.r4 == 0x78);
+    const auto velocity50Fields = MASS1848CommandFieldProjection::apply(0x53);
+    assert(velocity50Fields.r3 == 0x98 && velocity50Fields.r4 == 0x9a);
+
+    // R3 is the high-five-bit projection of R4 for every possible input byte.
+    for (unsigned value = 0; value < 0x100u; ++value) {
+        const auto fields = MASS1848CommandFieldProjection::apply(
+            static_cast<std::uint8_t>(value));
+        assert(fields.r3 == static_cast<std::uint8_t>(fields.r4 & 0xf8u));
+    }
 }
 
 void testFirmwareROMTableView() {

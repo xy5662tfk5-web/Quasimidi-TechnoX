@@ -3405,6 +3405,16 @@ int main(int argc, char** argv) {
                lowPacketInputs->registers[3] == 0x98u);
         assert(highPacketInputs->registers[4] == 0x78u &&
                lowPacketInputs->registers[4] == 0x9au);
+        const auto projectedHighFields =
+            technox::MASS1848CommandFieldProjection::apply(
+                secondNote1848Returns[1].accumulator);
+        const auto projectedLowFields =
+            technox::MASS1848CommandFieldProjection::apply(
+                lowerVelocity1848Returns[1].accumulator);
+        assert(projectedHighFields.r3 == highPacketInputs->registers[3]);
+        assert(projectedHighFields.r4 == highPacketInputs->registers[4]);
+        assert(projectedLowFields.r3 == lowPacketInputs->registers[3]);
+        assert(projectedLowFields.r4 == lowPacketInputs->registers[4]);
 
         const auto comparableVelocityPackets =
             std::min<std::size_t>(referenceVelocityPackets.size(), lowerVelocityPacketCount);

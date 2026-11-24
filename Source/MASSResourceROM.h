@@ -910,6 +910,29 @@ private:
     }
 };
 
+// The selected IC4 branch at 0x2089..0x208E projects the second
+// 0x1848 result into the R3/R4 bytes consumed by the 0x210F command builder:
+// SWAP A; RR A; MOV R4,A; ANL A,#0xF8; MOV R3,A.
+// This models register construction only; it does not assign DSP semantics.
+struct MASS1848CommandFields {
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+};
+
+class MASS1848CommandFieldProjection {
+public:
+    static MASS1848CommandFields apply(std::uint8_t accumulator) noexcept {
+        const auto swapped = static_cast<std::uint8_t>(
+            (accumulator << 4u) | (accumulator >> 4u));
+        const auto rotatedRight = static_cast<std::uint8_t>(
+            (swapped >> 1u) | (swapped << 7u));
+        return {
+            static_cast<std::uint8_t>(rotatedRight & 0xf8u),
+            rotatedRight
+        };
+    }
+};
+
 struct MASS1EDDParameterPipelineResult {
     std::uint8_t r4 = 0xff;
     std::uint8_t coefficientB = 0;
