@@ -796,7 +796,12 @@ public:
             pc == 0x19fbu || pc == 0x19feu || pc == 0x1a01u ||
             pc == 0x1a07u || pc == 0x1a11u || pc == 0x1a16u ||
             pc == 0x1a17u || pc == 0x1a1au || pc == 0x1a1du ||
-            pc == 0x1a1fu ||
+            pc == 0x1a1fu || pc == 0x1a31u || pc == 0x1a3eu ||
+            pc == 0x1a44u || pc == 0x1a4au || pc == 0x1a4bu ||
+            pc == 0x1a4cu || pc == 0x1a50u || pc == 0x1a54u ||
+            pc == 0x1a57u || pc == 0x1a5au || pc == 0x1a74u ||
+            pc == 0x1a76u || pc == 0x1a7eu || pc == 0x1a82u ||
+            pc == 0x1a88u || pc == 0x1a9fu || pc == 0x1aa5u ||
             pc == 0x1a31u || pc == 0x1a3eu || pc == 0x1a4au ||
             pc == 0x1a4eu || pc == 0x1a50u || pc == 0x1a8cu ||
             pc == 0x1a8fu || pc == 0x1a99u || pc == 0x1a9fu ||
