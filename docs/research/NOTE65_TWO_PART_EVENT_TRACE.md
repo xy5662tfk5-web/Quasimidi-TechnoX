@@ -47,7 +47,7 @@ Those are observed architectural values at interpreter entry, not decoded DSP co
 
 The same Note 65 stimulus visits the `0x09B9` interpolation route twice, both from return PC `0x1E6A`. The exact source triplets and arithmetic results are pinned in `PITCH_INTERPOLATION_SLOT_TRACE.md`: XDATA `0x0081–0x0083` (`57 01 A2`) produces `0x020171`; XDATA `0x0091–0x0093` (`01 00 48`) produces `0x000001`, both with step `+0x000D`.
 
-The order and counts agree with the two Part-event dispatches, but the semantic units of these 24-bit values remain unknown. They are not declared sample addresses or DSP pitch words.
+Crucially, the follow-up Single-mode test still executes both `0x09B9` passes and reads both triplets even though only event ID `0x0C` enters `0x4256`. The interpolation passes therefore do **not** correspond one-to-one with the two active Part events. The two 24-bit slots remain an independent firmware structure whose semantic units are unknown; they are not declared sample addresses or DSP pitch words.
 
 ## 6. Common layer selector explains the two event calls
 
@@ -67,6 +67,15 @@ The current real-ROM fixture reads `0x7BD5=1`, and the firmware test now asserts
 The follow-up regression changes only the same Common selector read-override from `1` to `0`, then repeats the same Note On (key `0x41`, velocity `0x64`) through the real ACIA/IC4 path. It asserts exactly one call each to `0x4256`, `0x1494`, `0x189D` and `0xAC00`, and pins the sole event ID to `0x0C`. Event `0x0D`, its `0x299C` selection record and its second Note On processing pass are no longer entered. This directly verifies the selector-driven expansion from two candidate Part events to one.
 
 Both selector values are test overrides. The experiment verifies IC4's behavior when Common mode is set to Layer 2 or Single; it does not establish which mode is stored in any factory Performance's actual Common data.
+
+## 8. Interpolation lanes are not one-to-one with Part events
+
+The follow-up Single-mode run changes only the Common selector read-override from Layer 2 (`0x7BD5=1`) to Single (`0x7BD5=0`). The Part event path contracts to one event (`0x0C`) and one resource-selection/stream entry. However, the interpolation trace still records two calls at `0x09B9`, two arithmetic bodies at `0x09DA`, two packet writers at `0x0A4F`, and 20 watched MOVX accesses. It reads both triplets:
+
+- `0x0081–0x0083`: `57 01 A2`;
+- `0x0091–0x0093`: `01 00 48`.
+
+The two interpolation passes therefore cannot be assigned one-to-one to Parts 13 and 14. They remain an independent internal pair of parameter/interpolation lanes with unresolved ownership and units.
 
 ## 8. What this establishes—and what remains open
 

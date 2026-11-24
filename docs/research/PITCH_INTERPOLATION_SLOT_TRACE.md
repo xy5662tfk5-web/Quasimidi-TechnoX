@@ -29,3 +29,14 @@ The resulting low/middle/high bytes at the two 0x0A4F writer snapshots are respe
 ## Next differential probe
 
 Capture the same two slot addresses for note 64 and note 65 under identical Part/program/velocity. Then vary only the active Performance Part / event ID and verify whether the selected slot pair changes. This will show whether the 16-byte slot stride corresponds to event/voice records, a pair of interpolation lanes, or another firmware structure. Continue to keep the synthetic ready response labelled as a test fixture.
+
+## Layer-mode differential: both pitch lanes remain active in Single
+
+The same IC4 Note 65 stimulus was repeated with the Common selector read-override changed from Layer 2 (`0x7BD5=1`) to Single (`0x7BD5=0`). The MIDI dispatch/resource path collapsed from two Part events to one (`0x4256=1`, `0x1494=1`, `0x189D=1`, `0xAC00=1`; sole event ID `0x0C`).
+
+Despite that reduction, the interpolation trace still records two entries at `0x09B9`, two arithmetic bodies at `0x09DA`, two packet-writer entries at `0x0A4F`, and 20 watched MOVX events. It reads the same two source triplets:
+
+- `0x0081–0x0083`: `57 01 A2`;
+- `0x0091–0x0093`: `01 00 48`.
+
+This is decisive negative evidence against assigning one interpolation triplet to each enabled Performance Part. The pitch slots are independent from the number of candidate Part events selected by the Common layer mode. They may represent two interpolation lanes or another internal pair of parameter states, but their exact ownership/semantics remain unidentified. The physical sound device and sample format are still unknown.

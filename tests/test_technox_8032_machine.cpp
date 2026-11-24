@@ -2986,6 +2986,7 @@ int main(int argc, char** argv) {
         firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x00u);
         assert(firmwareMachine.readExternal(0x7bd5u) == 0x00u);
         firmwareMachine.clearInstructionWatchForTesting();
+        firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
         const auto singleModePartCallsBefore = firmwareMachine.watchedCallCount(0x4256u);
         const auto singleModeDescriptorCallsBefore = firmwareMachine.watchedCallCount(0x1494u);
         const auto singleModeStreamCallsBefore = firmwareMachine.watchedCallCount(0x189du);
@@ -3016,6 +3017,61 @@ int main(int argc, char** argv) {
                     firmwareMachine.watchedCallCount(0x189du) - singleModeStreamCallsBefore,
                     firmwareMachine.watchedCallCount(0xac00u) - singleModeNoteMapCallsBefore,
                     static_cast<unsigned>(singleModeDispatch.registers[7]));
+        std::size_t singleModeInterpolationEntryCount = 0;
+        std::size_t singleModeInterpolationMathCount = 0;
+        std::size_t singleModeInterpolationWriterCount = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x09b9u)
+                ++singleModeInterpolationEntryCount;
+            else if (event.instructionPC == 0x09dau)
+                ++singleModeInterpolationMathCount;
+            else if (event.instructionPC == 0x0a4fu)
+                ++singleModeInterpolationWriterCount;
+        }
+        assert(singleModeInterpolationEntryCount == 2u);
+        assert(singleModeInterpolationMathCount == 2u);
+        assert(singleModeInterpolationWriterCount == 2u);
+        const auto singleModeInterpolationAccessCount =
+            firmwareMachine.slotInterpolationDataAccessTraceCountForTesting();
+        assert(singleModeInterpolationAccessCount == 20u);
+        const auto findSingleModeInterpolationRead = [&](std::uint16_t pc,
+                                                          std::uint16_t address)
+            -> const TechnoX8032Machine::SlotInterpolationDataAccessEvent* {
+            for (std::size_t i = 0; i < singleModeInterpolationAccessCount; ++i) {
+                const auto& access =
+                    firmwareMachine.slotInterpolationDataAccessTraceAtForTesting(i);
+                if (!access.write && access.instructionPC == pc &&
+                    access.stackReturnPC == 0x1e6au && access.address == address)
+                    return &access;
+            }
+            return nullptr;
+        };
+        const auto* singleLowA = findSingleModeInterpolationRead(0x09dfu, 0x0081u);
+        const auto* singleMidA = findSingleModeInterpolationRead(0x09e6u, 0x0082u);
+        const auto* singleHighA = findSingleModeInterpolationRead(0x0a00u, 0x0083u);
+        const auto* singleLowB = findSingleModeInterpolationRead(0x09dfu, 0x0091u);
+        const auto* singleMidB = findSingleModeInterpolationRead(0x09e6u, 0x0092u);
+        const auto* singleHighB = findSingleModeInterpolationRead(0x0a00u, 0x0093u);
+        assert(singleLowA && singleMidA && singleHighA);
+        assert(singleLowB && singleMidB && singleHighB);
+        assert(singleLowA->value == 0x57u && singleMidA->value == 0x01u &&
+               singleHighA->value == 0xa2u);
+        assert(singleLowB->value == 0x01u && singleMidB->value == 0x00u &&
+               singleHighB->value == 0x48u);
+        std::printf("NOTE65 SINGLE PITCH: 09B9=%zu math=%zu writer=%zu MOVX=%zu "
+                    "tripletA=%02X/%02X/%02X tripletB=%02X/%02X/%02X\\n",
+                    singleModeInterpolationEntryCount,
+                    singleModeInterpolationMathCount,
+                    singleModeInterpolationWriterCount,
+                    singleModeInterpolationAccessCount,
+                    static_cast<unsigned>(singleLowA->value),
+                    static_cast<unsigned>(singleMidA->value),
+                    static_cast<unsigned>(singleHighA->value),
+                    static_cast<unsigned>(singleLowB->value),
+                    static_cast<unsigned>(singleMidB->value),
+                    static_cast<unsigned>(singleHighB->value));
 
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
