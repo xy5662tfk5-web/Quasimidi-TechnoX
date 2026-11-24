@@ -25,6 +25,7 @@ The routine at `0xA762–0xA79F` is a two-channel quadrature-style encoder scan:
 - scans two independent state bytes at internal RAM `0xA4` and `0xA5`;
 - uses P1.5 (bit address `0x95`) as the strobe/phase input: a low transition from the released state emits one event and sets the per-channel state byte; a held-low phase does not repeat; a subsequent high phase clears the state and rearms the next edge;
 - samples P1.6 (bit address `0x96`) at the low-phase edge to select one of two direction codes from that channel's table pair;
+- the table byte's bit 0 is shifted into P3.0, so the first pass selects P3.0 low and the second pass selects P3.0 high; external P1.5/P1.6 levels therefore belong to the currently selected row;
 - queues the selected byte with `0xA6D1`, then scans the second channel;
 - restores P1 before returning.
 
@@ -32,8 +33,8 @@ The table bytes at `0xA6A4–0xA6A7` give an exact code mapping:
 
 | Encoder scan state | P1.6 low | P1.6 high |
 |---|---:|---:|
-| First channel (state `0xA4`, table `0xA6A4`) | `BE` | `7E` |
-| Second channel (state `0xA5`, table `0xA6A6`) | `BD` | `7D` |
+| First channel (state `0xA4`, P3.0 low, table `0xA6A4`) | `BE` | `7E` |
+| Second channel (state `0xA5`, P3.0 high, table `0xA6A6`) | `BD` | `7D` |
 
 This is strong firmware evidence for **two independent rotary/encoder inputs with a phase/strobe and a direction sample**. The source does not yet identify which physical encoder is labelled PARAMETER versus VALUE, or whether the two values are increment/decrement codes in the eventual consumer; that remains a separate call-path correlation task.
 
@@ -66,13 +67,15 @@ Do not connect UI gestures to guessed pins. First correlate one known control ac
 
 ## 5. Emulator input seam
 
-`TechnoX8032Machine::setExternalPortInputs(portAddress, mask, value)` already supplies external pin levels independently of the output latch. Its `readInternal()` path combines the emulated port pins with the configured external input mask. This is the correct low-level seam for later panel simulation:
+`TechnoX8032Machine::setExternalPortInputs(portAddress, mask, value)` supplies fixed external pin levels independently of the output latch. For the multiplexed encoder scan, the test fixture now also has a P3.0-selected P1 input seam: `setExternalPort1InputsByP3Bit0ForTesting()`. This lets the ROM test provide different P1.5/P1.6 levels for the two P3.0-selected rows without pretending that the physical board wiring is already known.
+
+The regression test loads the raw IC4 image, runs the actual `0xA6A8` FIFO initializer and `0xA762` scan code, and checks that the firmware queues `7E/BE` for the P3.0-low channel and `7D/BD` for the P3.0-high channel. It also verifies no repeated event while P1.5 remains low. This tests the firmware routine and queue, not just the host pin-injection helper.
 
 ```
 UI gesture -> typed panel event -> audio-thread handoff
-           -> setExternalPortInputs(P1/P3, mask, value)
+           -> P1.5/P1.6 values for selected P3.0 scan row
            -> run IC4 scan routine -> firmware event FIFO
            -> decode the verified consumer path
 ```
 
-The project should keep the pin-to-control map data-driven until each input line and event code has been traced.
+The project should keep the PARAMETER/VALUE label mapping data-driven until a firmware consumer trace or hardware capture identifies the two physical encoder channels.
