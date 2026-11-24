@@ -3163,6 +3163,7 @@ int main(int argc, char** argv) {
         const auto comparedInstructionCount = std::min(
             secondNoteExecutionTrace.size(), lowerVelocityExecutionTrace.size());
         bool firstExecutionDifferenceReported = false;
+        std::size_t firstStateDifferenceIndex = comparedInstructionCount;
         for (std::size_t i = 0; i < comparedInstructionCount; ++i) {
             const auto& high = secondNoteExecutionTrace[i];
             const auto& low = lowerVelocityExecutionTrace[i];
@@ -3194,6 +3195,7 @@ int main(int argc, char** argv) {
                 high.port2 != low.port2 || high.port3 != low.port3 ||
                 high.soundBusMode != low.soundBusMode;
             if (stateDiffers) {
+                firstStateDifferenceIndex = i;
                 std::printf("8032 FIRST STATE DIVERGENCE[%zu] PC=%04X: "
                             "A=%02X/%02X B=%02X/%02X PSW=%02X/%02X "
                             "RET=%04X/%04X DPTR=%04X/%04X R2=%02X/%02X RAM2B=%02X/%02X "
@@ -3227,9 +3229,28 @@ int main(int argc, char** argv) {
                         comparedInstructionCount, secondNoteExecutionTrace.size(),
                         lowerVelocityExecutionTrace.size());
         }
+        // The first velocity-dependent CPU state must be the 1FC9 arithmetic
+        // return, after identical instruction flow. Pin its register values so
+        // a future firmware/model regression cannot silently move this boundary.
+        assert(firstStateDifferenceIndex == 0u);
+        const auto& firstHighState = secondNoteExecutionTrace[firstStateDifferenceIndex];
+        const auto& firstLowState = lowerVelocityExecutionTrace[firstStateDifferenceIndex];
+        assert(firstHighState.instructionPC == 0x1fc9u);
+        assert(firstLowState.instructionPC == 0x1fc9u);
+        assert(firstHighState.opcodeBytes == firstLowState.opcodeBytes);
+        assert(firstHighState.accumulator == 0x10u);
+        assert(firstLowState.accumulator == 0x59u);
+        assert(firstHighState.b == 0xeau);
+        assert(firstLowState.b == 0xe2u);
+        assert(firstHighState.registers[2] == 0x11u);
+        assert(firstLowState.registers[2] == 0x63u);
+        assert(firstHighState.ram2BAnd30To37[0] == 0x0au);
+        assert(firstLowState.ram2BAnd30To37[0] == 0x0au);
+
         const auto comparedDataAccessCount = std::min(
             secondNoteDataTrace.size(), lowerVelocityDataTrace.size());
         bool firstDataDifferenceReported = false;
+        std::size_t firstDataDifferenceIndex = comparedDataAccessCount;
         for (std::size_t i = 0; i < comparedDataAccessCount; ++i) {
             const auto& high = secondNoteDataTrace[i];
             const auto& low = lowerVelocityDataTrace[i];
@@ -3239,6 +3260,7 @@ int main(int argc, char** argv) {
                 high.port3 != low.port3 ||
                 high.soundBusMode != low.soundBusMode ||
                 high.ic51Selected != low.ic51Selected) {
+                firstDataDifferenceIndex = i;
                 std::printf("8032 FIRST XDATA DIVERGENCE[%zu]: "
                             "vel100 PC=%04X %c %04X=%02X; "
                             "vel50 PC=%04X %c %04X=%02X\\n",
@@ -3261,6 +3283,23 @@ int main(int argc, char** argv) {
                         comparedDataAccessCount, secondNoteDataTrace.size(),
                         lowerVelocityDataTrace.size());
         }
+        // This fixed velocity-only pair first diverges at the write to the
+        // neutral XDATA address 00D1. Keep the address/value correlation
+        // explicit; its DSP-level meaning remains intentionally unnamed.
+        assert(firstDataDifferenceReported);
+        assert(firstDataDifferenceIndex == 1u);
+        assert(secondNoteDataTrace.size() == 8u);
+        assert(lowerVelocityDataTrace.size() == 8u);
+        const auto& firstHighData = secondNoteDataTrace[firstDataDifferenceIndex];
+        const auto& firstLowData = lowerVelocityDataTrace[firstDataDifferenceIndex];
+        assert(firstHighData.instructionPC == 0x2005u);
+        assert(firstLowData.instructionPC == 0x2005u);
+        assert(firstHighData.write && firstLowData.write);
+        assert(firstHighData.address == 0x00d1u);
+        assert(firstLowData.address == 0x00d1u);
+        assert(firstHighData.value == 0x10u);
+        assert(firstLowData.value == 0x59u);
+
         std::printf("8032 XDATA trace totals: vel100=%zu (retained %zu), "
                     "vel50=%zu (retained %zu)\\n",
                     secondNoteExecutionDataCount, secondNoteExecutionDataRetained,
