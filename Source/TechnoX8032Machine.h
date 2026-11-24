@@ -176,6 +176,16 @@ public:
         std::uint8_t directRam50 = 0;
         std::uint8_t directRam51 = 0;
         std::uint8_t directRam52 = 0;
+        std::uint8_t directRam2C = 0;
+        std::uint8_t directRam2D = 0;
+        std::uint8_t directRam2E = 0;
+        std::uint8_t directRam38 = 0;
+        std::uint8_t directRam39 = 0;
+        std::uint8_t directRam3A = 0;
+        std::uint8_t directRam3B = 0;
+        std::uint8_t directRam41 = 0;
+        std::uint8_t directRam43 = 0;
+        std::uint8_t directRam44 = 0;
         std::uint8_t directRam30 = 0;
         std::uint8_t directRam31 = 0;
         std::uint8_t directRam32 = 0;
@@ -738,6 +748,22 @@ public:
             pc == 0x9988u || pc == 0x9994u || pc == 0x9997u ||
             pc == 0x99b5u || pc == 0x99b8u || pc == 0x99c5u ||
             pc == 0x9a14u ||
+            pc == 0x189du || pc == 0x18a6u || pc == 0x18b8u ||
+            pc == 0x18c0u || pc == 0x18d7u || pc == 0x18dbu ||
+            pc == 0x18dfu || pc == 0x195fu || pc == 0x1975u ||
+            pc == 0x1986u || pc == 0x1995u || pc == 0x199cu ||
+            pc == 0x19a2u || pc == 0x19a4u || pc == 0x19bdu ||
+            pc == 0x19c1u || pc == 0x19bcu || pc == 0x19cdu ||
+            pc == 0x19e1u || pc == 0x19fbu || pc == 0x1a01u ||
+            pc == 0x1a16u || pc == 0x1a1fu || pc == 0x1a31u ||
+            pc == 0x1a3eu || pc == 0x1a4au || pc == 0x1a8fu ||
+            pc == 0x1a9fu || pc == 0x1aa6u || pc == 0x1aacu ||
+            pc == 0x1acbu || pc == 0x1ad4u || pc == 0x1b00u ||
+            pc == 0x1b20u || pc == 0x1b40u || pc == 0x1b60u ||
+            pc == 0x1b80u || pc == 0x1ba0u || pc == 0x1bb1u ||
+            pc == 0x1bc3u || pc == 0x1c2bu || pc == 0x1c61u ||
+            pc == 0x1eddu || pc == 0x224cu || pc == 0x2301u ||
+            pc == 0x2374u ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
             pc == 0x211fu || pc == 0x236bu) {
@@ -772,6 +798,16 @@ public:
             event.directRam50 = readInternal(0x50u);
             event.directRam51 = readInternal(0x51u);
             event.directRam52 = readInternal(0x52u);
+            event.directRam2C = readInternal(0x2cu);
+            event.directRam2D = readInternal(0x2du);
+            event.directRam2E = readInternal(0x2eu);
+            event.directRam38 = readInternal(0x38u);
+            event.directRam39 = readInternal(0x39u);
+            event.directRam3A = readInternal(0x3au);
+            event.directRam3B = readInternal(0x3bu);
+            event.directRam41 = readInternal(0x41u);
+            event.directRam43 = readInternal(0x43u);
+            event.directRam44 = readInternal(0x44u);
             event.directRam30 = readInternal(0x30u);
             event.directRam31 = readInternal(0x31u);
             event.directRam32 = readInternal(0x32u);
