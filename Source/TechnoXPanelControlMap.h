@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace technox {
@@ -82,6 +83,41 @@ constexpr PanelControlAction panelAction(PanelOperatingMode mode,
     return mode == PanelOperatingMode::performance
         ? PanelControlAction::switchPerformanceBank
         : PanelControlAction::selectPart;
+}
+
+
+constexpr std::size_t kSequencerPartCount = 16;
+using SequencerMidiChannelMap = std::array<int, kSequencerPartCount>;
+
+constexpr SequencerMidiChannelMap defaultSequencerMidiChannelMap() noexcept
+{
+    SequencerMidiChannelMap result{};
+    for (std::size_t part = 0; part < result.size(); ++part)
+        result[part] = static_cast<int>(part + 1);
+    return result;
+}
+
+constexpr bool isValidSequencerMidiChannelMap(
+    const SequencerMidiChannelMap& channels) noexcept
+{
+    std::array<bool, 17> used{};
+    for (const int channel : channels) {
+        if (channel < 1 || channel > 16 || used[static_cast<std::size_t>(channel)])
+            return false;
+        used[static_cast<std::size_t>(channel)] = true;
+    }
+    return true;
+}
+
+constexpr int sequencerPartIndexForMidiChannel(
+    const SequencerMidiChannelMap& channels, int midiChannel) noexcept
+{
+    if (midiChannel < 1 || midiChannel > 16)
+        return -1;
+    for (std::size_t part = 0; part < channels.size(); ++part)
+        if (channels[part] == midiChannel)
+            return static_cast<int>(part);
+    return -1;
 }
 
 } // namespace technox
