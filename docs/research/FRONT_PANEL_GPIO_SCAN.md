@@ -71,7 +71,39 @@ For the `BE/7E` branch, the handler converts the selected value using `0xEC30`, 
 
 This is a concrete correlation between the first encoder's two codes and a selected-parameter/value transaction path. However, the reachable listing does not yet prove that this branch is directly invoked by every `A762` event, nor does it tell whether the physical first encoder is labelled PARAMETER or VALUE. The second encoder's `BD/7D` handling also needs its downstream consumer traced before assigning its UI role.
 
-## 5. What this proves and what remains open
+## 5. FIFO consumer evidence: VALUE-edit path versus selection path
+
+The firmware consumer logic provides a second layer of role evidence for the two encoder channels:
+
+### First scan channel — codes BE/7E
+
+In the `0x2C74–0x2DC5` handler path, the `0x2D6D` routine explicitly accepts event codes `0xBE` and `0x7E` from XDATA `0x2B8F`:
+
+- reads `0x307A` as the currently selected parameter/item index;
+- calls `0x6B2D` with that index;
+- reads the selected value from XDATA `0x3063 + index`;
+- converts the value through `0xEC30`;
+- constructs a record pointer and sends an update through `0xEDCE` to page `0x33`, offset `0xD8`;
+- sets XDATA `0x2B94` to `3`.
+
+This is a strong firmware-level match for **changing the current selected value**, i.e. the logical VALUE/SOUND encoder function. It is not merely a key-matrix press.
+
+### Second scan channel — codes BD/7D
+
+When `0x2D6D` receives a code other than `BE/7E`, it falls through to `0x29AA`. The `0x29AA–0x2AB6` path reads status at `0x7D95`, reads current selection/index state around `0x62CB–0x62CC` and `0x307A`, and issues multiple page-`0x33` mailbox updates, including offsets `0x99`, `0xA6`, `0xAA`, `0xB1`, `0xBA`, and `0xBE`. Its alternate subpaths also read the selected Part record at `0x7C00 + 24*index + 0x15/0x16`.
+
+This is consistent with **selection/navigation feedback** rather than direct value editing, and therefore is the stronger candidate for the PARAMETER/SOUNDGROUP encoder. The exact menu/group step semantics and the meanings of each page-`0x33` field are not completely decoded yet.
+
+### Current evidence-based logical assignment
+
+| IC4 scan row | FIFO codes | Strongest downstream role |
+|---|---|---|
+| P3.0 low / state `0xA4` | `BE/7E` | VALUE/SOUND — alters the currently selected value |
+| P3.0 high / state `0xA5` | `BD/7D` | PARAMETER/SOUNDGROUP — selection/navigation candidate |
+
+This assignment is firmware-derived from the event-code consumers, not yet verified against the physical PCB connector pinout. Keep the logical UI roles separate from the electrical pin numbers until a board capture confirms the wiring.
+
+## 6. What this proves and what remains open
 
 **Proven from the reachable IC4 disassembly:**
 - The firmware actively drives P1 and P3.0 with scan patterns.
@@ -89,7 +121,7 @@ This is a concrete correlation between the first encoder's two codes and a selec
 
 Do not connect UI gestures to guessed pins. First correlate one known control action at a time with the port patterns and queued bytes, ideally using a board capture or a controlled firmware fixture.
 
-## 6. Emulator input seam
+## 7. Emulator input seam
 
 `TechnoX8032Machine::setExternalPortInputs(portAddress, mask, value)` supplies fixed external pin levels independently of the output latch. For the multiplexed encoder scan, the test fixture now also has a P3.0-selected P1 input seam: `setExternalPort1InputsByP3Bit0ForTesting()`. This lets the ROM test provide different P1.5/P1.6 levels for the two P3.0-selected rows without pretending that the physical board wiring is already known.
 
