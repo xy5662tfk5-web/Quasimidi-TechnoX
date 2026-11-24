@@ -41,6 +41,7 @@ private:
     bool ramPerformanceBank = false;
     int ramPerformanceSelection = 0;
     MidiRoutingMode lastRoutingMode = MidiRoutingMode::performanceOmni;
+    int lastPerformanceIndex = 0;
     EditorPage page = EditorPage::main;
     int selectedEditFunction = 2; // <2> Edit Part is the implemented default.
     int selectedSystemParameter = 0; // 0 = Mode (Perform / Sequencer Multi).
