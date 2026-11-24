@@ -3426,11 +3426,21 @@ int main(int argc, char** argv) {
                     : nullptr;
                 if (expected.active) {
                     ++activeNestedSlotCount;
-                    assert(!emptyBranch && !emptyTest && tupleCopy);
+                    assert(!emptyBranch && tupleCopy);
                     assert(tupleCopy->registers[1] == expected.slotOffset);
+                    // R3!=0 branches directly at 1A17; otherwise 1A1A
+                    // still executes and tests ACC.6 before deciding whether
+                    // to take the empty-record path at 19E9.
+                    if (expected.entryR3 != 0u) {
+                        assert(!emptyTest);
+                    } else {
+                        assert(emptyTest);
+                        assert((emptyTest->accumulator & 0x40u) != 0u);
+                    }
                 } else {
                     ++emptyNestedSlotCount;
                     assert(emptyBranch && emptyTest && !tupleCopy);
+                    assert((emptyTest->accumulator & 0x40u) == 0u);
                 }
             }
             assert(activeNestedSlotCount == 2u);
