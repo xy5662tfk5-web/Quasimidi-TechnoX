@@ -416,8 +416,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
                 break;
             case technox::PanelControlAction::selectSoundGroup:
                 parameterDragStartIndex = static_cast<float>(juce::jmax(0,
-                    audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
-                        selectedPart, technox::PartParameter::bankNumber)));
+                    currentPartParameterRaw(technox::PartParameter::bankNumber)));
                 break;
             case technox::PanelControlAction::selectEditFunction:
                 parameterDragStartIndex = static_cast<float>(selectedEditFunction - 1);
@@ -446,8 +445,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
                 break;
             case technox::PanelControlAction::selectSingleSound:
                 valueDragStartRaw = static_cast<float>(juce::jmax(0,
-                    audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
-                        selectedPart, technox::PartParameter::soundNumber)));
+                    currentPartParameterRaw(technox::PartParameter::soundNumber)));
                 break;
             case technox::PanelControlAction::selectEditFunction:
                 valueDragStartRaw = static_cast<float>(selectedEditFunction - 1);
@@ -461,8 +459,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
                 break;
             case technox::PanelControlAction::editSelectedParameter:
                 valueDragStartRaw = static_cast<float>(juce::jmax(0,
-                    audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
-                        selectedPart,
+                    currentPartParameterRaw(
                         static_cast<technox::PartParameter>(selectedParameter))));
                 break;
             default:
@@ -518,9 +515,11 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
             ramPerformanceSelection = audioProcessor.getCurrentProgram();
             syncDialsFromCurrentSelection();
         } else if (action == technox::PanelControlAction::selectPart) {
-            // The current parser has four stored Performance Part blocks:
-            // user-visible Parts 13–16. Full Sequencer Multi Parts 1–16 follow later.
-            selectedPart = juce::jlimit(0, 3, selectedPart + (p.x < 776 ? -1 : 1));
+            // Performance memories store four Parts (13–16); Sequencer
+            // Multi owns all 16 channels/Parts, independently of those records.
+            const int maximumPart = mode == technox::PanelOperatingMode::performance ? 3 : 15;
+            selectedPart = juce::jlimit(0, maximumPart,
+                selectedPart + (p.x < 776 ? -1 : 1));
             syncDialsFromCurrentSelection();
         }
         repaint();
