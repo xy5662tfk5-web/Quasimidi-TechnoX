@@ -683,6 +683,10 @@ public:
             case 0x4803: return watchedCallCounts_[17];
             case 0x02d1: return watchedCallCounts_[18];
             case 0x1848: return watchedCallCounts_[19];
+            case 0x0e3a: return watchedCallCounts_[20];
+            case 0x26a2: return watchedCallCounts_[21];
+            case 0x0e21: return watchedCallCounts_[22];
+            case 0x0df7: return watchedCallCounts_[23];
             default: return 0;
         }
     }
@@ -936,6 +940,10 @@ public:
                 case 0x4803: ++watchedCallCounts_[17]; break;
                 case 0x02d1: ++watchedCallCounts_[18]; break;
                 case 0x1848: ++watchedCallCounts_[19]; break;
+                case 0x0e3a: ++watchedCallCounts_[20]; break;
+                case 0x26a2: ++watchedCallCounts_[21]; break;
+                case 0x0e21: ++watchedCallCounts_[22]; break;
+                case 0x0df7: ++watchedCallCounts_[23]; break;
                 default: break;
             }
             if (testInternalWriteOnCallEnabled_ &&
@@ -2126,7 +2134,7 @@ private:
     std::size_t portWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
     mutable std::size_t portReadCount_ = 0;
-    std::array<std::uint64_t, 20> watchedCallCounts_{};
+    std::array<std::uint64_t, 24> watchedCallCounts_{};
     std::uint8_t aciaControl_ = 0;
     std::uint8_t aciaStatus_ = 0x02;
     std::uint8_t aciaReceive_ = 0;

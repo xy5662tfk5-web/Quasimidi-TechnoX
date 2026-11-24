@@ -2578,6 +2578,10 @@ int main(int argc, char** argv) {
         firmwareMachine.clearExecutionTraceForTesting();
         const auto secondNotePacketStart = firmwareMachine.soundCommandPacketCount();
         const auto secondNote1848CallStart = firmwareMachine.watchedCallCount(0x1848u);
+        const auto secondNoteBulkEntryStart = firmwareMachine.watchedCallCount(0x0e3au);
+        const auto secondNoteBulkCallerStart = firmwareMachine.watchedCallCount(0x26a2u);
+        const auto secondNoteBulkPageStart = firmwareMachine.watchedCallCount(0x0e21u);
+        const auto secondNoteSparseStart = firmwareMachine.watchedCallCount(0x0df7u);
         runRealMidiStage("Second Note On Part 1 after DSP-ready setup",
                          secondNoteOn.data(), secondNoteOn.size());
         firmwareMachine.disableExecutionTraceForTesting();
@@ -2635,6 +2639,11 @@ int main(int argc, char** argv) {
         const auto secondNotePacketCount =
             firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
         assert(secondNotePacketCount == 549u);
+        std::printf("NOTE64-BULK-CALLS vel100: 0E3A=%llu 26A2=%llu 0E21=%llu 0DF7=%llu\\n",
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e3au) - secondNoteBulkEntryStart),
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x26a2u) - secondNoteBulkCallerStart),
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e21u) - secondNoteBulkPageStart),
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0df7u) - secondNoteSparseStart));
 
         // The five event-specific command packets are followed by a repeatable
         // 544-packet firmware-generated transfer: two 256-index passes from
@@ -3012,6 +3021,10 @@ int main(int argc, char** argv) {
                 firmwareMachine.soundCommandPacketAt(secondNotePacketStart + i).bytes;
         const auto lowerVelocityPacketStart = firmwareMachine.soundCommandPacketCount();
         const auto lowerVelocity1848CallStart = firmwareMachine.watchedCallCount(0x1848u);
+        const auto lowerVelocityBulkEntryStart = firmwareMachine.watchedCallCount(0x0e3au);
+        const auto lowerVelocityBulkCallerStart = firmwareMachine.watchedCallCount(0x26a2u);
+        const auto lowerVelocityBulkPageStart = firmwareMachine.watchedCallCount(0x0e21u);
+        const auto lowerVelocitySparseStart = firmwareMachine.watchedCallCount(0x0df7u);
         firmwareMachine.clearInstructionWatchForTesting();
         firmwareMachine.clearExecutionTraceForTesting();
         runRealMidiStage("Same note 64 with lower velocity 50",
@@ -3069,6 +3082,11 @@ int main(int argc, char** argv) {
         const auto lowerVelocityPacketCount =
             firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
         assert(lowerVelocityPacketCount == 549u);
+        std::printf("NOTE64-BULK-CALLS vel50: 0E3A=%llu 26A2=%llu 0E21=%llu 0DF7=%llu\\n",
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e3au) - lowerVelocityBulkEntryStart),
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x26a2u) - lowerVelocityBulkCallerStart),
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e21u) - lowerVelocityBulkPageStart),
+            static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0df7u) - lowerVelocitySparseStart));
         const auto lowerVelocity1848Calls =
             firmwareMachine.watchedCallCount(0x1848u) - lowerVelocity1848CallStart;
         assert(lowerVelocity1848Calls == 2u);
