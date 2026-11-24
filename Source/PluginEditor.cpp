@@ -19,7 +19,7 @@ void drawOriginalCurvedLabel(juce::Graphics& g, const juce::String& text,
     // so render the same glyph run along the original SVG arc here.
     constexpr float fontHeight = 8.0f;
     constexpr float letterSpacing = 1.6f;
-    const juce::Font font("Arial Black", fontHeight, juce::Font::plain);
+    const juce::Font font(juce::FontOptions{}.withName("Arial Black").withPointHeight(fontHeight));
 
     juce::GlyphArrangement glyphs;
     glyphs.addLineOfText(font, text, 0.0f, 0.0f);
