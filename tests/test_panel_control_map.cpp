@@ -86,6 +86,30 @@ int main()
     remappedChannels[7] = 16;
     assert(!isValidSequencerMidiChannelMap(remappedChannels));
 
+    // V1–V4 plugin states stored only the four legacy Performance Part
+    // channels. Valid 13..16 assignments migrate to the Sequencer Part
+    // slots 13..16 while Parts 1..12 keep their standard channels.
+    const std::array<int, 4> legacyDefault{{13, 14, 15, 16}};
+    const auto migratedDefault = migrateLegacyPerformancePartChannels(legacyDefault);
+    assert(isValidSequencerMidiChannelMap(migratedDefault));
+    for (int channel = 1; channel <= 16; ++channel)
+        assert(sequencerPartIndexForMidiChannel(migratedDefault, channel) == channel - 1);
+
+    const std::array<int, 4> legacyRemapped{{16, 13, 15, 14}};
+    const auto migratedRemapped = migrateLegacyPerformancePartChannels(legacyRemapped);
+    assert(isValidSequencerMidiChannelMap(migratedRemapped));
+    assert(migratedRemapped[12] == 16);
+    assert(migratedRemapped[13] == 13);
+    assert(migratedRemapped[14] == 15);
+    assert(migratedRemapped[15] == 14);
+
+    const std::array<int, 4> legacyDuplicate{{13, 13, 15, 16}};
+    assert(migrateLegacyPerformancePartChannels(legacyDuplicate) == defaultChannels);
+    const std::array<int, 4> legacyCollision{{12, 13, 14, 16}};
+    assert(migrateLegacyPerformancePartChannels(legacyCollision) == defaultChannels);
+    const std::array<int, 4> legacyInvalid{{0, 13, 14, 16}};
+    assert(migrateLegacyPerformancePartChannels(legacyInvalid) == defaultChannels);
+
     std::cout << "TechnoX manual-based panel control map tests passed\\n";
     return 0;
 }
