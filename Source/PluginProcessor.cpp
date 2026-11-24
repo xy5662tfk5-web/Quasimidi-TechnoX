@@ -251,6 +251,17 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             ? static_cast<double>(firmwareMachine->machineCyclesPerSecond()) / hostSampleRate
             : 0.0;
     const int performanceIndex = getCurrentProgram();
+
+    // GUI-originated edits are applied only on the audio thread. The editor
+    // publishes latest values into a bounded per-Performance mailbox; this
+    // avoids touching VoiceManager/backend state from the message thread.
+    panelPartEditMailbox.consume(performanceIndex,
+        [this](const technox::PanelPartEditMailbox::Edit& edit) {
+            massEngine.setPartParameter(12 + edit.partIndex, edit.parameter, edit.rawValue);
+            massEngine.setPerformancePartByte(edit.partIndex,
+                static_cast<int>(edit.parameter), edit.rawValue);
+        });
+
     const int channelCount = buffer.getNumChannels();
     int renderedSamples = 0;
 
@@ -467,6 +478,23 @@ bool QuasimidiTechnoXAudioProcessor::setPartParameterRaw(
         massEngine.setPerformancePartByte(partIndex, static_cast<int>(parameterIndex), rawValue);
     }
     return true;
+}
+
+bool QuasimidiTechnoXAudioProcessor::queuePanelPartParameterRaw(
+    int performanceIndex, int partIndex, technox::PartParameter parameter, int rawValue) noexcept
+{
+    const auto parameterIndex = static_cast<std::size_t>(parameter);
+    const auto* descriptor = technox::PartEditModel::descriptor(parameterIndex);
+    if (performanceIndex < 0 || performanceIndex >= 50 || partIndex < 0 || partIndex >= 4 ||
+        descriptor == nullptr || rawValue < 0 || rawValue > descriptor->maximum)
+        return false;
+
+    // Keep the canonical UI/Performance model immediately readable. The
+    // engine-side mutation is deferred to processBlock through the mailbox.
+    partValues[static_cast<std::size_t>(performanceIndex)]
+              [static_cast<std::size_t>(partIndex)][parameterIndex]
+                  .store(rawValue, std::memory_order_release);
+    return panelPartEditMailbox.publish(performanceIndex, partIndex, parameter, rawValue);
 }
 
 int QuasimidiTechnoXAudioProcessor::getCommonControlRaw(
