@@ -47,7 +47,31 @@ The event queue helpers are separate from the scan logic:
 - `0xA6E7` returns zero when the queue is empty; otherwise it removes the next queued byte and advances/wraps the read pointer.
 - `0xA6A8` is called at `0x384F`; `0xA6FF` is called from `0x31D4`, `0x3303`, `0x352E`, `0x37DB`, and `0x3855`; `0xA762` is called from the Timer 1 interrupt handler at `0x2857`.
 
-## 4. What this proves and what remains open
+## 4. Downstream consumer correlation
+
+The event FIFO is read by several main-state routines. One concrete consumer path at `0x3303–0x3316` is:
+
+```
+0x3303  call 0xA6FF (refresh matrix scan)
+0x3306  call 0xA6E7 (pop one FIFO event into R7)
+0x3309  XDATA[0x2B8F] = R7
+0x3310  call 0x2FD4 (dispatch event code)
+0x3313  call 0x30DC (advance/decrement associated state)
+0x3316  call 0x2892
+```
+
+This confirms that event codes from the FIFO are staged at XDATA `0x2B8F` and passed to an event dispatcher. It does not alone assign a UI label to a code.
+
+A separate reachable handler at `0x2D6D–0x2DC5` reads:
+- `0x307A` as a selected-item/parameter index;
+- `XDATA[0x3063 + index]` as the current value used by the conversion;
+- event code `XDATA[0x2B8F]`, with explicit comparisons against `0xBE` and `0x7E`.
+
+For the `BE/7E` branch, the handler converts the selected value using `0xEC30`, builds a record pointer from the converted result, and issues `EDCE` to page `0x33`, offset `0xD8`; it then sets `XDATA[0x2B94]=3`. The alternate branch calls `0x29AA`.
+
+This is a concrete correlation between the first encoder's two codes and a selected-parameter/value transaction path. However, the reachable listing does not yet prove that this branch is directly invoked by every `A762` event, nor does it tell whether the physical first encoder is labelled PARAMETER or VALUE. The second encoder's `BD/7D` handling also needs its downstream consumer traced before assigning its UI role.
+
+## 5. What this proves and what remains open
 
 **Proven from the reachable IC4 disassembly:**
 - The firmware actively drives P1 and P3.0 with scan patterns.
@@ -65,7 +89,7 @@ The event queue helpers are separate from the scan logic:
 
 Do not connect UI gestures to guessed pins. First correlate one known control action at a time with the port patterns and queued bytes, ideally using a board capture or a controlled firmware fixture.
 
-## 5. Emulator input seam
+## 6. Emulator input seam
 
 `TechnoX8032Machine::setExternalPortInputs(portAddress, mask, value)` supplies fixed external pin levels independently of the output latch. For the multiplexed encoder scan, the test fixture now also has a P3.0-selected P1 input seam: `setExternalPort1InputsByP3Bit0ForTesting()`. This lets the ROM test provide different P1.5/P1.6 levels for the two P3.0-selected rows without pretending that the physical board wiring is already known.
 
