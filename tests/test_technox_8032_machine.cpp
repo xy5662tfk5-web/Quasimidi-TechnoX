@@ -3193,9 +3193,16 @@ int main(int argc, char** argv) {
                     firmwareMachine.readCode(0x18f0u) == 0x00u)
                     ++boundaryJumpToZero;
             }
+            assert(boundaryAt40 == 1u);
+            assert(boundaryJumpToZero == 1u);
+            assert(resetVectorCount == 1u);
+            assert(resetBootCount == 1u);
+            assert(firmwareMachine.readCode(0x0000u) == 0x02u);
+            assert(firmwareMachine.readCode(0x0001u) == 0xebu);
+            assert(firmwareMachine.readCode(0x0002u) == 0x32u);
             std::printf("NOTE65 RESOURCE SLOT BOUNDARY selector=%u "
-                        "PC18EB=%zu at40=%zu PC18EE=%zu LJMP0000=%zu "
-                        "PC0000=%zu PC=EB32=%zu finalPC=%04X\\n",
+                        "PC18EB=%zu at40=%zu PC18EE/LJMP0000=%zu "
+                        "PC0000=%zu PC_EB32=%zu finalPC=%04X\\n",
                         static_cast<unsigned>(selector),
                         nestedSlotBoundaryCount, boundaryAt40,
                         boundaryJumpToZero, resetVectorCount, resetBootCount,

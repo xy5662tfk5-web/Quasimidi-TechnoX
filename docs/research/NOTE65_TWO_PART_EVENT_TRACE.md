@@ -93,3 +93,19 @@ Still open:
 - The sample/waveform memory format and the original M.A.S.S. oscillator/voice algorithm.
 
 Next probe: repeat the differential with selector values `2` and `3` to validate the three- and four-layer event sets while keeping the same Note 65 stimulus. Do not turn the number of firmware Part events into a claim about the external processor's voice count.
+
+## 10. Layer 3/4 probe reaches the nested eight-slot guard and reset vector
+
+Run `45378212647` (commit `4e24607b`) now has a passing real-ROM 8032 integration test and a passing Intel macOS build. For both synthetic Common selector values 2 and 3, the `0x593D` dispatcher sets the candidate-layer flags, but processing the second candidate event (`0x0D`, the Part-14 runtime record) does not return to the subsequent `0x0E`/`0x0F` call sites in this fixture.
+
+The capture distinguishes a real firmware branch from a slow/incomplete timeout:
+
+- The nested `0x189D` path reads an eight-entry, two-byte IC51 pointer list in bank 1 at `0x03AF..0x03BE`. The firmware classifies two entries as active at byte offsets `0x00` and `0x28`, and six as empty.
+- The first active entry points to `0x3806`, whose bytes begin `A4 16 A3 40`; the transform path changes the first byte to `E4` before the tuple is copied to the allocated page.
+- The second active entry points to `0x3C10`, which begins `51 00 00 29`. The firmware copies the tuple into page offset `0x28`, then writes separate metadata fields including `page+0x2B=0x7F`, `page+0x2D=0x50`, and `page+0x2E=0x00`.
+- The nested slot cursor in IRAM `0x2E` advances by eight. The observed `0x18EB` pre-instruction snapshots progress through `08, 10, 18, 20, 28, 30, 38, 40`.
+- At cursor `0x40`, ACC.6 is set. The instruction at `0x18EB` is `JNB 0xE6,0x18F1`; it falls through to `0x18EE`, whose ROM bytes are `02 00 00` (`LJMP 0x0000`). The regression now asserts the boundary, the jump opcode/target, one PC snapshot at `0x0000`, and one at the reset-vector target `0xEB32`. The reset vector bytes at address zero are checked as `02 EB 32`.
+
+This gives a concrete explanation for why the Layer 3/4 probe does not reach the next dispatcher calls: the Part-14 nested resource interpreter reaches its eight-slot boundary and takes the reset-vector branch. It is not evidence that the Common selector cannot enable event IDs `0x0E` and `0x0F`.
+
+Important limitation: the Common selector and sound-device-ready response in this experiment are explicit test overrides. The trace proves the IC4 v1.05 code path under this reproducible fixture; it does not prove that real hardware resets on an ordinary Layer 3/4 note. The reason the nested interpreter reaches its guard despite only two entries being marked active remains unresolved. In particular, the exact role of the second `0x3C10` tuple and the expected terminal condition still need to be traced before assigning resource semantics.

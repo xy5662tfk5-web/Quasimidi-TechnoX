@@ -229,3 +229,11 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - That branch clears A before the `XCH`/`MOVX` sequence, so PC `0x1A57` writes `00` at offset `+3`. `0x7F` is staged only on the opposite zero-byte branch and was an incorrect unconditional expectation in the earlier test.
 - The regression now pins the branch state (`A=R2=0x16` at `0x1A4E`), the clear at `0x1A8C`, and the actual `00` write at `0x1A57`; the other post-copy writes remain `+4=00`, `+5=80`, `+6=00`.
 - This is a test/documentation correction to the firmware's conditional metadata processing, not a change to the audio backend or the model of the physical sound device.
+## Nested Part resource path now includes a confirmed reset-vector branch
+
+- The latest real-ROM regression follows the Layer 3 and Layer 4 Note-65 probes through the second Part event (`0x0D`) into the `0x189D` nested resource interpreter.
+- The IC51 bank-1 pointer table at `0x03AF..0x03BE` is treated as eight entries; the firmware classifies two as active (offsets `0x00` and `0x28`) and six as empty. The active pointers lead to `0x3806` (`A4 16 A3 40`) and `0x3C10` (`51 00 00 29`).
+- The nested slot cursor in IRAM `0x2E` advances by eight; at `0x40`, ACC.6 is set. IC4 executes `0x18EE: 02 00 00`, a confirmed `LJMP 0x0000`. The test now asserts the reset vector bytes `02 EB 32` and records one PC entry at `0x0000` and one at `0xEB32` in each selector-2/3 probe.
+- This explains the missing later event `0x0E`/`0x0F` calls in those test runs: the second Part event reaches the interpreter's nested-slot boundary and branches to the reset vector before returning to `0x593D`. The selector logic itself sets the candidate flags.
+- Limitation: Common selector and ready-response values are synthetic test overrides. The nested list's expected termination marker and the role of the two active tuples remain unidentified; no conclusion is made that physical hardware resets in normal playback.
+- Full trace and exact bytes: `docs/research/NOTE65_TWO_PART_EVENT_TRACE.md`, section 10.

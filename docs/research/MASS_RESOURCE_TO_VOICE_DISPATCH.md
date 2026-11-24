@@ -155,3 +155,14 @@ A follow-up instruction-level watch corrects the first interpretation of the pos
 The regression now watches PC `0x1A4E` and asserts `A=R2=0x16`, watches `0x1A8C` before the clear, and pins the `0x1A57` write to zero. This makes the condition, not a guessed constant, the tested property.
 
 This is IC4's conditional slot-metadata post-processing after the nested four-byte table tuple copy. It is still not a decoded sample address or physical DSP command.
+## 12. Nested Part-14 resource-list boundary in Layer 3/4 probes
+
+A new instrumented run of the IC4 v1.05 interpreter shows that the second candidate event (`0x0D`, mapped to the stored Part 14 record in this fixture) enters `0x189D` with a nested IC51 pointer list at bank 1 `0x03AF..0x03BE`. It contains eight two-byte entries; the firmware's own branch path classifies offsets `0x00` and `0x28` as active and six entries as empty.
+
+The active records are followed further:
+- list offset `0x00` points to bank-1 address `0x3806` (`A4 16 A3 40`); the firmware changes `A4` to `E4` before copying the four-byte tuple to the allocated page;
+- list offset `0x28` points to bank-1 address `0x3C10` (`51 00 00 29`); the firmware copies that tuple to the page at offset `0x28` and then updates its metadata bytes.
+
+The interpreter advances IRAM `0x2E` by eight and checks ACC.6 at PC `0x18EB`. At offset `0x40`, ACC.6 is set, so `JNB 0xE6,0x18F1` falls through to PC `0x18EE`, where the actual ROM opcode is `LJMP 0x0000` (`02 00 00`). The regression observes PC `0x0000` and the reset-vector target `0xEB32` for both selector-2 and selector-3 fixtures. This is a firmware reset-vector path, not a delayed return from the nested resource interpreter.
+
+Consequently, the Layer 3/4 fixture sets additional candidate-event flags but its second Part event reaches this nested-list guard before control returns to the later `0x593D` call sites. Do not interpret this as a failure of the selector arithmetic. The test uses synthetic Common-selector and ready-response overrides; the expected terminal condition for the nested list and the meaning of the two active tuples remain open. A hardware reset or normal-playback reset is not claimed.
