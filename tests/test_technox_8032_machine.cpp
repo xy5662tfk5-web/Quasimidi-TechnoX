@@ -576,9 +576,9 @@ int main(int argc, char** argv) {
 
             auto& registers = phaseMachine.cpuForTesting().registersForTesting();
             registers.pc = 0x044cu;
-            const auto executed = phaseMachine.runUntilProgramCounter(0x047eu, 512u);
+            const auto executed = phaseMachine.runUntilProgramCounter(0x047du, 512u);
             assert(executed > 0u);
-            assert(registers.pc == 0x047eu);
+            assert(registers.pc == 0x047du);
             assert(!phaseMachine.cpuFaulted());
 
             std::fprintf(stderr,
@@ -623,9 +623,9 @@ int main(int argc, char** argv) {
         assert(sineSingleStep[1] == 0x0fu);
         assert(sineSingleStep[2] == firmwareMachine.readCode(0x0025u));
 
-        // R48=3 causes two additions of the same 0x0F phase step.
-        // 0x1E rotates right to 0x0F, selecting CODE[0x001E + 0x0F].
-        const auto sineDoubleStep = runPeriodicSineStep(0x3cu, 0x03u);
+        // R48=2 runs one addition after the initial phase seed, giving
+        // two total 0x0F units (0x1E). One RR selects table index 0x0F.
+        const auto sineDoubleStep = runPeriodicSineStep(0x3cu, 0x02u);
         assert(sineDoubleStep[0] == 0x00u);
         assert(sineDoubleStep[1] == 0x1eu);
         assert(sineDoubleStep[2] == firmwareMachine.readCode(0x002du));
