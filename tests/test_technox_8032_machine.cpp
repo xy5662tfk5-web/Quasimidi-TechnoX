@@ -998,11 +998,45 @@ int main(int argc, char** argv) {
                 static_cast<unsigned>(voiceRecordPage),
                 static_cast<unsigned>(cpuRegisters.pc), downstreamInstructions,
                 reachedSoundHostWriter ? 1 : 0, writerInstructions,
+                static_cast<unsigned>(writerExitPC),
                 static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u))),
                 static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u))),
                 consumerMachine.soundHostWriteCount(),
                 consumerMachine.soundCommandPacketCount(),
-                consumerMachine.cpuFaulted());
+                consumerMachine.cpuFaulted() ? 1 : 0);
+            assert(reachedSoundHostWriter);
+            assert(voiceRecordPage == 0x00u);
+            assert(cpuRegisters.pc == 0x0a52u);
+            assert(writerExitPC == 0x0a52u);
+            assert(writerInstructions == 16u);
+            assert(!consumerMachine.cpuFaulted());
+            assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)) ==
+                   (sineStepCount == 0x01u ? 0x14u : 0x1fu));
+            assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u)) == 0x00u);
+            assert(consumerMachine.soundHostWriteCount() == 4u);
+            assert(consumerMachine.soundCommandPacketCount() == 1u);
+
+            const auto& slotOnePacket = consumerMachine.soundCommandPacketAt(0);
+            assert(slotOnePacket.bytes[0] == 0x01u);
+            assert(slotOnePacket.bytes[1] == (sineStepCount == 0x01u ? 0x03u : 0x04u));
+            assert(slotOnePacket.bytes[2] == 0x05u);
+            assert(slotOnePacket.bytes[3] == 0x00u);
+            assert(slotOnePacket.returnPC == 0x0a52u);
+            assert(slotOnePacket.deviceIndex == 0x01u);
+
+            constexpr std::array<std::uint8_t, 4> slotOneRegisters{{0, 1, 2, 3}};
+            constexpr std::array<std::uint16_t, 4> slotOneWriterPCs{{
+                0x0dbau, 0x0dbdu, 0x0dc0u, 0x0dc5u
+            }};
+            for (std::size_t index = 0; index < slotOneRegisters.size(); ++index) {
+                const auto& event = consumerMachine.soundHostWriteAt(index);
+                assert(event.registerIndex == slotOneRegisters[index]);
+                assert(event.instructionPC == slotOneWriterPCs[index]);
+                assert(event.returnPC == 0x0a52u);
+                assert(event.deviceIndex == 0x01u);
+                assert(event.port2 == 0x80u);
+            }
+
             std::fprintf(stderr, "  slot1 writer final PC=%04X instructions=%zu\\n",
                 static_cast<unsigned>(writerExitPC), writerInstructions);
             const auto hostTraceCount = consumerMachine.soundHostWriteCount();
