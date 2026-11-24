@@ -90,6 +90,17 @@ The two startup packets are now asserted byte-for-byte by the regression:
 
 The follow-up warm-state Note On below emits a different five-packet prefix. Keep these two startup packets separate from those five note-associated packets: they occur only in the first synthetic-ready stage of this fixture. The test does not identify the external device or the meaning of `F0/F1`, and this startup sequence is not evidence of real hardware acknowledgement.
 
+## Paired Note Off after the ready-state Note On
+
+After the synthetic-ready Part 1 setup and two-layer Note 65 dispatch, the regression sends `80 41 40` (Note Off, key 65, release velocity 64). The firmware:
+
+- enters the general event path and dispatches the two active layer IDs;
+- calls the Note Off helper `0xAC88` twice and executes the Part handler `0x4256` twice;
+- records the expected Note Off branch at `0xAC A0` and page-`0x35` transition at `0xACB2` for both layer event IDs;
+- emits **zero** writes to `0x8000–0x8003` and makes no call to `0x0DB7` in this test window.
+
+The regression now asserts the packet-count and packet-writer deltas remain unchanged for this Note Off event. This is a useful separation: the tested Note Off path changes IC4's internal note/event state rather than replaying the four-byte command-window burst. It does **not** prove that the physical sound device receives no release indication through another, still-unidentified interface, nor does it establish the DSP's actual release behavior. The test still uses the explicitly synthetic ready-response fixture.
+
 ## Latest differential probe: a second Note On after setup
 
 A follow-up probe now sends a second, distinct event (`90 40 64`, note 64, velocity 100) after the first Note On has passed the test-only ready/queue-drain handshake. The existing synthetic read override remains active; this second stage does not inject a new status value.
