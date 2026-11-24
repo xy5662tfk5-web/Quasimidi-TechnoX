@@ -253,7 +253,18 @@ void QuasimidiTechnoXAudioProcessor::syncSequencerPartsToEngine() noexcept
     // factory Performance image. Clear Performance-only global data first.
     massEngine.clearPerformanceImage();
     massEngine.clearCommonModulationDepths();
+    constexpr technox::MASSCommonControl performanceOnlyControls[] = {
+        technox::MASSCommonControl::performanceMode,
+        technox::MASSCommonControl::fx1Type,
+        technox::MASSCommonControl::fx2Type,
+        technox::MASSCommonControl::arpResolution,
+        technox::MASSCommonControl::arpSpeed
+    };
+    for (const auto control : performanceOnlyControls)
+        massEngine.clearCommonControl(control);
+
     for (int part = 0; part < 16; ++part) {
+        massEngine.resetPartControllers(part);
         for (std::size_t parameter = 0; parameter < 24; ++parameter) {
             const int value = getSequencerPartParameterRaw(
                 part, static_cast<technox::PartParameter>(parameter));
