@@ -982,7 +982,6 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(voiceRecordAddress(0x96u), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x97u), 0x00u);
 
-            cpuRegisters.pc = 0x044cu;
             const auto downstreamInstructions =
                 consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
             const bool reachedSoundHostWriter = cpuRegisters.pc == 0x0db7u;
