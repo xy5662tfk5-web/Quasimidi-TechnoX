@@ -549,6 +549,57 @@ int main(int argc, char** argv) {
         assertObservedBulkLoadCall(0x37a1u);
         assertObservedBulkLoadCall(0x38f1u);
 
+        // Exercise the real IC4 periodic scheduler (0x044C) and its
+        // phase/sine updater (0x0C1A), independent of MIDI and DSP-host writes.
+        // The test fixture makes the scheduler's external-ready input explicit.
+        const auto runPeriodicSineStep = [&](std::uint8_t gate,
+                                             std::uint8_t stepCount) {
+            TechnoX8032Machine phaseMachine;
+            assert(phaseMachine.loadIC4Rom(realRom.data(), realRom.size()));
+            phaseMachine.reset();
+
+            // Scheduler state: R47 is copied to R48 at the first tick;
+            // its counter increments from zero to one before comparing 0x2064.
+            phaseMachine.writeInternal(0x47u, stepCount);
+            phaseMachine.writeExternal(0x2064u, 0x01u);
+            phaseMachine.writeExternal(0x2050u, gate);
+            phaseMachine.writeExternal(0x2051u, 0x00u);
+            phaseMachine.writeExternal(0x2052u, 0x00u);
+            phaseMachine.writeExternal(0x2053u, 0xccu);
+            phaseMachine.setTestExternalReadOverride(0xfffau, 0x40u);
+
+            auto& registers = phaseMachine.cpuForTesting().registersForTesting();
+            registers.pc = 0x044cu;
+            const auto executed = phaseMachine.runUntilProgramCounter(0x047eu, 512u);
+            assert(executed > 0u);
+            assert(registers.pc == 0x047eu);
+            assert(!phaseMachine.cpuFaulted());
+
+            return std::array<std::uint8_t, 3>{{
+                phaseMachine.xdataByteForTesting(0x2051u),
+                phaseMachine.xdataByteForTesting(0x2052u),
+                phaseMachine.xdataByteForTesting(0x2053u)
+            }};
+        };
+
+        // Gate zero exits at 0x0C22: phase and lookup output are untouched.
+        const auto sineDisabled = runPeriodicSineStep(0x00u, 0x01u);
+        assert((sineDisabled == std::array<std::uint8_t, 3>{{0x00u, 0x00u, 0xccu}}));
+
+        // 0x3C rotates right twice to 0x0F. With R48=1 the firmware adds
+        // one phase step to 0x2052, then indexes CODE[0x001E + 7] -> 0x0025.
+        const auto sineSingleStep = runPeriodicSineStep(0x3cu, 0x01u);
+        assert(sineSingleStep[0] == 0x00u);
+        assert(sineSingleStep[1] == 0x0fu);
+        assert(sineSingleStep[2] == firmwareMachine.readCode(0x0025u));
+
+        // R48=3 causes two additions of the same 0x0F phase step.
+        // 0x1E rotates right to 0x0F, selecting CODE[0x001E + 0x0F].
+        const auto sineDoubleStep = runPeriodicSineStep(0x3cu, 0x03u);
+        assert(sineDoubleStep[0] == 0x00u);
+        assert(sineDoubleStep[1] == 0x1eu);
+        assert(sineDoubleStep[2] == firmwareMachine.readCode(0x002du));
+
         // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
         // then resolve the two IC51 upload-stream formats associated with each FX1 entry.
         if (!realIC51.empty()) {
