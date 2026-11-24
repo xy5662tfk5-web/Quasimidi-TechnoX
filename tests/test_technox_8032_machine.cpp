@@ -2716,7 +2716,7 @@ int main(int argc, char** argv) {
         assert(note65PartDispatchCount == 2u);
         // The loaded Common mode byte 0x7BD5 is 1 (Layer 2). Firmware
         // dispatcher 0x593D expands this to event IDs 0x0C and 0x0D.
-        assert(firmwareMachine.testExternalRamByteForTesting(0x7bd5u) == 0x01u);
+        assert(firmwareMachine.readExternal(0x7bd5u) == 0x01u);
         assert(note65OnAddressCount == 2u);
         assert(note65OnBranchCount == 2u);
         assert(note65PartDispatchEvents[0].returnPC == 0x56c8u);
