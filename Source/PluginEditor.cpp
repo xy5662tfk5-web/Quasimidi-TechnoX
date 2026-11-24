@@ -113,17 +113,20 @@ QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
 
 void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
 {
-    // A host Program Change may update the Performance without a UI gesture.
-    // Keep both indicators and the LCD in sync, but never move the inactive
-    // dial during an in-progress gesture.
+    // Follow host program/mode changes without moving an inactive dial during
+    // a gesture. Part selection belongs to the operating mode: 4 stored
+    // Performance parts versus 16 Sequencer-Multi Parts.
     if (dragTarget == DragTarget::none) {
         const auto currentMode = audioProcessor.getMidiRoutingMode();
         const int currentProgram = audioProcessor.getCurrentProgram();
-        if (currentMode != lastRoutingMode || currentProgram != lastPerformanceIndex) {
+        if (currentMode != lastRoutingMode) {
             lastRoutingMode = currentMode;
-            lastPerformanceIndex = currentProgram;
+            selectedPart = 0;
+            syncDialsFromCurrentSelection();
+        } else if (currentProgram != lastPerformanceIndex) {
             syncDialsFromCurrentSelection();
         }
+        lastPerformanceIndex = currentProgram;
     }
     repaint();
 }
@@ -341,9 +344,7 @@ void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noex
         parameterDialNormalized = static_cast<float>(selectedPerformanceForDial())
             / static_cast<float>(maximumProgram);
     } else {
-        const int bank = audioProcessor.getPartParameterRaw(
-            audioProcessor.getCurrentProgram(), selectedPart,
-            technox::PartParameter::bankNumber);
+        const int bank = currentPartParameterRaw(technox::PartParameter::bankNumber);
         parameterDialNormalized = bank < 0 ? 0.0f : static_cast<float>(bank) / 3.0f;
     }
 }
@@ -357,8 +358,7 @@ void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
             valueDialNormalized = 0.0f;
             return;
         }
-        const int raw = audioProcessor.getPartParameterRaw(
-            audioProcessor.getCurrentProgram(), selectedPart,
+        const int raw = currentPartParameterRaw(
             static_cast<technox::PartParameter>(selectedParameter));
         valueDialNormalized = raw < 0 ? 0.0f
             : static_cast<float>(juce::jlimit(0, static_cast<int>(descriptor->maximum), raw))
@@ -373,10 +373,11 @@ void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
         valueDialNormalized = static_cast<float>(selectedPerformanceForDial())
             / static_cast<float>(maximumProgram);
     } else {
-        const int sound = audioProcessor.getPartParameterRaw(
-            audioProcessor.getCurrentProgram(), selectedPart,
-            technox::PartParameter::soundNumber);
-        valueDialNormalized = sound < 0 ? 0.0f : static_cast<float>(sound) / 127.0f;
+        const int sound = currentPartParameterRaw(technox::PartParameter::soundNumber);
+        const int maximumSound = selectedPart == 9 ? 7 : 127;
+        valueDialNormalized = sound < 0 ? 0.0f
+            : static_cast<float>(juce::jlimit(0, maximumSound, sound))
+                / static_cast<float>(maximumSound);
     }
 }
 
