@@ -3254,6 +3254,20 @@ int main(int argc, char** argv) {
                        secondWrite && nextMarker);
                 assert(entry->registers[7] == 0x0cu);
                 assert(entry->directRam36 == 0x0cu && entry->directRam37 == 0x16u);
+                std::fprintf(stderr,
+                    "TYPE08 A snapshots tag=%02X bytes=%02X/%02X/%02X/%02X/%02X/%02X "
+                    "writeA=%02X/%02X markerA=%02X markerDPTR=%04X\\n",
+                    static_cast<unsigned>(readTag->accumulator),
+                    static_cast<unsigned>(readByte1->accumulator),
+                    static_cast<unsigned>(readByte2->accumulator),
+                    static_cast<unsigned>(readByte3->accumulator),
+                    static_cast<unsigned>(readByte4->accumulator),
+                    static_cast<unsigned>(readByte5->accumulator),
+                    static_cast<unsigned>(readByte6->accumulator),
+                    static_cast<unsigned>(firstWrite->accumulator),
+                    static_cast<unsigned>(secondWrite->accumulator),
+                    static_cast<unsigned>(nextMarker->accumulator),
+                    static_cast<unsigned>(nextMarker->dptr));
                 assert(readTag->accumulator == 0x08u);
                 assert(readByte1->accumulator == 0x20u);
                 assert(readByte2->accumulator == 0x18u);
