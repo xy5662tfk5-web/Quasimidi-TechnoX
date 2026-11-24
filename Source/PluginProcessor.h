@@ -54,6 +54,10 @@ public:
     bool setSequencerPartParameterRaw(int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
     bool queueSequencerPartParameterRaw(int partIndex, technox::PartParameter parameter, int rawValue) noexcept;
     juce::String getSequencerPartSoundName(int partIndex) const;
+    int getSequencerDrumSet() const noexcept {
+        return sequencerDrumSet.load(std::memory_order_acquire);
+    }
+    bool queueSequencerDrumSet(int drumSet) noexcept;
     int getSequencerDrumSet() const noexcept;
     bool queueSequencerDrumSet(int drumSet) noexcept;
     int getCommonControlRaw(int performanceIndex, technox::MASSCommonControl control) const noexcept;
@@ -93,6 +97,8 @@ private:
     technox::PanelSequencerPartEditMailbox panelSequencerPartEditMailbox;
     std::array<std::array<std::array<std::atomic<int>, 24>, 4>, 50> partValues{};
     std::array<std::array<std::atomic<int>, 24>, 16> sequencerPartValues{};
+    std::atomic<int> sequencerDrumSet{0};
+    std::atomic<int> pendingSequencerDrumSet{-1};
     std::atomic<int> sequencerDrumSet{0};
     std::atomic<int> pendingSequencerDrumSet{-1};
     std::array<std::array<std::atomic<int>, 5>, 50> commonValues{};
