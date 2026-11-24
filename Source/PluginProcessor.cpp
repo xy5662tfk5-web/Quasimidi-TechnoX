@@ -871,7 +871,8 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
                     juce::jlimit(0, static_cast<int>(maximum), value), std::memory_order_release);
             }
 
-    if (magic == kStateMagicV4 || magic == kStateMagicV5) {
+    if (magic == kStateMagicV4 || magic == kStateMagicV5 ||
+        magic == kStateMagicV6) {
         constexpr int maxima[5] = {
             3, technox::MASSCommonControlStore::kFXTypeMaximumIndex,
             technox::MASSCommonControlStore::kFXTypeMaximumIndex, 3, 127
