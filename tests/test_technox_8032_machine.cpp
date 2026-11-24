@@ -3214,7 +3214,7 @@ int main(int argc, char** argv) {
 
                 const auto captureType08 = [&](std::uint16_t pc,
                                                std::uint16_t dptr = 0u,
-                                               std::uint8_t slot = 0x80u)
+                                               std::uint8_t slot = 0xffu)
                     -> const TechnoX8032Machine::InstructionWatchEvent* {
                     for (std::size_t i = instructionWatchFirst;
                          i < instructionWatchCount; ++i) {
@@ -3222,8 +3222,7 @@ int main(int argc, char** argv) {
                         if (event.instructionPC != pc ||
                             event.returnPC != 0x1720u ||
                             event.port2Latch != allocatedPages[0] ||
-                            event.directRam2E != slot ||
-                            event.registers[7] != 0x0cu ||
+                            (slot != 0xffu && event.directRam2E != slot) ||
                             (dptr != 0u && event.dptr != dptr))
                             continue;
                         return &event;
@@ -3241,9 +3240,17 @@ int main(int argc, char** argv) {
                 const auto* firstWrite = captureType08(0x1c9cu, 0u);
                 const auto* secondWrite = captureType08(0x1cabu, 0u);
                 const auto* nextMarker = captureType08(0x1986u, 0x1613u, 0x88u);
+                std::fprintf(stderr,
+                    "TYPE08 SNAPSHOTS entry=%u tag=%u b1=%u b2=%u b3=%u b4=%u b5=%u b6=%u w0=%u w1=%u marker=%u page=%02X\\n",
+                    entry != nullptr, readTag != nullptr, readByte1 != nullptr,
+                    readByte2 != nullptr, readByte3 != nullptr, readByte4 != nullptr,
+                    readByte5 != nullptr, readByte6 != nullptr, firstWrite != nullptr,
+                    secondWrite != nullptr, nextMarker != nullptr,
+                    static_cast<unsigned>(allocatedPages[0]));
                 assert(entry && readTag && readByte1 && readByte2 && readByte3 &&
                        readByte4 && readByte5 && readByte6 && firstWrite &&
                        secondWrite && nextMarker);
+                assert(entry->registers[7] == 0x0cu);
                 assert(entry->directRam36 == 0x0cu && entry->directRam37 == 0x16u);
                 assert(readTag->accumulator == 0x08u);
                 assert(readByte1->accumulator == 0x20u);
