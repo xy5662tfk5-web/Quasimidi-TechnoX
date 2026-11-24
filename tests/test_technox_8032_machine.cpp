@@ -2598,6 +2598,102 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.returnPC));
         }
 
+        // New-pitch probe: keep Part/program/velocity fixed and change only
+        // pitch to 65. Capture the live 09B9 arithmetic inputs, the exact
+        // MOVX bytes consumed by 09DA, and the resulting 0A4F writer registers.
+        const std::array<std::uint8_t, 3> note65On{{0x90u, 0x41u, 0x64u}};
+        const auto note65PacketStart = firmwareMachine.soundCommandPacketCount();
+        firmwareMachine.clearInstructionWatchForTesting();
+        firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
+        runRealMidiStage("Note 65 Part 1 after same-program setup",
+                         note65On.data(), note65On.size());
+        const auto note65PacketCount =
+            firmwareMachine.soundCommandPacketCount() - note65PacketStart;
+        assert(note65PacketCount == 549u);
+
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note65SlotEntryEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note65InterpolationEvents{};
+        std::array<TechnoX8032Machine::InstructionWatchEvent, 2>
+            note65WriterEvents{};
+        std::size_t note65SlotEntryCount = 0;
+        std::size_t note65InterpolationCount = 0;
+        std::size_t note65WriterCount = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x09b9u) {
+                assert(note65SlotEntryCount < note65SlotEntryEvents.size());
+                note65SlotEntryEvents[note65SlotEntryCount++] = event;
+            } else if (event.instructionPC == 0x09dau) {
+                assert(note65InterpolationCount < note65InterpolationEvents.size());
+                note65InterpolationEvents[note65InterpolationCount++] = event;
+            } else if (event.instructionPC == 0x0a4fu) {
+                assert(note65WriterCount < note65WriterEvents.size());
+                note65WriterEvents[note65WriterCount++] = event;
+            }
+        }
+        std::printf("NOTE65 09B9 trace: packets=%zu entry=%zu multiply=%zu writer=%zu "
+                    "MOVX-events=%zu\\n",
+                    note65PacketCount, note65SlotEntryCount,
+                    note65InterpolationCount, note65WriterCount,
+                    firmwareMachine.slotInterpolationDataAccessTraceCountForTesting());
+        assert(note65SlotEntryCount == 2u);
+        assert(note65InterpolationCount == 2u);
+        assert(note65WriterCount == 2u);
+
+        const auto interpolationAccessCount =
+            firmwareMachine.slotInterpolationDataAccessTraceCountForTesting();
+        for (std::size_t pass = 0; pass < note65InterpolationCount; ++pass) {
+            const auto& input = note65InterpolationEvents[pass];
+            const auto nextPassCycle = pass + 1u < note65InterpolationCount
+                ? note65InterpolationEvents[pass + 1u].machineCycle
+                : std::numeric_limits<std::uint64_t>::max();
+            const auto findRead = [&](std::uint16_t pc) {
+                for (std::size_t i = 0; i < interpolationAccessCount; ++i) {
+                    const auto& access =
+                        firmwareMachine.slotInterpolationDataAccessTraceAtForTesting(i);
+                    if (!access.write && access.instructionPC == pc &&
+                        access.stackReturnPC == input.returnPC &&
+                        access.machineCycle >= input.machineCycle &&
+                        access.machineCycle < nextPassCycle)
+                        return access.value;
+                }
+                return static_cast<std::uint8_t>(0xffu);
+            };
+            const auto valueLow = findRead(0x09dfu);
+            const auto valueMiddle = findRead(0x09e6u);
+            const auto valueHigh = findRead(0x0a00u);
+            assert(valueLow != 0xffu);
+            assert(valueMiddle != 0xffu);
+            assert(valueHigh != 0xffu);
+            const auto stepMagnitude = static_cast<std::uint16_t>(
+                (static_cast<std::uint16_t>(input.registers[5]) << 8u) |
+                input.registers[4]);
+            const bool negativeStep = (input.directRam20 & 0x08u) != 0;
+            const auto expected = technox::MASS09B9SlotInterpolationArithmetic::apply(
+                valueLow, valueMiddle, valueHigh, stepMagnitude, negativeStep);
+            const auto& writer = note65WriterEvents[pass];
+            std::printf("NOTE65 PASS%zu: slot=%02X %02X %02X step=%04X neg=%u "
+                        "result=%06X writer=%02X %02X %02X\n",
+                        pass + 1u, static_cast<unsigned>(valueLow),
+                        static_cast<unsigned>(valueMiddle),
+                        static_cast<unsigned>(valueHigh),
+                        static_cast<unsigned>(stepMagnitude),
+                        negativeStep ? 1u : 0u,
+                        static_cast<unsigned>(expected.outputValue24),
+                        static_cast<unsigned>(writer.registers[2]),
+                        static_cast<unsigned>(writer.registers[3]),
+                        static_cast<unsigned>(writer.registers[4]));
+            assert(writer.registers[2] ==
+                   static_cast<std::uint8_t>(expected.outputValue24 & 0xffu));
+            assert(writer.registers[3] ==
+                   static_cast<std::uint8_t>((expected.outputValue24 >> 8u) & 0xffu));
+            assert(writer.registers[4] ==
+                   static_cast<std::uint8_t>((expected.outputValue24 >> 16u) & 0x07u));
+        }
+
         runRealMidiStage("Note Off Part 1 after synthetic ready response",
                          realNoteOff.data(), realNoteOff.size());
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
