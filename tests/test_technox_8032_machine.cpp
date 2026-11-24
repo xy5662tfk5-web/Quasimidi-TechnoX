@@ -508,6 +508,26 @@ int main(int argc, char** argv) {
             }
             assert(offset == streamBytes.size());
             assert(factoryFrames.size() == 300u);
+
+            // The first restored Performance (source index 5) supplies the
+            // Part 13..16 records used by the MIDI routing fixture. Record
+            // their Track Mode bytes before firmware dispatch probes so we
+            // can distinguish Common layer candidates from muted Parts.
+            std::printf("FACTORY PERF 5 PART MODES:");
+            for (std::size_t part = 0; part < 4u; ++part) {
+                const auto& frame = factoryFrames[2u + part].bytes;
+                assert(frame.size() == 33u);
+                assert(frame[5] == 5u);
+                assert(frame[6] == static_cast<std::uint8_t>(part + 1u));
+                const auto trackMode = frame[8u +
+                    static_cast<std::size_t>(technox::PartParameter::trackMode)];
+                std::printf(" P%zu(bank=%02X sound=%02X mode=%02X)",
+                            part + 13u,
+                            static_cast<unsigned>(frame[8u]),
+                            static_cast<unsigned>(frame[9u]),
+                            static_cast<unsigned>(trackMode));
+            }
+            std::printf("\\n");
         }
 
         TechnoX8032Machine firmwareMachine;
