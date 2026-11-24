@@ -718,10 +718,10 @@ bool QuasimidiTechnoXAudioProcessor::isPerformancePartActive(int partIndex) cons
 
 int QuasimidiTechnoXAudioProcessor::partSlotForMidiChannel(int channel) const noexcept
 {
-    for (int part = 0; part < static_cast<int>(partMidiChannels.size()); ++part)
-        if (getPartMidiChannel(part) == channel)
-            return part;
-    return -1;
+    technox::SequencerMidiChannelMap channels{};
+    for (std::size_t part = 0; part < channels.size(); ++part)
+        channels[part] = getPartMidiChannel(static_cast<int>(part));
+    return technox::sequencerPartIndexForMidiChannel(channels, channel);
 }
 
 bool QuasimidiTechnoXAudioProcessor::getEditedPartSysEx(
@@ -868,20 +868,10 @@ void QuasimidiTechnoXAudioProcessor::setStateInformation(const void* data, int s
     // stream alignment, but only migrate them to Parts 13–16 when they form a
     // valid, unique map that does not collide with the default Part 1–12 map.
     if (magic == kStateMagicV5) {
-        std::array<int, 16> restoredChannels{};
-        bool validChannelMap = true;
-        std::array<bool, 17> usedChannels{};
-        for (std::size_t channelIndex = 0; channelIndex < restoredChannels.size(); ++channelIndex) {
-            const int value = static_cast<unsigned char>(stream.readByte());
-            restoredChannels[channelIndex] = value;
-            if (value < 1 || value > 16 || usedChannels[static_cast<std::size_t>(
-                    juce::jlimit(1, 16, value))]) {
-                validChannelMap = false;
-            } else {
-                usedChannels[static_cast<std::size_t>(value)] = true;
-            }
-        }
-        if (validChannelMap) {
+        technox::SequencerMidiChannelMap restoredChannels{};
+        for (auto& value : restoredChannels)
+            value = static_cast<unsigned char>(stream.readByte());
+        if (technox::isValidSequencerMidiChannelMap(restoredChannels)) {
             for (std::size_t channelIndex = 0; channelIndex < restoredChannels.size(); ++channelIndex)
                 partMidiChannels[channelIndex].store(
                     restoredChannels[channelIndex], std::memory_order_release);
