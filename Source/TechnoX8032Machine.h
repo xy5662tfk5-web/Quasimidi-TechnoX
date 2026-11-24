@@ -159,6 +159,7 @@ public:
         std::array<std::uint8_t, 8> registers{};
         std::uint8_t directRam28 = 0;
         std::uint8_t directRam29 = 0;
+        std::uint8_t directRam2F = 0;
         std::uint8_t directRam2A = 0;
         std::uint8_t directRam2B = 0;
         std::uint8_t directRam30 = 0;
@@ -636,7 +637,8 @@ public:
             pc == 0x5942u || pc == 0x5945u || pc == 0x5948u ||
             pc == 0x594cu || pc == 0x5958u || pc == 0x5962u ||
             pc == 0x596cu || pc == 0x5976u || pc == 0x597eu ||
-            pc == 0x598au || pc == 0x5999u || pc == 0x59a8u ||
+            pc == 0x598au || pc == 0x598du || pc == 0x5999u ||
+            pc == 0x599cu || pc == 0x59a8u || pc == 0x59abu ||
             pc == 0x59b7u ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
@@ -655,6 +657,7 @@ public:
                     event.registerBankBase + index));
             event.directRam28 = readInternal(0x28u);
             event.directRam29 = readInternal(0x29u);
+            event.directRam2F = readInternal(0x2fu);
             event.directRam2A = readInternal(0x2au);
             event.directRam2B = readInternal(0x2bu);
             event.directRam30 = readInternal(0x30u);
