@@ -12,8 +12,10 @@ constexpr int kStateMagicV5 = 0x54584E35; // TXN5: adds all 16 Sequencer-Multi P
 constexpr int kPartStateBytesV2 = 50 * 4 * 24 + 4;
 constexpr int kPartStateBytesV3 = 50 * 4 * 24 + 50 * 4 + 4;
 constexpr int kPartStateBytesV4 = 50 * 4 * 24 + 50 * 5 + 4 + 1;
+constexpr int kSequencerChannelBytesV5 = 16;
 constexpr int kSequencerStateBytesV5 = 16 * 24;
-constexpr int kPartStateBytesV5 = kPartStateBytesV4 + kSequencerStateBytesV5;
+constexpr int kPartStateBytesV5 = kPartStateBytesV4 + (kSequencerChannelBytesV5 - 4)
+    + kSequencerStateBytesV5;
 }
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
@@ -29,8 +31,9 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     for (auto& performance : commonValues)
         for (auto& value : performance)
             value.store(-1, std::memory_order_relaxed);
+    // Sequencer Multi Parts 1..16 default to MIDI channels 1..16.
     for (std::size_t part = 0; part < partMidiChannels.size(); ++part)
-        partMidiChannels[part].store(static_cast<int>(part + 13), std::memory_order_relaxed);
+        partMidiChannels[part].store(static_cast<int>(part + 1), std::memory_order_relaxed);
 
     int midiSize = 0;
     int catalogSize = 0;
@@ -246,6 +249,10 @@ void QuasimidiTechnoXAudioProcessor::syncCurrentPerformanceToEngine() noexcept
 
 void QuasimidiTechnoXAudioProcessor::syncSequencerPartsToEngine() noexcept
 {
+    // Sequencer Multi is a distinct live 16-Part state, not the selected
+    // factory Performance image. Clear Performance-only global data first.
+    massEngine.clearPerformanceImage();
+    massEngine.clearCommonModulationDepths();
     for (int part = 0; part < 16; ++part) {
         for (std::size_t parameter = 0; parameter < 24; ++parameter) {
             const int value = getSequencerPartParameterRaw(
@@ -665,16 +672,17 @@ bool QuasimidiTechnoXAudioProcessor::setCommonControlRaw(
 
 int QuasimidiTechnoXAudioProcessor::getPartMidiChannel(int partIndex) const noexcept
 {
-    if (partIndex < 0 || partIndex >= 4)
+    if (partIndex < 0 || partIndex >= static_cast<int>(partMidiChannels.size()))
         return 0;
     return partMidiChannels[static_cast<std::size_t>(partIndex)].load(std::memory_order_acquire);
 }
 
 bool QuasimidiTechnoXAudioProcessor::setPartMidiChannel(int partIndex, int midiChannel) noexcept
 {
-    if (partIndex < 0 || partIndex >= 4 || midiChannel < 1 || midiChannel > 16)
+    if (partIndex < 0 || partIndex >= static_cast<int>(partMidiChannels.size()) ||
+        midiChannel < 1 || midiChannel > 16)
         return false;
-    for (int other = 0; other < 4; ++other)
+    for (int other = 0; other < static_cast<int>(partMidiChannels.size()); ++other)
         if (other != partIndex && getPartMidiChannel(other) == midiChannel)
             return false;
     partMidiChannels[static_cast<std::size_t>(partIndex)].store(midiChannel, std::memory_order_release);
@@ -710,8 +718,10 @@ bool QuasimidiTechnoXAudioProcessor::isPerformancePartActive(int partIndex) cons
 
 int QuasimidiTechnoXAudioProcessor::partSlotForMidiChannel(int channel) const noexcept
 {
-    // In Sequencer Multi, Part N is fixed to MIDI channel N by the manual.
-    return channel >= 1 && channel <= 16 ? channel - 1 : -1;
+    for (int part = 0; part < static_cast<int>(partMidiChannels.size()); ++part)
+        if (getPartMidiChannel(part) == channel)
+            return part;
+    return -1;
 }
 
 bool QuasimidiTechnoXAudioProcessor::getEditedPartSysEx(
