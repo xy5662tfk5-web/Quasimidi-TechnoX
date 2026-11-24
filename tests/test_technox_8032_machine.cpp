@@ -3143,8 +3143,27 @@ int main(int argc, char** argv) {
                     pc == 0x442fu || pc == 0x4430u || pc == 0x4440u ||
                     pc == 0x4455u || pc == 0x4458u || pc == 0x4459u ||
                     pc == 0x4467u || pc == 0x446au;
+                const bool resourcePipelinePath =
+                    pc == 0x16a4u || pc == 0x16a7u || pc == 0x16afu ||
+                    pc == 0x16b0u || pc == 0x16c3u || pc == 0x16cau ||
+                    pc == 0x16d8u || pc == 0x16dbu || pc == 0x16ddu ||
+                    pc == 0x16e4u || pc == 0x16e6u || pc == 0x16f7u ||
+                    pc == 0x1700u || pc == 0x171du || pc == 0x1720u ||
+                    pc == 0x172du || pc == 0x1734u || pc == 0x1742u ||
+                    pc == 0x1749u || pc == 0x174cu || pc == 0x174eu ||
+                    pc == 0x174fu || pc == 0x177eu || pc == 0x1780u ||
+                    pc == 0x1788u || pc == 0x1789u || pc == 0x1792u ||
+                    pc == 0x179au || pc == 0x179eu || pc == 0x179fu ||
+                    pc == 0x17acu || pc == 0x17b4u || pc == 0x17bbu ||
+                    pc == 0x17c3u || pc == 0x17c7u || pc == 0x17c8u ||
+                    pc == 0x17d4u || pc == 0x17dau || pc == 0x17e6u ||
+                    pc == 0x17eau || pc == 0x17ebu || pc == 0x17f8u ||
+                    pc == 0x1800u || pc == 0x1807u || pc == 0x1813u ||
+                    pc == 0x1817u || pc == 0x1818u || pc == 0x182bu ||
+                    pc == 0x1834u || pc == 0x1837u || pc == 0x183bu ||
+                    pc == 0x183cu || pc == 0x1841u || pc == 0x1848u;
                 if (!selectorPath && !repeatedNoteHandlerPath &&
-                    !partHandlerDetailPath)
+                    !partHandlerDetailPath && !resourcePipelinePath)
                     continue;
                 if (partHandlerDetailPath) {
                     std::printf("  PART-ROUTE PC=%04X ret=%04X event=%02X "
@@ -3164,6 +3183,32 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned>(event.directRam28),
                                 static_cast<unsigned>(event.directRam29),
                                 static_cast<unsigned>(event.directRam2A));
+                }
+                if (resourcePipelinePath) {
+                    std::printf("  RESOURCE-ROUTE PC=%04X ret=%04X "
+                                "A=%02X DPTR=%04X R0=%02X R5=%02X "
+                                "RAM2F/30=%02X/%02X RAM3C/3D=%02X/%02X "
+                                "RAM3E/3F=%02X/%02X RAM45=%02X "
+                                "RAM50/51/52=%02X/%02X/%02X "
+                                "P2=%02X P3=%02X\\n",
+                                static_cast<unsigned>(pc),
+                                static_cast<unsigned>(event.returnPC),
+                                static_cast<unsigned>(event.accumulator),
+                                static_cast<unsigned>(event.dptr),
+                                static_cast<unsigned>(event.registers[0]),
+                                static_cast<unsigned>(event.registers[5]),
+                                static_cast<unsigned>(event.directRam2F),
+                                static_cast<unsigned>(event.directRam30),
+                                static_cast<unsigned>(event.directRam3C),
+                                static_cast<unsigned>(event.directRam3D),
+                                static_cast<unsigned>(event.directRam3E),
+                                static_cast<unsigned>(event.directRam3F),
+                                static_cast<unsigned>(event.directRam45),
+                                static_cast<unsigned>(event.directRam50),
+                                static_cast<unsigned>(event.directRam51),
+                                static_cast<unsigned>(event.directRam52),
+                                static_cast<unsigned>(event.port2Latch),
+                                static_cast<unsigned>(event.port3Pins));
                 }
                 if (pc == 0x5941u) ++selectorReadCount;
                 if (pc == 0x5958u || pc == 0x5962u ||
@@ -3193,6 +3238,39 @@ int main(int argc, char** argv) {
             std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
                         selectorReadCount, selectorBranchCount,
                         selectorCallsiteCount);
+            const auto selectorXdataAfter = firmwareMachine.xdataWatchTraceCount();
+            const auto firstRetainedSelectorXdata = selectorXdataAfter > 8192u
+                ? selectorXdataAfter - 8192u : 0u;
+            const auto firstSelectorXdata = std::max(
+                selectorXdataBefore, firstRetainedSelectorXdata);
+            std::size_t resourcePageReads = 0;
+            std::size_t resourcePageWrites = 0;
+            std::printf("NOTE65 RESOURCE PAGE 2D XDATA TRACE:\\n");
+            for (std::size_t i = firstSelectorXdata; i < selectorXdataAfter; ++i) {
+                const auto& access = firmwareMachine.xdataWatchTraceAt(i);
+                if (access.address < 0x2d00u || access.address > 0x2dffu)
+                    continue;
+                if (access.write) ++resourcePageWrites;
+                else ++resourcePageReads;
+                const auto offset = static_cast<unsigned>(access.address & 0xffu);
+                if (offset == 0x60u || offset == 0x61u || offset == 0x62u ||
+                    offset == 0xf8u || offset == 0xfbu || offset == 0xfcu ||
+                    offset == 0xfdu || offset == 0xfeu || offset == 0xffu ||
+                    (offset >= 0x80u && offset <= 0xf8u && access.write)) {
+                    std::printf("  RESOURCE-XDATA %c 2D%02X=%02X pc=%04X ret=%04X "
+                                "P2=%02X P3=%02X mode=%u cycle=%llu\\n",
+                                access.write ? 'W' : 'R', offset,
+                                static_cast<unsigned>(access.value),
+                                static_cast<unsigned>(access.instructionPC),
+                                static_cast<unsigned>(access.stackReturnPC),
+                                static_cast<unsigned>(access.port2),
+                                static_cast<unsigned>(access.port3),
+                                static_cast<unsigned>(access.soundBusMode),
+                                static_cast<unsigned long long>(access.machineCycle));
+                }
+            }
+            std::printf("NOTE65 RESOURCE PAGE COUNTS: reads=%zu writes=%zu\\n",
+                        resourcePageReads, resourcePageWrites);
             const auto gateAccessCount =
                 firmwareMachine.midiEventGateTraceCountForTesting();
             std::printf("NOTE65 REPEATED-NOTE GATE XDATA: count=%zu\\n",
