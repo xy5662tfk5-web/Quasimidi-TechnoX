@@ -37,6 +37,27 @@ int main()
             static_cast<std::uint8_t>(unknown), event));
     }
 
+    // Decoded firmware roles must route to the manual-defined actions:
+    // Multi main: PARAMETER row chooses a group; VALUE row chooses a sound.
+    FirmwarePanelEncoderEvent parameterEvent{};
+    FirmwarePanelEncoderEvent valueEvent{};
+    assert(decodeFirmwarePanelEncoderEvent(0xbd, parameterEvent));
+    assert(decodeFirmwarePanelEncoderEvent(0xbe, valueEvent));
+    assert(panelActionForFirmwareEvent(
+        PanelOperatingMode::sequencerMulti, PanelEditPage::main, parameterEvent) ==
+        PanelControlAction::selectSoundGroup);
+    assert(panelActionForFirmwareEvent(
+        PanelOperatingMode::sequencerMulti, PanelEditPage::main, valueEvent) ==
+        PanelControlAction::selectSingleSound);
+
+    // Part Edit routes the same physical roles to parameter select / value edit.
+    assert(panelActionForFirmwareEvent(
+        PanelOperatingMode::performance, PanelEditPage::editPart, parameterEvent) ==
+        PanelControlAction::selectEditParameter);
+    assert(panelActionForFirmwareEvent(
+        PanelOperatingMode::performance, PanelEditPage::editPart, valueEvent) ==
+        PanelControlAction::editSelectedParameter);
+
     std::cout << "TechnoX IC4 firmware panel event decoder tests passed\\n";
     return 0;
 }
