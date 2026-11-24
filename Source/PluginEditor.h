@@ -19,11 +19,17 @@ private:
     void updateFromDrag(float y);
     void selectNextParameter(int delta);
     void changeSelectedValue(int delta);
+    void syncValueDialFromSelection() noexcept;
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
     DragTarget dragTarget = DragTarget::none;
     float dragStartY = 0.0f;
-    float dragStartValue = 0.0f;
+    float parameterDragStartIndex = 0.0f;
+    float valueDragStartRaw = 0.0f;
+    float volumeDragStartValue = 0.0f;
+    // The VALUE dial has its own displayed state. It is frozen while the
+    // PARAMETER encoder is being moved, then synchronised when that gesture ends.
+    float valueDialNormalized = 0.0f;
     int selectedPart = 0;
     int selectedParameter = 3;
     bool editMode = false;
