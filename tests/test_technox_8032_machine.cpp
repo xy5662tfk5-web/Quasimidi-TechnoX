@@ -3076,6 +3076,7 @@ int main(int argc, char** argv) {
             const auto descriptorBefore = firmwareMachine.watchedCallCount(0x1494u);
             const auto streamBefore = firmwareMachine.watchedCallCount(0x189du);
             const auto noteMapBefore = firmwareMachine.watchedCallCount(0xac00u);
+            firmwareMachine.clearResourceTupleWriteTraceForTesting();
             runRealMidiStage(label, note65On.data(), note65On.size());
             const auto partCalls =
                 firmwareMachine.watchedCallCount(0x4256u) - partBefore;
@@ -3091,8 +3092,8 @@ int main(int argc, char** argv) {
             assert(noteMapCalls == partCalls);
             const auto instructionWatchCount =
                 firmwareMachine.instructionWatchCountForTesting();
-            const auto instructionWatchFirst = instructionWatchCount > 512u
-                ? instructionWatchCount - 512u : 0u;
+            const auto instructionWatchFirst = instructionWatchCount > 1024u
+                ? instructionWatchCount - 1024u : 0u;
             std::printf("NOTE65 WATCH CAPTURE: total=%zu retained=%zu\\n",
                         instructionWatchCount, instructionWatchCount - instructionWatchFirst);
             std::array<std::uint8_t, 4> observedEventIds{};
@@ -3174,6 +3175,88 @@ int main(int argc, char** argv) {
                 std::printf("%s%02X", i == 0u ? "" : ",",
                             static_cast<unsigned>(allocatedPages[i]));
             std::printf("\\n");
+
+            // Event 0x0C begins with a typed 0x08 record. The 0x1BC3
+            // dispatch table selects handler 0x1C61; trace its source fields,
+            // working-page writes, and cursor advance to the 0x7F marker.
+            if (selector == 0x02u) {
+                constexpr std::array<std::uint8_t, 8> type08Bytes{{
+                    0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u, 0x7fu
+                }};
+                for (std::size_t i = 0; i < type08Bytes.size(); ++i) {
+                    assert(firmwareMachine.ic51RomByteForTesting(
+                        1u, static_cast<std::uint16_t>(0x160cu + i)) ==
+                        type08Bytes[i]);
+                }
+                assert(firmwareMachine.readCode(0x1bc7u) == 0x02u);
+                assert(firmwareMachine.readCode(0x1bc8u) == 0x1cu);
+                assert(firmwareMachine.readCode(0x1bc9u) == 0x61u);
+
+                const auto captureType08 = [&](std::uint16_t pc,
+                                               std::uint16_t dptr = 0u,
+                                               std::uint8_t slot = 0x80u)
+                    -> const TechnoX8032Machine::InstructionWatchEvent* {
+                    for (std::size_t i = instructionWatchFirst;
+                         i < instructionWatchCount; ++i) {
+                        const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+                        if (event.instructionPC != pc ||
+                            event.returnPC != 0x1720u ||
+                            event.port2Latch != allocatedPages[0] ||
+                            event.directRam2E != slot ||
+                            event.registers[7] != 0x0cu ||
+                            (dptr != 0u && event.dptr != dptr))
+                            continue;
+                        return &event;
+                    }
+                    return nullptr;
+                };
+                const auto* entry = captureType08(0x1c61u, 0x1bc3u);
+                const auto* readTag = captureType08(0x1c76u, 0x160cu);
+                const auto* readByte1 = captureType08(0x1c7au, 0x160du);
+                const auto* readByte2 = captureType08(0x1c7du, 0x160eu);
+                const auto* readByte3 = captureType08(0x1c80u, 0x160fu);
+                const auto* readByte4 = captureType08(0x1c83u, 0x1610u);
+                const auto* readByte5 = captureType08(0x1c86u, 0x1611u);
+                const auto* readByte6 = captureType08(0x1c89u, 0x1612u);
+                const auto* firstWrite = captureType08(0x1c9bu, 0u);
+                const auto* secondWrite = captureType08(0x1caau, 0u);
+                const auto* nextMarker = captureType08(0x1986u, 0x1613u, 0x88u);
+                assert(entry && readTag && readByte1 && readByte2 && readByte3 &&
+                       readByte4 && readByte5 && readByte6 && firstWrite &&
+                       secondWrite && nextMarker);
+                assert(entry->directRam36 == 0x0cu && entry->directRam37 == 0x16u);
+                assert(readTag->accumulator == 0x08u);
+                assert(readByte1->accumulator == 0x20u);
+                assert(readByte2->accumulator == 0x18u);
+                assert(readByte3->accumulator == 0xa0u);
+                assert(readByte4->accumulator == 0xf6u);
+                assert(readByte5->accumulator == 0x00u);
+                assert(readByte6->accumulator == 0x00u);
+                assert(nextMarker->directRam36 == 0x13u);
+                assert(nextMarker->directRam37 == 0x16u);
+                assert(nextMarker->directRam2E == 0x88u);
+                const auto typedWriteCount =
+                    firmwareMachine.resourceTupleWriteTraceCountForTesting();
+                std::size_t typedWriteMatches = 0;
+                for (std::size_t i = 0; i < typedWriteCount; ++i) {
+                    const auto& write =
+                        firmwareMachine.resourceTupleWriteTraceAtForTesting(i);
+                    if (write.stackReturnPC != 0x1720u ||
+                        write.port2 != allocatedPages[0] ||
+                        write.port3 != 0xfeu ||
+                        write.address < 0x0180u || write.address > 0x0190u)
+                        continue;
+                    ++typedWriteMatches;
+                    std::printf("NOTE65 TYPE08 WRITE: pc=%04X addr=%04X value=%02X\\n",
+                                static_cast<unsigned>(write.instructionPC),
+                                static_cast<unsigned>(write.address),
+                                static_cast<unsigned>(write.value));
+                }
+                assert(typedWriteMatches >= 4u);
+                std::printf("NOTE65 TYPE08 DISPATCH: source=160C..1612 "
+                            "table=1BC7->1C61 cursor=1613 page=%02X slot=80->88\\n",
+                            static_cast<unsigned>(allocatedPages[0]));
+            }
 
             // The second active Part (event 0x0D) resolves an IC51 bank-1
             // nested resource pointer at 0x03AF/0x03B0 -> 0x3806. Its raw
@@ -3660,8 +3743,17 @@ int main(int argc, char** argv) {
                     pc == 0x1b00u || pc == 0x1b20u || pc == 0x1b40u ||
                     pc == 0x1b60u || pc == 0x1b80u || pc == 0x1ba0u ||
                     pc == 0x1bb1u || pc == 0x1c2bu || pc == 0x1c61u ||
-                    pc == 0x1eddu || pc == 0x224cu || pc == 0x2301u ||
-                    pc == 0x2374u;
+                    pc == 0x1c76u || pc == 0x1c7au || pc == 0x1c7du ||
+                    pc == 0x1c80u || pc == 0x1c83u || pc == 0x1c86u ||
+                    pc == 0x1c89u || pc == 0x1c91u || pc == 0x1c97u ||
+                    pc == 0x1c9bu || pc == 0x1c9eu || pc == 0x1ca0u ||
+                    pc == 0x1ca3u || pc == 0x1ca6u || pc == 0x1ca8u ||
+                    pc == 0x1caau || pc == 0x1cabu || pc == 0x1caeu ||
+                    pc == 0x1cb0u || pc == 0x1cb2u || pc == 0x1cb3u ||
+                    pc == 0x1cb5u || pc == 0x1cb6u || pc == 0x1cb7u ||
+                    pc == 0x1cbeu || pc == 0x1cc1u || pc == 0x1cc4u ||
+                    pc == 0x1ccbu || pc == 0x1eddu || pc == 0x224cu ||
+                    pc == 0x2301u || pc == 0x2374u;
                 if (!selectorPath && !repeatedNoteHandlerPath &&
                     !partHandlerDetailPath && !resourcePipelinePath &&
                     !streamInterpreterPath)

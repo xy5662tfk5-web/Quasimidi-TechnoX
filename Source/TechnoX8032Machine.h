@@ -812,7 +812,17 @@ public:
             pc == 0x1b00u || pc == 0x1b20u || pc == 0x1b40u ||
             pc == 0x1b60u || pc == 0x1b80u || pc == 0x1ba0u ||
             pc == 0x1bb1u || pc == 0x1bc3u || pc == 0x1c2bu ||
-            pc == 0x1c61u || pc == 0x1eddu || pc == 0x224cu ||
+            pc == 0x1c61u || pc == 0x1c76u || pc == 0x1c7au ||
+            pc == 0x1c7du || pc == 0x1c80u || pc == 0x1c83u ||
+            pc == 0x1c86u || pc == 0x1c89u || pc == 0x1c91u ||
+            pc == 0x1c97u || pc == 0x1c9bu || pc == 0x1c9eu ||
+            pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
+            pc == 0x1ca8u || pc == 0x1caau || pc == 0x1cabu ||
+            pc == 0x1caeu || pc == 0x1cb0u || pc == 0x1cb2u ||
+            pc == 0x1cb3u || pc == 0x1cb5u || pc == 0x1cb6u ||
+            pc == 0x1cb7u || pc == 0x1cbeu || pc == 0x1cc1u ||
+            pc == 0x1cc4u || pc == 0x1ccbu ||
+            pc == 0x1eddu || pc == 0x224cu ||
             pc == 0x2301u || pc == 0x2374u ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
@@ -1348,7 +1358,10 @@ public:
             instructionPC == 0x1a44u || instructionPC == 0x1a57u ||
             instructionPC == 0x1a82u || instructionPC == 0x1a88u ||
             instructionPC == 0x1a9bu || instructionPC == 0x1a9eu ||
-            instructionPC == 0x1aa5u;
+            instructionPC == 0x1aa5u ||
+            instructionPC == 0x1c9bu || instructionPC == 0x1caau ||
+            instructionPC == 0x1cb0u || instructionPC == 0x1cb3u ||
+            instructionPC == 0x1cb6u || instructionPC == 0x1cbeu;
         if (nestedResourceWritePC &&
             address >= 0x0100u && address <= 0x02ffu) {
             auto& event = resourceTupleWriteTrace_[
@@ -2009,7 +2022,7 @@ private:
     std::size_t internalFlagWriteTraceCount_ = 0;
     std::array<BulkTransferEntryEvent, 16> bulkTransferEntryTrace_{};
     std::size_t bulkTransferEntryCount_ = 0;
-    std::array<InstructionWatchEvent, 512> instructionWatchTrace_{};
+    std::array<InstructionWatchEvent, 1024> instructionWatchTrace_{};
     std::size_t instructionWatchCount_ = 0;
     std::array<SlotInterpolationDataAccessEvent, 256> slotInterpolationDataAccessTrace_{};
     std::size_t slotInterpolationDataAccessTraceCount_ = 0;
