@@ -138,10 +138,10 @@ jobs:
       - name: Configure (x86_64)
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
-        run: cmake --build build --config Release --parallel 2
+        run: cmake --build build --config Release --parallel 4
       - name: Build and run Intel C++ regression tests
         run: |
-          cmake --build build --config Release --parallel 2 --target technox_mcs51_core_tests technox_8032_machine_tests technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests
+          cmake --build build --config Release --parallel 4 --target technox_mcs51_core_tests technox_8032_machine_tests technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests
           ctest --test-dir build -C Release --output-on-failure
       - name: Verify Catalina (10.15) deployment target
         run: |
