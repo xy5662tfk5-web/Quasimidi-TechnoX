@@ -9,8 +9,6 @@ int main()
     using technox::PartParameter;
     using Edit = technox::PanelPartEditMailbox::Edit;
 
-    std::array<int, 96> received{};
-    received.fill(-1);
     int count = 0;
 
     // Repeated turns of one encoder coalesce to the latest raw value.
@@ -51,17 +49,18 @@ int main()
     });
     assert(count == 4);
 
-    // Exercise all bit positions, including word boundaries 31/32/63/64/95.
-    const std::array<int, 4> partIndices{{1, 1, 2, 2}};
-    const std::array<PartParameter, 4> parameters{{
-        PartParameter::soundNumber, PartParameter::bankNumber,
-        PartParameter::soundNumber, PartParameter::portamentoTime
+    // Exercise the exact edit indices at word boundaries 31/32/63/64/95.
+    const std::array<int, 5> partIndices{{1, 1, 2, 2, 3}};
+    const std::array<PartParameter, 5> parameters{{
+        PartParameter::transpose, PartParameter::tune,
+        PartParameter::vibratoDepth, PartParameter::vibratoDelay,
+        PartParameter::portamentoTime
     }};
-    const std::array<int, 4> values{{81, 3, 91, 127}};
+    const std::array<int, 5> values{{33, 65, 92, 93, 127}};
     for (std::size_t i = 0; i < partIndices.size(); ++i)
         assert(mailbox.publish(4, partIndices[i], parameters[i], values[i]));
 
-    std::array<bool, 4> seen{};
+    std::array<bool, 5> seen{};
     mailbox.consume(4, [&](const Edit& edit) {
         for (std::size_t i = 0; i < partIndices.size(); ++i) {
             if (edit.partIndex == partIndices[i] && edit.parameter == parameters[i]) {
