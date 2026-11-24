@@ -4006,6 +4006,48 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(access.ic51Selected),
                         static_cast<unsigned long long>(access.machineCycle));
         }
+        const std::uint16_t note72ResourceProducerPCs[] = {
+            0x1cabu, 0x1e5bu, 0x1e60u, 0x1e63u, 0x1e66u
+        };
+        std::array<bool, 5> note72SawResourceProducer{};
+        std::printf("NOTE72 RESOURCE-TO-PITCH PRODUCER TRACE:\\n");
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            const auto found = std::find(std::begin(note72ResourceProducerPCs),
+                                         std::end(note72ResourceProducerPCs),
+                                         event.instructionPC);
+            if (found == std::end(note72ResourceProducerPCs))
+                continue;
+            const auto producerIndex = static_cast<std::size_t>(
+                found - std::begin(note72ResourceProducerPCs));
+            note72SawResourceProducer[producerIndex] = true;
+            std::printf("  PC=%04X ret=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
+                        "R0-R7=%02X/%02X/%02X/%02X/%02X/%02X/%02X/%02X "
+                        "RAM2B/2D/2E=%02X/%02X/%02X P2/P3=%02X/%02X\\n",
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.accumulator),
+                        static_cast<unsigned>(event.b),
+                        static_cast<unsigned>(event.psw),
+                        static_cast<unsigned>(event.dptr),
+                        static_cast<unsigned>(event.registers[0]),
+                        static_cast<unsigned>(event.registers[1]),
+                        static_cast<unsigned>(event.registers[2]),
+                        static_cast<unsigned>(event.registers[3]),
+                        static_cast<unsigned>(event.registers[4]),
+                        static_cast<unsigned>(event.registers[5]),
+                        static_cast<unsigned>(event.registers[6]),
+                        static_cast<unsigned>(event.registers[7]),
+                        static_cast<unsigned>(event.directRam2B),
+                        static_cast<unsigned>(event.directRam2D),
+                        static_cast<unsigned>(event.directRam2E),
+                        static_cast<unsigned>(event.port2Latch),
+                        static_cast<unsigned>(event.port3Pins));
+        }
+        for (const bool seen : note72SawResourceProducer)
+            assert(seen);
+
         const auto& note72PitchPacket =
             firmwareMachine.soundCommandPacketAt(note72PacketStart);
         assert(note72PitchPacket.returnPC == 0x0a52u);
