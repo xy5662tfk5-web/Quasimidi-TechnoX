@@ -223,3 +223,9 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - The interpreter loads `R0/R2/R6/B = E4/16/A3/40` and writes the tuple to offsets `0x00–0x03` of the dynamically allocated P2 page using `MOVX @R1` at PCs `0x1A32`, `0x1A35`, `0x1A38` and `0x1A3C`.
 - A new focused trace retains those four writes separately from the broad XDATA ring, and CI regression asserts their exact addresses, byte values, writer PCs, P2 page and caller return PC.
 - This establishes an IC51 nested-record-to-page transfer, not the record's DSP or sample semantics. It must not be described as PCM or waveform data until its downstream consumer is identified. Details: `docs/research/MASS_RESOURCE_TO_VOICE_DISPATCH.md`.
+## Nested IC51 post-copy metadata: conditional branch corrected
+
+- The post-copy write at IC4 PC `0x1A57` is conditional. For the observed second-event tuple `E4 16 A3 40`, the byte at selected-page offset `+1` is `0x16`; the pre-instruction snapshot at `0x1A4E` therefore takes the nonzero branch to `0x1A8C`.
+- That branch clears A before the `XCH`/`MOVX` sequence, so PC `0x1A57` writes `00` at offset `+3`. `0x7F` is staged only on the opposite zero-byte branch and was an incorrect unconditional expectation in the earlier test.
+- The regression now pins the branch state (`A=R2=0x16` at `0x1A4E`), the clear at `0x1A8C`, and the actual `00` write at `0x1A57`; the other post-copy writes remain `+4=00`, `+5=80`, `+6=00`.
+- This is a test/documentation correction to the firmware's conditional metadata processing, not a change to the audio backend or the model of the physical sound device.
