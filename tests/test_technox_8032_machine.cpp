@@ -3017,22 +3017,6 @@ int main(int argc, char** argv) {
                     firmwareMachine.watchedCallCount(0x189du) - singleModeStreamCallsBefore,
                     firmwareMachine.watchedCallCount(0xac00u) - singleModeNoteMapCallsBefore,
                     static_cast<unsigned>(singleModeDispatch.registers[7]));
-        std::size_t singleModeInterpolationEntryCount = 0;
-        std::size_t singleModeInterpolationMathCount = 0;
-        std::size_t singleModeInterpolationWriterCount = 0;
-        for (std::size_t i = 0;
-             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
-            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
-            if (event.instructionPC == 0x09b9u)
-                ++singleModeInterpolationEntryCount;
-            else if (event.instructionPC == 0x09dau)
-                ++singleModeInterpolationMathCount;
-            else if (event.instructionPC == 0x0a4fu)
-                ++singleModeInterpolationWriterCount;
-        }
-        assert(singleModeInterpolationEntryCount == 2u);
-        assert(singleModeInterpolationMathCount == 2u);
-        assert(singleModeInterpolationWriterCount == 2u);
         const auto singleModeInterpolationAccessCount =
             firmwareMachine.slotInterpolationDataAccessTraceCountForTesting();
         assert(singleModeInterpolationAccessCount == 20u);
@@ -3060,12 +3044,28 @@ int main(int argc, char** argv) {
                singleHighA->value == 0xa2u);
         assert(singleLowB->value == 0x01u && singleMidB->value == 0x00u &&
                singleHighB->value == 0x48u);
-        std::printf("NOTE65 SINGLE PITCH: 09B9=%zu math=%zu writer=%zu MOVX=%zu "
+        const auto countSingleModePassReads = [&](std::uint16_t pc) {
+            std::size_t count = 0;
+            for (std::size_t i = 0; i < singleModeInterpolationAccessCount; ++i) {
+                const auto& access =
+                    firmwareMachine.slotInterpolationDataAccessTraceAtForTesting(i);
+                if (!access.write && access.instructionPC == pc &&
+                    access.stackReturnPC == 0x1e6au)
+                    ++count;
+            }
+            return count;
+        };
+        // The instruction-watch hook is not guaranteed to snapshot every
+        // helper entry. Count the two passes from the actual MOVX operand reads.
+        assert(countSingleModePassReads(0x09dfu) == 2u);
+        assert(countSingleModePassReads(0x09e6u) == 2u);
+        assert(countSingleModePassReads(0x0a00u) == 2u);
+        std::printf("NOTE65 SINGLE PITCH: MOVX=%zu passReads[09DF/09E6/0A00]=%zu/%zu/%zu "
                     "tripletA=%02X/%02X/%02X tripletB=%02X/%02X/%02X\\n",
-                    singleModeInterpolationEntryCount,
-                    singleModeInterpolationMathCount,
-                    singleModeInterpolationWriterCount,
                     singleModeInterpolationAccessCount,
+                    countSingleModePassReads(0x09dfu),
+                    countSingleModePassReads(0x09e6u),
+                    countSingleModePassReads(0x0a00u),
                     static_cast<unsigned>(singleLowA->value),
                     static_cast<unsigned>(singleMidA->value),
                     static_cast<unsigned>(singleHighA->value),

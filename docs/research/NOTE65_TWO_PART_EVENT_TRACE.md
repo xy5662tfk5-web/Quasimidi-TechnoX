@@ -77,7 +77,7 @@ The follow-up Single-mode run changes only the Common selector read-override fro
 
 The two interpolation passes therefore cannot be assigned one-to-one to Parts 13 and 14. They remain an independent internal pair of parameter/interpolation lanes with unresolved ownership and units.
 
-## 8. What this establishes—and what remains open
+## 9. What this establishes—and what remains open
 
 Established by real-ROM execution and passing regressions:
 - One key 65 / velocity 100 MIDI Note On reaches event IDs `0x0C` and `0x0D` separately.
