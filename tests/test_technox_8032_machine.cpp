@@ -575,6 +575,30 @@ int main(int argc, char** argv) {
             assert(registers.pc == 0x047eu);
             assert(!phaseMachine.cpuFaulted());
 
+            std::fprintf(stderr,
+                "Periodic sine probe gate=%02X step=%02X R47=%02X R48=%02X IRAM03=%02X PSW=%02X XDATA=%02X/%02X/%02X writes=%zu\\n",
+                static_cast<unsigned>(gate), static_cast<unsigned>(stepCount),
+                static_cast<unsigned>(phaseMachine.readInternal(0x47u)),
+                static_cast<unsigned>(phaseMachine.readInternal(0x48u)),
+                static_cast<unsigned>(phaseMachine.readInternal(0x03u)),
+                static_cast<unsigned>(registers.psw.pack()),
+                static_cast<unsigned>(phaseMachine.xdataByteForTesting(0x2051u)),
+                static_cast<unsigned>(phaseMachine.xdataByteForTesting(0x2052u)),
+                static_cast<unsigned>(phaseMachine.xdataByteForTesting(0x2053u)),
+                phaseMachine.xdataWatchTraceCount());
+            const auto traceCount = phaseMachine.xdataWatchTraceCount();
+            const auto firstTrace = traceCount > 20u ? traceCount - 20u : 0u;
+            for (std::size_t traceIndex = firstTrace; traceIndex < traceCount; ++traceIndex) {
+                const auto& event = phaseMachine.xdataWatchTraceAt(traceIndex);
+                if (event.address >= 0x2050u && event.address <= 0x2053u) {
+                    std::fprintf(stderr, "  XDATA %04X=%02X write=%d pc=%04X ret=%04X\\n",
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value), event.write ? 1 : 0,
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.stackReturnPC));
+                }
+            }
+
             return std::array<std::uint8_t, 3>{{
                 phaseMachine.xdataByteForTesting(0x2051u),
                 phaseMachine.xdataByteForTesting(0x2052u),
