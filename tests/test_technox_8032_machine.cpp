@@ -2972,8 +2972,14 @@ int main(int argc, char** argv) {
         // Exercise the paired Note Off path for the same pitch and event slots.
         const std::array<std::uint8_t, 3> note65Off{{0x80u, 0x41u, 0x40u}};
         firmwareMachine.clearInstructionWatchForTesting();
+        const auto note65OffPacketStart = firmwareMachine.soundCommandPacketCount();
+        const auto note65OffWriterStart = firmwareMachine.watchedCallCount(0x0db7u);
         runRealMidiStage("Note Off pitch 65 after synthetic ready response",
                          note65Off.data(), note65Off.size());
+        // The Note Off path dispatches through the firmware's note-map helper
+        // but produces no writes to the separate 0x8000-0x8003 command window.
+        assert(firmwareMachine.soundCommandPacketCount() == note65OffPacketStart);
+        assert(firmwareMachine.watchedCallCount(0x0db7u) == note65OffWriterStart);
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2> note65OffEntries{};
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2> note65OffBranches{};
         std::array<TechnoX8032Machine::InstructionWatchEvent, 2> note65OffPageBranches{};
