@@ -796,6 +796,7 @@ public:
             pc == 0x19fbu || pc == 0x19feu || pc == 0x1a01u ||
             pc == 0x1a07u || pc == 0x1a11u || pc == 0x1a16u ||
             pc == 0x1a17u || pc == 0x1a1au || pc == 0x1a1du ||
+            pc == 0x1a1fu ||
             pc == 0x1a31u || pc == 0x1a3eu || pc == 0x1a4au ||
             pc == 0x1a4eu || pc == 0x1a50u || pc == 0x1a8cu ||
             pc == 0x1a8fu || pc == 0x1a99u || pc == 0x1a9fu ||
