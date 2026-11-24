@@ -218,7 +218,8 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
 
 void QuasimidiTechnoXAudioProcessorEditor::selectNextParameter(int delta)
 {
-    selectedParameter = (selectedParameter + delta + 24) % 24;
+    selectedParameter = juce::jlimit(0, 23, selectedParameter + delta);
+    parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
     syncValueDialFromSelection();
     repaint();
 }
@@ -226,86 +227,189 @@ void QuasimidiTechnoXAudioProcessorEditor::selectNextParameter(int delta)
 void QuasimidiTechnoXAudioProcessorEditor::changeSelectedValue(int delta)
 {
     const auto parameter = static_cast<technox::PartParameter>(selectedParameter);
-    const auto* descriptor = technox::PartEditModel::descriptor(static_cast<std::size_t>(selectedParameter));
-    if (descriptor == nullptr) return;
-    const int current = audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
-                                                            selectedPart, parameter);
-    if (current < 0) return;
-    const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum), current + delta);
+    const auto* descriptor = technox::PartEditModel::descriptor(
+        static_cast<std::size_t>(selectedParameter));
+    if (descriptor == nullptr)
+        return;
+
+    const int current = audioProcessor.getPartParameterRaw(
+        audioProcessor.getCurrentProgram(), selectedPart, parameter);
+    if (current < 0)
+        return;
+
+    const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum),
+                                  current + delta);
     if (audioProcessor.queuePanelPartParameterRaw(
-            audioProcessor.getCurrentProgram(), selectedPart, parameter, next)) {
-        valueDialNormalized = descriptor->maximum > 0
-            ? static_cast<float>(next) / static_cast<float>(descriptor->maximum) : 0.0f;
-    }
+            audioProcessor.getCurrentProgram(), selectedPart, parameter, next))
+        syncValueDialFromSelection();
     repaint();
+}
+
+technox::PanelOperatingMode
+QuasimidiTechnoXAudioProcessorEditor::panelOperatingMode() const noexcept
+{
+    return audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+        ? technox::PanelOperatingMode::performance
+        : technox::PanelOperatingMode::sequencerMulti;
+}
+
+int QuasimidiTechnoXAudioProcessorEditor::selectedPerformanceForDial() const noexcept
+{
+    return ramPerformanceBank
+        ? juce::jlimit(0, juce::jmax(0, audioProcessor.getNumPrograms() - 1),
+                       ramPerformanceSelection)
+        : audioProcessor.getCurrentProgram();
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noexcept
+{
+    const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
+    if (editMode) {
+        parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+    } else if (panelOperatingMode() == technox::PanelOperatingMode::performance) {
+        parameterDialNormalized = static_cast<float>(selectedPerformanceForDial())
+            / static_cast<float>(maximumProgram);
+    } else {
+        const int bank = audioProcessor.getPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart,
+            technox::PartParameter::bankNumber);
+        parameterDialNormalized = bank < 0 ? 0.0f : static_cast<float>(bank) / 3.0f;
+    }
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
 {
-    const auto* descriptor = technox::PartEditModel::descriptor(
-        static_cast<std::size_t>(selectedParameter));
-    if (descriptor == nullptr || descriptor->maximum == 0) {
-        valueDialNormalized = 0.0f;
-        return;
+    if (editMode) {
+        const auto* descriptor = technox::PartEditModel::descriptor(
+            static_cast<std::size_t>(selectedParameter));
+        if (descriptor == nullptr || descriptor->maximum == 0) {
+            valueDialNormalized = 0.0f;
+            return;
+        }
+        const int raw = audioProcessor.getPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart,
+            static_cast<technox::PartParameter>(selectedParameter));
+        valueDialNormalized = raw < 0 ? 0.0f
+            : static_cast<float>(juce::jlimit(0, static_cast<int>(descriptor->maximum), raw))
+                / static_cast<float>(descriptor->maximum);
+    } else if (panelOperatingMode() == technox::PanelOperatingMode::performance) {
+        const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
+        valueDialNormalized = static_cast<float>(selectedPerformanceForDial())
+            / static_cast<float>(maximumProgram);
+    } else {
+        const int sound = audioProcessor.getPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart,
+            technox::PartParameter::soundNumber);
+        valueDialNormalized = sound < 0 ? 0.0f : static_cast<float>(sound) / 127.0f;
     }
+}
 
-    const int raw = audioProcessor.getPartParameterRaw(
-        audioProcessor.getCurrentProgram(), selectedPart,
-        static_cast<technox::PartParameter>(selectedParameter));
-    valueDialNormalized = raw < 0
-        ? 0.0f
-        : static_cast<float>(juce::jlimit(0, static_cast<int>(descriptor->maximum), raw))
-            / static_cast<float>(descriptor->maximum);
+void QuasimidiTechnoXAudioProcessorEditor::syncDialsFromCurrentSelection() noexcept
+{
+    syncParameterDialFromSelection();
+    syncValueDialFromSelection();
 }
 
 void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
 {
-    // A new press always owns exactly one control. Never carry a previous drag
-    // target into the next gesture.
     dragTarget = DragTarget::none;
-    // JUCE events can originate in a child/component coordinate space; always
-    // convert to this editor's local coordinates before hit-testing.
     const auto p = e.getEventRelativeTo(this).position;
     const auto insideKnob = [&p](float cx, float cy, float radius) {
         return p.getDistanceFrom(juce::Point<float>(cx, cy)) <= radius;
     };
 
-    // Use the visible circular knob faces rather than broad rectangular zones.
-    // The three hit regions are mutually exclusive in the TechnoX panel layout.
+    const auto mode = panelOperatingMode();
+    const auto page = editMode
+        ? technox::PanelEditPage::editPart : technox::PanelEditPage::main;
+
     if (insideKnob(kVolumeX, kKnobY, 21.0f)) {
         dragTarget = DragTarget::volume;
         dragStartY = p.y;
         volumeDragStartValue = audioProcessor.getOutputGain();
         return;
     }
+
     if (insideKnob(kParameterX, kKnobY, 29.0f)) {
+        const auto action = technox::panelAction(
+            mode, page, technox::PanelAlphaDial::parameterSoundGroup);
         dragTarget = DragTarget::parameter;
         dragStartY = p.y;
-        parameterDragStartIndex = static_cast<float>(selectedParameter);
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance:
+                parameterDragStartIndex = static_cast<float>(selectedPerformanceForDial());
+                break;
+            case technox::PanelControlAction::selectSoundGroup:
+                parameterDragStartIndex = static_cast<float>(juce::jmax(0,
+                    audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
+                        selectedPart, technox::PartParameter::bankNumber)));
+                break;
+            case technox::PanelControlAction::selectEditParameter:
+                parameterDragStartIndex = static_cast<float>(selectedParameter);
+                break;
+            default:
+                dragTarget = DragTarget::none;
+                break;
+        }
         return;
     }
+
     if (insideKnob(kValueX, kKnobY, 29.0f)) {
+        const auto action = technox::panelAction(
+            mode, page, technox::PanelAlphaDial::valueSound);
         dragTarget = DragTarget::value;
         dragStartY = p.y;
-        const int v = audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
-            selectedPart, static_cast<technox::PartParameter>(selectedParameter));
-        valueDragStartRaw = static_cast<float>(juce::jmax(0, v));
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance:
+                valueDragStartRaw = static_cast<float>(selectedPerformanceForDial());
+                break;
+            case technox::PanelControlAction::selectSingleSound:
+                valueDragStartRaw = static_cast<float>(juce::jmax(0,
+                    audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
+                        selectedPart, technox::PartParameter::soundNumber)));
+                break;
+            case technox::PanelControlAction::editSelectedParameter:
+                valueDragStartRaw = static_cast<float>(juce::jmax(0,
+                    audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
+                        selectedPart,
+                        static_cast<technox::PartParameter>(selectedParameter))));
+                break;
+            default:
+                dragTarget = DragTarget::none;
+                break;
+        }
         return;
     }
 
     if (p.x >= 742 && p.x <= 771 && p.y >= 38 && p.y <= 58) {
-        editMode = !editMode; // EDIT enters edit mode; OK confirms the current raw value.
+        editMode = !editMode;
+        syncDialsFromCurrentSelection();
         repaint();
         return;
     }
+
     if (p.x >= 780 && p.x <= 809 && p.y >= 38 && p.y <= 58) {
-        editMode = false; // EXIT leaves edit mode without altering stored performance data.
+        editMode = false;
+        syncDialsFromCurrentSelection();
         repaint();
         return;
     }
+
     if (p.y >= 82 && p.y <= 101 && p.x >= 742 && p.x <= 809) {
-        selectedPart = juce::jlimit(0, 3, selectedPart + (p.x < 776 ? -1 : 1));
-        syncValueDialFromSelection();
+        const auto key = p.x < 776
+            ? technox::PanelKey::partBankPrevious
+            : technox::PanelKey::partBankNext;
+        const auto action = technox::panelAction(mode, page, key);
+        if (action == technox::PanelControlAction::switchPerformanceBank) {
+            // ROM has the 50 verified factory Performances. A RAM Performance
+            // image is not embedded yet, so expose the bank honestly as empty.
+            ramPerformanceBank = p.x >= 776.0f;
+            ramPerformanceSelection = audioProcessor.getCurrentProgram();
+        } else if (action == technox::PanelControlAction::selectPart) {
+            // The current parser has four stored Performance Part blocks:
+            // user-visible Parts 13–16. Full Sequencer Multi Parts 1–16 follow later.
+            selectedPart = juce::jlimit(0, 3, selectedPart + (p.x < 776 ? -1 : 1));
+            syncDialsFromCurrentSelection();
+        }
         repaint();
     }
 }
@@ -322,9 +426,11 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
     const auto completedTarget = dragTarget;
     dragTarget = DragTarget::none;
 
-    // Parameter selection and value editing are separate encoder gestures.
-    // Once parameter selection stops, snap VALUE to the newly selected Part value.
-    if (completedTarget == DragTarget::parameter || completedTarget == DragTarget::value)
+    // In Edit mode, changing the parameter selects a new stored value for the
+    // VALUE encoder. In the two main modes the dials remain independent.
+    if (completedTarget == DragTarget::parameter && editMode)
+        syncValueDialFromSelection();
+    else if (completedTarget == DragTarget::value)
         syncValueDialFromSelection();
 }
 
@@ -333,21 +439,85 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
     const float delta = (dragStartY - y) / 2.5f;
     if (dragTarget == DragTarget::volume) {
         audioProcessor.setOutputGain(volumeDragStartValue + delta / 100.0f);
-    } else if (dragTarget == DragTarget::parameter) {
-        selectedParameter = juce::jlimit(0, 23,
-            static_cast<int>(std::lround(parameterDragStartIndex + delta)));
-    } else if (dragTarget == DragTarget::value && editMode) {
-        const auto* descriptor = technox::PartEditModel::descriptor(
-            static_cast<std::size_t>(selectedParameter));
-        if (descriptor != nullptr) {
-            const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum),
-                static_cast<int>(std::lround(valueDragStartRaw + delta)));
-            if (audioProcessor.queuePanelPartParameterRaw(
-                    audioProcessor.getCurrentProgram(), selectedPart,
-                    static_cast<technox::PartParameter>(selectedParameter), next)) {
-                valueDialNormalized = descriptor->maximum > 0
-                    ? static_cast<float>(next) / static_cast<float>(descriptor->maximum) : 0.0f;
+        repaint();
+        return;
+    }
+
+    const auto mode = panelOperatingMode();
+    const auto page = editMode
+        ? technox::PanelEditPage::editPart : technox::PanelEditPage::main;
+    const int maximumProgram = juce::jmax(0, audioProcessor.getNumPrograms() - 1);
+
+    if (dragTarget == DragTarget::parameter) {
+        const auto action = technox::panelAction(
+            mode, page, technox::PanelAlphaDial::parameterSoundGroup);
+        const int next = static_cast<int>(std::lround(parameterDragStartIndex + delta));
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance: {
+                const int selection = juce::jlimit(0, maximumProgram, next);
+                if (ramPerformanceBank)
+                    ramPerformanceSelection = selection;
+                else
+                    audioProcessor.setCurrentProgram(selection);
+                parameterDialNormalized = maximumProgram > 0
+                    ? static_cast<float>(selection) / static_cast<float>(maximumProgram) : 0.0f;
+                break;
             }
+            case technox::PanelControlAction::selectSoundGroup: {
+                const int bank = juce::jlimit(0, 3, next);
+                if (audioProcessor.queuePanelPartParameterRaw(
+                        audioProcessor.getCurrentProgram(), selectedPart,
+                        technox::PartParameter::bankNumber, bank))
+                    parameterDialNormalized = static_cast<float>(bank) / 3.0f;
+                break;
+            }
+            case technox::PanelControlAction::selectEditParameter:
+                selectedParameter = juce::jlimit(0, 23, next);
+                parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+                break;
+            default:
+                break;
+        }
+    } else if (dragTarget == DragTarget::value) {
+        const auto action = technox::panelAction(
+            mode, page, technox::PanelAlphaDial::valueSound);
+        const int next = static_cast<int>(std::lround(valueDragStartRaw + delta));
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance: {
+                const int selection = juce::jlimit(0, maximumProgram, next);
+                if (ramPerformanceBank)
+                    ramPerformanceSelection = selection;
+                else
+                    audioProcessor.setCurrentProgram(selection);
+                valueDialNormalized = maximumProgram > 0
+                    ? static_cast<float>(selection) / static_cast<float>(maximumProgram) : 0.0f;
+                break;
+            }
+            case technox::PanelControlAction::selectSingleSound: {
+                const int sound = juce::jlimit(0, 127, next);
+                if (audioProcessor.queuePanelPartParameterRaw(
+                        audioProcessor.getCurrentProgram(), selectedPart,
+                        technox::PartParameter::soundNumber, sound))
+                    valueDialNormalized = static_cast<float>(sound) / 127.0f;
+                break;
+            }
+            case technox::PanelControlAction::editSelectedParameter: {
+                const auto* descriptor = technox::PartEditModel::descriptor(
+                    static_cast<std::size_t>(selectedParameter));
+                if (descriptor != nullptr) {
+                    const int value = juce::jlimit(0, static_cast<int>(descriptor->maximum), next);
+                    if (audioProcessor.queuePanelPartParameterRaw(
+                            audioProcessor.getCurrentProgram(), selectedPart,
+                            static_cast<technox::PartParameter>(selectedParameter), value)) {
+                        valueDialNormalized = descriptor->maximum > 0
+                            ? static_cast<float>(value) / static_cast<float>(descriptor->maximum)
+                            : 0.0f;
+                    }
+                }
+                break;
+            }
+            default:
+                break;
         }
     }
     repaint();
