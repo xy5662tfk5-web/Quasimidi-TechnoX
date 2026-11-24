@@ -353,8 +353,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
     };
 
     const auto mode = panelOperatingMode();
-    const auto page = editMode
-        ? technox::PanelEditPage::editPart : technox::PanelEditPage::main;
+    const auto currentPage = panelEditPage();
 
     if (insideKnob(kVolumeX, kKnobY, 21.0f)) {
         dragTarget = DragTarget::volume;
@@ -365,7 +364,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
 
     if (insideKnob(kParameterX, kKnobY, 29.0f)) {
         const auto action = technox::panelAction(
-            mode, page, technox::PanelAlphaDial::parameterSoundGroup);
+            mode, currentPage, technox::PanelAlphaDial::parameterSoundGroup);
         dragTarget = DragTarget::parameter;
         dragStartY = p.y;
         switch (action) {
@@ -377,8 +376,14 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
                     audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
                         selectedPart, technox::PartParameter::bankNumber)));
                 break;
+            case technox::PanelControlAction::selectEditFunction:
+                parameterDragStartIndex = static_cast<float>(selectedEditFunction - 1);
+                break;
             case technox::PanelControlAction::selectEditParameter:
                 parameterDragStartIndex = static_cast<float>(selectedParameter);
+                break;
+            case technox::PanelControlAction::selectSystemParameter:
+                parameterDragStartIndex = static_cast<float>(selectedSystemParameter);
                 break;
             default:
                 dragTarget = DragTarget::none;
@@ -389,7 +394,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
 
     if (insideKnob(kValueX, kKnobY, 29.0f)) {
         const auto action = technox::panelAction(
-            mode, page, technox::PanelAlphaDial::valueSound);
+            mode, currentPage, technox::PanelAlphaDial::valueSound);
         dragTarget = DragTarget::value;
         dragStartY = p.y;
         switch (action) {
@@ -400,6 +405,16 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
                 valueDragStartRaw = static_cast<float>(juce::jmax(0,
                     audioProcessor.getPartParameterRaw(audioProcessor.getCurrentProgram(),
                         selectedPart, technox::PartParameter::soundNumber)));
+                break;
+            case technox::PanelControlAction::selectEditFunction:
+                valueDragStartRaw = static_cast<float>(selectedEditFunction - 1);
+                break;
+            case technox::PanelControlAction::selectSystemParameter:
+                valueDragStartRaw = static_cast<float>(selectedSystemParameter);
+                break;
+            case technox::PanelControlAction::editSystemParameter:
+                valueDragStartRaw = audioProcessor.getMidiRoutingMode()
+                    == MidiRoutingMode::performanceOmni ? 0.0f : 1.0f;
                 break;
             case technox::PanelControlAction::editSelectedParameter:
                 valueDragStartRaw = static_cast<float>(juce::jmax(0,
@@ -414,15 +429,35 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
         return;
     }
 
+    // EDIT opens the function menu; OK confirms the highlighted function.
     if (p.x >= 742 && p.x <= 771 && p.y >= 38 && p.y <= 58) {
-        editMode = !editMode;
+        if (page == EditorPage::main) {
+            page = EditorPage::editFunctionMenu;
+            selectedEditFunction = 2; // Edit Part is currently the main supported page.
+            menuNotImplemented = false;
+        } else if (page == EditorPage::editFunctionMenu) {
+            if (selectedEditFunction == 2) {
+                page = EditorPage::editPart;
+                menuNotImplemented = false;
+            } else if (selectedEditFunction == 7) {
+                page = EditorPage::editSystem;
+                menuNotImplemented = false;
+            } else {
+                menuNotImplemented = true;
+            }
+        } else if (page == EditorPage::editPart) {
+            // OK keeps the selected Part edit page open.
+        } else if (page == EditorPage::editSystem) {
+            // System mode is applied immediately by the VALUE encoder.
+        }
         syncDialsFromCurrentSelection();
         repaint();
         return;
     }
 
     if (p.x >= 780 && p.x <= 809 && p.y >= 38 && p.y <= 58) {
-        editMode = false;
+        page = EditorPage::main;
+        menuNotImplemented = false;
         syncDialsFromCurrentSelection();
         repaint();
         return;
@@ -432,7 +467,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
         const auto key = p.x < 776
             ? technox::PanelKey::partBankPrevious
             : technox::PanelKey::partBankNext;
-        const auto action = technox::panelAction(mode, page, key);
+        const auto action = technox::panelAction(mode, currentPage, key);
         if (action == technox::PanelControlAction::switchPerformanceBank) {
             // ROM has the 50 verified factory Performances. A RAM Performance
             // image is not embedded yet, so expose the bank honestly as empty.
@@ -461,9 +496,8 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
     const auto completedTarget = dragTarget;
     dragTarget = DragTarget::none;
 
-    // In Edit mode, changing the parameter selects a new stored value for the
-    // VALUE encoder. In the two main modes the dials remain independent.
-    if (completedTarget == DragTarget::parameter && editMode)
+    // Only Part Edit couples selection of a new parameter to the stored VALUE.
+    if (completedTarget == DragTarget::parameter && page == EditorPage::editPart)
         syncValueDialFromSelection();
     else if (completedTarget == DragTarget::value)
         syncValueDialFromSelection();
@@ -479,13 +513,12 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
     }
 
     const auto mode = panelOperatingMode();
-    const auto page = editMode
-        ? technox::PanelEditPage::editPart : technox::PanelEditPage::main;
+    const auto currentPage = panelEditPage();
     const int maximumProgram = juce::jmax(0, audioProcessor.getNumPrograms() - 1);
 
     if (dragTarget == DragTarget::parameter) {
         const auto action = technox::panelAction(
-            mode, page, technox::PanelAlphaDial::parameterSoundGroup);
+            mode, currentPage, technox::PanelAlphaDial::parameterSoundGroup);
         const int next = static_cast<int>(std::lround(parameterDragStartIndex + delta));
         switch (action) {
             case technox::PanelControlAction::selectPerformance: {
@@ -506,16 +539,25 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                     parameterDialNormalized = static_cast<float>(bank) / 3.0f;
                 break;
             }
+            case technox::PanelControlAction::selectEditFunction:
+                selectedEditFunction = juce::jlimit(1, 9, next + 1);
+                menuNotImplemented = false;
+                parameterDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+                break;
             case technox::PanelControlAction::selectEditParameter:
                 selectedParameter = juce::jlimit(0, 23, next);
                 parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+                break;
+            case technox::PanelControlAction::selectSystemParameter:
+                selectedSystemParameter = 0; // Mode is the first supported System item.
+                parameterDialNormalized = 0.0f;
                 break;
             default:
                 break;
         }
     } else if (dragTarget == DragTarget::value) {
         const auto action = technox::panelAction(
-            mode, page, technox::PanelAlphaDial::valueSound);
+            mode, currentPage, technox::PanelAlphaDial::valueSound);
         const int next = static_cast<int>(std::lround(valueDragStartRaw + delta));
         switch (action) {
             case technox::PanelControlAction::selectPerformance: {
@@ -534,6 +576,19 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                         audioProcessor.getCurrentProgram(), selectedPart,
                         technox::PartParameter::soundNumber, sound))
                     valueDialNormalized = static_cast<float>(sound) / 127.0f;
+                break;
+            }
+            case technox::PanelControlAction::selectEditFunction:
+                selectedEditFunction = juce::jlimit(1, 9, next + 1);
+                menuNotImplemented = false;
+                valueDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+                break;
+            case technox::PanelControlAction::editSystemParameter: {
+                const int selectedMode = juce::jlimit(0, 1, next);
+                audioProcessor.setMidiRoutingMode(selectedMode == 0
+                    ? MidiRoutingMode::performanceOmni : MidiRoutingMode::partChannels);
+                lastRoutingMode = audioProcessor.getMidiRoutingMode();
+                valueDialNormalized = static_cast<float>(selectedMode);
                 break;
             }
             case technox::PanelControlAction::editSelectedParameter: {
