@@ -14,7 +14,7 @@ The periodic scheduler entry is `0x044C`. Its first tick performs the following 
 6. Sets `R1=0xFA` and reads `MOVX A,@R1`. Because `MOVX @Ri` uses the P2 output latch for the high address byte, this first status poll is at **XDATA `0x00FA`**.
 7. The scheduler proceeds only when this read returns `0x40`; it then compares XDATA `0x2064` against the incremented RAM counter and calls `0x0C1A` on a match.
 
-The test explicitly supplies `0x40` at `0x00FA` and sets `0x2064=1`. This is a controlled peripheral-ready fixture. `0x40` is not a captured response from a real TechnoX sound chip.
+The status byte at `0x00FA` is part of the firmware's own XDATA status-page map, not a register in the unidentified sound chip. IC4 routine `0x0148` initializes this map: it clears 32 P2-selected 256-byte pages in the order `CODE[0x0078..0x0097]`, then writes `0x40` at offset `0xFA` in each page. The actual first tick polls the first seeded entry, `XDATA 0x00FA`. The strengthened regression now executes the real `0x0148` initializer before entering `0x044C`; it no longer injects a synthetic status response.
 
 ## 2. The periodic sine updater at 0x0C1A
 
@@ -54,7 +54,9 @@ For the `0x3C` gate:
 
 ## 4. Downstream Part/slot-dependent use
 
-The sine byte is consumed by a separate firmware routine around `0x04B5–0x054E`; it is not written directly to the external command window `0x8000–0x8003`.
+The scheduler's status read at `0x0465` is a branch point. When the byte is `0x40`, the scheduler compares the tick at `0x2064`, calls `0x0C1A` if due, then returns at `0x047D`. When the byte is not `0x40`, control branches to `0x047E` and continues through the alternate processing path at `0x04B5–0x054E`. This alternate path reads the sine state at `0x2053`; it is not an unconditional straight-line continuation after the `0x0C1A` call.
+
+The sine byte is consumed in that alternate firmware path; it is not written directly to the external command window `0x8000–0x8003`.
 
 Observed instruction/data relationships:
 
@@ -69,13 +71,15 @@ The ROM therefore establishes a **Part/slot-dependent sine-derived parameter mod
 
 ## 5. Regression coverage
 
-The Intel/Linux regression runs the actual IC4 v1.05 machine code from scheduler PC `0x044C`. It checks:
+The Intel/Linux regression runs the actual IC4 v1.05 status-map initializer at `0x0148`, followed by the scheduler at `0x044C`. It checks:
 
-- the first-tick page lookup and status poll at XDATA `0x00FA`;
-- scheduler return at `0x047D` with the controlled `0x40` status and matching `0x2064` tick;
+- all 32 P2-selected XDATA pages from `CODE[0x0078..0x0097]` receive a `0x40` status byte at offset `0xFA`, with adjacent `0xFB` cleared;
+- the scheduler's first-tick page lookup reaches the real XDATA status byte at `0x00FA`;
+- scheduler return at `0x047D` with the firmware-initialized `0x40` status and matching `0x2064` tick;
 - gate-off behavior with no writes to `0x2051–0x2053`;
 - one-step and two-step phase values and their ROM table outputs;
 - exactly one write to each output address at the firmware PCs `0x0C49`, `0x0C4E`, and `0x0C57`, each returning to `0x0473`;
+- no SoundHost reads, writes, or command packets during this isolated XDATA phase/sine path;
 - all 64 entries of the ROM lookup table.
 
 The passing trace was captured on commit `96161eecb8c4a78db6ef3e4b531758357d07031f`, run `45416665661`. The follow-up regression strengthens the assertions with the full 64-byte table and exact writer PCs.
