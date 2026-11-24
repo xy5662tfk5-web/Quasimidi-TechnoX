@@ -67,6 +67,25 @@ int main()
                PanelControlAction::selectPart);
     }
 
+    // Sequencer Multi Part 1..16 defaults to MIDI channels 1..16.
+    const auto defaultChannels = defaultSequencerMidiChannelMap();
+    assert(isValidSequencerMidiChannelMap(defaultChannels));
+    for (int channel = 1; channel <= 16; ++channel)
+        assert(sequencerPartIndexForMidiChannel(defaultChannels, channel) == channel - 1);
+    assert(sequencerPartIndexForMidiChannel(defaultChannels, 0) == -1);
+    assert(sequencerPartIndexForMidiChannel(defaultChannels, 17) == -1);
+
+    // A valid remap is independent of display order; invalid duplicate maps
+    // must be rejected before they are restored from a plugin state chunk.
+    auto remappedChannels = defaultChannels;
+    remappedChannels[0] = 16;
+    remappedChannels[15] = 1;
+    assert(isValidSequencerMidiChannelMap(remappedChannels));
+    assert(sequencerPartIndexForMidiChannel(remappedChannels, 16) == 0);
+    assert(sequencerPartIndexForMidiChannel(remappedChannels, 1) == 15);
+    remappedChannels[7] = 16;
+    assert(!isValidSequencerMidiChannelMap(remappedChannels));
+
     std::cout << "TechnoX manual-based panel control map tests passed\\n";
     return 0;
 }
