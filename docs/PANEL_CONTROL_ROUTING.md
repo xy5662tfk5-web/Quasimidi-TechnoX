@@ -21,34 +21,49 @@ The plugin contains the 50 factory ROM Performance records. It does not yet cont
 ## 2. Implemented panel pages
 
 - **Main / Performance:** both dials select a factory ROM Performance; the inactive dial indicator stays still during a drag and follows the same selected Performance when the gesture ends. PART/BANK left selects ROM and right selects RAM.
-- **Main / Sequencer Multi:** PARAMETER selects Bank/Sound Group A–D (currently backed by the Part Bank field), VALUE selects Sound 000–127, and PART/BANK changes among the four currently stored Performance Parts 13–16.
+- **Main / Sequencer Multi:** PARAMETER selects Bank/Sound Group A–D, VALUE selects the individual sound 000–127, and PART/BANK moves independently through all 16 Sequencer Multi Parts. Part 10 is treated as the dedicated drum channel and VALUE selects one of its eight Drum Sets.
 - **Edit Function:** EDIT opens the menu, both dials navigate the highlighted function, OK confirms, EXIT leaves the menu. `Edit Part` and `Edit System` are implemented; other entries display `MENU NOT BUILT` rather than invoking placeholder behavior.
 - **Edit Part:** PARAMETER selects one of the documented 24 Part fields; VALUE edits its documented raw range. The edit is queued into the audio-thread mailbox.
 - **Edit System:** the first implemented item is Mode (Perform / Sequencer Multi). VALUE switches the plugin's canonical MIDI routing mode. This currently updates the plugin's state model; the exact original IC4 System-Edit SysEx/write transaction is not yet connected.
 
 
 
-## 3. Current Sequencer Multi Part coverage
+## 3. Independent Performance and 16-Part Sequencer state
 
-The manual defines 16 Sequencer Multi Parts, but the current factory Performance parser stores four Part blocks per Performance: Parts 13–16 (runtime indices 12–15). The present editor therefore lets the user select the four stored Performance Parts 13–16 only. It must not display them as if all 16 Sequencer Multi Parts were already modelled. Full Parts 1–16 and saved Sequencer Multi setups remain a follow-up implementation.
+The project now keeps two separate models:
 
-The sound-name catalog contains 4 banks × 128 names. In the current four-Part editor, PARAMETER writes the selected Part's Bank Number (0–3), and VALUE writes its Sound Number (0–127). The selected sound name is resolved through the catalog. The catalog contains names and IC51 resource metadata, not decoded waveforms.
+- **Performance memory:** 50 factory ROM Performance records. Each contains a Common block and four stored Part blocks, corresponding to user-visible Parts 13–16 (runtime voice slots 12–15).
+- **Sequencer Multi:** 16 independent live Part parameter sets, separate from the four stored Performance blocks. The panel has a separate Part selector for these Parts 1–16; selecting a Multi Part never changes the Performance Part 13–16 selector.
+
+The 16 Sequencer Multi Parts default to MIDI channels 1–16. A unique channel map is validated when a V5 plugin state is restored. Part 10 (index 9) is limited to eight Drum Sets in its Sound Number field; its LCD label is rendered as a drum-kit selection rather than a normal 128-sound name.
+
+The 4-bank × 128-sound catalog contains names, not waveforms. The 512 names are used for single-sound lookup on Parts 1–9 and 11–16. A Drum Set name/kit selection is distinct from the single-sound catalog.
 
 ## 4. What a panel edit reaches today
 
-The current path for a panel VALUE edit is:
+The current panel edit path depends on the active mode:
 
 ```
-VALUE encoder (EDIT mode)
-  -> selected Part + selected PartParameter
-  -> queuePanelPartParameterRaw()
-  -> canonical atomic Part value + bounded per-Performance mailbox
-  -> next processBlock() drains the mailbox
-  -> MASSAudioEngine::setPartParameter() on the audio thread
-  -> active IMASSVoiceBackend
+Performance Edit Part:
+  VALUE encoder
+    -> Performance index + Performance Part 13–16 + PartParameter
+    -> queuePanelPartParameterRaw()
+    -> atomic Performance value + 50 × 4 × 24 mailbox
+    -> processBlock() drains the mailbox
+    -> MASSAudioEngine Part 13–16
+
+Sequencer Multi:
+  VALUE encoder
+    -> Sequencer Part 1–16 + PartParameter
+    -> queueSequencerPartParameterRaw()
+    -> atomic live Part value + 16 × 24 mailbox
+    -> processBlock() drains the mailbox
+    -> MASSAudioEngine Part 1–16
 ```
 
-The mailbox coalesces repeated drag updates to the latest raw value per Part parameter. This avoids a growing queue while audio is stopped and keeps the editor/message thread from touching VoiceManager/backend state. The LCD reads the canonical atomic Part value immediately; the engine consumes the same value on its next audio callback.
+Both mailboxes coalesce repeated drag updates to the latest raw value for each Part parameter. This avoids a growing queue while audio is stopped and keeps the editor/message thread from touching VoiceManager/backend state. The LCD reads the canonical atomic value immediately; the engine consumes that value on its next audio callback. Switching modes defers the relevant 4-Part Performance or 16-Part Sequencer model synchronization to the audio thread.
+
+Plugin state format V5 stores all 16 Sequencer-Multi Part parameter sets and 16 MIDI channel assignments. Older V1–V4 states are still accepted; their legacy four-channel fields are consumed using the old chunk length and migrated only when they form a valid Part 13–16 channel mapping.
 
 Host Performance selection is similarly split: `setCurrentProgram()` changes the selected Performance index and sets a pending flag; the full Performance/Part image is synchronized to MASSAudioEngine at the start of the next `processBlock()`. This moves VoiceManager/backend mutations out of the host/message thread.
 
