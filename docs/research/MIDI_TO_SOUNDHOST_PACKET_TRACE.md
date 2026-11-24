@@ -74,6 +74,22 @@ Inspection of the regression assertions narrows the interpretation further:
 The immediate experiment must therefore use four separately booted, identically initialized machines (or a deterministic snapshot facility): (a) Program Change only, (b) Note On only after the same program is already selected, (c) Note Off only after a note-on baseline, and (d) velocity/note substitutions. Compare full packet streams, not only counts. Keep the synthetic ready response labelled as a test fixture in every result.
 
 
+## First Note On after synthetic ready/queue-drain setup
+
+The first Note On stage starts from the IC4 test fixture's initial startup state and uses an explicitly injected ready/queue-drain handshake. Its trace contains **546** complete four-byte transactions:
+
+- 544 repeated configuration transactions (512 via `0x0E6A`, 32 via `0x0E1D`);
+- two additional four-byte writes whose caller return PC is `0x1048`.
+
+The two startup packets are now asserted byte-for-byte by the regression:
+
+| Order | Packet bytes (`R5 R2 R3 R4`) | Recorded return PC | Writer |
+|---:|---|---|---|
+| 1 | `F0 80 01 80` | `0x1048` | `0x0DB7` |
+| 2 | `F1 80 01 80` | `0x1048` | `0x0DB7` |
+
+The follow-up warm-state Note On below emits a different five-packet prefix. Keep these two startup packets separate from those five note-associated packets: they occur only in the first synthetic-ready stage of this fixture. The test does not identify the external device or the meaning of `F0/F1`, and this startup sequence is not evidence of real hardware acknowledgement.
+
 ## Latest differential probe: a second Note On after setup
 
 A follow-up probe now sends a second, distinct event (`90 40 64`, note 64, velocity 100) after the first Note On has passed the test-only ready/queue-drain handshake. The existing synthetic read override remains active; this second stage does not inject a new status value.
