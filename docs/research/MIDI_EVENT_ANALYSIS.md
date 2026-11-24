@@ -352,19 +352,19 @@ Follow-up control-flow inspection narrows the interpretation of section 28:
 **What is not proven:** the target XDATA page/device, whether the generated values are audio-rate samples, and whether this code belongs to the main M.A.S.S. oscillator rather than modulation, envelope/LFO, or peripheral setup. Keep the wavetable finding as evidence of firmware-side waveform/math generation, not as proof that the complete sound engine has been recovered.
 ## 30. Sine generator is gated by XDATA[0x2050]
 
-Tracing the `0x0C1A–0x0C58` path reveals an important guard:
+Tracing the `0x0C1A–0x0C58` path reveals an important guard and a periodic-update caller:
 
 - `0x0C1A` sets P2=`0x20`, R1=`0x50`, then reads `XDATA[0x2050]` using `MOVX A,@R1`.
-- If the byte is nonzero (`JNZ` at `0x0C20`), the routine returns immediately.
-- Only when `XDATA[0x2050] == 0` does it continue through the phase/shape calculation, read `CODE[0x001E + (A & 0x3F)]`, increment R1, and write the sine value to XDATA through `MOVX @R1,A`.
-- Startup routine around `0x0130` explicitly initializes `XDATA[0x2050]` to `0x3C` (`MOV DPTR,#0x2050; MOV A,#0x3C; MOVX @DPTR,A`).
-- Static scan found no other direct `MOV DPTR,#0x2050` or direct immediate reference to `0x2051`; the generator uses the indirect P2/R1 addressing path.
+- The branch at `0x0C20` is `JNZ 0x0C23`: a **zero** byte returns at `0x0C22`; a **nonzero** byte continues into the update. Thus the startup value `0x3C` enables this path; it does not disable it.
+- The reachable caller `0x044C` periodically checks external status at `0xFFFA`, compares the scheduler counter at `0x2064`, and calls `0x0C1A` from `0x0470` when the scheduled count matches. It then resets the counter at `0x0473`. The routine is therefore part of a periodic service path, not a Note Off subroutine.
+- Inside `0x0C1A`, the nonzero control byte is rotated and used with RAM state `0x48` to calculate an increment. The routine updates XDATA `0x2051` and `0x2052` through `MOVX @R1,A`, derives a six-bit lookup index from the updated phase, reads `CODE[0x001E + index]`, and writes the table byte to `XDATA[0x2053]`.
+- Startup routine around `0x0130` initializes `XDATA[0x2050]` to `0x3C` (`MOV DPTR,#0x2050; MOV A,#0x3C; MOVX @DPTR,A`).
 
-This means the sine-writing path is disabled by its initial state and requires some later state transition to zero the gate byte. That is evidence against casually identifying it as the continuously running main audio oscillator. The routine may be an explicitly enabled modulation/diagnostic/peripheral initialization path; its caller/state transition still needs to be identified.
+This is consistent with an enabled periodic phase-accumulator / sine-table update: `0x2051–0x2052` behave as a multi-byte phase state and `0x2053` receives the lookup output. The downstream consumer and destination hardware are still unidentified, so this must not be called the main audio oscillator or a confirmed DSP parameter.
 
 ### Revised conclusion
 
-Confirmed: IC4 contains a 64-entry signed sine lookup, and executable firmware can write indexed sine values into external XDATA. Not confirmed: that this path runs during normal note playback, its exact destination beyond the indirect XDATA pointer, or its role in M.A.S.S. Continue by finding all writes to page `0x20`, offset `0x50`, including indirect page/R1 accesses, and by mapping the dispatch entry that reaches `0x0C1A`.
+Confirmed: IC4 contains a 64-entry signed sine lookup; the `0x0C1A` routine is periodically called from `0x044C` when the status/counter conditions are met; and it updates XDATA `0x2051–0x2053` while `XDATA[0x2050]` is nonzero. Not confirmed: which external device consumes `0x2053`, whether the generated value is an LFO/modulation signal or another peripheral control stream, or whether it contributes directly to audible synthesis.
 
 ## 31. Firmware Performance image layout: 0xB475
 
