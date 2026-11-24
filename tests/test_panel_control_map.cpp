@@ -1,5 +1,6 @@
 #include "../Source/TechnoXPanelControlMap.h"
 #include <cassert>
+#include <initializer_list>
 #include <iostream>
 
 int main()
