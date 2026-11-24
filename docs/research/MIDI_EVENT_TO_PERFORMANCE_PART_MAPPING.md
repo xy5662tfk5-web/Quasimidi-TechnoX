@@ -94,3 +94,14 @@ Still unresolved:
 ## 5. Next reverse-engineering step
 
 The next useful work is not more speculative Part numbering. It is to trace the 13-byte descriptor fields produced by `0x4256` through `0x1494` and `0x16C3`, then classify the command tuples written to `0x8000–0x8003` by event ID. That is the remaining path from a confirmed MIDI Part event to the unidentified hardware boundary.
+
+## 5. Live Note 65 dispatch confirms the first two mappings
+
+The real-ROM regression sends one Note On (key `0x41`, velocity `0x64`) and captures two separate calls to `0x4256` from return PC `0x56C8`:
+
+- event `0x0C`, key `0x41`, velocity `0x64` → runtime record index 12 / Performance Part 13;
+- event `0x0D`, key `0x41`, velocity `0x64` → runtime record index 13 / Performance Part 14.
+
+The loaded Common selector at XDATA `0x7BD5` is `1` (Layer 2). Routine `0x593D` maps selector values 0, 1, 2 and 3 to respectively one, two, three and four candidate event IDs beginning at `0x0C` (`0x0C`; `0x0C–0x0D`; `0x0C–0x0E`; `0x0C–0x0F`). This directly explains why the Layer 2 trace makes two calls. Per-Part enable and Track Mode conditions remain additional gates.
+
+The same capture observes distinct 12-byte resource-selection records at `0x2990` and `0x299C`, and two downstream `0x189D` entry contexts. Full register values and regression details: `NOTE65_TWO_PART_EVENT_TRACE.md`.
