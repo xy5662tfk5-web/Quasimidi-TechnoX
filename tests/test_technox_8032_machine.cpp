@@ -3238,15 +3238,15 @@ int main(int argc, char** argv) {
             std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
                         selectorReadCount, selectorBranchCount,
                         selectorCallsiteCount);
-            const auto selectorXdataAfter = firmwareMachine.xdataWatchTraceCount();
-            const auto firstRetainedSelectorXdata = selectorXdataAfter > 8192u
-                ? selectorXdataAfter - 8192u : 0u;
-            const auto firstSelectorXdata = std::max(
-                selectorXdataBefore, firstRetainedSelectorXdata);
+            const auto resourceXdataAfter = firmwareMachine.xdataWatchTraceCount();
+            const auto firstRetainedResourceXdata = resourceXdataAfter > 8192u
+                ? resourceXdataAfter - 8192u : 0u;
+            const auto firstResourceXdata = std::max(
+                selectorXdataBefore, firstRetainedResourceXdata);
             std::size_t resourcePageReads = 0;
             std::size_t resourcePageWrites = 0;
             std::printf("NOTE65 RESOURCE PAGE 2D XDATA TRACE:\\n");
-            for (std::size_t i = firstSelectorXdata; i < selectorXdataAfter; ++i) {
+            for (std::size_t i = firstResourceXdata; i < resourceXdataAfter; ++i) {
                 const auto& access = firmwareMachine.xdataWatchTraceAt(i);
                 if (access.address < 0x2d00u || access.address > 0x2dffu)
                     continue;
