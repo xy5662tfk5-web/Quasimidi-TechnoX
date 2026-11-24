@@ -158,7 +158,7 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
 
     juce::String line1;
     juce::String line2;
-    if (editMode) {
+    if (page == EditorPage::editPart) {
         const int raw = audioProcessor.getPartParameterRaw(
             performanceIndex, selectedPart,
             static_cast<technox::PartParameter>(selectedParameter));
@@ -167,6 +167,20 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
         line1 = "PART " + juce::String(selectedPart + 13) + " "
             + (descriptor != nullptr ? juce::String(descriptor->name) : juce::String("PARAM"));
         line2 = juce::String(shown) + " " + soundName;
+    } else if (page == EditorPage::editFunctionMenu) {
+        static const char* const menuNames[] = {
+            "Edit Common", "Edit Part", "Edit Drums", "Edit FX1", "Edit FX2",
+            "Edit Arpegg.", "Edit System", "Write/Dump", "Play Demo"
+        };
+        line1 = "EDIT/FUNCTION";
+        line2 = menuNotImplemented ? juce::String("MENU NOT BUILT")
+            : juce::String("<") + juce::String(selectedEditFunction) + "> "
+                + menuNames[juce::jlimit(1, 9, selectedEditFunction) - 1];
+    } else if (page == EditorPage::editSystem) {
+        line1 = "EDIT SYSTEM";
+        line2 = audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+            ? juce::String("MODE: PERFORM")
+            : juce::String("MODE: SEQ MULTI");
     } else if (mode == technox::PanelOperatingMode::performance) {
         line1 = "TECHNOX";
         const int slot = selectedPerformanceForDial() + 1;
@@ -253,6 +267,17 @@ QuasimidiTechnoXAudioProcessorEditor::panelOperatingMode() const noexcept
         : technox::PanelOperatingMode::sequencerMulti;
 }
 
+technox::PanelEditPage
+QuasimidiTechnoXAudioProcessorEditor::panelEditPage() const noexcept
+{
+    switch (page) {
+        case EditorPage::editFunctionMenu: return technox::PanelEditPage::editFunctionMenu;
+        case EditorPage::editPart: return technox::PanelEditPage::editPart;
+        case EditorPage::editSystem: return technox::PanelEditPage::editSystem;
+        case EditorPage::main: default: return technox::PanelEditPage::main;
+    }
+}
+
 int QuasimidiTechnoXAudioProcessorEditor::selectedPerformanceForDial() const noexcept
 {
     return ramPerformanceBank
@@ -264,8 +289,12 @@ int QuasimidiTechnoXAudioProcessorEditor::selectedPerformanceForDial() const noe
 void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noexcept
 {
     const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
-    if (editMode) {
+    if (page == EditorPage::editPart) {
         parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+    } else if (page == EditorPage::editFunctionMenu) {
+        parameterDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+    } else if (page == EditorPage::editSystem) {
+        parameterDialNormalized = static_cast<float>(selectedSystemParameter);
     } else if (panelOperatingMode() == technox::PanelOperatingMode::performance) {
         parameterDialNormalized = static_cast<float>(selectedPerformanceForDial())
             / static_cast<float>(maximumProgram);
@@ -279,7 +308,7 @@ void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noex
 
 void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
 {
-    if (editMode) {
+    if (page == EditorPage::editPart) {
         const auto* descriptor = technox::PartEditModel::descriptor(
             static_cast<std::size_t>(selectedParameter));
         if (descriptor == nullptr || descriptor->maximum == 0) {
@@ -292,6 +321,11 @@ void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
         valueDialNormalized = raw < 0 ? 0.0f
             : static_cast<float>(juce::jlimit(0, static_cast<int>(descriptor->maximum), raw))
                 / static_cast<float>(descriptor->maximum);
+    } else if (page == EditorPage::editFunctionMenu) {
+        valueDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+    } else if (page == EditorPage::editSystem) {
+        valueDialNormalized = audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+            ? 0.0f : 1.0f;
     } else if (panelOperatingMode() == technox::PanelOperatingMode::performance) {
         const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
         valueDialNormalized = static_cast<float>(selectedPerformanceForDial())
