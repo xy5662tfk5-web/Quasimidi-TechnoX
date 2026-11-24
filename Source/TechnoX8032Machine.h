@@ -626,6 +626,7 @@ public:
         if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
             pc == 0x5671u || pc == 0x4256u ||
+            pc == 0x1494u || pc == 0xac00u || pc == 0x189du ||
             pc == 0x09b9u || pc == 0x09dau ||
             pc == 0x0a4fu || pc == 0x22f8u ||
             pc == 0x211fu || pc == 0x236bu) {
