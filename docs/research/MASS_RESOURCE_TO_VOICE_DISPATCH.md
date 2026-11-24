@@ -128,3 +128,17 @@ The current branch map is confirmed by disassembly:
 - The common loop at 0x18E1 advances RAM[0x2E] by eight before testing its accumulator-bit boundary and loading the next stream cursor. Thus the 0x19FB/0x1A01 route is a nested descriptor/slot expansion path, not a second MIDI event or a second sound-host command protocol.
 
 The PC/register watch now includes the loop, empty-slot cleanup, nested-table read, and four-byte tuple writer. The exact purpose of the nested table values and their physical consumer remains unproven; no sample address or waveform interpretation is assigned here.
+
+## 9. Nested IC51 record bytes and the four-byte page copy are now pinned
+
+A passing real-ROM Note 65 trace follows the second active Part event (`0x0D`) one step deeper than the resource-list branch described above. This capture uses the same synthetic Common Layer selector and the test-only DSP-ready setup already labelled in the preceding sections.
+
+- With IC51 bank 1 selected (`P3=0xEC` during the source reads), the stream cursor reaches `0x03AD`. The image bytes at `0x03AD..0x03B0` are `10 43 06 38`; the low/high pointer bytes consumed by the nested-table read are `06 38`, giving `DPTR=0x3806`.
+- The bank-1 IC51 record at `0x3806..0x3809` is byte-exact `A4 16 A3 40`.
+- At `0x1A17`, the live 8032 snapshot has `A=0xA4`, `R3=0x86`, and `DPTR=0x3806`. Since `R3` is nonzero, the `CJNE R3,#0` branch goes directly to `0x1A1D`; it does not take the `JNB ACC.6` empty-record branch at `0x1A1A`.
+- `0x1A1D` is `SETB 0xE6`, which sets ACC.6. At the following `0x1A1F` snapshot, `A=0xE4` and `R0=0xE4`. The other source bytes are loaded into `R2=0x16`, `R6=0xA3`, and `B=0x40`.
+- `0x1A31` begins the copy. The four `MOVX @R1,A` writes at `0x1A32`, `0x1A35`, `0x1A38`, and `0x1A3C` store `E4 16 A3 40` at offsets `0x00..0x03` of the dynamically allocated P2 page for event `0x0D`.
+
+The new focused `ResourceTupleWriteTrace` keeps these writes in a dedicated small ring, independent of the broad XDATA trace. The regression asserts the IC51 source bytes, the raw `A4` source byte, the post-`SETB ACC.6` value `E4`, the remaining registers, and all four destination addresses/values/PCs with the active P2 page and caller `0x1720`. This avoids losing the four writes when the much larger generic XDATA ring rolls over.
+
+This is a confirmed IC51 resource-record transfer and firmware bit operation. The four bytes are not yet identified as a sample descriptor, pitch, PCM, or hardware DSP command; those meanings remain open until the next consumer and physical interface are established.
