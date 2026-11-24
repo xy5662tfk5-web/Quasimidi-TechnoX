@@ -404,6 +404,7 @@ void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
             // image is not embedded yet, so expose the bank honestly as empty.
             ramPerformanceBank = p.x >= 776.0f;
             ramPerformanceSelection = audioProcessor.getCurrentProgram();
+            syncDialsFromCurrentSelection();
         } else if (action == technox::PanelControlAction::selectPart) {
             // The current parser has four stored Performance Part blocks:
             // user-visible Parts 13–16. Full Sequencer Multi Parts 1–16 follow later.
