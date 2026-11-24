@@ -205,3 +205,12 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 - The arithmetic body reads two separate 24-bit operand triplets from XDATA `0x0081–0x0083` (`57 01 A2`) and `0x0091–0x0093` (`01 00 48`), with the same positive step `0x000D`.
 - After the firmware's 3-bit top-byte mask, the operands are `0x020157` and `0x000001`; the reconstructed `MASS09B9SlotInterpolationArithmetic` returns `0x020171` and `0x000001`, matching the live `0x0A4F` writer registers (`71 01 02` and `01 00 00`).
 - This identifies the two XDATA source triplets and exact arithmetic path, but does not assign their physical or musical units. They are not the Performance Part records or the `0x8000–0x8003` command port. Details: `docs/research/PITCH_INTERPOLATION_SLOT_TRACE.md`.
+
+## One Note 65 now traced into two distinct Part event slots
+
+- A real-ROM Note On with key `0x41` and velocity `0x64` reaches `0x4256` twice, with event IDs `0x0C` and `0x0D`; both calls return to `0x56C8`. Under the firmware/Performance address correlation these are runtime records 12 and 13, displayed as stored Performance Parts 13 and 14.
+- The `0xAC00` Note On bit-map path selects page `0x35`, byte offsets `0xC8` and `0xD8`, and the note-65 computed branch offset `0x0E`. The matched Note Off path reaches `0xAC88`/`0xACA0`/`0xACB2` twice, using the same event-specific byte offsets and page, with its separate branch offset `0x11`.
+- Each event also gets a separate 12-byte resource-selection record: event `0x0C` at `0x2990` (pointer bytes `54 02`), event `0x0D` at `0x299C` (pointer bytes `58 FA`). Both then enter `0x189D`, with distinct register/pointer snapshots (`R5=7A, DPTR=26E2` and `R5=63, DPTR=274B`).
+- A new CI regression pins both raw selection records, both `0xAC00`/`0xAC88` address paths, and the two `0x189D` contexts. The earlier Note 65 interpolation assertions remain in place for XDATA triplets `0x0081–0x0083` and `0x0091–0x0093`.
+- Correction to earlier notes: the per-event selection record consumed by `0x1494` is 12 bytes (`0x2900 + 12*eventID`), not a 13-byte record. It points onward to a separate IC51 descriptor structure; those two structures must not be conflated.
+- Details: `docs/research/NOTE65_TWO_PART_EVENT_TRACE.md`. Still unresolved: why this test setup activates exactly these two event slots, and the meaning of the downstream resource/command fields.
