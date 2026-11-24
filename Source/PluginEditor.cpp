@@ -9,6 +9,54 @@ constexpr float kValueX = 674.0f;
 constexpr float kVolumeX = 964.0f;
 constexpr float kKnobY = 68.0f;
 constexpr int kPartFirstParameter = 0;
+
+void drawOriginalCurvedLabel(juce::Graphics& g, const juce::String& text,
+                             juce::Point<float> centre, float radius,
+                             bool lowerArc)
+{
+    // Match the source SVG exactly: Arial Black, 8 px, 1.6 px tracking.
+    // JUCE 8.0.13's SVG parser does not implement <textPath> or letter-spacing,
+    // so render the same glyph run along the original SVG arc here.
+    constexpr float fontHeight = 8.0f;
+    constexpr float letterSpacing = 1.6f;
+    const juce::Font font("Arial Black", fontHeight, juce::Font::plain);
+
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText(font, text, 0.0f, 0.0f);
+
+    const int count = glyphs.getNumGlyphs();
+    if (count == 0)
+        return;
+
+    const float textWidth = juce::GlyphArrangement::getStringWidth(font, text)
+        + letterSpacing * static_cast<float>(juce::jmax(0, count - 1));
+    const float pathLength = juce::MathConstants<float>::pi * radius;
+    const float firstGlyphOffset = (pathLength - textWidth) * 0.5f;
+
+    g.setColour(juce::Colour(0xff181a1c));
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& glyph = glyphs.getGlyph(i);
+        const float glyphWidth = glyph.getRight() - glyph.getLeft();
+        const float distance = firstGlyphOffset + glyph.getLeft()
+            + glyphWidth * 0.5f + letterSpacing * static_cast<float>(i);
+        const float theta = lowerArc
+            ? distance / radius
+            : juce::MathConstants<float>::pi + distance / radius;
+
+        const juce::Point<float> position(
+            centre.x + radius * std::cos(theta),
+            centre.y + radius * std::sin(theta));
+        const float tangent = std::atan2(radius * std::cos(theta),
+                                         -radius * std::sin(theta));
+
+        const auto glyphTransform = juce::AffineTransform::translation(
+                -glyph.getLeft(), -glyph.getBaselineY())
+            .rotated(tangent)
+            .translated(position.x, position.y);
+        glyph.draw(g, glyphTransform);
+    }
+}
 }
 
 QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
@@ -33,6 +81,10 @@ void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
     if (frontPanel != nullptr)
         frontPanel->drawWithin(g, getLocalBounds().toFloat(),
                                juce::RectanglePlacement::stretchToFit, 1.0f);
+
+    // These labels use the exact source-SVG font, size, tracking and arc geometry.
+    drawOriginalCurvedLabel(g, "TECHNO - RAVE", { 876.0f, 62.0f }, 40.0f, false);
+    drawOriginalCurvedLabel(g, "ELECTRONIC", { 876.0f, 74.0f }, 40.0f, true);
 
     const auto* descriptor = technox::PartEditModel::descriptor(
         static_cast<std::size_t>(selectedParameter));
