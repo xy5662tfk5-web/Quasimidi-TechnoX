@@ -122,6 +122,7 @@ void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
         if (currentMode != lastRoutingMode) {
             lastRoutingMode = currentMode;
             selectedPart = 0;
+            selectedSequencerPart = 0;
             syncDialsFromCurrentSelection();
         } else if (currentProgram != lastPerformanceIndex) {
             syncDialsFromCurrentSelection();
@@ -646,6 +647,8 @@ void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
                 audioProcessor.setMidiRoutingMode(selectedMode == 0
                     ? MidiRoutingMode::performanceOmni : MidiRoutingMode::partChannels);
                 lastRoutingMode = audioProcessor.getMidiRoutingMode();
+                selectedPart = 0;
+                selectedSequencerPart = 0;
                 valueDialNormalized = static_cast<float>(selectedMode);
                 break;
             }
