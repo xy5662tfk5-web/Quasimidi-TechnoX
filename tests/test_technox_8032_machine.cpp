@@ -731,7 +731,9 @@ int main(int argc, char** argv) {
         const auto runSineSlotConsumer = [&](std::uint8_t sineStepCount,
                                                std::uint8_t recordByte1,
                                                std::uint8_t recordByte2,
-                                               std::uint8_t recordByte3) {
+                                               std::uint8_t recordByte3,
+                                               std::uint8_t slotMultiplierInput,
+                                               std::uint8_t slotSineGain) {
             TechnoX8032Machine consumerMachine;
             assert(consumerMachine.loadIC4Rom(realRom.data(), realRom.size()));
             consumerMachine.reset();
@@ -771,8 +773,11 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(0x28c8u, 0x22u);
             consumerMachine.writeExternal(0x2888u, 0x33u);
             consumerMachine.writeExternal(0x2898u, 0x44u);
-            consumerMachine.writeExternal(0x2020u, 0x05u);
+            consumerMachine.writeExternal(0x2020u, slotMultiplierInput);
             consumerMachine.writeExternal(0x2021u, 0x00u);
+            consumerMachine.writeExternal(0x2b61u, slotSineGain);
+            consumerMachine.writeExternal(0x2000u, 0x00u);
+            consumerMachine.writeExternal(0x2001u, 0x00u);
             consumerMachine.writeInternal(0x47u, 0x01u);
             consumerMachine.writeInternal(0x49u, 0x00u);
 
@@ -881,13 +886,13 @@ int main(int argc, char** argv) {
                 record97Reads, record97Writes);
             assert(record96Writes > 0u);
             assert(record96LastWrite ==
-                   (sineStepCount == 0x01u ? 0x14u : 0x1fu));
+                   consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)));
 
             assert(voiceRecordPage == 0x00u);
             assert(cpuRegisters.pc == 0x0a52u);
             assert(!consumerMachine.cpuFaulted());
             assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)) ==
-                   (sineStepCount == 0x01u ? 0x14u : 0x1fu));
+                   record96LastWrite);
             assert(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u)) == 0x00u);
             assert(consumerMachine.soundHostWriteCount() == 4u);
             assert(consumerMachine.soundCommandPacketCount() == 1u);
@@ -937,18 +942,22 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(packet.returnPC),
                     static_cast<unsigned>(packet.deviceIndex));
             }
-            return std::array<std::uint8_t, 6>{{
+            return std::array<std::uint8_t, 8>{{
                 sineSample,
                 consumerMachine.readInternal(0x36u),
                 consumerMachine.readInternal(0x37u),
+                consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u)),
+                consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u)),
                 sinePacket.bytes[1],
                 sinePacket.bytes[2],
                 sinePacket.bytes[3]
             }};
         };
 
-        const auto slotConsumerSingle = runSineSlotConsumer(0x01u, 0x03u, 0x05u, 0x08u);
-        const auto slotConsumerDouble = runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x08u);
+        const auto slotConsumerSingle =
+            runSineSlotConsumer(0x01u, 0x03u, 0x05u, 0x08u, 0x05u, 0x98u);
+        const auto slotConsumerDouble =
+            runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x08u, 0x05u, 0x98u);
         assert(slotConsumerSingle[0] == sineSingleStep[2]);
         assert(slotConsumerDouble[0] == sineDoubleStep[2]);
         assert(slotConsumerSingle[1] != slotConsumerDouble[1] ||
@@ -960,26 +969,43 @@ int main(int argc, char** argv) {
         // bytes; the external device's response/meaning remains unmodelled.
         assert(slotConsumerSingle[1] == 0x14u);
         assert(slotConsumerDouble[1] == 0x1fu);
-        assert(slotConsumerSingle[3] == 0x03u &&
-               slotConsumerSingle[4] == 0x05u && slotConsumerSingle[5] == 0x00u);
-        assert(slotConsumerDouble[3] == 0x04u &&
-               slotConsumerDouble[4] == 0x05u && slotConsumerDouble[5] == 0x00u);
+        assert(slotConsumerSingle[3] == 0x14u && slotConsumerSingle[4] == 0x00u);
+        assert(slotConsumerDouble[3] == 0x1fu && slotConsumerDouble[4] == 0x00u);
+        assert(slotConsumerSingle[5] == 0x03u &&
+               slotConsumerSingle[6] == 0x05u && slotConsumerSingle[7] == 0x00u);
+        assert(slotConsumerDouble[5] == 0x04u &&
+               slotConsumerDouble[6] == 0x05u && slotConsumerDouble[7] == 0x00u);
 
         // Change one of the three record bytes at a time. The 0x09DA–0x0A55
         // routine uses bytes +1/+2/+3 as a 24-bit base and scales it by the
         // branch-adjusted 16-bit value cached at +0x0E/+0x0F.
         const auto changedRecordByte1 =
-            runSineSlotConsumer(0x02u, 0x83u, 0x05u, 0x08u);
+            runSineSlotConsumer(0x02u, 0x83u, 0x05u, 0x08u, 0x05u, 0x98u);
         const auto changedRecordByte2 =
-            runSineSlotConsumer(0x02u, 0x03u, 0x0fu, 0x08u);
+            runSineSlotConsumer(0x02u, 0x03u, 0x0fu, 0x08u, 0x05u, 0x98u);
         const auto changedRecordByte3 =
-            runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x09u);
-        assert(changedRecordByte1[3] == 0x84u &&
-               changedRecordByte1[4] == 0x05u && changedRecordByte1[5] == 0x00u);
-        assert(changedRecordByte2[3] == 0x06u &&
-               changedRecordByte2[4] == 0x0fu && changedRecordByte2[5] == 0x00u);
-        assert(changedRecordByte3[3] == 0x43u &&
-               changedRecordByte3[4] == 0x05u && changedRecordByte3[5] == 0x01u);
+            runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x09u, 0x05u, 0x98u);
+        assert(changedRecordByte1[5] == 0x84u &&
+               changedRecordByte1[6] == 0x05u && changedRecordByte1[7] == 0x00u);
+        assert(changedRecordByte2[5] == 0x06u &&
+               changedRecordByte2[6] == 0x0fu && changedRecordByte2[7] == 0x00u);
+        assert(changedRecordByte3[5] == 0x43u &&
+               changedRecordByte3[6] == 0x05u && changedRecordByte3[7] == 0x01u);
+
+        // Now vary the two inputs that generate RAM[0x36/0x37]: the slot-local
+        // multiplier at 0x2020+slot and the sine-gain byte at 0x2B61+slot.
+        const auto changedSlotInput =
+            runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x08u, 0x0au, 0x98u);
+        const auto changedSlotGain =
+            runSineSlotConsumer(0x02u, 0x03u, 0x05u, 0x08u, 0x05u, 0xd0u);
+        assert(changedSlotInput[1] == 0x4eu && changedSlotInput[2] == 0x00u);
+        assert(changedSlotInput[3] == 0x4eu && changedSlotInput[4] == 0x00u);
+        assert(changedSlotInput[5] == 0x06u &&
+               changedSlotInput[6] == 0x05u && changedSlotInput[7] == 0x00u);
+        assert(changedSlotGain[1] == 0x3fu && changedSlotGain[2] == 0x00u);
+        assert(changedSlotGain[3] == 0x3fu && changedSlotGain[4] == 0x00u);
+        assert(changedSlotGain[5] == 0x05u &&
+               changedSlotGain[6] == 0x05u && changedSlotGain[7] == 0x00u);
 
         // Also execute the alternate 0x28D8 coefficient-table page with
         // Part/slot index 1. XDATA 00FC selects slot 1; ACC.3 in 00FB selects
