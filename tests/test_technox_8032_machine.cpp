@@ -813,14 +813,22 @@ int main(int argc, char** argv) {
             consumerMachine.writeExternal(voiceRecordAddress(0x96u), 0x00u);
             consumerMachine.writeExternal(voiceRecordAddress(0x97u), 0x00u);
             const auto downstreamInstructions =
-                consumerMachine.runUntilProgramCounter(0x084cu, 8192u);
+                consumerMachine.runUntilProgramCounter(0x0db7u, 8192u);
+            const bool reachedSoundHostWriter = cpuRegisters.pc == 0x0db7u;
+            if (reachedSoundHostWriter) {
+                const auto writerInstructions =
+                    consumerMachine.runUntilProgramCounter(0x0a52u, 128u);
+                assert(writerInstructions > 0u);
+                assert(cpuRegisters.pc == 0x0a52u);
+            }
             std::fprintf(stderr,
-                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
+                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu writer=%d voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
                 static_cast<unsigned>(sineStepCount),
                 static_cast<unsigned>(voiceRecordPage),
                 static_cast<unsigned>(consumerMachine.readPortLatch(0xb0u)),
                 static_cast<unsigned>(consumerMachine.readInternal(0x8eu)),
                 static_cast<unsigned>(cpuRegisters.pc), downstreamInstructions,
+                reachedSoundHostWriter ? 1 : 0,
                 static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x96u))),
                 static_cast<unsigned>(consumerMachine.xdataByteForTesting(voiceRecordAddress(0x97u))),
                 consumerMachine.soundHostWriteCount(),
