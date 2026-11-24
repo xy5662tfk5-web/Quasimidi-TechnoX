@@ -18,6 +18,8 @@ The status byte at `0x00FA` is part of the firmware's own XDATA status-page map,
 
 ## 2. The periodic sine updater at 0x0C1A
 
+Before the scheduler probe, the test also runs the real IC4 initializer at `0x0130`. This routine writes `0x3C` to XDATA `0x2050` and seeds the 16 slot coefficients `0x2B61–0x2B70` with `0x98`. The test checks the gate and all 16 initialized bytes directly after the ROM routine returns at `0x0147`.
+
 The real updater reads XDATA `0x2050` as a gate/configuration byte.
 
 - A zero value exits immediately at `0x0C22`; no phase or sample output bytes are changed.
@@ -68,6 +70,8 @@ Observed instruction/data relationships:
 - The firmware then accesses a two-byte slot-indexed field in the `0x20xx` region using an address derived from `2 × slot`, adds the intermediate with carry, and applies a saturation branch before storing the final high byte.
 
 The ROM therefore establishes a **Part/slot-dependent sine-derived parameter modulation path** with separate coefficient/state tables. It does not yet establish the user-facing name of the modulated parameter, the physical destination of that parameter, or that the table is used to generate audio samples.
+
+**Coverage boundary:** the current automated probe executes the `0x0148` status-map initializer, the `0x0130` sine-gate/slot-coefficient initializer, and the scheduler's `0x40`-ready branch into `0x0C1A`. It does **not** yet execute the alternate not-ready branch at `0x047E` through `0x04B5–0x054E`; that consumer mapping is based on reachable-ROM/disassembly analysis. A separate differential ROM test is still needed to seed a non-`0x40` status byte and capture the `0x2020`, `0x2B61`, `0x28xx`, and `0x20xx` operands/outputs for a known slot.
 
 ## 5. Regression coverage
 
