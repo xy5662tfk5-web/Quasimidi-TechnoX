@@ -88,8 +88,8 @@
     <text x="775" y="112" class="lbl-sm" text-anchor="middle">PART / BANK</text>
   </g>
   <g id="right">
-    <text class="circ"><textPath href="#arcTop" xlink:href="#arcTop" startOffset="50%" text-anchor="middle" spacing="auto">TECHNO - RAVE</textPath></text>
-    <text class="circ"><textPath href="#arcBot" xlink:href="#arcBot" startOffset="50%" text-anchor="middle" spacing="auto">ELECTRONIC</textPath></text>
+    <text class="circ"><textPath href="#arcTop" xlink:href="#arcTop" startOffset="50%" text-anchor="middle">TECHNO - RAVE</textPath></text>
+    <text class="circ"><textPath href="#arcBot" xlink:href="#arcBot" startOffset="50%" text-anchor="middle">ELECTRONIC</textPath></text>
     <text x="964" y="21" class="lbl" text-anchor="middle">VOLUME</text>
     <g stroke="#181a1c" stroke-width="1.5">
       <line x1="946.5" y1="35" x2="946.5" y2="34.2"/>
