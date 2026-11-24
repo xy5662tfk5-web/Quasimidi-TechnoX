@@ -26,6 +26,26 @@ The resulting low/middle/high bytes at the two 0x0A4F writer snapshots are respe
 - The code path is part of the previously traced pitch-handler route through 0x09B9. The exact semantic units of the 24-bit values and their physical destination are not yet proven; do not label them as sample addresses, pitch words, or DSP fields without additional differential evidence.
 - The separate velocity-sensitive 0x1848 -> 0x2089..0x208E -> 0x210F chain remains a different traced route; the two investigations should not be merged merely because both feed the same broad Note On processing flow.
 
+## Resource-handler producer: note 72 byte-level trace
+
+The follow-up Note 72 run now captures the resource-handler writes that populate the two interpolation triplets before the 0x09B9 arithmetic. The call returns to 0x1720, within the selected IC4 resource-command processing path. The captured data accesses and instruction snapshots establish the following sequence for this fixture:
+
+1. At 0x1E4B, `MOVX A,@DPTR` reads XDATA 0x2019. At 0x1E4C, opcode `CC` exchanges A with R4; at 0x1E4D, `MOV B,A` puts the caller's prior R4 value into B. The trace shows B=0x01 for the first lane and B=0x00 for the second.
+2. The routine decrements DPL at 0x1E4F and reads XDATA 0x2018 at 0x1E51. It copies that byte to R5 and compares it with R4 at 0x1E53. In the captured Note 72 passes the comparison is nonzero, so execution reaches the slot writer.
+3. At 0x1E5B, `MOVX A,@R1` reads the existing high byte of the selected triplet. At 0x1E5C, `ANL A,#0xF8` clears its low three bits; at 0x1E5E, `ORL A,B` reinserts the saved low-bit field. The result is written at 0x1E60.
+4. The following instructions write R3 at 0x1E63 and R2 at 0x1E66 while decrementing R1 after each write. Thus the firmware writes high, middle, low bytes; the later 0x09B9 consumer reads low, middle, high.
+
+The real-ROM trace asserts these six writes for the Note 72 fixture:
+
+| Slot | High byte (0x1E60) | Middle byte (0x1E63) | Low byte (0x1E66) | 24-bit bytes, low-to-high |
+|---|---:|---:|---:|---|
+| A, XDATA 0x0081–0x0083 | 0xA1 | 0x80 | 0xBE | `BE 80 A1` |
+| B, XDATA 0x0091–0x0093 | 0x48 | 0x00 | 0x01 | `01 00 48` |
+
+The same run then reads those exact triplets in the two 0x09B9 interpolation passes. With step +0x000D, the results are `0x0180D1` and `0x000001`, respectively. The high byte is masked to its low three bits by the interpolation arithmetic; no semantic unit or sample-address interpretation is assigned to these 24-bit values.
+
+The note-72 packet prefix also provides a useful separation check. Its first interpolation packet is `00 D1 80 01`, while the velocity-sensitive packet emitted at return PC 0x2122 remains `0A 00 78 00`, identical to the Note 65 / velocity 100 reference. The second run changes pitch while holding velocity at 100; this is a controlled cross-pitch comparison, not proof of the external receiver's byte semantics. The test fixture still uses synthetic ready/status inputs.
+
 ## Next differential probe
 
 Capture the same two slot addresses for note 64 and note 65 under identical Part/program/velocity. Then vary only the active Performance Part / event ID and verify whether the selected slot pair changes. This will show whether the 16-byte slot stride corresponds to event/voice records, a pair of interpolation lanes, or another firmware structure. Continue to keep the synthetic ready response labelled as a test fixture.
