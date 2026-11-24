@@ -3988,6 +3988,21 @@ int main(int argc, char** argv) {
         assert(note72PacketCount == 549u);
         const auto note72PitchSourceAccessCount =
             firmwareMachine.pitchSourceDataAccessTraceCountForTesting();
+        const auto hasNote72ResourceRead = [&](std::uint16_t address,
+                                               std::uint8_t value,
+                                               std::uint16_t pc) {
+            for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
+                const auto& access =
+                    firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+                if (!access.write && access.address == address &&
+                    access.value == value && access.instructionPC == pc &&
+                    access.stackReturnPC == 0x1720u)
+                    return true;
+            }
+            return false;
+        };
+        assert(hasNote72ResourceRead(0x2019u, 0x06u, 0x1e4bu));
+        assert(hasNote72ResourceRead(0x2018u, 0x00u, 0x1e51u));
         std::printf("NOTE72 PITCH SOURCE ACCESS: count=%zu\\n",
                     note72PitchSourceAccessCount);
         for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
