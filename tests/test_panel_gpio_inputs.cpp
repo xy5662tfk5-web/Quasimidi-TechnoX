@@ -91,7 +91,7 @@ int main(int argc, char** argv)
 
     // Release both strobe inputs, then assert the opposite direction.
     assert(runEncoderScan(machine, 0x60u) == 2u);
-    const auto nextHighCount = runEncoderScan(machine, 0x20u);
+    const auto nextHighCount = runEncoderScan(machine, 0x00u);
     assert(nextHighCount == 4u);
     assert(machine.readIndirect(0xa8u) == 0xbeu);
     assert(machine.readIndirect(0xa9u) == 0xbdu);
