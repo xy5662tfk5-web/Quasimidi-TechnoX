@@ -349,7 +349,7 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             firmwareMachine->runForMachineCycles(targetCycles - currentCycles);
     };
 
-    const auto handleMessage = [this, performanceIndex](const juce::MidiMessage& message)
+    const auto handleMessage = [this, performanceIndex, activeRoutingMode](const juce::MidiMessage& message)
     {
         if (message.isController()) {
             if (message.getControllerNumber() == 124)
@@ -357,7 +357,9 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             else if (message.getControllerNumber() == 125)
                 setMidiRoutingMode(MidiRoutingMode::performanceOmni);
         }
-        const bool omniPerformance = getMidiRoutingMode() == MidiRoutingMode::performanceOmni;
+        // A MIDI mode command takes effect on the next audio block, after the
+        // corresponding 16-Part/Performance state has been synchronized.
+        const bool omniPerformance = activeRoutingMode == MidiRoutingMode::performanceOmni;
         std::array<int, 16> targetSlots{};
         int targetCount = 0;
         if (omniPerformance) {
@@ -388,16 +390,20 @@ void QuasimidiTechnoXAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
             massEngine.allNotesOff(message.getChannel());
         } else if (message.isPitchWheel()) {
             const int bend = message.getPitchWheelValue() - 8192;
-            for (int i = 0; i < targetCount; ++i)
-                massEngine.setPitchBend(getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+            for (int i = 0; i < targetCount; ++i) {
+                const int enginePart = omniPerformance
                     ? 12 + targetSlots[static_cast<std::size_t>(i)]
-                    : targetSlots[static_cast<std::size_t>(i)], bend);
+                    : targetSlots[static_cast<std::size_t>(i)];
+                massEngine.setPitchBend(enginePart, bend);
+            }
         } else if (message.isChannelPressure()) {
             const int pressure = message.getChannelPressureValue();
-            for (int i = 0; i < targetCount; ++i)
-                massEngine.setAftertouch(getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+            for (int i = 0; i < targetCount; ++i) {
+                const int enginePart = omniPerformance
                     ? 12 + targetSlots[static_cast<std::size_t>(i)]
-                    : targetSlots[static_cast<std::size_t>(i)], pressure);
+                    : targetSlots[static_cast<std::size_t>(i)];
+                massEngine.setAftertouch(enginePart, pressure);
+            }
         } else if (message.isController()) {
             const int controller = message.getControllerNumber();
             const int value = message.getControllerValue();
