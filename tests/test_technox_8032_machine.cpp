@@ -2736,6 +2736,36 @@ int main(int argc, char** argv) {
         assert(readyPoll.port3 == 0xfeu);
         assert(readyPoll.soundBusMode == 0x00u);
         assert(readyPoll.soundDeviceResetReleased);
+
+        // P3.2 is traced as a firmware-controlled line, not assumed to be DSP
+        // reset. The bulk loader explicitly writes CLR P3.2 at AF1A and SETB
+        // P3.2 at AF73; capture both operations even if the line was already
+        // at the requested level.
+        bool sawBulkP3Bit2Clear = false;
+        bool sawBulkP3Bit2Set = false;
+        for (std::size_t i = 0; i < firmwareMachine.p3Bit2ControlWriteCount(); ++i) {
+            const auto& event = firmwareMachine.p3Bit2ControlWriteAt(i);
+            if (event.instructionPC == 0xaf1au) {
+                sawBulkP3Bit2Clear = true;
+                assert((event.port3 & 0x04u) == 0u);
+            } else if (event.instructionPC == 0xaf73u) {
+                sawBulkP3Bit2Set = true;
+                assert((event.port3 & 0x04u) != 0u);
+            }
+            std::printf("  P3.2 control write pc=%04X ret=%04X P3=%02X->%02X "
+                        "changed=%u P2=%02X 8E=%02X cycle=%llu\n",
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.returnPC),
+                        static_cast<unsigned>(event.previousPort3),
+                        static_cast<unsigned>(event.port3),
+                        event.bit2Changed ? 1u : 0u,
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.soundBusMode),
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
+        assert(sawBulkP3Bit2Clear);
+        assert(sawBulkP3Bit2Set);
+
         std::printf("FF10 status reads after synthetic-ready injection: %zu\n",
                     statusReadsAfterResume - statusReadsBeforeResume);
         const auto firstRetainedStatusRead = statusReadsAfterResume > 4096u
