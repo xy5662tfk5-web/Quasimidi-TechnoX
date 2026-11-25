@@ -2174,8 +2174,15 @@ enum class MASSFXProcessorFamily : std::uint8_t { fx1, fx2 };
 struct MASSFXUploadStreamImage {
     std::uint8_t resourceIndex = 0;
     std::uint16_t sourceAddress = 0;
+    std::uint16_t terminatorAddress = 0;
+    MASSIC51PortStreamFormat format =
+        MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets;
+    bool skippedLeadingByte = false;
+    std::uint8_t leadingByteValue = 0;
+    std::vector<std::uint8_t> skippedFollowingBytes;
     std::size_t blockCount = 0;
     std::size_t sourceBytesConsumed = 0;
+    // Bytes actually written to XDATA 0xFF10, in firmware order.
     std::vector<std::uint8_t> portBytes;
     bool terminated = false;
 };
@@ -2246,8 +2253,17 @@ private:
         MASSFXUploadStreamImage image{};
         image.resourceIndex = resourceIndex;
         image.sourceAddress = source.dataAddress;
+        image.terminatorAddress = source.terminatorAddress;
+        image.format = source.format;
+        image.skippedLeadingByte = source.skippedLeadingByte;
+        image.leadingByteValue = source.leadingByteValue;
         image.blockCount = source.blocks.size();
         image.sourceBytesConsumed = source.sourceBytesConsumed;
+        image.skippedFollowingBytes.reserve(source.blocks.size());
+        for (const auto& block : source.blocks) {
+            if (block.skippedFollowingByte)
+                image.skippedFollowingBytes.push_back(block.skippedFollowingByteValue);
+        }
 
         std::size_t expectedWriteBytes = 0;
         for (const auto& block : source.blocks) {
