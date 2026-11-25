@@ -438,6 +438,68 @@ int main(int argc, char** argv) {
         const std::vector<std::uint8_t> realRom(romBegin, romEnd);
         assert(realRom.size() == TechnoX8032Machine::kIC4RomSize);
 
+        // Execute the deferred FX request scheduler at 0x7C29 for both
+        // request kinds. It sets independent pending flags, stores selector
+        // staging state, emits a fixed 54-byte FF10 service sequence, and
+        // samples four status/input locations. Those service bytes are not
+        // the later IC51 FX1/FX2 upload payloads.
+        struct FXRequestVector {
+            std::uint8_t r7;
+            std::uint8_t r5;
+            std::uint8_t expectedFX1Pending;
+            std::uint8_t expectedFX2Pending;
+        };
+        constexpr std::array<FXRequestVector, 2> fxRequestVectors{{
+            {0x01u, 0x00u, 0x01u, 0x00u}, // FX1 pending
+            {0x00u, 0x01u, 0x00u, 0x01u}  // FX2 pending
+        }};
+        constexpr std::array<std::uint8_t, 54> expectedFXServiceBytes{{
+            0x01u, 0x00u, 0x45u, 0x37u, 0x8cu, 0xc1u,
+            0x01u, 0x01u, 0x8au, 0x00u, 0x01u, 0x00u,
+            0x01u, 0x01u, 0x87u, 0x00u, 0x00u, 0x00u,
+            0x01u, 0x01u, 0x86u, 0x00u, 0x00u, 0x00u,
+            0x01u, 0x01u, 0x8cu, 0x00u, 0x50u, 0x00u,
+            0x01u, 0x01u, 0x8eu, 0x00u, 0x00u, 0x00u,
+            0x01u, 0x01u, 0x8du, 0x00u, 0x00u, 0x00u,
+            0x01u, 0x00u, 0x08u, 0x1cu, 0x02u, 0xcfu,
+            0x01u, 0x01u, 0x89u, 0x00u, 0x00u, 0x00u
+        }};
+        for (const auto& vector : fxRequestVectors) {
+            TechnoX8032Machine fxRequestMachine;
+            assert(fxRequestMachine.loadIC4Rom(realRom.data(), realRom.size()));
+            fxRequestMachine.reset();
+            fxRequestMachine.enableTestExternalRamWindow7000(0x00u);
+            fxRequestMachine.writeInternal(0x23u, 0x08u); // firmware bit 0x1B enables mode-2 FF10 writes
+            fxRequestMachine.writeInternal(0x07u, vector.r7); // R7 request state
+            fxRequestMachine.writeInternal(0x05u, vector.r5); // R5 request state
+            fxRequestMachine.writeInternal(0x03u, 0x01u); // R3 becomes XDATA 0x3097
+            fxRequestMachine.cpuForTesting().registersForTesting().pc = 0x7c29u;
+            const auto executed =
+                fxRequestMachine.runUntilProgramCounter(0x7cd9u, 10000u);
+            assert(executed > 0u);
+            assert(fxRequestMachine.cpu().registers().pc == 0x7cd9u);
+            assert(!fxRequestMachine.cpuFaulted());
+
+            assert(fxRequestMachine.readExternal(0x308bu) == vector.expectedFX1Pending);
+            assert(fxRequestMachine.readExternal(0x308du) == vector.expectedFX2Pending);
+            assert(fxRequestMachine.readExternal(0x3097u) == 0x01u);
+            assert(fxRequestMachine.readExternal(0x309cu) == 0x01u);
+            assert(fxRequestMachine.readExternal(0x3099u) == 0x32u);
+            assert(fxRequestMachine.readExternal(0x309au) == 0x00u);
+            assert(fxRequestMachine.readExternal(0x309du) == 0x00u);
+            assert(fxRequestMachine.readExternal(0x309bu) == 0x00u);
+            assert(fxRequestMachine.readExternal(0x309eu) == 0x00u);
+
+            assert(fxRequestMachine.ff10WriteCount() == expectedFXServiceBytes.size());
+            for (std::size_t i = 0; i < expectedFXServiceBytes.size(); ++i) {
+                const auto& event = fxRequestMachine.ff10WriteAt(i);
+                assert(event.address == 0xff10u);
+                assert(event.value == expectedFXServiceBytes[i]);
+                assert(event.soundBusMode == 0x02u);
+                assert(event.port2 == 0xffu);
+            }
+        }
+
         // IC4 maintains FX selectors in two external XDATA slots before
         // their loader reads them back. The overlay is intentionally a test
         // stand-in for the still-unidentified physical 0x7Bxx/0x7Cxx target.
