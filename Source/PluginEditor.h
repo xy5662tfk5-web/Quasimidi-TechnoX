@@ -2,7 +2,8 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
-class QuasimidiTechnoXAudioProcessorEditor final : public juce::AudioProcessorEditor
+class QuasimidiTechnoXAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                                   private juce::Timer
 {
 public:
     explicit QuasimidiTechnoXAudioProcessorEditor(QuasimidiTechnoXAudioProcessor&);
@@ -12,10 +13,13 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
 
 private:
+    void timerCallback() override;
+
     QuasimidiTechnoXAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> frontPanel;
-    int presetNumber = 1;
-    int partNumber = 1;
+    juce::ComboBox performanceSelector;
+    juce::Label performanceLabel;
+    int partNumber = 13;
     int midiChannel = 1;
     int parameterNumber = 1;
     int valueNumber = 64;

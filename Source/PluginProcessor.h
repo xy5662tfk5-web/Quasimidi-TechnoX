@@ -1,5 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
+#include "TechnoXPerformanceBank.h"
+#include "TechnoXSoundCatalog.h"
 
 class QuasimidiTechnoXAudioProcessor final : public juce::AudioProcessor
 {
@@ -21,15 +23,23 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram(int) override {}
-    const juce::String getProgramName(int) override { return "TechnoX Rave"; }
+    int getNumPrograms() override { return static_cast<int>(performanceBank.count()); }
+    int getCurrentProgram() override { return static_cast<int>(performanceBank.selectedIndex()); }
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
     void changeProgramName(int, const juce::String&) override {}
+
+    const technox::PerformanceBank& getPerformanceBank() const noexcept { return performanceBank; }
+    juce::String getCurrentPerformanceName() const;
+    juce::String getCurrentPartSoundName(int partIndex) const;
+    const technox::SoundCatalog& getSoundCatalog() const noexcept { return soundCatalog; }
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
 private:
+    technox::PerformanceBank performanceBank;
+    technox::SoundCatalog soundCatalog;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(QuasimidiTechnoXAudioProcessor)
 };

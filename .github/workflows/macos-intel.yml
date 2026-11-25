@@ -2,17 +2,63 @@ name: macOS Intel build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/part-editor-midi-mass-foundation ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, feature/performance-manager, research/part-parameter-model-final ]
   workflow_dispatch:
 
+concurrency:
+  group: technox-intel-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  unit-tests:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test lossless MIDI/SysEx parser
+        run: python3 -m unittest discover -s tests -v
+      - name: Compile and test MIDI control router (C++17)
+        if: hashFiles('tests/test_midi_controller.cpp') != ''
+        run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_midi_controller.cpp -o /tmp/test_midi_controller && /tmp/test_midi_controller
+      - name: Compile and test M.A.S.S. foundation (C++17)
+        if: hashFiles('Source/MASSAudioEngine.h') != ''
+        run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_mass_engine.cpp -o /tmp/test_mass_engine && /tmp/test_mass_engine
+      - name: Compile and test Part editor model (C++17)
+        if: hashFiles('tests/test_part_model.cpp') != ''
+        run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_part_model.cpp -o /tmp/test_part_model && /tmp/test_part_model
+      - name: Compile and test Performance layer selection (C++17)
+        if: hashFiles('tests/test_performance_layers.cpp') != ''
+        run: c++ -std=c++17 -Wall -Wextra -pedantic tests/test_performance_layers.cpp -o /tmp/test_performance_layers && /tmp/test_performance_layers
+      - name: Analyze opaque Part SysEx bytes
+        run: python3 tools/analyze_technox_parts.py TECHNOX.MID --output technox_part_byte_report.json
+      - name: Upload Part byte report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-part-byte-report
+          path: technox_part_byte_report.json
+          if-no-files-found: ignore
+
   build:
-    runs-on: macos-13
+    needs: unit-tests
+    timeout-minutes: 60
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Configure (x86_64)
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin formats
         run: cmake --build build --config Release --parallel 2
+      - name: Package Intel plugin formats
+        run: |
+          cd build/QuasimidiTechnoX_artefacts/Release
+          tar -czf "$GITHUB_WORKSPACE/technox-intel-plugins.tar.gz" AU VST3 Standalone
+      - name: Upload Intel plugin formats
+        uses: actions/upload-artifact@v4
+        with:
+          name: technox-intel-plugins
+          path: technox-intel-plugins.tar.gz
+          if-no-files-found: error
+          compression-level: 0

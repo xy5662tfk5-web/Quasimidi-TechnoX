@@ -10,7 +10,7 @@ include(FetchContent)
 FetchContent_Declare(
     JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG 7.0.12
+    GIT_TAG 8.0.13
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(JUCE)
@@ -18,6 +18,8 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_binary_data(TechnoXAssets
     SOURCES
         assets/technox_front_panel.svg
+        TECHNOX.MID
+        data/technox_ins.json
 )
 
 juce_add_plugin(QuasimidiTechnoX
@@ -35,9 +37,13 @@ juce_add_plugin(QuasimidiTechnoX
     COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
+juce_generate_juce_header(QuasimidiTechnoX)
+
 target_sources(QuasimidiTechnoX PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/TechnoXPartModel.h
+    Source/TechnoXSoundCatalog.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC
