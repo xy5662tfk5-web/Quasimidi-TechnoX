@@ -119,3 +119,68 @@ This now connects a real IC51 record to the firmware register tuple, the 1C61 tr
 The external-window exchange continues through companion helper 0x0DCE. It compares requested R4.7 with internal bit 0x0C. A mismatch causes a control write to XDATA offset 3: 0xC0 when the requested phase is set, or 0x40 when it is clear. If the phase already matches, that control write is skipped. The helper then reads offset 4, followed by offsets 0, 1, 2, and 3 into R5, R2, R3, and R4.
 
 The repository now models this ordering with `MASS0DCEExchangeDecoder`, taking the five response bytes as external inputs. Tests cover both phase transitions and the no-write case. Offset 4 remains an opaque status byte: the model does not call it an acknowledgement and does not invent a peripheral response.
+
+
+## Indexed two-byte curve producer: IC4 routine 0x02D1
+
+The Note 72 trace now captures the full indexed-pair calculation that was previously only identified as a generic writer. The routine starts with `RAM[0x28]` as a slot index, reads the slot's scale/guard byte from `XDATA[0x2054 + RAM[0x28]]`, computes a two-byte result, and writes it at:
+
+- `XDATA[0x2000 + 2*RAM[0x28]]` = R5 (high byte)
+- the next XDATA byte = R4 (low byte)
+
+Thus index `0x0C` maps to `0x2018/0x2019`. A zero guard bypasses the curve/table math and writes `00 00`.
+
+### Exact ROM coefficient tables
+
+The routine selects one of two 48-byte tables from IC4 v1.05 code ROM:
+
+- `0x0098` when the signed input takes the negative branch.
+- `0x00C8` when the signed input takes the nonnegative branch.
+
+Each table contains twelve four-byte records: a 16-bit cumulative base followed by a 16-bit segment slope. The positive table is:
+
+| Record | Base | Slope |
+|---:|---:|---:|
+| 0 | `0000` | `079C` |
+| 1 | `079C` | `0811` |
+| 2 | `0FAD` | `088B` |
+| 3 | `1838` | `090D` |
+| 4 | `2145` | `0997` |
+| 5 | `2ADC` | `0A29` |
+| 6 | `3505` | `0AC4` |
+| 7 | `3FC9` | `0B67` |
+| 8 | `4B30` | `0C15` |
+| 9 | `5745` | `0CCD` |
+| 10 | `6412` | `0D90` |
+| 11 | `71A2` | `0E5E` |
+
+The negative table uses the same segment ordering in reverse slope progression:
+
+| Record | Base | Slope |
+|---:|---:|---:|
+| 0 | `0000` | `0E5E` |
+| 1 | `0E5E` | `0D90` |
+| 2 | `1BEE` | `0CCD` |
+| 3 | `28BB` | `0C15` |
+| 4 | `34D0` | `0B67` |
+| 5 | `4037` | `0AC4` |
+| 6 | `4AFB` | `0A29` |
+| 7 | `5524` | `0997` |
+| 8 | `5EBB` | `090D` |
+| 9 | `67C8` | `088B` |
+| 10 | `7053` | `0810` |
+| 11 | `7863` | `079D` |
+
+In both tables each record's base plus slope reaches the next record's base, and the final base plus final slope equals `0x8000`. The positive slope sequence's geometric step is approximately `1.0594805`, about 16.5 ppm above the equal-temperament semitone ratio. This is strong evidence that the tables encode a twelve-segment exponential or pitch-related conversion curve. It is not yet proof of the physical unit or the external sound device's interpretation.
+
+### Firmware arithmetic and executable projection
+
+The input scale is the low nibble of the guard byte shifted into the high nibble (`(guard & 0x0F) << 4`). The two input bytes at `RAM[0x29]` and `RAM[0x2A]` are rotated, sign-tested around `0x80`, normalized on the negative branch, and converted into a segment index plus a 16-bit fractional value. The selected record's base is then combined with the interpolated segment offset.
+
+The multiplication at `0x035E..0x037E` is a firmware-specific three-product fixed-point approximation, not a normal full 16×16 multiply. It uses `slopeHigh*fractionHigh`, `slopeLow*fractionHigh`, and `slopeHigh*fractionLow`; the low×low product is not computed. The implementation `MASSIndexedPairMathProjection` mirrors the 8-bit rotates, carry propagation, table selection, table fetch, three partial products, base addition and final two's-complement step. Its tests use the ROM's original 96 coefficient bytes rather than synthetic approximations.
+
+The Note 72 live trace verifies slot index `0x0C` with scale `0xF0` and positive record 0 (`base=0x0000, slope=0x079C`). Both the `0x3F1B` and `0x4C8E` caller paths write `00 06` to `0x2018/0x2019` on the later curve-update passes. The `0x3F1B` loop is a 16-slot loop; its index is `RAM[0x6B]`. The `0x4C8E` path selects `RAM[0x6C]` and uses the normalized value in `RAM[0x70]`.
+
+The resource handler reads `00 06` at `0x2018/0x2019` earlier in the Note 72 pass (cycles about `105,107,166` and `105,107,171`); the later curve writes happen around cycle `107,980,804` onward. These are separate time points. The later matching output corroborates the curve writer and target slot but does not prove that those later writes created the earlier consumed pair.
+
+The projection is raw firmware math only. `0x2018/0x2019` remains an indexed state/output pair; the project does not yet identify it as a DSP pitch register, frequency in hertz, sample address, or modulation amount.
