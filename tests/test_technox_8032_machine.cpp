@@ -1494,6 +1494,78 @@ int main(int argc, char** argv) {
                 fxResources, firmwareCode.data(), firmwareCode.size()));
             assert(fx2Catalog.isLoaded());
 
+            // Build the immutable wire images from the IC51 resolver output.
+            // These are the exact bytes sent by the firmware to XDATA 0xFF10;
+            // they do not assign DSP register or algorithm semantics.
+            technox::MASSFXUploadProgramImage roomUploadPlan{};
+            assert(technox::MASSFXUploadPlanBuilder::buildFX1(
+                fx1Catalog, 0, 0, roomUploadPlan));
+            assert(roomUploadPlan.family == technox::MASSFXProcessorFamily::fx1);
+            assert(roomUploadPlan.bank == 0u && roomUploadPlan.effectIndex == 0u);
+            assert(roomUploadPlan.streamA.resourceIndex == 0u);
+            assert(roomUploadPlan.streamA.sourceAddress == 0x24d4u);
+            assert(roomUploadPlan.streamA.blockCount == 2u);
+            assert(roomUploadPlan.streamA.portBytes.size() == 837u);
+            assert(roomUploadPlan.streamA.portBytes[0] == 0x19u);
+            assert(roomUploadPlan.streamA.portBytes[1] == 0x00u);
+            assert(roomUploadPlan.streamA.portBytes[2] == 0xcfu);
+            assert(roomUploadPlan.streamA.portBytes[3] == 0x10u);
+            assert(roomUploadPlan.streamB.resourceIndex == 1u);
+            assert(roomUploadPlan.streamB.portBytes.empty());
+            assert(roomUploadPlan.streamB.skippedLeadingByte);
+            assert(roomUploadPlan.streamB.leadingByteValue == 0x7fu);
+            assert(roomUploadPlan.streamB.terminatorAddress == 0x2852u);
+            assert(roomUploadPlan.totalPortBytes() == 837u);
+
+            technox::MASSFXUploadProgramImage equalizr1UploadPlan{};
+            assert(technox::MASSFXUploadPlanBuilder::buildFX2(
+                fx2Catalog, 0, 14, equalizr1UploadPlan));
+            assert(equalizr1UploadPlan.family == technox::MASSFXProcessorFamily::fx2);
+            assert(equalizr1UploadPlan.bank == 0u && equalizr1UploadPlan.effectIndex == 14u);
+            assert(equalizr1UploadPlan.streamA.resourceIndex == 0x42u);
+            assert(equalizr1UploadPlan.streamA.sourceAddress == 0x4f02u);
+            assert(equalizr1UploadPlan.streamA.portBytes.size() == 177u);
+            assert(equalizr1UploadPlan.streamA.portBytes[0] == 0x3au);
+            assert(equalizr1UploadPlan.streamA.portBytes[1] == 0x15u);
+            assert(equalizr1UploadPlan.streamA.portBytes[2] == 0x00u);
+            assert(equalizr1UploadPlan.streamA.portBytes[3] == 0xdcu);
+            assert(equalizr1UploadPlan.streamB.resourceIndex == 0x43u);
+            assert(equalizr1UploadPlan.streamB.portBytes.empty());
+            assert(equalizr1UploadPlan.streamB.skippedLeadingByte);
+            assert(equalizr1UploadPlan.streamB.leadingByteValue == 0x74u);
+            assert(equalizr1UploadPlan.streamB.terminatorAddress == 0x4d6du);
+            assert(equalizr1UploadPlan.totalPortBytes() == 177u);
+            technox::MASSFXUploadProgramImage invalidUploadPlan{};
+            assert(!technox::MASSFXUploadPlanBuilder::buildFX1(
+                fx1Catalog, -1, 0, invalidUploadPlan));
+            assert(!technox::MASSFXUploadPlanBuilder::buildFX2(
+                fx2Catalog, 0, 21, invalidUploadPlan));
+
+            // Execute the original FX1 loader at 0x8004. The two firmware
+            // routines must emit the same ordered bytes as the prebuilt plan.
+            {
+                TechnoX8032Machine fx1Runtime;
+                assert(fx1Runtime.loadIC4Rom(realRom.data(), realRom.size()));
+                assert(fx1Runtime.loadIC51Rom(realIC51.data(), realIC51.size()));
+                fx1Runtime.reset();
+                fx1Runtime.writeExternal(0x3098u, 0u); // FX1 Room, zero-based index 0
+                fx1Runtime.writeInternal(0x23u, 0x08u); // enable external FF10 writes
+                fx1Runtime.cpuForTesting().registersForTesting().pc = 0x8004u;
+                const auto executed = fx1Runtime.runUntilProgramCounter(0x8048u, 100000u);
+                assert(executed > 0u);
+                assert(fx1Runtime.cpu().registers().pc == 0x8048u);
+                assert(!fx1Runtime.cpuFaulted());
+                assert(fx1Runtime.ff10WriteCount() == roomUploadPlan.totalPortBytes());
+                for (std::size_t i = 0; i < roomUploadPlan.streamA.portBytes.size(); ++i) {
+                    const auto& event = fx1Runtime.ff10WriteAt(i);
+                    assert(event.address == 0xff10u);
+                    assert(event.value == roomUploadPlan.streamA.portBytes[i]);
+                    assert(event.soundBusMode == 0x02u);
+                    assert(event.port2 == 0xffu);
+                }
+                assert(roomUploadPlan.streamB.portBytes.empty());
+            }
+
             // Execute the original FX2 firmware loader at 0x88D1 using the
             // factory Equalizr1 algorithm (index 14). Bank-0 Stream A has two
             // real IC51 blocks; Stream B demonstrates B015's skipped prefix
@@ -1565,6 +1637,10 @@ int main(int argc, char** argv) {
                 }
                 assert(fx2Runtime.ff10WriteCount() == expectedPortBytes);
                 assert(fx2Runtime.ic51ReadCount() > 6u);
+                assert(equalizr1UploadPlan.totalPortBytes() == expectedPortBytes);
+                for (std::size_t i = 0; i < equalizr1UploadPlan.streamA.portBytes.size(); ++i)
+                    assert(fx2Runtime.ff10WriteAt(i).value ==
+                           equalizr1UploadPlan.streamA.portBytes[i]);
 
                 std::size_t portOffset = 0;
                 for (const auto& block : equalizr1->streamAResource.blocks) {
