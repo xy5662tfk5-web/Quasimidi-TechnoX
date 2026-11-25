@@ -1033,6 +1033,39 @@ public:
     }
 };
 
+struct MASS0DCEExchangeResult {
+    bool controlWriteRequired = false;
+    std::uint8_t controlByte = 0;
+    std::uint8_t statusOffset4 = 0;
+    std::uint8_t r5 = 0;
+    std::uint8_t r2 = 0;
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+};
+
+// Models the observed 0x0DCE phase comparison and response-byte ordering.
+// responseOffsets are the values supplied by the external-window read path;
+// this does not fabricate a device response or assign status semantics.
+class MASS0DCEExchangeDecoder {
+public:
+    static MASS0DCEExchangeResult decode(
+        bool currentInternalBit0C,
+        std::uint8_t requestedR4,
+        const std::array<std::uint8_t, 5>& responseOffsets) noexcept {
+        const bool requestedPhase = (requestedR4 & 0x80u) != 0;
+        const bool changePhase = requestedPhase != currentInternalBit0C;
+        return {
+            changePhase,
+            static_cast<std::uint8_t>(requestedPhase ? 0xc0u : 0x40u),
+            responseOffsets[4],
+            responseOffsets[0],
+            responseOffsets[1],
+            responseOffsets[2],
+            responseOffsets[3]
+        };
+    }
+};
+
 struct MASS1EDDCommandPacket {
     std::array<std::uint8_t, 4> bytes{};
 };
