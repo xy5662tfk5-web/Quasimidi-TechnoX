@@ -500,6 +500,15 @@ int main(int argc, char** argv) {
             }
         }
 
+        if (argc > 2) {
+            std::ifstream deferredIC51File(argv[2], std::ios::binary);
+            assert(deferredIC51File.good());
+            const std::istreambuf_iterator<char> deferredIC51Begin{deferredIC51File};
+            const std::istreambuf_iterator<char> deferredIC51End{};
+            const std::vector<std::uint8_t> deferredIC51(
+                deferredIC51Begin, deferredIC51End);
+            assert(deferredIC51.size() == TechnoX8032Machine::kIC51RomSize);
+
         // Exercise the deferred consumers from their real IC4 entry PCs.
         // A set pending flag must pass staging byte 0x3097 as R7, enter the
         // family-specific loader, upload the selected IC51 resource stream,
@@ -508,7 +517,7 @@ int main(int argc, char** argv) {
         {
             TechnoX8032Machine fx1Deferred;
             assert(fx1Deferred.loadIC4Rom(realRom.data(), realRom.size()));
-            assert(fx1Deferred.loadIC51Rom(realIC51.data(), realIC51.size()));
+            assert(fx1Deferred.loadIC51Rom(deferredIC51.data(), deferredIC51.size()));
             fx1Deferred.reset();
             fx1Deferred.enableTestExternalRamWindow7000(0x00u);
             fx1Deferred.setTestExternalRamByte(0x7bfeu, 0x00u); // FX1 Room
@@ -534,7 +543,7 @@ int main(int argc, char** argv) {
         {
             TechnoX8032Machine fx2Deferred;
             assert(fx2Deferred.loadIC4Rom(realRom.data(), realRom.size()));
-            assert(fx2Deferred.loadIC51Rom(realIC51.data(), realIC51.size()));
+            assert(fx2Deferred.loadIC51Rom(deferredIC51.data(), deferredIC51.size()));
             fx2Deferred.reset();
             fx2Deferred.enableTestExternalRamWindow7000(0x00u);
             fx2Deferred.setTestExternalRamByte(0x7c06u, 0x0eu); // FX2 Equalizr1
@@ -583,6 +592,7 @@ int main(int argc, char** argv) {
             assert(noFX2Request.ff10WriteCount() == 0u);
         }
 
+        }
         // IC4 maintains FX selectors in two external XDATA slots before
         // their loader reads them back. The overlay is intentionally a test
         // stand-in for the still-unidentified physical 0x7Bxx/0x7Cxx target.
