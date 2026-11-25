@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MASSAudioEngine.h"
+#include "MASSOriginalVoiceProgramRuntime.h"
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -12,13 +13,45 @@ namespace technox {
 // not a claim that the TechnoX ROM/sample format has been decoded.
 class BasicMASSVoiceBackend final : public IMASSVoiceBackend {
 public:
+    // These callbacks now bind the selected voice to the already-decoded
+    // IC51 program stream and startup external-memory image. The renderer
+    // below remains a diagnostic oscillator until the waveform format and
+    // original DSP playback algorithm are verified.
+    void setProgramCatalog(const MASSResourceProgramCatalog* catalog) noexcept override {
+        originalProgramRuntime_.setProgramCatalog(catalog);
+    }
+
+    void setExternalSoundMemoryImage(
+        const MASSIC51ExternalSoundMemoryImage* image) noexcept override {
+        originalProgramRuntime_.setExternalSoundMemoryImage(image);
+    }
+
+    const MASSOriginalVoiceProgramRuntime::VoiceProgramBinding*
+    originalProgramBindingForTesting(int voiceIndex) const noexcept {
+        return originalProgramRuntime_.bindingForVoice(voiceIndex);
+    }
+
+    const MASSResourceCommand* originalProgramCommandForTesting(
+        int voiceIndex, bool firmwareFlag0ASet,
+        std::size_t commandIndex) const noexcept {
+        return originalProgramRuntime_.commandForVoice(
+            voiceIndex, firmwareFlag0ASet, commandIndex);
+    }
+
+    bool readOriginalSoundMemoryForTesting(
+        std::uint16_t address, std::uint8_t& value) const noexcept {
+        return originalProgramRuntime_.readExternalSoundMemory(address, value);
+    }
+
     void prepare(double sampleRate, int) override {
         sampleRate_ = sampleRate > 8000.0 ? sampleRate : 44100.0;
         for (auto& voice : states_) voice = {};
+        originalProgramRuntime_.reset();
     }
 
     void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept override {
         if (!valid(voiceIndex)) return;
+        originalProgramRuntime_.noteOn(voiceIndex, voice);
         auto& state = states_[static_cast<std::size_t>(voiceIndex)];
         state = {};
         state.active = true;
@@ -30,6 +63,7 @@ public:
 
     void noteOff(int voiceIndex, const VoiceSlot&) noexcept override {
         if (!valid(voiceIndex)) return;
+        originalProgramRuntime_.noteOff(voiceIndex);
         auto& state = states_[static_cast<std::size_t>(voiceIndex)];
         if (state.active) {
             state.gate = false;
@@ -41,7 +75,10 @@ public:
     }
 
     void resetVoice(int voiceIndex, const VoiceSlot&) noexcept override {
-        if (valid(voiceIndex)) states_[static_cast<std::size_t>(voiceIndex)] = {};
+        if (valid(voiceIndex)) {
+            states_[static_cast<std::size_t>(voiceIndex)] = {};
+            originalProgramRuntime_.resetVoice(voiceIndex);
+        }
     }
 
     bool isVoiceFinished(int voiceIndex) const noexcept override {
@@ -63,6 +100,14 @@ public:
             ? performanceImage.commonByte(0) : 127;
         const float performanceGain = rawPerformanceLevel < 0
             ? 1.0f : static_cast<float>(rawPerformanceLevel) / 127.0f;
+
+        // Keep original IC51 program/resource bindings synchronized with the
+        // authoritative voice slots. This covers legato retargeting and
+        // program changes that do not issue a new backend noteOn callback.
+        const auto& activeSlots = voices.voices();
+        for (std::size_t index = 0; index < activeSlots.size(); ++index)
+            originalProgramRuntime_.synchronizeVoice(
+                static_cast<int>(index), activeSlots[index]);
 
         for (int sample = 0; sample < sampleCount; ++sample) {
             float mixedLeft = 0.0f;
@@ -216,6 +261,7 @@ private:
 
     static constexpr double twoPi = 6.28318530717958647692;
     std::array<VoiceState, VoiceManager::kVoiceCount> states_{};
+    MASSOriginalVoiceProgramRuntime originalProgramRuntime_{};
     double sampleRate_ = 44100.0;
 
     static bool valid(int index) noexcept {
