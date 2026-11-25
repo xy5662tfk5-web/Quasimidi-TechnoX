@@ -1552,6 +1552,31 @@ int main(int argc, char** argv) {
                 fx1Runtime.writeInternal(0x23u, 0x08u); // enable external FF10 writes
                 fx1Runtime.cpuForTesting().registersForTesting().pc = 0x8004u;
                 const auto executed = fx1Runtime.runUntilProgramCounter(0x8048u, 100000u);
+                std::fprintf(stderr,
+                    "FX1 Room runtime: executed=%zu PC=%04X opcode=%02X fault=%u FF10writes=%zu IC51reads=%llu P2=%02X P3=%02X 8E=%02X bit1B=%u cycles=%llu\\n",
+                    executed, static_cast<unsigned>(fx1Runtime.cpu().registers().pc),
+                    static_cast<unsigned>(fx1Runtime.readCode(fx1Runtime.cpu().registers().pc)),
+                    static_cast<unsigned>(fx1Runtime.cpuFaulted()),
+                    fx1Runtime.ff10WriteCount(),
+                    static_cast<unsigned long long>(fx1Runtime.ic51ReadCount()),
+                    static_cast<unsigned>(fx1Runtime.readPortLatch(0xa0u)),
+                    static_cast<unsigned>(fx1Runtime.readInternal(0xb0u)),
+                    static_cast<unsigned>(fx1Runtime.readInternal(0x8eu)),
+                    static_cast<unsigned>((fx1Runtime.readInternal(0x23u) >> 3u) & 1u),
+                    static_cast<unsigned long long>(fx1Runtime.elapsedMachineCycles()));
+                for (std::size_t i = 0; i < fx1Runtime.ic51ReadTraceCount(); ++i) {
+                    const auto& e = fx1Runtime.ic51ReadTraceAt(i);
+                    std::fprintf(stderr, "  FX1 IC51[%zu] bank=%u addr=%04X value=%02X PC=%04X\\n",
+                        i, static_cast<unsigned>(e.bank), static_cast<unsigned>(e.address),
+                        static_cast<unsigned>(e.value), static_cast<unsigned>(e.instructionPC));
+                }
+                for (std::size_t i = 0; i < fx1Runtime.ff10WriteCount(); ++i) {
+                    const auto& e = fx1Runtime.ff10WriteAt(i);
+                    std::fprintf(stderr, "  FX1 FF10[%zu]=%02X mode=%02X PC=%04X P2=%02X P3=%02X\\n",
+                        i, static_cast<unsigned>(e.value), static_cast<unsigned>(e.soundBusMode),
+                        static_cast<unsigned>(e.instructionPC), static_cast<unsigned>(e.port2),
+                        static_cast<unsigned>(e.port3));
+                }
                 assert(executed > 0u);
                 assert(fx1Runtime.cpu().registers().pc == 0x8048u);
                 assert(!fx1Runtime.cpuFaulted());
