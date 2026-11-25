@@ -85,6 +85,51 @@ void testMASS1C61AccumulatorTransform() {
            result.r3 == 0x56 && result.r4 == 0x67);
 }
 
+void testMASSPitchSlotGuardProjection() {
+    // Both state bytes zero: the firmware takes the JZ bypass and does not
+    // write the three-byte interpolation slot.
+    auto result = MASSPitchSlotGuardProjection::apply(
+        0x00u, 0x00u, 0x06u, 0xa5u, 0x1fu, 0xd5u);
+    assert(!result.writeSlot);
+    assert(result.mergedHigh == 0xa6u);
+    assert(result.middle == 0x1fu && result.low == 0xd5u);
+
+    // Either state byte being nonzero enables writeback. The previous R4
+    // value contributes only its low three bits to the existing high byte.
+    result = MASSPitchSlotGuardProjection::apply(
+        0x00u, 0x06u, 0x06u, 0xa0u, 0x1fu, 0xd5u);
+    assert(result.writeSlot);
+    assert(result.mergedHigh == 0xa6u);
+    assert(result.middle == 0x1fu && result.low == 0xd5u);
+
+    result = MASSPitchSlotGuardProjection::apply(
+        0x01u, 0x00u, 0x01u, 0xf8u, 0x80u, 0x20u);
+    assert(result.writeSlot && result.mergedHigh == 0xf9u);
+}
+
+void testMASS1EDDRecordRouteDecoder() {
+    assert(MASS1EDDRecordRouteDecoder::resolve(0x00u) ==
+           MASS1EDDRecordRoute::shortPage80Packet);
+    assert(MASS1EDDRecordRouteDecoder::resolve(0x03u) ==
+           MASS1EDDRecordRoute::shortPage80Packet);
+    assert(MASS1EDDRecordRouteDecoder::resolve(0x04u) ==
+           MASS1EDDRecordRoute::ordinaryRecordPackets);
+    assert(MASS1EDDRecordRouteDecoder::resolve(0xffu) ==
+           MASS1EDDRecordRoute::ordinaryRecordPackets);
+
+    auto packet = MASS1EDDRecordRouteDecoder::buildShortPacket(
+        0x0au, 0x78u, 0x06u, false);
+    assert(packet.r5 == 0x0au && packet.r2 == 0x00u);
+    assert(packet.r3 == 0x78u && packet.r4 == 0x06u);
+    assert(!packet.setsInternalBit0C);
+
+    packet = MASS1EDDRecordRouteDecoder::buildShortPacket(
+        0x2bu, 0x98u, 0xfdu, true);
+    assert(packet.r5 == 0x2bu && packet.r2 == 0x00u);
+    assert(packet.r3 == 0x98u && packet.r4 == 0x85u);
+    assert(packet.setsInternalBit0C);
+}
+
 void testMASS09B9SlotInterpolationArithmetic() {
     // Live Note 65 pass 1:
     // slot bytes 57 01 A2 are treated as 24-bit 0x020157 (top byte & 07).
@@ -1391,6 +1436,8 @@ void testActualIC51(const char* path) {
 
 int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
+    testMASSPitchSlotGuardProjection();
+    testMASS1EDDRecordRouteDecoder();
     testMASS09B9SlotInterpolationArithmetic();
     testMASS1C61SecondaryTableAddress();
     testMASS1C61AccumulatorTransform();
