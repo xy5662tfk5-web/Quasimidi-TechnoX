@@ -130,6 +130,28 @@ void testMASS1EDDRecordRouteDecoder() {
     assert(packet.setsInternalBit0C);
 }
 
+void testMASS1EDDRecordPacketSequenceBuilder() {
+    auto sequence = MASS1EDDRecordPacketSequenceBuilder::build(
+        false, 0x20u, {{0x11u, 0x22u, 0x87u}}, false,
+        0x31u, 0x42u, 0x53u, 0x64u, 0x75u, 0x06u);
+    assert(sequence.count == 2u);
+    assert((sequence.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x20u, 0x31u, 0x42u, 0x53u}}));
+    assert((sequence.packets[1].bytes ==
+            std::array<std::uint8_t, 4>{{0x1fu, 0x64u, 0x75u, 0x06u}}));
+
+    sequence = MASS1EDDRecordPacketSequenceBuilder::build(
+        true, 0x20u, {{0x11u, 0x22u, 0x87u}}, true,
+        0x31u, 0x42u, 0x53u, 0x64u, 0x75u, 0x06u);
+    assert(sequence.count == 3u);
+    assert((sequence.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x1eu, 0x11u, 0x22u, 0x87u}}));
+    assert((sequence.packets[1].bytes ==
+            std::array<std::uint8_t, 4>{{0x20u, 0x31u, 0x42u, 0x53u}}));
+    assert((sequence.packets[2].bytes ==
+            std::array<std::uint8_t, 4>{{0x1fu, 0x64u, 0x75u, 0x06u}}));
+}
+
 void testMASS09B9SlotInterpolationArithmetic() {
     // Live Note 65 pass 1:
     // slot bytes 57 01 A2 are treated as 24-bit 0x020157 (top byte & 07).
@@ -1438,6 +1460,7 @@ int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testMASSPitchSlotGuardProjection();
     testMASS1EDDRecordRouteDecoder();
+    testMASS1EDDRecordPacketSequenceBuilder();
     testMASS09B9SlotInterpolationArithmetic();
     testMASS1C61SecondaryTableAddress();
     testMASS1C61AccumulatorTransform();
