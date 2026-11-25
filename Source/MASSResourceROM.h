@@ -2167,6 +2167,121 @@ private:
     bool loaded_ = false;
 };
 
+// Exact byte image of one firmware resource stream as written to XDATA 0xFF10.
+// This is transport reconstruction only: the receiver's DSP interpretation is unknown.
+enum class MASSFXProcessorFamily : std::uint8_t { fx1, fx2 };
+
+struct MASSFXUploadStreamImage {
+    std::uint8_t resourceIndex = 0;
+    std::uint16_t sourceAddress = 0;
+    std::size_t blockCount = 0;
+    std::size_t sourceBytesConsumed = 0;
+    std::vector<std::uint8_t> portBytes;
+    bool terminated = false;
+};
+
+struct MASSFXUploadProgramImage {
+    MASSFXProcessorFamily family = MASSFXProcessorFamily::fx1;
+    std::uint8_t bank = 0;
+    std::uint8_t effectIndex = 0;
+    MASSFXUploadStreamImage streamA{};
+    MASSFXUploadStreamImage streamB{};
+
+    std::size_t totalPortBytes() const noexcept {
+        return streamA.portBytes.size() + streamB.portBytes.size();
+    }
+};
+
+// Serializes the parsed IC51 blocks back into the exact ordered byte stream
+// written by the firmware. Leading/inter-block skipped bytes and zero-count
+// terminators are deliberately excluded because the original routines do not
+// write them to 0xFF10. Run this during setup, never in the audio callback.
+class MASSFXUploadPlanBuilder {
+public:
+    static bool buildFX1(const MASSFX1ResourceCatalog& catalog,
+                         int bank, int effectIndex,
+                         MASSFXUploadProgramImage& result) {
+        const auto* program = catalog.find(bank, effectIndex);
+        if (program == nullptr)
+            return false;
+        MASSFXUploadProgramImage image{};
+        image.family = MASSFXProcessorFamily::fx1;
+        image.bank = static_cast<std::uint8_t>(bank);
+        image.effectIndex = static_cast<std::uint8_t>(effectIndex);
+        if (!serialize(program->directoryEntry.streamAResourceIndex,
+                       program->streamAResource, image.streamA) ||
+            !serialize(program->directoryEntry.streamBResourceIndex,
+                       program->streamBResource, image.streamB))
+            return false;
+        result = std::move(image);
+        return true;
+    }
+
+    static bool buildFX2(const MASSFX2ResourceCatalog& catalog,
+                         int bank, int effectIndex,
+                         MASSFXUploadProgramImage& result) {
+        const auto* program = catalog.find(bank, effectIndex);
+        if (program == nullptr)
+            return false;
+        MASSFXUploadProgramImage image{};
+        image.family = MASSFXProcessorFamily::fx2;
+        image.bank = static_cast<std::uint8_t>(bank);
+        image.effectIndex = static_cast<std::uint8_t>(effectIndex);
+        if (!serialize(program->directoryEntry.streamAResourceIndex,
+                       program->streamAResource, image.streamA) ||
+            !serialize(program->directoryEntry.streamBResourceIndex,
+                       program->streamBResource, image.streamB))
+            return false;
+        result = std::move(image);
+        return true;
+    }
+
+private:
+    static bool serialize(std::uint8_t resourceIndex,
+                          const MASSIC51PortStreamResource& source,
+                          MASSFXUploadStreamImage& result) {
+        if (!source.terminated)
+            return false;
+
+        MASSFXUploadStreamImage image{};
+        image.resourceIndex = resourceIndex;
+        image.sourceAddress = source.dataAddress;
+        image.blockCount = source.blocks.size();
+        image.sourceBytesConsumed = source.sourceBytesConsumed;
+
+        std::size_t expectedWriteBytes = 0;
+        for (const auto& block : source.blocks) {
+            const auto expectedPreambleBytes =
+                source.format == MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets
+                    ? 2u : 3u;
+            const auto expectedPayloadBytes =
+                source.format == MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets
+                    ? static_cast<std::size_t>(block.sourceCount) * 3u
+                    : static_cast<std::size_t>(block.sourceCount);
+            if (block.sourceCount == 0u ||
+                block.preambleByteCount != expectedPreambleBytes ||
+                block.payload.size() != expectedPayloadBytes ||
+                block.portWriteByteCount != 1u + expectedPreambleBytes + expectedPayloadBytes)
+                return false;
+
+            image.portBytes.push_back(block.wireHeader);
+            for (std::size_t i = 0; i < block.preambleByteCount; ++i)
+                image.portBytes.push_back(block.preamble[i]);
+            image.portBytes.insert(image.portBytes.end(),
+                                   block.payload.begin(), block.payload.end());
+            expectedWriteBytes += block.portWriteByteCount;
+        }
+
+        if (expectedWriteBytes != source.portWriteByteCount ||
+            image.portBytes.size() != source.portWriteByteCount)
+            return false;
+
+        image.terminated = true;
+        result = std::move(image);
+        return true;
+    }
+};
+
 // Firmware XDATA addressing for MOVX @R0: P2 selects the page and R0 is
 // the eight-bit offset. Incrementing R0 wraps within the selected page.
 struct MASSXDataAddress {
