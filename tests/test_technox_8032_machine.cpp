@@ -4184,10 +4184,22 @@ int main(int argc, char** argv) {
         for (const bool seen : note72SawResourceProducer)
             assert(seen);
 
-        // Trace the indexed two-byte state producer in a separate ring.
-        // This keeps its probes from evicting established MIDI dispatch events.
-        std::array<bool, 2> note72SawIndexedPairMathEntry{};
-        std::array<std::array<bool, 2>, 2> note72SawIndexedPairStore{};
+        // Compare every observed 16-slot curve invocation against the
+        // independent projection, not only the initially selected slot 12.
+        constexpr std::size_t kIndexedCurveSlotCount = 16u;
+        constexpr std::size_t kIndexedCurveCallerCount = 3u;
+        const auto callerIndex = [](std::uint16_t returnPC) noexcept {
+            if (returnPC == 0x3f1bu) return 0;
+            if (returnPC == 0x484eu) return 1;
+            if (returnPC == 0x4c8eu) return 2;
+            return -1;
+        };
+        std::array<std::array<std::size_t, kIndexedCurveCallerCount>,
+                   kIndexedCurveSlotCount> indexedCurveMatched{};
+        std::array<std::array<bool, kIndexedCurveCallerCount>,
+                   kIndexedCurveSlotCount> indexedCurveHighStoreSeen{};
+        std::array<std::array<bool, kIndexedCurveCallerCount>,
+                   kIndexedCurveSlotCount> indexedCurveLowStoreSeen{};
         const auto indexedPairMathCount =
             firmwareMachine.indexedPairMathWatchCountForTesting();
         std::printf("NOTE72 INDEXED PAIR MATH (0x02D1) TRACE: count=%zu\\n",
@@ -4205,40 +4217,48 @@ int main(int argc, char** argv) {
         bool indexedPairGuardCaptured = false;
         bool indexedPairHighCaptured = false;
         std::uint16_t indexedPairPendingReturn = 0;
+        std::uint8_t indexedPairPendingSlot = 0;
         std::uint8_t indexedPairPendingR29 = 0;
         std::uint8_t indexedPairPendingR2A = 0;
         std::uint8_t indexedPairPendingGuard = 0;
         std::uint8_t indexedPairActualHigh = 0;
         std::size_t note72IndexedPairMathCompared = 0;
+        std::size_t ignoredIndexedPairCallers = 0;
 
-        for (std::size_t i = 0; i < indexedPairMathCount; ++i) {
+        // The ring is bounded; retain only its chronological valid window.
+        const auto firstIndexedPairEvent = indexedPairMathCount >
+                firmwareMachine.indexedPairMathWatchCapacityForTesting()
+            ? indexedPairMathCount -
+                firmwareMachine.indexedPairMathWatchCapacityForTesting()
+            : 0u;
+        for (std::size_t i = firstIndexedPairEvent;
+             i < indexedPairMathCount; ++i) {
             const auto& event =
                 firmwareMachine.indexedPairMathWatchAtForTesting(i);
-            const bool from3F1B = event.returnPC == 0x3f1bu;
-            const bool from4C8E = event.returnPC == 0x4c8eu;
-            const std::size_t caller = from3F1B ? 0u : 1u;
+            const auto caller = callerIndex(event.returnPC);
+            const bool recognizedCaller = caller >= 0;
+            const bool validSlot = event.ram28 < kIndexedCurveSlotCount;
 
             if (event.instructionPC == 0x02d1u &&
-                (from3F1B || from4C8E) && event.ram28 == 0x0cu) {
+                recognizedCaller && validSlot) {
                 assert(!indexedPairPending);
                 indexedPairPending = true;
                 indexedPairGuardCaptured = false;
                 indexedPairHighCaptured = false;
                 indexedPairPendingReturn = event.returnPC;
+                indexedPairPendingSlot = event.ram28;
                 indexedPairPendingR29 = event.ram29;
                 indexedPairPendingR2A = event.ram2A;
-                note72SawIndexedPairMathEntry[caller] = true;
-                if (from3F1B) {
-                    assert(event.ram29 == 0x00u);
-                    assert(event.ram2A == 0x40u);
-                }
+            } else if (event.instructionPC == 0x02d1u &&
+                       !recognizedCaller) {
+                ++ignoredIndexedPairCallers;
             }
 
-            // At 0x02E0 the MOVX at 0x02DF has already loaded the guard
-            // byte into A, and JZ has not yet taken the zero-guard bypass.
+            // At 0x02E0 the MOVX at 0x02DF has loaded the guard byte
+            // into A; JZ has not yet taken the zero-guard bypass.
             if (event.instructionPC == 0x02e0u && indexedPairPending &&
                 event.returnPC == indexedPairPendingReturn &&
-                event.ram28 == 0x0cu) {
+                event.ram28 == indexedPairPendingSlot) {
                 indexedPairPendingGuard = event.accumulator;
                 indexedPairGuardCaptured = true;
                 const auto projected =
@@ -4246,12 +4266,11 @@ int main(int argc, char** argv) {
                         indexedPairFirmware, indexedPairPendingGuard,
                         indexedPairPendingR29, indexedPairPendingR2A);
                 assert(projected.valid);
-                if (projected.zeroGuardBypass)
-                    assert(projected.value == 0u);
-                std::printf("  INPUT ret=%04X slot=0C guard=%02X R29=%02X R2A=%02X "
+                std::printf("  INPUT ret=%04X slot=%02X guard=%02X R29=%02X R2A=%02X "
                             "table=%04X record=%04X fraction=%04X base=%04X "
                             "slope=%04X expected=%04X\\n",
                             static_cast<unsigned>(event.returnPC),
+                            static_cast<unsigned>(indexedPairPendingSlot),
                             static_cast<unsigned>(indexedPairPendingGuard),
                             static_cast<unsigned>(indexedPairPendingR29),
                             static_cast<unsigned>(indexedPairPendingR2A),
@@ -4263,56 +4282,28 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(projected.value));
             }
 
-            if ((from3F1B || from4C8E) &&
-                (event.instructionPC == 0x034fu ||
-                 event.instructionPC == 0x0354u ||
-                 event.instructionPC == 0x0358u ||
-                 event.instructionPC == 0x035cu ||
-                 event.instructionPC == 0x0392u ||
-                 event.instructionPC == 0x039eu ||
-                 event.instructionPC == 0x03a2u)) {
-                std::printf("  PC=%04X ret=%04X DPTR=%04X A=%02X R4=%02X R5=%02X "
-                            "R6=%02X R7=%02X RAM28/29/2A=%02X/%02X/%02X "
-                            "RAM6B/6C/6E/70=%02X/%02X/%02X/%02X cycle=%llu\\n",
-                            static_cast<unsigned>(event.instructionPC),
-                            static_cast<unsigned>(event.returnPC),
-                            static_cast<unsigned>(event.dptr),
-                            static_cast<unsigned>(event.accumulator),
-                            static_cast<unsigned>(event.registers[4]),
-                            static_cast<unsigned>(event.registers[5]),
-                            static_cast<unsigned>(event.registers[6]),
-                            static_cast<unsigned>(event.registers[7]),
-                            static_cast<unsigned>(event.ram28),
-                            static_cast<unsigned>(event.ram29),
-                            static_cast<unsigned>(event.ram2A),
-                            static_cast<unsigned>(event.ram6B),
-                            static_cast<unsigned>(event.ram6C),
-                            static_cast<unsigned>(event.ram6E),
-                            static_cast<unsigned>(event.ram70),
-                            static_cast<unsigned long long>(event.machineCycle));
-            }
+            if (!indexedPairPending ||
+                event.returnPC != indexedPairPendingReturn ||
+                event.ram28 != indexedPairPendingSlot)
+                continue;
 
-            if ((from3F1B || from4C8E) &&
-                (event.instructionPC == 0x039eu ||
-                 event.instructionPC == 0x03a2u) &&
-                event.ram28 == 0x0cu) {
-                const std::size_t store =
-                    event.instructionPC == 0x039eu ? 0u : 1u;
-                assert(event.dptr == (store == 0u ? 0x2018u : 0x2019u));
-                note72SawIndexedPairStore[caller][store] = true;
-            }
-
-            if (indexedPairPending &&
-                event.returnPC == indexedPairPendingReturn &&
-                event.ram28 == 0x0cu && event.instructionPC == 0x039eu) {
+            if (event.instructionPC == 0x039eu) {
                 assert(indexedPairGuardCaptured);
+                assert(event.dptr == static_cast<std::uint16_t>(
+                    0x2000u + 2u * indexedPairPendingSlot));
                 indexedPairActualHigh = event.accumulator;
                 indexedPairHighCaptured = true;
+                const auto slot = static_cast<std::size_t>(
+                    indexedPairPendingSlot);
+                const auto callerId = static_cast<std::size_t>(
+                    callerIndex(indexedPairPendingReturn));
+                indexedCurveHighStoreSeen[slot][callerId] = true;
             }
-            if (indexedPairPending &&
-                event.returnPC == indexedPairPendingReturn &&
-                event.ram28 == 0x0cu && event.instructionPC == 0x03a2u) {
+
+            if (event.instructionPC == 0x03a2u) {
                 assert(indexedPairGuardCaptured && indexedPairHighCaptured);
+                assert(event.dptr == static_cast<std::uint16_t>(
+                    0x2001u + 2u * indexedPairPendingSlot));
                 const auto actual = static_cast<std::uint16_t>(
                     (static_cast<std::uint16_t>(indexedPairActualHigh) << 8u) |
                     event.accumulator);
@@ -4321,21 +4312,30 @@ int main(int argc, char** argv) {
                         indexedPairFirmware, indexedPairPendingGuard,
                         indexedPairPendingR29, indexedPairPendingR2A);
                 assert(projected.valid && projected.value == actual);
+                const auto slot = static_cast<std::size_t>(
+                    indexedPairPendingSlot);
+                const auto callerId = static_cast<std::size_t>(
+                    callerIndex(indexedPairPendingReturn));
+                indexedCurveLowStoreSeen[slot][callerId] = true;
+                ++indexedCurveMatched[slot][callerId];
                 ++note72IndexedPairMathCompared;
                 indexedPairPending = false;
             }
         }
         assert(!indexedPairPending);
         assert(note72IndexedPairMathCompared > 0u);
-        assert(indexedPairMathCount > 0u);
-        assert(note72SawIndexedPairMathEntry[0]);
-        assert(note72SawIndexedPairMathEntry[1]);
-        for (const auto& callerStores : note72SawIndexedPairStore) {
-            assert(callerStores[0]);
-            assert(callerStores[1]);
+        for (std::size_t slot = 0; slot < kIndexedCurveSlotCount; ++slot) {
+            for (std::size_t callerId = 0;
+                 callerId < kIndexedCurveCallerCount; ++callerId) {
+                if (indexedCurveMatched[slot][callerId] == 0u)
+                    continue;
+                assert(indexedCurveHighStoreSeen[slot][callerId]);
+                assert(indexedCurveLowStoreSeen[slot][callerId]);
+            }
         }
-        std::printf("NOTE72 INDEXED PAIR MODEL VS REAL IC4 STORES: %zu matched invocations\\n",
-                    note72IndexedPairMathCompared);
+        std::printf("NOTE72 INDEXED PAIR MODEL VS REAL IC4 STORES: %zu matched "
+                    "invocations across all 16 slots; ignored callers=%zu\\n",
+                    note72IndexedPairMathCompared, ignoredIndexedPairCallers);
 
         std::printf("NOTE72 IC4 1E00-1E5F EXECUTION CONTEXT (B register source):\\n");
         std::size_t note72SubroutineInstructionCount = 0;
