@@ -130,6 +130,20 @@ void testMASS1EDDRecordRouteDecoder() {
     assert(packet.setsInternalBit0C);
 }
 
+void testMASS0DB7PacketBuilder() {
+    auto packet = MASS0DB7PacketBuilder::build(
+        0x0au, 0x00u, 0x78u, 0xc6u);
+    assert((packet.bytes ==
+            std::array<std::uint8_t, 4>{{0x0au, 0x00u, 0x78u, 0x86u}}));
+    assert(packet.setsInternalBit0C);
+
+    packet = MASS0DB7PacketBuilder::build(
+        0x20u, 0x80u, 0x01u, 0x46u);
+    assert((packet.bytes ==
+            std::array<std::uint8_t, 4>{{0x20u, 0x80u, 0x01u, 0x06u}}));
+    assert(!packet.setsInternalBit0C);
+}
+
 void testMASS1EDDRecordPacketSequenceBuilder() {
     auto sequence = MASS1EDDRecordPacketSequenceBuilder::build(
         false, 0x20u, {{0x11u, 0x22u, 0x87u}}, false,
@@ -1460,6 +1474,7 @@ int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testMASSPitchSlotGuardProjection();
     testMASS1EDDRecordRouteDecoder();
+    testMASS0DB7PacketBuilder();
     testMASS1EDDRecordPacketSequenceBuilder();
     testMASS09B9SlotInterpolationArithmetic();
     testMASS1C61SecondaryTableAddress();
