@@ -112,3 +112,10 @@ The secondary lookup is independently reproducible from the descrambled IC4 code
 A separate IC51 Performance 1 / Part 13 resource-stream decode finds a seven-byte group-08 pitch-parameter command at stream offset 0x0179 (`0E 64 CC 05 9E 0C 5C`). It is consistent with the same handler class, but the current evidence does not prove that this exact stream record is the pointer source for the 0x160C..0x1612 bytes in the live Note 66 capture. Keep the two observations linked as a candidate relationship, not a completed pointer chain, until the command-stream cursor is captured through the pointer-table lookup.
 
 This now connects a real IC51 record to the firmware register tuple, the 1C61 transform, the three-byte XDATA pitch slot, the 09B9 consumer, and the 0x0A4F packet writer. It still does not map the raw values to Hz, semitones, sample addresses, amplitude, or named external-device registers.
+
+
+### 0x0DCE phase/readback companion
+
+The external-window exchange continues through companion helper 0x0DCE. It compares requested R4.7 with internal bit 0x0C. A mismatch causes a control write to XDATA offset 3: 0xC0 when the requested phase is set, or 0x40 when it is clear. If the phase already matches, that control write is skipped. The helper then reads offset 4, followed by offsets 0, 1, 2, and 3 into R5, R2, R3, and R4.
+
+The repository now models this ordering with `MASS0DCEExchangeDecoder`, taking the five response bytes as external inputs. Tests cover both phase transitions and the no-write case. Offset 4 remains an opaque status byte: the model does not call it an acknowledgement and does not invent a peripheral response.
