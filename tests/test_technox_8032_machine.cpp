@@ -749,7 +749,7 @@ int main(int argc, char** argv) {
         };
         constexpr std::array<FXHardwareEventVector, 2> fxHardwareEvents{{
             {0x3070u,0x30a4u,0x00u,0x01u,0x50u,0x15u,0x01u,0x14u,0x7bfeu},
-            {0x307au,0x3085u,0x01u,0x00u,0x51u,0x01u,0x7fu,0x14u,0x7c06u}
+            {0x307au,0x3085u,0x01u,0x01u,0x51u,0x01u,0x7fu,0x14u,0x7c06u}
         }};
         for (const auto& event : fxHardwareEvents) {
             TechnoX8032Machine fxEventProbe;
@@ -775,8 +775,31 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(fxEventProbe.cpu().registers().pc == event.exit);
             assert(!fxEventProbe.cpuFaulted());
-            assert(fxEventProbe.testExternalRamByteForTesting(
-                event.destination) == expected);
+            const auto storedSelector =
+                fxEventProbe.testExternalRamByteForTesting(event.destination);
+            if (storedSelector != expected) {
+                std::fprintf(stderr,
+                    "FX event path mismatch: entry=%04X cmd=%02X input1A=%u 7BDC=%02X dest=%04X stored=%02X expected=%02X 3702=%02X 3708=%02X 7BD9=%02X 7BDA=%02X 7BDB=%02X 308B=%02X 308D=%02X 3097=%02X 6A=%02X PC=%04X fault=%u\\n",
+                    static_cast<unsigned>(event.entry),
+                    static_cast<unsigned>(event.command),
+                    static_cast<unsigned>(event.bit1aInitial),
+                    static_cast<unsigned>(event.xdata7bdc),
+                    static_cast<unsigned>(event.destination),
+                    static_cast<unsigned>(storedSelector),
+                    static_cast<unsigned>(expected),
+                    static_cast<unsigned>(fxEventProbe.readExternal(0x3702u)),
+                    static_cast<unsigned>(fxEventProbe.readExternal(0x3708u)),
+                    static_cast<unsigned>(fxEventProbe.testExternalRamByteForTesting(0x7bd9u)),
+                    static_cast<unsigned>(fxEventProbe.testExternalRamByteForTesting(0x7bdau)),
+                    static_cast<unsigned>(fxEventProbe.testExternalRamByteForTesting(0x7bdbu)),
+                    static_cast<unsigned>(fxEventProbe.readExternal(0x308bu)),
+                    static_cast<unsigned>(fxEventProbe.readExternal(0x308du)),
+                    static_cast<unsigned>(fxEventProbe.readExternal(0x3097u)),
+                    static_cast<unsigned>(fxEventProbe.readInternal(0x6au)),
+                    static_cast<unsigned>(fxEventProbe.cpu().registers().pc),
+                    static_cast<unsigned>(fxEventProbe.cpuFaulted()));
+            }
+            assert(storedSelector == expected);
             // The selector handler calls the 0x7C29 deferred scheduler:
             // one 54-byte service transaction, separate from the later
             // decoded IC51 resource stream.
