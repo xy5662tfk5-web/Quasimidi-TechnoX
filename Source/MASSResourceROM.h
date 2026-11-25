@@ -1885,7 +1885,8 @@ struct MASSIC51PortStreamResource {
 class MASSIC51PortStreamResolver {
 public:
     // Firmware path through IC4 0xAF93 repeats:
-    //   [count] [two fixed preamble bytes] [count * 3 payload bytes].
+    //   [count] [two fixed preamble bytes] [(count * 3) mod 256 payload bytes].
+    // AFCA stores only the low MUL AB result in R1 before the DJNZ loop.
     // The third byte after count is already payload byte zero.
     // A zero count ends the resource without a host-port write.
     static bool resolveTripletStream(
