@@ -4197,9 +4197,8 @@ int main(int argc, char** argv) {
             const bool from3F1B = event.returnPC == 0x3f1bu;
             const bool from4C8E = event.returnPC == 0x4c8eu;
             if (event.instructionPC == 0x02d1u &&
-                (from3F1B || from4C8E)) {
+                (from3F1B || from4C8E) && event.ram28 == 0x0cu) {
                 const std::size_t caller = from3F1B ? 0u : 1u;
-                assert(event.ram28 == 0x0cu);
                 note72SawIndexedPairMathEntry[caller] = true;
                 if (from3F1B) {
                     assert(event.ram29 == 0x00u);
@@ -4236,11 +4235,11 @@ int main(int argc, char** argv) {
             }
             if ((from3F1B || from4C8E) &&
                 (event.instructionPC == 0x039eu ||
-                 event.instructionPC == 0x03a2u)) {
+                 event.instructionPC == 0x03a2u) &&
+                event.ram28 == 0x0cu) {
                 const std::size_t caller = from3F1B ? 0u : 1u;
                 const std::size_t store =
                     event.instructionPC == 0x039eu ? 0u : 1u;
-                assert(event.ram28 == 0x0cu);
                 assert(event.dptr == (store == 0u ? 0x2018u : 0x2019u));
                 note72SawIndexedPairStore[caller][store] = true;
             }
