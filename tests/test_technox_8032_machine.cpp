@@ -604,29 +604,6 @@ int main(int argc, char** argv) {
             assert(!fx2Deferred.cpuFaulted());
             if (fx2Deferred.ff10WriteCount() != 177u) {
                 std::fprintf(stderr,
-                    "FX2 deferred mismatch: FF10=%zu IC51=%llu PC=%04X selector=%02X staging=%02X P3=%02X mode=%02X fault=%u\\n",
-                    fx2Deferred.ff10WriteCount(),
-                    static_cast<unsigned long long>(fx2Deferred.ic51ReadCount()),
-                    static_cast<unsigned>(fx2Deferred.cpu().registers().pc),
-                    static_cast<unsigned>(fx2Deferred.testExternalRamByteForTesting(0x7c06u)),
-                    static_cast<unsigned>(fx2Deferred.readExternal(0x3097u)),
-                    static_cast<unsigned>(fx2Deferred.readInternal(0xb0u)),
-                    static_cast<unsigned>(fx2Deferred.readInternal(0x8eu)),
-                    static_cast<unsigned>(fx2Deferred.cpuFaulted()));
-                for (std::size_t i = 177u; i < fx2Deferred.ff10WriteCount(); ++i) {
-                    const auto& e = fx2Deferred.ff10WriteAt(i);
-                    std::fprintf(stderr,
-                        "  FX2 finalization FF10[%zu]=%02X PC=%04X return=%04X P2=%02X mode=%02X\\n",
-                        i, static_cast<unsigned>(e.value),
-                        static_cast<unsigned>(e.instructionPC),
-                        static_cast<unsigned>(e.stackReturnPC),
-                        static_cast<unsigned>(e.port2),
-                        static_cast<unsigned>(e.soundBusMode));
-                }
-            }
-            assert(fx2Deferred.ff10WriteCount() >= 177u);
-            if (fx2Deferred.ff10WriteCount() > 177u) {
-                std::fprintf(stderr,
                     "FX2 deferred tail: total=%zu IC51=%llu PC=%04X selector=%02X\\n",
                     fx2Deferred.ff10WriteCount(),
                     static_cast<unsigned long long>(fx2Deferred.ic51ReadCount()),
@@ -643,6 +620,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(e.soundBusMode));
                 }
             }
+            assert(fx2Deferred.ff10WriteCount() >= 177u);
             assert(fx2Deferred.ff10WriteAt(0).value == 0x3au);
             assert(fx2Deferred.ff10WriteAt(1).value == 0x15u);
             assert(fx2Deferred.ff10WriteAt(176).value == 0x7eu);
