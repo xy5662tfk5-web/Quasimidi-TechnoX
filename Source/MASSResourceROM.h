@@ -1012,6 +1012,27 @@ public:
     }
 };
 
+struct MASS0DB7PacketResult {
+    std::array<std::uint8_t, 4> bytes{};
+    bool setsInternalBit0C = false;
+};
+
+// Exact register-to-XDATA mapping of IC4 helper 0x0DB7.
+// The fourth byte clears bit 6 before the write; the post-write software
+// handshake flag mirrors bit 7 of that modified byte. No peripheral response
+// or sound-chip meaning is inferred by this packet formatter.
+class MASS0DB7PacketBuilder {
+public:
+    static MASS0DB7PacketResult build(
+        std::uint8_t r5,
+        std::uint8_t r2,
+        std::uint8_t r3,
+        std::uint8_t r4) noexcept {
+        const auto fourth = static_cast<std::uint8_t>(r4 & 0xbfu);
+        return {{{r5, r2, r3, fourth}}, (fourth & 0x80u) != 0};
+    }
+};
+
 struct MASS1EDDCommandPacket {
     std::array<std::uint8_t, 4> bytes{};
 };
