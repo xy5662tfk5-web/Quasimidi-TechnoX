@@ -101,7 +101,7 @@ Static disassembly of the validated, descrambled IC4 v1.05 image now resolves th
 0x0DCD  22          RET
 ```
 
-So offset 0 is a selector/latch byte sourced from R5; it is not safe to give it a physical device-index meaning yet. Offsets 1–3 carry the three-byte value from R2/R3/R4, with ACC.6 cleared in the final byte. After the write, IC4 synchronizes its internal phase bit `0x0C` to the original R4.7 value.
+So offset 0 is the firmware's R5 selector/command-latch byte; in command-generation paths R5 is populated from the current command number, but the receiver-side meaning and device decode remain unverified. It is not safe to label it a physical device index. Offsets 1–3 carry the three-byte value from R2/R3/R4, with ACC.6 cleared in the final byte. After the write, IC4 synchronizes its internal phase bit `0x0C` to the original R4.7 value.
 
 #### Phase helper 0x0DCE
 
