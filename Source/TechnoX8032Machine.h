@@ -264,6 +264,18 @@ public:
         std::uint16_t stackReturnPC = 0;
         std::uint64_t machineCycle = 0;
     };
+    struct FF10ReadEvent {
+        std::uint16_t address = 0xff10u;
+        std::uint8_t value = 0xffu;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t stackReturnPC = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
+        bool soundDeviceResetReleased = true;
+        std::uint64_t machineCycle = 0;
+    };
     struct FF10WriteEvent {
         std::uint16_t address = 0xff10u;
         std::uint8_t value = 0xffu;
@@ -525,6 +537,8 @@ public:
         soundHostExpectedRegister_ = 0;
         soundHostTransactionBytes_.fill(0);
         soundHostTransactionContext_.fill(SoundHostBusContext{});
+        ff10ReadTrace_.fill(FF10ReadEvent{});
+        ff10ReadCount_ = 0;
         ff10WriteTrace_.fill(FF10WriteEvent{});
         ff10WriteCount_ = 0;
         soundHostBurstWordCount_ = 0;
@@ -1302,8 +1316,23 @@ public:
             ++soundHostReadCount_;
             return value;
         }
-        if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u)
-            return soundDeviceResponse_; // status port outside RAM mode
+        if (address == 0xff10u && (internal_[0x8e] & 0x03u) != 0x02u) {
+            // Preserve the real firmware's status/data-port reads so the
+            // startup ready poll can be traced without inventing a response.
+            auto& event = ff10ReadTrace_[
+                ff10ReadCount_ % ff10ReadTrace_.size()];
+            event.value = soundDeviceResponse_;
+            event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+            event.stackReturnPC = currentStackReturnPC();
+            event.port2 = portPins_[2];
+            event.port3 = portPins_[3];
+            event.soundBusMode = internal_[0x8e];
+            event.ic51Selected = ic51Selected;
+            event.soundDeviceResetReleased = soundDeviceResetReleased_;
+            event.machineCycle = elapsedMachineCycles_;
+            ++ff10ReadCount_;
+            return event.value;
+        }
         for (std::size_t i = 0; i < testExternalReadOverrideEnabled_.size(); ++i) {
             if (!testExternalReadOverrideEnabled_[i] ||
                 address != testExternalReadOverrideAddresses_[i])
@@ -1877,6 +1906,10 @@ public:
     }
 
     std::uint8_t lastSoundDeviceWrite() const noexcept { return soundDeviceWrite_; }
+    std::size_t ff10ReadCount() const noexcept { return ff10ReadCount_; }
+    const FF10ReadEvent& ff10ReadAt(std::size_t index) const noexcept {
+        return ff10ReadTrace_[index % ff10ReadTrace_.size()];
+    }
     std::size_t ff10WriteCount() const noexcept {
         return ff10WriteCount_;
     }
@@ -2282,6 +2315,8 @@ private:
     std::uint64_t elapsedMachineCycles_ = 0;
     bool soundDeviceResetReleased_ = true;
     std::uint8_t soundDeviceWrite_ = 0;
+    std::array<FF10ReadEvent, 4096> ff10ReadTrace_{};
+    std::size_t ff10ReadCount_ = 0;
     std::array<FF10WriteEvent, 4096> ff10WriteTrace_{};
     std::size_t ff10WriteCount_ = 0;
     std::uint8_t soundDeviceResponse_ = 0xff;
