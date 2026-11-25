@@ -415,8 +415,9 @@ int main(int argc, char** argv) {
         // IC4 maintains FX selectors in two external XDATA slots before
         // their loader reads them back. The overlay is intentionally a test
         // stand-in for the still-unidentified physical 0x7Bxx/0x7Cxx target.
-        // PC 0x5411 stores IRAM[0x6A] into FX1 selector 0x7BFE; 0x7FF2 reads
-        // that same location, copies it to 0x3098 and clamps it to 0..0x14.
+        // FX1 normalization/store runs from 0x5407 to 0x5417 (write at 0x5416);
+        // FX2 normalization/store runs from 0x543D to 0x544D (write at 0x544C).
+        // Both use IRAM[0x6A], clamp it to 0..0x14, then store to 0x7BFE/0x7C06.
         struct FXClampVector {
             std::uint8_t input;
             std::uint8_t expected;
@@ -431,17 +432,29 @@ int main(int argc, char** argv) {
             fxIndexProbe.reset();
             fxIndexProbe.enableTestExternalRamWindow7000(0x00u);
             fxIndexProbe.writeInternal(0x6au, vector.input);
-            fxIndexProbe.cpuForTesting().registersForTesting().pc = 0x5411u;
+            fxIndexProbe.cpuForTesting().registersForTesting().pc = 0x5407u;
             const auto storeExecuted =
-                fxIndexProbe.runUntilProgramCounter(0x5417u, 8u);
+                fxIndexProbe.runUntilProgramCounter(0x5417u, 16u);
             assert(storeExecuted > 0u);
             assert(fxIndexProbe.cpu().registers().pc == 0x5417u);
-            assert(fxIndexProbe.readExternal(0x7bfeu) == vector.input);
+            assert(fxIndexProbe.readExternal(0x7bfeu) == vector.expected);
             fxIndexProbe.cpuForTesting().registersForTesting().pc = 0x7ff2u;
             const auto executed = fxIndexProbe.runUntilProgramCounter(0x8004u, 32u);
             assert(executed > 0u);
             assert(fxIndexProbe.cpu().registers().pc == 0x8004u);
             assert(fxIndexProbe.readExternal(0x3098u) == vector.expected);
+
+            TechnoX8032Machine fx2IndexProbe;
+            assert(fx2IndexProbe.loadIC4Rom(realRom.data(), realRom.size()));
+            fx2IndexProbe.reset();
+            fx2IndexProbe.enableTestExternalRamWindow7000(0x00u);
+            fx2IndexProbe.writeInternal(0x6au, vector.input);
+            fx2IndexProbe.cpuForTesting().registersForTesting().pc = 0x543du;
+            const auto fx2StoreExecuted =
+                fx2IndexProbe.runUntilProgramCounter(0x544du, 16u);
+            assert(fx2StoreExecuted > 0u);
+            assert(fx2IndexProbe.cpu().registers().pc == 0x544du);
+            assert(fx2IndexProbe.readExternal(0x7c06u) == vector.expected);
         }
 
         std::vector<std::uint8_t> realIC51;
@@ -1561,9 +1574,9 @@ int main(int argc, char** argv) {
                 fx1Runtime.enableTestExternalRamWindow7000(0x00u);
                 fx1Runtime.writeInternal(0x6au, 0u); // FX1 Room, zero-based selector
                 fx1Runtime.writeInternal(0x23u, 0x08u); // enable external FF10 writes
-                fx1Runtime.cpuForTesting().registersForTesting().pc = 0x5411u;
+                fx1Runtime.cpuForTesting().registersForTesting().pc = 0x5407u;
                 const auto selectorStore =
-                    fx1Runtime.runUntilProgramCounter(0x5417u, 8u);
+                    fx1Runtime.runUntilProgramCounter(0x5417u, 16u);
                 assert(selectorStore > 0u);
                 assert(fx1Runtime.readExternal(0x7bfeu) == 0u);
                 fx1Runtime.cpuForTesting().registersForTesting().pc = 0x7ff2u;
@@ -1605,9 +1618,9 @@ int main(int argc, char** argv) {
                 fx2Runtime.enableTestExternalRamWindow7000(0x00u);
                 fx2Runtime.writeInternal(0x6au, 14u); // FX2 Equalizr1 selector
                 fx2Runtime.writeInternal(0x23u, 0x08u); // enable external FF10 writes
-                fx2Runtime.cpuForTesting().registersForTesting().pc = 0x5447u;
+                fx2Runtime.cpuForTesting().registersForTesting().pc = 0x543du;
                 const auto selectorStore =
-                    fx2Runtime.runUntilProgramCounter(0x544du, 8u);
+                    fx2Runtime.runUntilProgramCounter(0x544du, 16u);
                 assert(selectorStore > 0u);
                 assert(fx2Runtime.readExternal(0x7c06u) == 14u);
                 assert((fx2Runtime.readInternal(0x23u) & 0x08u) != 0u);
