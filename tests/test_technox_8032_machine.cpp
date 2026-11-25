@@ -710,8 +710,25 @@ int main(int argc, char** argv) {
                 assert(executed > 0u);
                 assert(fxDispatchProbe.cpu().registers().pc == 0x563eu);
                 assert(!fxDispatchProbe.cpuFaulted());
-                assert(fxDispatchProbe.testExternalRamByteForTesting(
-                    dispatch.destination) == expected);
+                const auto actual =
+                    fxDispatchProbe.testExternalRamByteForTesting(dispatch.destination);
+                if (actual != expected) {
+                    std::fprintf(stderr,
+                        "FX dispatch mismatch: sub=%02X input=%02X dest=%04X actual=%02X expected=%02X PC=%04X 3702=%02X 3708=%02X 6A=%02X 2B94=%02X 308B=%02X 308D=%02X\\n",
+                        static_cast<unsigned>(dispatch.subcommand),
+                        static_cast<unsigned>(input),
+                        static_cast<unsigned>(dispatch.destination),
+                        static_cast<unsigned>(actual),
+                        static_cast<unsigned>(expected),
+                        static_cast<unsigned>(fxDispatchProbe.cpu().registers().pc),
+                        static_cast<unsigned>(fxDispatchProbe.readExternal(0x3702u)),
+                        static_cast<unsigned>(fxDispatchProbe.readExternal(0x3708u)),
+                        static_cast<unsigned>(fxDispatchProbe.readInternal(0x6au)),
+                        static_cast<unsigned>(fxDispatchProbe.readExternal(0x2b94u)),
+                        static_cast<unsigned>(fxDispatchProbe.readExternal(0x308bu)),
+                        static_cast<unsigned>(fxDispatchProbe.readExternal(0x308du)));
+                }
+                assert(actual == expected);
             }
         }
 
