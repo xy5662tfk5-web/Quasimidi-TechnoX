@@ -828,6 +828,18 @@ void testCommandRegisterFieldDecoders() {
     assert(pitch.r4 == 0x43 && pitch.r7 == 0x54 &&
            pitch.r6 == 0x65 && pitch.r5 == 0x76);
 
+    // Live IC51 group-08 pitch record captured by the 1C61 trace:
+    // opcode, R2, R3, R4, R7, R6, R5. These remain raw firmware fields;
+    // no musical unit is assigned here.
+    command.opcode = 0x08u;
+    command.kind = MASSResourceCommandKind::pitchParameter;
+    command.length = 7u;
+    command.bytes = {{0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u}};
+    assert(MASSResourceCommandFieldDecoder::decodePitchParameter(command, pitch));
+    assert(pitch.opcode == 0x08u && pitch.r2 == 0x20u &&
+           pitch.r3 == 0x18u && pitch.r4 == 0xa0u);
+    assert(pitch.r7 == 0xf6u && pitch.r6 == 0x00u && pitch.r5 == 0x00u);
+
     command.opcode = 0x12;
     command.kind = MASSResourceCommandKind::multiParameter;
     command.bytes = {{0x12, 0x23, 0x34, 0x45, 0x56, 0x67, 0x78}};
