@@ -77,9 +77,89 @@ Only two reachable whole-port P3 writes were found in this pass: `0x34DF: MOV P3
 
 ### Four-byte host window: 0x8000–0x8003
 
-The firmware writes sequentially to offsets 0, 1, 2 and 3; the emulator records each byte and the bus context independently. `0x0DB7` is a four-byte writer. The `0x0DCE`/related control path can write `0x40` or `0xC0` to offset 3 and then read offset 2. Those values are observed phase/control writes, not yet decoded as ACK, BUSY, reset, or a command opcode.
+Static disassembly of the validated, descrambled IC4 v1.05 image now resolves the writer and the phase-control helper more precisely.
 
-The present emulator's read response defaults to `0xFF`; any alternate response used to force firmware progress is a test fixture. A captured four-byte transaction is not yet a processor command specification.
+#### Writer 0x0DB7
+
+```asm
+0x0DB7  78 00       MOV  R0,#0x00
+0x0DB9  ED          MOV  A,R5
+0x0DBA  F2          MOVX @R0,A       ; offset 0 = R5 selector/latch
+0x0DBB  EA          MOV  A,R2
+0x0DBC  08          INC  R0
+0x0DBD  F2          MOVX @R0,A       ; offset 1 = R2
+0x0DBE  EB          MOV  A,R3
+0x0DBF  08          INC  R0
+0x0DC0  F2          MOVX @R0,A       ; offset 2 = R3
+0x0DC1  EC          MOV  A,R4
+0x0DC2  C2 E6       CLR  ACC.6
+0x0DC4  08          INC  R0
+0x0DC5  F2          MOVX @R0,A       ; offset 3 = R4 with bit 6 cleared
+0x0DC6  C2 0C       CLR  bit 0x0C
+0x0DC8  30 E7 02    JNB  ACC.7,0x0DCD
+0x0DCB  D2 0C       SETB bit 0x0C
+0x0DCD  22          RET
+```
+
+So offset 0 is a selector/latch byte sourced from R5; it is not safe to give it a physical device-index meaning yet. Offsets 1–3 carry the three-byte value from R2/R3/R4, with ACC.6 cleared in the final byte. After the write, IC4 synchronizes its internal phase bit `0x0C` to the original R4.7 value.
+
+#### Phase helper 0x0DCE
+
+```asm
+0x0DCE  EC          MOV  A,R4
+0x0DCF  20 E7 09    JB   ACC.7,0x0DDB
+0x0DD2  30 0C 12    JNB  bit 0x0C,0x0DE7
+0x0DD5  C2 0C       CLR  bit 0x0C
+0x0DD7  74 40       MOV  A,#0x40
+0x0DD9  80 07       SJMP 0x0DE2
+0x0DDB  20 0C 09    JB   bit 0x0C,0x0DE7
+0x0DDE  D2 0C       SETB bit 0x0C
+0x0DE0  74 C0       MOV  A,#0xC0
+0x0DE2  78 03       MOV  R0,#0x03
+0x0DE4  F2          MOVX @R0,A       ; write phase code to offset 3
+0x0DE5  18          DEC  R0
+0x0DE6  E2          MOVX A,@R0      ; read offset 2; returned A is discarded
+0x0DE7  78 00       MOV  R0,#0x00
+0x0DE9  ED          MOV  A,R5
+0x0DEA  F2          MOVX @R0,A      ; rewrite selector/latch
+0x0DEB  00          NOP
+0x0DEC  00          NOP
+0x0DED  08          INC  R0
+0x0DEE  E2          MOVX A,@R0
+0x0DEF  FA          MOV  R2,A      ; readback offset 1
+0x0DF0  08          INC  R0
+0x0DF1  E2          MOVX A,@R0
+0x0DF2  FB          MOV  R3,A      ; readback offset 2
+0x0DF3  08          INC  R0
+0x0DF4  E2          MOVX A,@R0
+0x0DF5  FC          MOV  R4,A      ; readback offset 3
+0x0DF6  22          RET
+```
+
+The branch logic toggles bit `0x0C` only when current ACC.7 (from R4) differs from that internal phase bit. Transition 1→0 emits `0x40`; transition 0→1 emits `0xC0`. Thus `0x40/0xC0` are firmware-generated phase codes on offset 3, not proven ACK/BUSY opcodes. The immediate offset-2 read occurs only on a phase transition and its returned byte is overwritten before use. This is consistent with a read side-effect/acknowledge strobe, but does not prove one; no conventional busy-wait loop is established here.
+
+After this optional phase action, IC4 rewrites offset 0 with R5 and reads offsets 1, 2 and 3 back into R2, R3 and R4. Those three returned bytes feed subsequent firmware arithmetic. The model must therefore distinguish outgoing payload bytes from incoming readback bytes; the existing separate `soundHostData_` and `soundHostResponseData_` stores preserve this distinction, but their default readback value `0xFF` is still only open-bus behavior.
+
+#### Companion helper 0x0E21
+
+```asm
+0x0E21  30 0C 04    JNB  bit 0x0C,0x0E28
+0x0E24  74 C0       MOV  A,#0xC0
+0x0E26  80 02       SJMP 0x0E2A
+0x0E28  74 40       MOV  A,#0x40
+0x0E2A  78 03       MOV  R0,#0x03
+0x0E2C  F2          MOVX @R0,A       ; phase code to offset 3
+0x0E2D  EA          MOV  A,R2
+0x0E2E  78 00       MOV  R0,#0x00
+0x0E30  F2          MOVX @R0,A       ; selector/latch to offset 0
+0x0E31  22          RET
+```
+
+This helper emits the same phase code selected from bit `0x0C`, then writes R2 to offset 0. It is not the four-byte writer and must remain a separate operation in the host model.
+
+#### Evidence limits
+
+The four-byte window is now understood structurally as selector + three-byte write payload, three-byte readback, and a phase output on offset 3. This still does not identify the physical chip, establish the meaning of selector values or payload fields, or prove whether the phase-triggered offset-2 read causes an external side effect. The present emulator's read response defaults to `0xFF`; any alternate response used to force firmware progress is a test fixture. No original DSP register semantics should be implemented from this alone.
 
 ### FF10 aperture
 
@@ -97,8 +177,8 @@ Those facts are not yet reconciled into a SAM9407 pin-level interface. External 
 
 ## 6. Next experiments — ordered, no duplicate MIDI work
 
-1. **P3 write timeline:** extend the existing port-write trace with instruction PC, previous latch and new latch. Capture both direct P3 writes and bit-address writes. Run cold boot through the complete IC51 transfer, the `0xB34D` memory test and the first 544 initialization SoundHost transactions. Report every P3.2 transition and the P3 value at each host packet.
-2. **Mode/port correlation:** emit one chronological merged timeline for SFR `0x8E` writes, P3 transitions, P2 changes, `0xFF10` reads/writes, IC51 reads and `0x8000–0x8003` transactions. Retain instruction PC, caller PC, cycle and reset-candidate bit state.
+1. **P3 write timeline:** the machine now records port-write source PC, previous/new latch, changed mask, P2 and SFR `0x8E`; a separate P3.2 control-write log captures writes even when the bit level does not change. The cold-boot integration test asserts the `0xAF1A` low write and `0xAF73` high write. Next, use its output to compare the `0xB34D` memory test and all P3.2 states at host transactions.
+2. **Mode/port correlation:** emit one chronological merged timeline for SFR `0x8E` writes, P3 control writes, P2 changes, `0xFF10` reads/writes, IC51 reads and `0x8000–0x8003` transactions. Retain instruction PC, caller PC, cycle and P3.2 state.
 3. **Control response differential:** vary only the external read response for the actual `0x8002` and `0xFF10` reads in isolated fixtures. Record which firmware branches change and which are purely timing/polling. Clearly label all such values synthetic.
 4. **Device identity:** compare the inferred signals with a legible TechnoX PCB photo, chip top markings and any schematic/service documentation. A Quasar/Raven family resemblance or a SAM9407 datasheet match is insufficient by itself.
 5. **Only after protocol evidence:** implement a named host-port device model. Until then preserve neutral register indices, raw byte order, exact cycle timing, and configurable external responses; do not build sample playback or DSP register meanings on guesses.
