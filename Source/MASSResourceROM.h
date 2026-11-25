@@ -226,6 +226,39 @@ public:
     }
 };
 
+// Reconstructs the 0x1E4B..0x1E66 pitch-slot guard/writeback.
+// XDATA[0x2019] is exchanged with R4; the incoming R4 is saved in B.
+// XDATA[0x2018] is ORed with the exchanged byte only for the zero test.
+// On the nonzero path, B's low three bits are merged into the existing
+// high slot byte; R3 and R2 become the middle and low bytes respectively.
+// This is slot-staging logic only, not a claim about the pair's DSP units.
+struct MASSPitchSlotGuardResult {
+    bool writeSlot = false;
+    std::uint8_t mergedHigh = 0;
+    std::uint8_t middle = 0;
+    std::uint8_t low = 0;
+};
+
+class MASSPitchSlotGuardProjection {
+public:
+    static MASSPitchSlotGuardResult apply(
+        std::uint8_t xdata2018,
+        std::uint8_t xdata2019,
+        std::uint8_t incomingR4,
+        std::uint8_t existingHigh,
+        std::uint8_t incomingR3,
+        std::uint8_t incomingR2) noexcept {
+        const bool writeSlot = (xdata2018 | xdata2019) != 0;
+        return {
+            writeSlot,
+            static_cast<std::uint8_t>(
+                (existingHigh & 0xf8u) | (incomingR4 & 0x07u)),
+            incomingR3,
+            incomingR2
+        };
+    }
+};
+
 struct MASS1C61PackedLookupFields {
     std::uint8_t r3 = 0;
     std::uint8_t r4 = 0;
@@ -929,6 +962,52 @@ public:
         return {
             static_cast<std::uint8_t>(rotatedRight & 0xf8u),
             rotatedRight
+        };
+    }
+};
+
+// The 0x2092 decision in the 0x1EDD descriptor tail tests bit 2 of the
+// current record byte. Clear selects the 0x210F short packet route; set
+// continues through the ordinary record-derived packet sequence.
+enum class MASS1EDDRecordRoute : std::uint8_t {
+    ordinaryRecordPackets,
+    shortPage80Packet
+};
+
+struct MASS1EDDShortPacket {
+    std::uint8_t r5 = 0;
+    std::uint8_t r2 = 0;
+    std::uint8_t r3 = 0;
+    std::uint8_t r4 = 0;
+    bool setsInternalBit0C = false;
+};
+
+class MASS1EDDRecordRouteDecoder {
+public:
+    static constexpr std::uint8_t kShortRouteBit = 0x04u;
+
+    static MASS1EDDRecordRoute resolve(std::uint8_t recordByte) noexcept {
+        return (recordByte & kShortRouteBit) == 0
+            ? MASS1EDDRecordRoute::shortPage80Packet
+            : MASS1EDDRecordRoute::ordinaryRecordPackets;
+    }
+
+    // 0x210F prepares R2=0, uses RAM[0x2B] as R5, preserves R3,
+    // keeps only R4[2:0], and conditionally restores ACC.7 from bit 0x0D.
+    // 0x0DB7 mirrors that outgoing ACC.7 state into internal bit 0x0C.
+    static MASS1EDDShortPacket buildShortPacket(
+        std::uint8_t ram2B,
+        std::uint8_t r3,
+        std::uint8_t r4,
+        bool internalBit0D) noexcept {
+        const auto outgoingR4 = static_cast<std::uint8_t>(
+            (r4 & 0x07u) | (internalBit0D ? 0x80u : 0x00u));
+        return {
+            ram2B,
+            0x00u,
+            r3,
+            outgoingR4,
+            internalBit0D
         };
     }
 };
