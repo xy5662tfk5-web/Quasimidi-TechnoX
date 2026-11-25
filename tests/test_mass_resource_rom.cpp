@@ -820,7 +820,8 @@ void testActualFirmwareROMTables(const char* path) {
         assert(view.lookupNonlinearScale(static_cast<std::uint8_t>(index), value));
 }
 
-void testOriginalVoiceProgramRuntime(const char* romPath) {
+void testOriginalVoiceProgramRuntime(
+    const char* romPath, const char* firmwarePath = nullptr) {
     std::ifstream input(romPath, std::ios::binary);
     assert(input.good());
     std::vector<std::uint8_t> bytes(
@@ -831,18 +832,31 @@ void testOriginalVoiceProgramRuntime(const char* romPath) {
     MASSResourceProgramCatalog catalog;
     assert(catalog.loadBothFirmwareFlagVariants(rom));
 
-    // Use an identity logical-page map only to exercise the resource binding
-    // and bounded memory hand-off. This is not the device's verified board map.
-    std::vector<std::uint8_t> firmwareCode(
-        static_cast<std::size_t>(MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress) +
-        MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize, 0);
-    for (std::size_t i = 0; i < MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize; ++i)
-        firmwareCode[MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress + i] =
-            static_cast<std::uint8_t>(i);
+    std::vector<std::uint8_t> firmwareCode;
+    if (firmwarePath != nullptr) {
+        // The second CI invocation supplies the real descrambled IC4 image;
+        // use its firmware address permutation for the C000-FFFF resource.
+        std::ifstream firmwareInput(firmwarePath, std::ios::binary);
+        assert(firmwareInput.good());
+        firmwareCode.assign(
+            std::istreambuf_iterator<char>(firmwareInput),
+            std::istreambuf_iterator<char>());
+    } else {
+        // First invocation has only IC51 available. Use an identity map strictly
+        // to exercise the resource-binding API; no board map is inferred here.
+        firmwareCode.resize(
+            static_cast<std::size_t>(MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress) +
+            MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize, 0);
+        for (std::size_t i = 0; i < MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize; ++i)
+            firmwareCode[MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress + i] =
+                static_cast<std::uint8_t>(i);
+    }
     MASSIC51ExternalSoundMemoryImage externalImage;
     assert(externalImage.load(
         rom, firmwareCode.data(), firmwareCode.size()));
     assert(externalImage.isLoaded());
+    assert(externalImage.loadedByteCount() == 13647u);
+
 
     MASSOriginalVoiceProgramRuntime runtime;
     runtime.setProgramCatalog(&catalog);
@@ -1746,7 +1760,7 @@ int main(int argc, char** argv) {
         testActualIC51(argv[1]);
         testActualBulkBlockLoader(argv[1]);
         testBankProgramResolver(argv[1]);
-        testOriginalVoiceProgramRuntime(argv[1]);
+        testOriginalVoiceProgramRuntime(argv[1], argc > 2 ? argv[2] : nullptr);
     }
     return 0;
 }
