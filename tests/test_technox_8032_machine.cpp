@@ -530,6 +530,24 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(fx1Deferred.cpu().registers().pc == 0x7d7au);
             assert(!fx1Deferred.cpuFaulted());
+            if (fx1Deferred.ff10WriteCount() != 325u) {
+                std::fprintf(stderr,
+                    "FX1 deferred mismatch: FF10=%zu IC51=%llu PC=%04X selector=%02X staging=%02X P3=%02X mode=%02X fault=%u\n",
+                    fx1Deferred.ff10WriteCount(),
+                    static_cast<unsigned long long>(fx1Deferred.ic51ReadCount()),
+                    static_cast<unsigned>(fx1Deferred.cpu().registers().pc),
+                    static_cast<unsigned>(fx1Deferred.testExternalRamByteForTesting(0x7bfeu)),
+                    static_cast<unsigned>(fx1Deferred.readExternal(0x3097u)),
+                    static_cast<unsigned>(fx1Deferred.readInternal(0xb0u)),
+                    static_cast<unsigned>(fx1Deferred.readInternal(0x8eu)),
+                    static_cast<unsigned>(fx1Deferred.cpuFaulted()));
+                for (std::size_t i = 0; i < fx1Deferred.ic51ReadTraceCount() && i < 12u; ++i) {
+                    const auto& e = fx1Deferred.ic51ReadTraceAt(i);
+                    std::fprintf(stderr, "  deferred IC51[%zu] bank=%u addr=%04X value=%02X PC=%04X\n",
+                        i, static_cast<unsigned>(e.bank), static_cast<unsigned>(e.address),
+                        static_cast<unsigned>(e.value), static_cast<unsigned>(e.instructionPC));
+                }
+            }
             assert(fx1Deferred.ff10WriteCount() == 325u);
             assert(fx1Deferred.ff10WriteAt(0).value == 0x19u);
             assert(fx1Deferred.ff10WriteAt(78).value == 0xfcu);
