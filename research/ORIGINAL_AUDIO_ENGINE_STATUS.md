@@ -335,3 +335,23 @@ A fresh reachability-guided static pass over the validated, descrambled IC4 v1.0
 Detailed evidence, opcode excerpts, caveats and next experiments: [`docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md`](../docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md). The master work queue has been updated in [`research/SOUND_CORE_MASTER_CHECKLIST.md`](SOUND_CORE_MASTER_CHECKLIST.md).
 
 **Next technical action:** add instruction-PC and previous/new latch context to P3 write events, then produce one merged cold-boot timeline across P3 transitions, SFR `0x8E`, P2, IC51 reads, `0xFF10` and `0x8000–0x8003`. Do not implement DSP register semantics until that timeline and a board-level signal map agree.
+
+
+## SoundHost 0x8000–0x8003 phase/readback protocol refinement — 26 November 2026
+
+A fresh straight-line disassembly of the IC4 v1.05 helper region resolves more of the external command-port framing without assigning DSP register meanings. Full instruction excerpts and limitations are in [`docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md`](../docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md), section 4.
+
+- `0x0DB7` is now identified as a selector-plus-three-byte writer: offset `0x8000` receives R5; offsets `0x8001/2/3` receive R2/R3/R4, with ACC.6 cleared in the final R4 byte. It then synchronizes internal phase bit `0x0C` to the original R4.7 value.
+- `0x0DCE` compares R4.7 with internal bit `0x0C`. On a phase transition it toggles the bit, writes `0x40` for 1→0 or `0xC0` for 0→1 to offset `0x8003`, then reads offset `0x8002`. The value returned by that immediate read is overwritten before it is used; the code then rewrites the R5 selector at offset 0 and reads offsets 1, 2 and 3 back into R2/R3/R4.
+- Consequently `0x40/0xC0` are proven phase codes produced by IC4, not decoded ACK/BUSY opcodes. The phase-triggered offset-2 read may have an external side effect, but this is not established. No conventional busy-wait status loop has been demonstrated in this helper.
+- `0x0E21` is a separate companion operation: it writes the phase code selected by bit `0x0C` to offset 3, then writes R2 to offset 0. It must not be merged with the four-byte writer or the `0x0DCE` readback sequence.
+- The C++ machine keeps outgoing payload storage and incoming response storage separate. Response defaults to open-bus `0xFF`; any substituted response remains a test fixture, not a physical-device model.
+
+### P3 trace instrumentation and verification
+
+- `PortWriteEvent` now includes previous/new latch values, changed mask, instruction PC, P2 and SFR `0x8E`; retained history is expanded to 4096 writes.
+- `P3Bit2ControlWriteEvent` records P3.2-targeted writes, including unchanged-level writes, with instruction/caller PC, previous/new P3, P2, SFR `0x8E`, changed state and machine cycle.
+- The real-ROM cold-boot test asserts the `0xAF1A` P3.2-low operation and `0xAF73` P3.2-high operation and prints the full context. Existing generic port-trace log output now prints source PC and before/after values.
+- GitHub Actions run [1613](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45682441974) has passed all 29 unit-test steps, including the TechnoX 8032 machine test. The macOS Intel plug-in-format build was still running at the last status check; no build success is claimed until its final result is available.
+
+**Next:** merge the P3/SFR8E/P2/IC51/FF10/SoundHost event streams into one cycle-ordered trace; then compare real firmware-controlled external read values against hardware evidence. Physical DSP identity, actual read responses, external-memory meaning and all DSP/audio algorithms remain unresolved.
