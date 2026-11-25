@@ -570,7 +570,7 @@ int main(int argc, char** argv) {
             for (std::size_t packet = 0; packet < 8u; ++packet) {
                 for (std::size_t byte = 0; byte < 6u; ++byte) {
                     const auto& event = fx1Deferred.ff10WriteAt(
-                        roomUploadPlan.totalPortBytes() + packet * 6u + byte);
+                        roomIC51UploadBytes + packet * 6u + byte);
                     assert(event.stackReturnPC == roomServiceReturns[packet]);
                     const auto expectedPC = packet == 6u
                         ? std::array<std::uint16_t, 6>{{
