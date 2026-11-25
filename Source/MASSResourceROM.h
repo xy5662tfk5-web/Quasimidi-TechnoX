@@ -1012,6 +1012,50 @@ public:
     }
 };
 
+struct MASS1EDDCommandPacket {
+    std::array<std::uint8_t, 4> bytes{};
+};
+
+struct MASS1EDDRecordPacketSequence {
+    std::array<MASS1EDDCommandPacket, 3> packets{};
+    std::size_t count = 0;
+};
+
+// Exact ordinary route packet assembly from 0x20CC..0x210B.
+// The optional record-derived packet is controlled by internal bit 0x0A;
+// the following two packets are always emitted on this route.
+class MASS1EDDRecordPacketSequenceBuilder {
+public:
+    static MASS1EDDRecordPacketSequence build(
+        bool internalBit0A,
+        std::uint8_t ram2B,
+        const std::array<std::uint8_t, 3>& recordTail,
+        bool internalBit0C,
+        std::uint8_t r5,
+        std::uint8_t r6,
+        std::uint8_t r7,
+        std::uint8_t r2,
+        std::uint8_t r3,
+        std::uint8_t r4) noexcept {
+        MASS1EDDRecordPacketSequence result{};
+        if (internalBit0A) {
+            result.packets[result.count++].bytes = {{
+                static_cast<std::uint8_t>(ram2B - 2u),
+                recordTail[0],
+                recordTail[1],
+                static_cast<std::uint8_t>(
+                    (recordTail[2] & 0x07u) |
+                    (internalBit0C ? 0x80u : 0x00u))
+            }};
+        }
+        result.packets[result.count++].bytes = {{ram2B, r5, r6, r7}};
+        result.packets[result.count++].bytes = {{
+            static_cast<std::uint8_t>(ram2B - 1u), r2, r3, r4
+        }};
+        return result;
+    }
+};
+
 struct MASS1EDDParameterPipelineResult {
     std::uint8_t r4 = 0xff;
     std::uint8_t coefficientB = 0;
