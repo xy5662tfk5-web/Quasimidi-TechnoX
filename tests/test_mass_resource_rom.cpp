@@ -130,6 +130,25 @@ void testMASS1EDDRecordRouteDecoder() {
     assert(packet.setsInternalBit0C);
 }
 
+void testMASS0DCEExchangeDecoder() {
+    const std::array<std::uint8_t, 5> response{{0x11u, 0x22u, 0x33u, 0x84u, 0x55u}};
+    auto result = MASS0DCEExchangeDecoder::decode(false, 0x80u, response);
+    assert(result.controlWriteRequired && result.controlByte == 0xc0u);
+    assert(result.statusOffset4 == 0x55u);
+    assert(result.r5 == 0x11u && result.r2 == 0x22u);
+    assert(result.r3 == 0x33u && result.r4 == 0x84u);
+
+    result = MASS0DCEExchangeDecoder::decode(true, 0x00u, response);
+    assert(result.controlWriteRequired && result.controlByte == 0x40u);
+    assert(result.statusOffset4 == 0x55u);
+    assert(result.r5 == 0x11u && result.r2 == 0x22u);
+    assert(result.r3 == 0x33u && result.r4 == 0x84u);
+
+    result = MASS0DCEExchangeDecoder::decode(true, 0x80u, response);
+    assert(!result.controlWriteRequired);
+    assert(result.controlByte == 0xc0u);
+}
+
 void testMASS0DB7PacketBuilder() {
     auto packet = MASS0DB7PacketBuilder::build(
         0x0au, 0x00u, 0x78u, 0xc6u);
@@ -1486,6 +1505,7 @@ int main(int argc, char** argv) {
     testPointerTableAndPartMapping();
     testMASSPitchSlotGuardProjection();
     testMASS1EDDRecordRouteDecoder();
+    testMASS0DCEExchangeDecoder();
     testMASS0DB7PacketBuilder();
     testMASS1EDDRecordPacketSequenceBuilder();
     testMASS09B9SlotInterpolationArithmetic();
