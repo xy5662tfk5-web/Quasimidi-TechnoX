@@ -74,3 +74,25 @@ The evidence above is exercised by `tests/test_technox_8032_machine.cpp` and the
 - `technox-ic51-raw-research` — raw IC51 dump used by the test.
 
 The machine test uses a synthetic SoundHost ready response for the post-loader startup path; that fixture must not be confused with a hardware-confirmed response.
+
+
+## 7. SFR 0x8E qualification — direct-byte and bit-address forms are different
+
+The earlier phrase "SFR 0x8E selects sound-bus modes" describes the current machine-test latch, not a generic Intel 8032 register definition.
+
+The descrambled IC4 v1.05 image contains both direct-byte operations (`MOV 0x8E,#0x02`, `MOV 0x8E,#0x01`, `MOV R7,0x8E`, and `MOV 0x8E,R4`) and a bit-address operation `SETB bit 0x8E` at PC `0x3510`. In the standard MCS-51 bit map, bit address `0x8E` is `TCON.6/TR1` (Timer 1 run control); it is not bit 0 of the direct SFR byte at address `0x8E`.
+
+A strong derivative match is Atmel AT89C51RD2/ED2: direct byte SFR `AUXR` is at `0x8E`; bit 1 EXTRAM selects on-chip XRAM versus the external MOVX bus, and bit 0 AO suppresses free-running ALE while retaining ALE during MOVX/MOVC. On that family, firmware values `0x02` and `0x01` mean EXTRAM=1/AO=0 and EXTRAM=0/AO=1. This explains why IC4 brackets external MOVX writes with those values, but it does **not** identify the fitted MCU.
+
+The Dallas DS5001/DS5002 SFR map has no direct-byte SFR at `0x8E`; therefore an earlier DS5002FP reference is not proof of the IC4 CPU model. See the dedicated investigation in the repository's hardware notes and the Atmel/Dallas data sheets:
+- Atmel AT89C51RD2/ED2: https://media.digikey.com/pdf/Data%20Sheets/Atmel%20PDFs/AT89C51ED2%2CRD2_Rev06.pdf
+- Dallas DS5001/DS5002 guide: https://www.keil.com/dd/docs/datashts/dallas/secure_ug.pdf
+
+### Confirmed XDATA address distinction
+
+- `P2=0xFF, R0=0x10` constructs XDATA address `0xFF10`; it is used by the IC51 loader/status path and by the FX stream upload routines.
+- `P2=0x80, R0=0..3` constructs `0x8000..0x8003`; helper `0x0DB7` writes `[R5,R2,R3,R4]`, while `0x0DCE` writes `0x40/0xC0` handshake values to offset 3 and reads response bytes.
+
+These are distinct 16-bit XDATA addresses and different firmware call paths, not aliases. `0xFF10` is used for both reads and writes. The current generic 8032 test run has firmware bit `0x1B=0`, so its conditional direct-`0x8E` transitions are skipped; the synthetic `0xAC` response proves only the loader's expected code path, not physical ready behavior or an AUXR-enabled bus waveform.
+
+Do not hard-code an Atmel CPU identity. The next hardware-model test is to add a selectable AUXR-compatible bus profile, keep the generic 8032 behavior unchanged, and compare actual IC4 execution across both. Capture P2, R0/DPTR, P0, P3.6/P3.7, direct SFR `0x8E`, PC, and cycle at each MOVX so logical XDATA transactions are not mistaken for pin-level ALE/RD/WR proof.
