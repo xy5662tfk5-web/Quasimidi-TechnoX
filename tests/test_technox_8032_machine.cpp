@@ -4183,6 +4183,70 @@ int main(int argc, char** argv) {
         for (const bool seen : note72SawResourceProducer)
             assert(seen);
 
+        // Trace the indexed two-byte state producer. 0x02D1 writes
+        // XDATA[0x2000 + 2*RAM[0x28]] and the next byte. Capture the live
+        // callers, input selectors, coefficient lookups and actual stores.
+        std::array<bool, 2> note72SawIndexedPairMathEntry{};
+        std::array<std::array<bool, 2>, 2> note72SawIndexedPairStore{};
+        std::size_t note72IndexedPairMathEventCount = 0;
+        std::printf("NOTE72 INDEXED PAIR MATH (0x02D1) TRACE:\\n");
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            const bool from3F1B = event.returnPC == 0x3f1bu;
+            const bool from4C8E = event.returnPC == 0x4c8eu;
+            const std::size_t caller = from3F1B ? 0u : 1u;
+            if (event.instructionPC == 0x02d1u &&
+                (from3F1B || from4C8E)) {
+                assert(event.directRam28 == 0x0cu);
+                note72SawIndexedPairMathEntry[caller] = true;
+                ++note72IndexedPairMathEventCount;
+                if (from3F1B) {
+                    assert(event.directRam29 == 0x00u);
+                    assert(event.directRam2A == 0x40u);
+                }
+            }
+            if ((from3F1B || from4C8E) &&
+                (event.instructionPC == 0x034fu ||
+                 event.instructionPC == 0x0354u ||
+                 event.instructionPC == 0x0358u ||
+                 event.instructionPC == 0x035cu ||
+                 event.instructionPC == 0x0392u ||
+                 event.instructionPC == 0x039eu ||
+                 event.instructionPC == 0x03a2u)) {
+                ++note72IndexedPairMathEventCount;
+                std::printf("  PC=%04X ret=%04X DPTR=%04X A=%02X R4=%02X R5=%02X "
+                            "R6=%02X R7=%02X RAM28/29/2A=%02X/%02X/%02X cycle=%llu\\n",
+                            static_cast<unsigned>(event.instructionPC),
+                            static_cast<unsigned>(event.returnPC),
+                            static_cast<unsigned>(event.dptr),
+                            static_cast<unsigned>(event.accumulator),
+                            static_cast<unsigned>(event.registers[4]),
+                            static_cast<unsigned>(event.registers[5]),
+                            static_cast<unsigned>(event.registers[6]),
+                            static_cast<unsigned>(event.registers[7]),
+                            static_cast<unsigned>(event.directRam28),
+                            static_cast<unsigned>(event.directRam29),
+                            static_cast<unsigned>(event.directRam2A),
+                            static_cast<unsigned long long>(event.machineCycle));
+            }
+            if ((from3F1B || from4C8E) &&
+                (event.instructionPC == 0x039eu ||
+                 event.instructionPC == 0x03a2u)) {
+                const std::size_t store =
+                    event.instructionPC == 0x039eu ? 0u : 1u;
+                assert(event.dptr == (store == 0u ? 0x2018u : 0x2019u));
+                note72SawIndexedPairStore[caller][store] = true;
+            }
+        }
+        assert(note72SawIndexedPairMathEntry[0]);
+        assert(note72SawIndexedPairMathEntry[1]);
+        for (const auto& callerStores : note72SawIndexedPairStore) {
+            assert(callerStores[0]);
+            assert(callerStores[1]);
+        }
+        assert(note72IndexedPairMathEventCount >= 10u);
+
         std::printf("NOTE72 IC4 1E00-1E5F EXECUTION CONTEXT (B register source):\\n");
         std::size_t note72SubroutineInstructionCount = 0;
         for (std::size_t i = 0;
