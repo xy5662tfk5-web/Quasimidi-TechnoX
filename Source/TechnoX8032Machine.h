@@ -198,6 +198,28 @@ public:
         std::uint8_t port3Pins = 0xff;
         std::uint64_t machineCycle = 0;
     };
+    // Dedicated bounded trace for IC4's indexed two-byte state calculator
+    // (0x02D1). Kept separate from the broad instruction watch ring so the
+    // additional probes cannot evict established MIDI-dispatch observations.
+    struct IndexedPairMathWatchEvent {
+        std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
+        std::uint16_t dptr = 0;
+        std::uint8_t accumulator = 0;
+        std::uint8_t b = 0;
+        std::uint8_t psw = 0;
+        std::array<std::uint8_t, 8> registers{};
+        std::uint8_t ram28 = 0;
+        std::uint8_t ram29 = 0;
+        std::uint8_t ram2A = 0;
+        std::uint8_t ram6B = 0;
+        std::uint8_t ram6C = 0;
+        std::uint8_t ram6E = 0;
+        std::uint8_t ram6F = 0;
+        std::uint8_t ram70 = 0;
+        std::uint8_t ram71 = 0;
+        std::uint64_t machineCycle = 0;
+    };
     // Bounded execution trace from the two firmware helper-return sites to the
     // next Note On packet builder. Values are raw 8032 architectural state.
     struct ExecutionInstructionEvent {
@@ -614,6 +636,17 @@ public:
         std::size_t index) const noexcept {
         return instructionWatchTrace_[index % instructionWatchTrace_.size()];
     }
+    void clearIndexedPairMathWatchForTesting() noexcept {
+        indexedPairMathWatchTrace_.fill(IndexedPairMathWatchEvent{});
+        indexedPairMathWatchCount_ = 0;
+    }
+    std::size_t indexedPairMathWatchCountForTesting() const noexcept {
+        return indexedPairMathWatchCount_;
+    }
+    const IndexedPairMathWatchEvent& indexedPairMathWatchAtForTesting(
+        std::size_t index) const noexcept {
+        return indexedPairMathWatchTrace_[index % indexedPairMathWatchTrace_.size()];
+    }
     void clearSlotInterpolationDataAccessTraceForTesting() noexcept {
         slotInterpolationDataAccessTrace_.fill(SlotInterpolationDataAccessEvent{});
         slotInterpolationDataAccessTraceCount_ = 0;
@@ -707,6 +740,11 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
+        if (pc == 0x02d1u || pc == 0x02dfu || pc == 0x0339u ||
+            pc == 0x034fu || pc == 0x0354u || pc == 0x0358u ||
+            pc == 0x035cu || pc == 0x0392u || pc == 0x039eu ||
+            pc == 0x03a2u)
+            recordIndexedPairMathWatch(pc);
         if (executionTraceArmed_ && !executionTraceActive_ &&
             (pc == 0x1fc9u || pc == 0x2027u)) {
             executionTraceActive_ = true;
@@ -746,11 +784,7 @@ public:
             if (pc == 0x210fu)
                 executionTraceActive_ = false;
         }
-        if (pc == 0x02d1u || pc == 0x02dfu || pc == 0x0339u ||
-            pc == 0x034fu || pc == 0x0354u || pc == 0x0358u ||
-            pc == 0x035cu || pc == 0x0392u || pc == 0x039eu ||
-            pc == 0x03a2u ||
-            pc == 0x210fu || pc == 0x1848u ||
+        if (pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
             pc == 0x5671u || pc == 0x4256u ||
             pc == 0x1494u || pc == 0xac00u || pc == 0xac16u ||
@@ -1933,6 +1967,33 @@ public:
     }
 
 private:
+    void recordIndexedPairMathWatch(std::uint16_t pc) noexcept {
+        const auto& registers = cpu_.registers();
+        auto& event = indexedPairMathWatchTrace_[
+            indexedPairMathWatchCount_ % indexedPairMathWatchTrace_.size()];
+        event.instructionPC = pc;
+        event.returnPC = currentStackReturnPC();
+        event.dptr = registers.dptr;
+        event.accumulator = registers.a;
+        event.b = registers.b;
+        event.psw = registers.psw.pack();
+        const auto bankBase = registers.psw.registerBankBase();
+        for (std::size_t index = 0; index < event.registers.size(); ++index)
+            event.registers[index] = readInternal(
+                static_cast<std::uint8_t>(bankBase + index));
+        event.ram28 = readInternal(0x28u);
+        event.ram29 = readInternal(0x29u);
+        event.ram2A = readInternal(0x2au);
+        event.ram6B = readInternal(0x6bu);
+        event.ram6C = readInternal(0x6cu);
+        event.ram6E = readInternal(0x6eu);
+        event.ram6F = readInternal(0x6fu);
+        event.ram70 = readInternal(0x70u);
+        event.ram71 = readInternal(0x71u);
+        event.machineCycle = elapsedMachineCycles_;
+        ++indexedPairMathWatchCount_;
+    }
+
     void recordMidiEventGateAccess(std::uint16_t address, std::uint8_t value,
                                    bool write) noexcept {
         if (!((address >= 0x30e4u && address <= 0x30e7u) ||
@@ -2122,6 +2183,8 @@ private:
     std::size_t bulkTransferEntryCount_ = 0;
     std::array<InstructionWatchEvent, 1024> instructionWatchTrace_{};
     std::size_t instructionWatchCount_ = 0;
+    std::array<IndexedPairMathWatchEvent, 1024> indexedPairMathWatchTrace_{};
+    std::size_t indexedPairMathWatchCount_ = 0;
     std::array<SlotInterpolationDataAccessEvent, 256> slotInterpolationDataAccessTrace_{};
     std::size_t slotInterpolationDataAccessTraceCount_ = 0;
     std::array<SlotInterpolationDataAccessEvent, 2048> pitchSourceDataAccessTrace_{};
