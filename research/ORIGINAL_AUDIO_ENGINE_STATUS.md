@@ -319,3 +319,19 @@ Details: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`.
 - The FX1/FX2 handlers then apply the already documented `0x3702/0x3708` gates, clamp 0..20 and write `0x7BFE/0x7C06`, respectively, before calling scheduler `0x7C29`.
 - A machine regression now executes `0x51B6 -> ED30 -> FX handler` for both commands with boundary values 0, 1, 20, 21 and 127. This validates the original table dispatch and store under synthetic context inputs.
 - Still unproven: the real Performance/controller/MIDI producer of the three input bytes and the exact producer of IRAM `0x6A` in that event context. Details: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`.
+
+
+## External sound-device bus audit — 26 November 2026
+
+A fresh reachability-guided static pass over the validated, descrambled IC4 v1.05 image decoded 15,474 instruction locations from reset and interrupt vectors. This is static firmware evidence; indirect control flow and hardware response remain outside its proof boundary.
+
+- The only reachable writer found for IRAM bit `0x1B` is `0x3829: MOV 0x1B,C`. The preceding `0x381F–0x3829` sequence compares SFR `0x8E` with `0x01`; at that checkpoint bit `0x1B` is set iff `0x8E == 1`. Other reachable uses are tests.
+- `0xAF05` checks bit `0x1B`; when set, it changes SFR `0x8E` to `0x02` for `MOVX @R0,A`, then restores `0x01`. When clear, it skips both mode changes. This proves a conditional mode switch around an external write, not the physical name or identity of the receiver.
+- P3.2 (8051 bit address `0xB2`) is actively changed: cleared at `0x34EB`, `0xAF1A`, and `0xB34D`; set at `0xAF73`. In the `0xAF1A` bulk loader it brackets the IC51 upload and is set before the subsequent `0xFF10` marker poll. The `0xB34D` external-memory test also clears it and does not locally set it before returning. Existing SoundHost event contexts include P3 values with bit 2 low. Therefore P3.2 is a proven control transition but **not a proven active-low reset**.
+- P3.1, P3.4 and P3.5 are also repeatedly sequenced around external reads. The routine at `0xB385–0xB3BB` tests ACC.0–ACC.2 (bit addresses `0xE0–0xE2`) and conditionally toggles P3.5/P3.4/P3.1; it does not test P3.0–P3.2. These lines remain neutrally named until board-level evidence is available.
+- The three paths remain distinct: `0x8000–0x8003` four-byte host transactions; `0xFF10` mode-dependent resource/status traffic; and the `0xC000–0xFFFF` memory window populated by the 13,647-byte IC51 bulk transfer. The synthetic `0xAC` ready byte is still not a hardware response.
+- SAM9407 remains a candidate only. Its datasheet describes a 16-bit host interface and separate sample-memory bus; the current IC4 traces do not yet establish the pin-level translation or identify a SAM9407 on the TechnoX board.
+
+Detailed evidence, opcode excerpts, caveats and next experiments: [`docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md`](../docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md). The master work queue has been updated in [`research/SOUND_CORE_MASTER_CHECKLIST.md`](SOUND_CORE_MASTER_CHECKLIST.md).
+
+**Next technical action:** add instruction-PC and previous/new latch context to P3 write events, then produce one merged cold-boot timeline across P3 transitions, SFR `0x8E`, P2, IC51 reads, `0xFF10` and `0x8000–0x8003`. Do not implement DSP register semantics until that timeline and a board-level signal map agree.
