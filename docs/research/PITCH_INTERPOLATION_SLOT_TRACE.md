@@ -81,3 +81,19 @@ The repository now models this as `MASSPitchSlotGuardProjection` and tests both 
 
 A separate static/cycle trace identifies the generic writer chain: 0x02D1 performs table-driven arithmetic using code tables at 0x0098 and 0x00C8, routes the two-byte result through 0x0392, and reaches the final XDATA stores at 0x039E and 0x03A2 in the indexed 0x2000 region. In the Note 72 fixture these writes occur after the handler's reads of 0x2019/0x2018. The writer is therefore identified, but the upstream caller and the initial source operands that seed this calculation are not yet proven. Do not claim that the 0x02D1 table inputs or outputs are pitch units until that producer chain is captured.
 
+
+
+## Descriptor branch and 0x0DB7 external-window handoff
+
+The descriptor-tail route is now represented as two distinct packet-building cases:
+
+- At the 0x2092 decision, bit 2 of the current record byte selects the route. Clear takes the short 0x210F path; set continues through the ordinary record-derived sequence.
+- The ordinary path emits the two fixed packets `[RAM[0x2B], R5, R6, R7]` and `[RAM[0x2B]-1, R2, R3, R4]`. When internal bit 0x0A is set, it first emits the record-tail packet sourced from offsets `RAM[0x2E]-0x0F`, `-0x0E`, and `-0x0D`.
+- The short 0x210F path sets R2 to zero, uses RAM[0x2B] as R5, preserves R3, masks R4 to its low three bits, and conditionally places ACC.7 from internal bit 0x0D.
+
+The code now has separate route, short-packet, and ordinary-sequence models with regression coverage. These models preserve the firmware's raw packet fields and do not call them pitch, amplitude, sample address, or voice number.
+
+The shared 0x0DB7 writer stores `[R5, R2, R3, R4 & 0xBF]` to XDATA `0x8000..0x8003`. After the fourth write it clears internal bit 0x0C and sets it only when the transmitted fourth byte retains bit 7. The new `MASS0DB7PacketBuilder` models that byte mask and software flag. This bit is a firmware-side protocol phase/state mirror; the synthetic ready response in the test fixture is not a hardware acknowledgement.
+
+The resource command decoder is also regression-tested against the captured seven-byte IC51 group-08 record `08 20 18 A0 F6 00 00`, preserving the firmware register order `R2,R3,R4,R7,R6,R5`. This ties the resource record to raw handler inputs, and the pitch-slot guard ties the subsequent register writeback to the two XDATA state bytes. Physical units and the external receiver's interpretation are still unassigned.
+
