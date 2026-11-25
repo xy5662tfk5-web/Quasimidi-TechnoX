@@ -249,8 +249,10 @@ public:
         std::uint8_t incomingR3,
         std::uint8_t incomingR2) noexcept {
         const bool writeSlot = (xdata2018 | xdata2019) != 0;
+        if (!writeSlot)
+            return {};
         return {
-            writeSlot,
+            true,
             static_cast<std::uint8_t>(
                 (existingHigh & 0xf8u) | (incomingR4 & 0x07u)),
             incomingR3,
