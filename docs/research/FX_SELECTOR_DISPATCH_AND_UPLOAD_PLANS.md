@@ -21,6 +21,44 @@ The descrambled IC4 v1.05 bytes contain two separate selector-store blocks:
 
 Both blocks are conditional on the status byte at XDATA `0x3708` being nonzero, after a separate `0x3702` condition. The destinations are different: they must not be aliased.
 
+### 0x7C29 is a deferred-request scheduler, not the FX resource loader
+
+Both handlers call `0x7C29` after storing their selector. It merges the current request with any already-pending request and writes independent flags:
+
+- FX1: `R7 != 0` or an already nonzero `XDATA[0x308B]` sets `0x308B=1`; otherwise it writes zero.
+- FX2: `R5 != 0` or an already nonzero `XDATA[0x308D]` sets `0x308D=1`; otherwise it writes zero.
+- `R3` is copied to `XDATA[0x3097]` as the staging byte; `XDATA[0x309C]` is set to 1.
+- It then calls `0xB14B`, six `0xB0EF` six-byte writers, `0xB2ED`, and one final `0xB0EF`. The actual firmware emits exactly 54 service bytes to XDATA `0xFF10`. With the request values used by the two handlers, the byte sequence is:
+
+```
+01 00 45 37 8C C1
+01 01 8A 00 01 00
+01 01 87 00 00 00
+01 01 86 00 00 00
+01 01 8C 00 50 00
+01 01 8E 00 00 00
+01 01 8D 00 00 00
+01 00 08 1C 02 CF
+01 01 89 00 00 00
+```
+
+Every byte is a write to `0xFF10`; with firmware bit `0x1B` set, the wrapper switches direct SFR `0x8E` to mode `0x02` for the MOVX write and restores it to `0x01`. These 54 bytes are a fixed service/control sequence emitted by `0x7C29`; they are **not** either IC51 effect payload.
+
+After the sequence, `0x7C29` reads four separate status/input bytes: `0x7BFF -> 0x309A`, `0x7C00 -> 0x309D`, `0x7C07 -> 0x309B`, and `0x30BA -> 0x309E`. Their physical device/register meanings and acknowledgement semantics remain unknown.
+
+A new real-ROM machine regression executes `0x7C29` twice, once with only the FX1 request input asserted and once with only the FX2 request input asserted. It checks the independent pending flags, staging/counter values, all 54 bytes in exact order, address `0xFF10`, bus mode `0x02`, and P2 `0xFF`. It does not assign a DSP command meaning to any byte.
+
+### Deferred loader consumers
+
+The pending flags are consumed later by separate firmware blocks:
+
+- FX1 consumer `0x7D67` checks `0x308B`. When set it reads `0x3097` into R7 and calls `0x7FF2`; when clear it calls `0x7EE2`. It then clears `0x308B`, samples `0x7BFF` into `0x308A`, samples `0x7C00` into `0x308E`, and increments `0x309C`.
+- FX2 consumer `0x7D34` checks `0x308D`. When set it reads `0x3097` into R7 and calls `0x88D1`; it then clears `0x308D`, samples `0x7C07` into `0x308C`, samples `0x30BA` into `0x3090`, and increments `0x309C`.
+
+The staging byte read into R7 is passed into the loader context, but the FX type itself is read by the FX1/FX2 helper from the separate selector locations `0x7BFE` and `0x7C06`. Keep these fields distinct.
+
+An adjacent FX2 preparation block at `0x7D21` calls `0xB28D`, checks `0x308D`, and calls `0xB08B` when FX2 is pending; this routine emits a repeated FF10 sequence. Its exact hardware interpretation and relation to the later `0x7D34` loader remain open.
+
 A machine regression now starts at each complete handler entry (`0x5407` and `0x543D`), tests values `00, 01, 13, 14, 15, 7F`, and checks the clamped result in the corresponding external XDATA location. The same test then runs the FX1 loader helper to confirm that the value at `0x7BFE` is copied to the loader's working selector at `0x3098`.
 
 **Unresolved:** direct-call scans find no ordinary LCALL/ACALL to either handler entry. Their higher-level dispatcher/indirect-entry provenance is not yet pinned. The test enters the verified handler blocks directly; it does not claim that a real Performance edit or controller event has been traced all the way into them.
