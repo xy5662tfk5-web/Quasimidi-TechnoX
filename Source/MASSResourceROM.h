@@ -945,6 +945,208 @@ private:
     }
 };
 
+// IC4 0x02D1 converts a two-byte indexed input into a two-byte curve
+// value. The two 12-record tables at code addresses 0x0098/0x00C8 have
+// cumulative 16-bit bases and 16-bit segment slopes. Their slopes are close
+// to twelve-step equal-temperament ratios, but the physical destination and
+// units of the resulting XDATA pair are still unclassified.
+//
+// This is a literal register-width projection of the 8032 routine, including
+// its three-product fixed-point multiply (the firmware intentionally does not
+// perform a full 16x16 multiply). It models bytes only; it does not label the
+// output as a pitch word, sample address, or DSP register.
+struct MASSIndexedPairMathResult {
+    bool valid = false;
+    bool zeroGuardBypass = false;
+    bool negativeInput = false;
+    std::uint8_t scale = 0;
+    std::uint8_t tableIndex = 0;
+    std::uint16_t tableAddress = 0;
+    std::uint16_t recordAddress = 0;
+    std::uint16_t base = 0;
+    std::uint16_t slope = 0;
+    std::uint16_t fraction = 0;
+    std::uint16_t interpolated = 0;
+    std::uint16_t value = 0;
+};
+
+class MASSIndexedPairMathProjection {
+public:
+    static constexpr std::uint16_t kNegativeTableAddress = 0x0098u;
+    static constexpr std::uint16_t kPositiveTableAddress = 0x00c8u;
+    static constexpr std::size_t kTableRecordBytes = 4u;
+    static constexpr std::size_t kTableRecordCount = 12u;
+
+    static MASSIndexedPairMathResult apply(
+        const MASSFirmwareROMView& firmware,
+        std::uint8_t guardByte,
+        std::uint8_t ram29,
+        std::uint8_t ram2A) noexcept {
+        MASSIndexedPairMathResult result{};
+        result.valid = true;
+        if (guardByte == 0u) {
+            result.zeroGuardBypass = true;
+            return result;
+        }
+
+        // 0x02E2..0x02E5: SWAP A; ANL A,#0xF0. This retains
+        // the low nibble of the guard byte as the upper-nibble scale.
+        const std::uint8_t scale = static_cast<std::uint8_t>(
+            (guardByte << 4u) & 0xf0u);
+        result.scale = scale;
+
+        // 0x02E6..0x02F4: build the signed two-byte input. RL is
+        // circular; both subsequent RLC instructions share the carry.
+        const auto rotateLeft = [](std::uint8_t value) noexcept {
+            return static_cast<std::uint8_t>(
+                (value << 1u) | (value >> 7u));
+        };
+        const auto rotateLeftThroughCarry = [](
+            std::uint8_t value, bool& carry) noexcept {
+            const bool nextCarry = (value & 0x80u) != 0u;
+            const auto rotated = static_cast<std::uint8_t>(
+                (value << 1u) | (carry ? 1u : 0u));
+            carry = nextCarry;
+            return rotated;
+        };
+        const auto rotateRight = [](std::uint8_t value) noexcept {
+            return static_cast<std::uint8_t>(
+                (value >> 1u) | ((value & 0x01u) << 7u));
+        };
+
+        bool carry = false;
+        std::uint8_t r2 = rotateLeftThroughCarry(rotateLeft(ram29), carry);
+        const auto shiftedInput = rotateLeftThroughCarry(ram2A, carry);
+        const bool negative = shiftedInput < 0x80u;
+        std::uint8_t r3 = static_cast<std::uint8_t>(
+            shiftedInput - 0x80u);
+        result.negativeInput = negative;
+
+        if (negative) {
+            // 0x02F7..0x0308: the special zero/-0x8000 case and
+            // two-byte one's-complement-plus-carry absolute value.
+            if (r2 == 0u && r3 == 0x80u)
+                r2 = static_cast<std::uint8_t>(r2 + 1u);
+            auto inverted = static_cast<std::uint8_t>(~r2);
+            const auto lowSum = static_cast<unsigned>(inverted) + 1u;
+            r2 = static_cast<std::uint8_t>(lowSum & 0xffu);
+            carry = lowSum > 0xffu;
+            inverted = static_cast<std::uint8_t>(~r3);
+            const auto highSum = static_cast<unsigned>(inverted) +
+                                 (carry ? 1u : 0u);
+            r3 = static_cast<std::uint8_t>(highSum & 0xffu);
+        }
+
+        // 0x0309..0x0338: fractional scaling and the table-record index.
+        carry = false;
+        auto accumulator = rotateLeftThroughCarry(r2, carry);
+        r2 = static_cast<std::uint8_t>(accumulator | 0x0fu);
+        r3 = rotateLeftThroughCarry(r3, carry);
+
+        const auto firstProduct = static_cast<std::uint16_t>(
+            static_cast<unsigned>(r3) * scale);
+        r3 = static_cast<std::uint8_t>(firstProduct >> 8u);
+        const auto firstProductLow = static_cast<std::uint8_t>(
+            firstProduct & 0xffu);
+        const auto originalR2 = r2;
+        const auto secondProduct = static_cast<std::uint16_t>(
+            static_cast<unsigned>(scale) * originalR2);
+        const auto secondProductHigh = static_cast<std::uint8_t>(
+            secondProduct >> 8u);
+        const auto secondProductLow = static_cast<std::uint8_t>(
+            secondProduct & 0xffu);
+        (void) secondProductLow; // retained below as the firmware's R3 value
+
+        const auto lowScaleSum =
+            static_cast<unsigned>(firstProductLow) + secondProductHigh;
+        r2 = static_cast<std::uint8_t>(lowScaleSum & 0xffu);
+        r3 = static_cast<std::uint8_t>(
+            r3 + (lowScaleSum > 0xffu ? 1u : 0u));
+
+        accumulator = static_cast<std::uint8_t>(r3 & 0xf0u);
+        result.tableIndex = rotateRight(rotateRight(accumulator));
+        r3 = static_cast<std::uint8_t>((r3 << 4u) & 0xf0u);
+        const auto swappedR2Low = static_cast<std::uint8_t>(
+            ((r2 << 4u) & 0xffu) & 0x0fu);
+        r3 = static_cast<std::uint8_t>(r3 + swappedR2Low);
+        r2 = static_cast<std::uint8_t>(
+            (((r2 << 4u) & 0xffu) & 0xf0u) | 0x0fu);
+        result.fraction = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(r3) << 8u) | r2);
+
+        result.tableAddress = negative
+            ? kNegativeTableAddress : kPositiveTableAddress;
+        result.recordAddress = static_cast<std::uint16_t>(
+            result.tableAddress + result.tableIndex);
+        const auto indexWithinTable = static_cast<std::size_t>(
+            result.tableIndex);
+        if (indexWithinTable + 3u >=
+            kTableRecordBytes * kTableRecordCount) {
+            result.valid = false;
+            return result;
+        }
+        std::uint8_t baseHigh = 0;
+        std::uint8_t baseLow = 0;
+        std::uint8_t slopeHigh = 0;
+        std::uint8_t slopeLow = 0;
+        if (!firmware.readCodeByte(result.recordAddress, baseHigh) ||
+            !firmware.readCodeByte(
+                static_cast<std::uint16_t>(result.recordAddress + 1u), baseLow) ||
+            !firmware.readCodeByte(
+                static_cast<std::uint16_t>(result.recordAddress + 2u), slopeHigh) ||
+            !firmware.readCodeByte(
+                static_cast<std::uint16_t>(result.recordAddress + 3u), slopeLow)) {
+            result.valid = false;
+            return result;
+        }
+
+        result.base = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(baseHigh) << 8u) | baseLow);
+        result.slope = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(slopeHigh) << 8u) | slopeLow);
+
+        // 0x035E..0x037E. This is the firmware's exact three-product
+        // approximation of the upper 16 bits of slope*fraction:
+        //   slopeHi*fractionHi, slopeLo*fractionHi, slopeHi*fractionLo.
+        const auto product1 = static_cast<std::uint16_t>(
+            static_cast<unsigned>(slopeHigh) * r3);
+        const auto product2 = static_cast<std::uint16_t>(
+            static_cast<unsigned>(slopeLow) * r3);
+        const auto product3 = static_cast<std::uint16_t>(
+            static_cast<unsigned>(slopeHigh) * r2);
+        const auto productLowStage1 =
+            static_cast<unsigned>(product1 & 0xffu) +
+            static_cast<unsigned>(product2 >> 8u);
+        auto productLow = static_cast<std::uint8_t>(
+            productLowStage1 & 0xffu);
+        auto productHigh = static_cast<std::uint8_t>(
+            (product1 >> 8u) +
+            (productLowStage1 > 0xffu ? 1u : 0u));
+
+        const auto productCarryStage =
+            static_cast<unsigned>(product3 & 0xffu) +
+            static_cast<unsigned>(product2 & 0xffu);
+        const auto productLowStage2 =
+            static_cast<unsigned>(productLow) +
+            static_cast<unsigned>(product3 >> 8u) +
+            (productCarryStage > 0xffu ? 1u : 0u);
+        const auto carryOut = productLowStage2 > 0xffu;
+        productLow = static_cast<std::uint8_t>(
+            productLowStage2 & 0xffu);
+        productHigh = static_cast<std::uint8_t>(
+            productHigh + (carryOut ? 1u : 0u));
+        result.interpolated = static_cast<std::uint16_t>(
+            (static_cast<std::uint16_t>(productHigh) << 8u) | productLow);
+
+        auto value = static_cast<std::uint16_t>(
+            result.base + result.interpolated);
+        if (negative)
+            value = static_cast<std::uint16_t>(0u - value);
+        result.value = value;
+        return result;
+    }
+};
+
 // The selected IC4 branch at 0x2089..0x208E projects the second
 // 0x1848 result into the R3/R4 bytes consumed by the 0x210F command builder:
 // SWAP A; RR A; MOV R4,A; ANL A,#0xF8; MOV R3,A.
