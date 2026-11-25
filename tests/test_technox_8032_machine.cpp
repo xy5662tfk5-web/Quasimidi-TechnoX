@@ -781,9 +781,15 @@ int main(int argc, char** argv) {
             // one 54-byte service transaction, separate from the later
             // decoded IC51 resource stream.
             assert(fxEventProbe.ff10WriteCount() == 54u);
-            assert(fxEventProbe.readExternal(0x308bu) == 0x01u);
-            assert(fxEventProbe.readExternal(0x308du) == 0x01u);
-            assert(fxEventProbe.readExternal(0x3097u) == expected);
+            const bool fx1Pending = event.command == 0x50u;
+            assert(fxEventProbe.readExternal(0x308bu) ==
+                   static_cast<std::uint8_t>(fx1Pending ? 1u : 0u));
+            assert(fxEventProbe.readExternal(0x308du) ==
+                   static_cast<std::uint8_t>(fx1Pending ? 0u : 1u));
+            // Both selector handlers stage R3=1 for the scheduler. The
+            // selected effect index remains in the separate 0x7BFE/0x7C06
+            // register and is deliberately not copied into 0x3097.
+            assert(fxEventProbe.readExternal(0x3097u) == 0x01u);
         }
 
         for (const auto& vector : fxClampVectors) {
