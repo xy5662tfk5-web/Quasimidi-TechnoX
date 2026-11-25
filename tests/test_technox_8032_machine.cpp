@@ -24,6 +24,10 @@ public:
     void setFX2ResourceCatalog(const technox::MASSFX2ResourceCatalog* catalog) noexcept override {
         receivedFX2Catalog = catalog;
     }
+    void setFXUploadPlanCatalog(
+        const technox::MASSFXUploadPlanCatalog* catalog) noexcept override {
+        receivedFXUploadPlans = catalog;
+    }
     void prepare(double, int) override {}
     void noteOn(int, const technox::VoiceSlot&) noexcept override {}
     void noteOff(int, const technox::VoiceSlot&) noexcept override {}
@@ -50,10 +54,26 @@ public:
         fx1StreamBBlockCount = fx1Resolved ? fx1->streamBResource.blocks.size() : 0u;
         fx2StreamABlockCount = fx2Resolved ? fx2->streamAResource.blocks.size() : 0u;
         fx2StreamBBlockCount = fx2Resolved ? fx2->streamBResource.blocks.size() : 0u;
+
+        const auto* fx1Plan = receivedFXUploadPlans != nullptr && selectedFX1 >= 0
+            ? receivedFXUploadPlans->find(
+                technox::MASSFXProcessorFamily::fx1, 0, selectedFX1) : nullptr;
+        const auto* fx2Plan = receivedFXUploadPlans != nullptr && selectedFX2 >= 0
+            ? receivedFXUploadPlans->find(
+                technox::MASSFXProcessorFamily::fx2, 0, selectedFX2) : nullptr;
+        fx1UploadPlanResolved = fx1Plan != nullptr;
+        fx2UploadPlanResolved = fx2Plan != nullptr;
+        fx1UploadByteCount = fx1Plan != nullptr ? fx1Plan->totalPortBytes() : 0u;
+        fx2UploadByteCount = fx2Plan != nullptr ? fx2Plan->totalPortBytes() : 0u;
+        if (fx1Plan != nullptr && !fx1Plan->streamA.portBytes.empty())
+            fx1UploadFirstByte = fx1Plan->streamA.portBytes.front();
+        if (fx2Plan != nullptr && !fx2Plan->streamA.portBytes.empty())
+            fx2UploadFirstByte = fx2Plan->streamA.portBytes.front();
     }
 
     const technox::MASSFX1ResourceCatalog* receivedFX1Catalog = nullptr;
     const technox::MASSFX2ResourceCatalog* receivedFX2Catalog = nullptr;
+    const technox::MASSFXUploadPlanCatalog* receivedFXUploadPlans = nullptr;
     int selectedFX1 = -1;
     int selectedFX2 = -1;
     bool fx1Resolved = false;
@@ -62,6 +82,12 @@ public:
     std::size_t fx1StreamBBlockCount = 0;
     std::size_t fx2StreamABlockCount = 0;
     std::size_t fx2StreamBBlockCount = 0;
+    bool fx1UploadPlanResolved = false;
+    bool fx2UploadPlanResolved = false;
+    std::size_t fx1UploadByteCount = 0;
+    std::size_t fx2UploadByteCount = 0;
+    std::uint8_t fx1UploadFirstByte = 0;
+    std::uint8_t fx2UploadFirstByte = 0;
 };
 
 int main(int argc, char** argv) {
@@ -1564,6 +1590,35 @@ int main(int argc, char** argv) {
             assert(!technox::MASSFXUploadPlanBuilder::buildFX2(
                 fx2Catalog, 0, 21, invalidUploadPlan));
 
+            // Prebuild every FX1/FX2 upload plan for both IC51 banks exactly
+            // once, then exercise the same immutable lookup contract exposed
+            // to the production audio backend.
+            technox::MASSFXUploadPlanCatalog fxUploadPlans;
+            assert(fxUploadPlans.load(fx1Catalog, fx2Catalog));
+            assert(fxUploadPlans.isLoaded());
+            const auto* roomWirePlan = fxUploadPlans.find(
+                technox::MASSFXProcessorFamily::fx1, 0, 0);
+            assert(roomWirePlan != nullptr);
+            assert(roomWirePlan->totalPortBytes() == 325u);
+            assert(roomWirePlan->streamA.portBytes.front() == 0x19u);
+            assert(roomWirePlan->streamA.portBytes[1] == 0x00u);
+            assert(roomWirePlan->streamA.portBytes[2] == 0xcfu);
+            assert(roomWirePlan->streamA.portBytes[3] == 0x10u);
+            const auto* equalizr1WirePlan = fxUploadPlans.find(
+                technox::MASSFXProcessorFamily::fx2, 0, 14);
+            assert(equalizr1WirePlan != nullptr);
+            assert(equalizr1WirePlan->totalPortBytes() == 177u);
+            assert(equalizr1WirePlan->streamA.portBytes[0] == 0x3au);
+            assert(equalizr1WirePlan->streamA.portBytes[1] == 0x15u);
+            assert(equalizr1WirePlan->streamA.portBytes[2] == 0x00u);
+            assert(equalizr1WirePlan->streamA.portBytes[3] == 0xdcu);
+            assert(fxUploadPlans.find(
+                technox::MASSFXProcessorFamily::fx1, -1, 0) == nullptr);
+            assert(fxUploadPlans.find(
+                technox::MASSFXProcessorFamily::fx2, 2, 14) == nullptr);
+            assert(fxUploadPlans.find(
+                technox::MASSFXProcessorFamily::fx2, 0, 21) == nullptr);
+
             // Execute the original FX1 loader at 0x8004. The two firmware
             // routines must emit the same ordered bytes as the prebuilt plan.
             {
@@ -1747,13 +1802,17 @@ int main(int argc, char** argv) {
             technox::MASSAudioEngine fx1CatalogEngine(&originalFX1Backend);
             fx1CatalogEngine.setFX1ResourceCatalog(&fx1Catalog);
             fx1CatalogEngine.setFX2ResourceCatalog(&fx2Catalog);
+            fx1CatalogEngine.setFXUploadPlanCatalog(&fxUploadPlans);
             assert(fx1CatalogEngine.fx1ResourceCatalog() == &fx1Catalog);
             assert(fx1CatalogEngine.fx2ResourceCatalog() == &fx2Catalog);
+            assert(fx1CatalogEngine.fxUploadPlanCatalog() == &fxUploadPlans);
             assert(originalFX1Backend.receivedFX1Catalog == &fx1Catalog);
             assert(originalFX1Backend.receivedFX2Catalog == &fx2Catalog);
+            assert(originalFX1Backend.receivedFXUploadPlans == &fxUploadPlans);
             fx1CatalogEngine.setBackend(&replacementFX1Backend);
             assert(replacementFX1Backend.receivedFX1Catalog == &fx1Catalog);
             assert(replacementFX1Backend.receivedFX2Catalog == &fx2Catalog);
+            assert(replacementFX1Backend.receivedFXUploadPlans == &fxUploadPlans);
             assert(fx1CatalogEngine.setCommonControl(
                 technox::MASSCommonControl::fx1Type, 0));
             assert(fx1CatalogEngine.setCommonControl(
@@ -1772,6 +1831,12 @@ int main(int argc, char** argv) {
             // at 0x4D6C and terminates at 0x4D6D before uploading a block.
             assert(replacementFX1Backend.fx2StreamABlockCount == 1u);
             assert(replacementFX1Backend.fx2StreamBBlockCount == 0u);
+            assert(replacementFX1Backend.fx1UploadPlanResolved);
+            assert(replacementFX1Backend.fx2UploadPlanResolved);
+            assert(replacementFX1Backend.fx1UploadByteCount == 325u);
+            assert(replacementFX1Backend.fx2UploadByteCount == 177u);
+            assert(replacementFX1Backend.fx1UploadFirstByte == 0x19u);
+            assert(replacementFX1Backend.fx2UploadFirstByte == 0x3au);
 
             // The factory stores independent FX1 and FX2 selectors. Only the
             // FX1 selector maps to the 21-entry directory at IC4 0x8423.
