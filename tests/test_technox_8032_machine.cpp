@@ -695,10 +695,10 @@ int main(int argc, char** argv) {
                 assert(fxDispatchProbe.loadIC4Rom(realRom.data(), realRom.size()));
                 fxDispatchProbe.reset();
                 fxDispatchProbe.enableTestExternalRamWindow7000(0x00u);
-                // Handler preconditions observed at the two table targets:
-                // active Part/slot 0x0C and the zero-valued 0x3708 gate.
+                // Handler requires XDATA[0x3702] == R7/Part (0x0C)
+                // and a nonzero enable byte at XDATA[0x3708].
                 fxDispatchProbe.writeExternal(0x3702u, 0x0cu);
-                fxDispatchProbe.writeExternal(0x3708u, 0x00u);
+                fxDispatchProbe.writeExternal(0x3708u, 0x01u);
                 fxDispatchProbe.writeInternal(0xd0u, 0x00u); // register bank 0
                 fxDispatchProbe.writeInternal(0x07u, 0x0cu); // R7: Part/context
                 fxDispatchProbe.writeInternal(0x05u, dispatch.subcommand); // R5: FX1/FX2
@@ -757,7 +757,7 @@ int main(int argc, char** argv) {
             fxEventProbe.reset();
             fxEventProbe.enableTestExternalRamWindow7000(0x00u);
             fxEventProbe.writeExternal(0x3702u, 0x0cu); // Part/context C
-            fxEventProbe.writeExternal(0x3708u, 0x00u); // handler gate
+            fxEventProbe.writeExternal(0x3708u, 0x01u); // nonzero handler enable
             fxEventProbe.writeExternal(0x7d95u, 0x01u); // event dispatcher ready
             fxEventProbe.writeExternal(0x7bd5u, 0x01u); // enable Part C fan-out
             fxEventProbe.writeExternal(0x7bd9u, event.command);
