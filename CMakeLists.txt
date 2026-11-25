@@ -18,6 +18,7 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_binary_data(TechnoXAssets
     SOURCES
         assets/technox_front_panel.svg
+        TECHNOX.MID
 )
 
 juce_add_plugin(QuasimidiTechnoX
@@ -38,6 +39,7 @@ juce_add_plugin(QuasimidiTechnoX
 target_sources(QuasimidiTechnoX PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/TechnoXPartModel.h
 )
 
 target_compile_definitions(QuasimidiTechnoX PUBLIC

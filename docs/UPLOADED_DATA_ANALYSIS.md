@@ -11,17 +11,17 @@ This is a Standard MIDI File, format 0, one track, 384 ticks per quarter note, 1
 Parsed contents:
 - 300 complete SysEx frames.
 - Exactly 50 performance records, indexed by the first record byte from 0x05 through 0x36 (decimal 5–54).
-- Every record has six frames, with subrecord types in this order: 0x05 (8-character performance name), 0x00 (73-byte global/performance block), 0x01, 0x02, 0x03, 0x04 (four 32-byte part blocks).
+- Every record has six frames, with address-middle values in this order: 0x05 (8-character performance name), 0x00 (73-byte global/performance block), 0x01, 0x02, 0x03, 0x04 (four 32-byte part blocks). The first address byte identifies the Performance (0x05..0x36); the second address byte selects the block.
 - Frame lengths including the final F7 byte: 16 bytes × 50, 73 bytes × 50, 32 bytes × 200.
 - All SysEx payload bytes are 7-bit values; each frame ends with F7.
-- The common SysEx prefix is `F0 3F 00 22 44` (the SMF stores the event payload without the leading F0).
+- The common SysEx prefix is `F0 3F 00 22 44`. The next two bytes are the Performance address (0x05..0x36) and block selector (0x00..0x05); the low address offset is implicitly zero in these bulk-dump frames, so the 24-byte Part payload begins at byte 7.
 
 Performance names, records 5–54:
 ArpPad, Fantasy, FatTekno, Obi_Pad, Passport, Killer, Saege, Spectize, Snowbird, Crunch, Taurin, RedBull, Natural, Koffein, SyntVoic, AnaStrng, OverPads, Padding, Piano!, HardCore, Strictly, FatSolo, Computer, ArpOdyx, Arounder, D_Mode, Blubber, BodyMoog, Sequenz, Syncers, Beltram, DeepSea, Aliens, Dionysos, DarkSide, Sweepoid, Foggy, OverDriv, Texture, Frusty, Arktis, Sirena, VeryDeep, ResoArp, Floating, ChillOut, Bonita, BanaBrss, Happy, Friday13.
 
 This is strong evidence of a 50-performance SysEx bank dump with four part blocks per performance. It is suitable as a golden test fixture for the SysEx parser and future performance/part editor.
 
-Important limitation: the frame layout is empirically observed from this file. Do not yet treat byte offsets as a complete official address map, assume checksum semantics, or implement writes to the hardware until corroborated against the manual and/or a hardware capture.
+The owner manual independently documents the Performance address map and the 24 Part parameter offsets (printed pages 35–37). The observed 32-byte Part frames contain the 24 parameter values at bytes 7–30; the four selectors 0x01–0x04 represent Parts 13–16. Hardware round-trip testing is still required before enabling SysEx writes.
 
 ## Technox.ins
 
@@ -41,4 +41,4 @@ This independently corroborates the manual's advertised 512 single sounds and 24
 3. Convert the four 128-entry program banks and drum maps from `Technox.ins` into structured metadata.
 4. Only after this, wire preset selection and parameter editing into the audio engine.
 
-No sample codec, waveform data, or full synthesis engine is identified by these two files.
+The official owner manual maps the Part parameter offsets and MIDI control paths; see [PART_PARAMETER_RESEARCH.md](PART_PARAMETER_RESEARCH.md). No sample codec, waveform data, or full synthesis engine is identified by these two files.

@@ -1,0 +1,3304 @@
+{
+  "format": "Quasimidi TechnoX Cakewalk/Sonar instrument definition",
+  "source": "Technox.ins",
+  "source_sha": "c698ac0ad295037bc1c61c2308f438c6ab82bd17",
+  "program_banks": [
+    {
+      "bank": "A",
+      "programs": [
+        {
+          "program": 0,
+          "name": "303 Lead"
+        },
+        {
+          "program": 1,
+          "name": "Adventure"
+        },
+        {
+          "program": 2,
+          "name": "Arp 2600"
+        },
+        {
+          "program": 3,
+          "name": "Attack Sweep"
+        },
+        {
+          "program": 4,
+          "name": "Axxe"
+        },
+        {
+          "program": 5,
+          "name": "B_Blank"
+        },
+        {
+          "program": 6,
+          "name": "BanaBrss"
+        },
+        {
+          "program": 7,
+          "name": "Bananas"
+        },
+        {
+          "program": 8,
+          "name": "Bantal"
+        },
+        {
+          "program": 9,
+          "name": "Beltram"
+        },
+        {
+          "program": 10,
+          "name": "Bic_Bac1"
+        },
+        {
+          "program": 11,
+          "name": "Bic_Bac2"
+        },
+        {
+          "program": 12,
+          "name": "Bic_Bac3"
+        },
+        {
+          "program": 13,
+          "name": "Brassing"
+        },
+        {
+          "program": 14,
+          "name": "Briting"
+        },
+        {
+          "program": 15,
+          "name": "Buchla"
+        },
+        {
+          "program": 16,
+          "name": "Casio Tek"
+        },
+        {
+          "program": 17,
+          "name": "Cpt_Iglu"
+        },
+        {
+          "program": 18,
+          "name": "Disco Brass"
+        },
+        {
+          "program": 19,
+          "name": "Dominate"
+        },
+        {
+          "program": 20,
+          "name": "Dramatic"
+        },
+        {
+          "program": 21,
+          "name": "El_Paso"
+        },
+        {
+          "program": 22,
+          "name": "Electron"
+        },
+        {
+          "program": 23,
+          "name": "Executer"
+        },
+        {
+          "program": 24,
+          "name": "FanFare"
+        },
+        {
+          "program": 25,
+          "name": "Fast Pads"
+        },
+        {
+          "program": 26,
+          "name": "Flummi"
+        },
+        {
+          "program": 27,
+          "name": "Fotokina"
+        },
+        {
+          "program": 28,
+          "name": "Fucksyn"
+        },
+        {
+          "program": 29,
+          "name": "Futschi"
+        },
+        {
+          "program": 30,
+          "name": "Gabriel"
+        },
+        {
+          "program": 31,
+          "name": "Gipsy"
+        },
+        {
+          "program": 32,
+          "name": "Hilbert"
+        },
+        {
+          "program": 33,
+          "name": "Leader"
+        },
+        {
+          "program": 34,
+          "name": "Long Sweep"
+        },
+        {
+          "program": 35,
+          "name": "Luckerei"
+        },
+        {
+          "program": 36,
+          "name": "Lucky"
+        },
+        {
+          "program": 37,
+          "name": "Luckysch"
+        },
+        {
+          "program": 38,
+          "name": "M_Mann2"
+        },
+        {
+          "program": 39,
+          "name": "Mix Brass"
+        },
+        {
+          "program": 40,
+          "name": "MKS Brass"
+        },
+        {
+          "program": 41,
+          "name": "Move It"
+        },
+        {
+          "program": 42,
+          "name": "Mover"
+        },
+        {
+          "program": 43,
+          "name": "MS-20"
+        },
+        {
+          "program": 44,
+          "name": "MS-20 po2"
+        },
+        {
+          "program": 45,
+          "name": "NeoDisco"
+        },
+        {
+          "program": 46,
+          "name": "OBX Synth"
+        },
+        {
+          "program": 47,
+          "name": "OBX 2 Synth"
+        },
+        {
+          "program": 48,
+          "name": "OBX 3 Synth"
+        },
+        {
+          "program": 49,
+          "name": "OBX 4 Synth"
+        },
+        {
+          "program": 50,
+          "name": "Old Brass"
+        },
+        {
+          "program": 51,
+          "name": "Pcp_Down"
+        },
+        {
+          "program": 52,
+          "name": "Pcp_Up"
+        },
+        {
+          "program": 53,
+          "name": "Perc_Sol"
+        },
+        {
+          "program": 54,
+          "name": "Perc Sweep"
+        },
+        {
+          "program": 55,
+          "name": "Photon"
+        },
+        {
+          "program": 56,
+          "name": "Pitchy X"
+        },
+        {
+          "program": 57,
+          "name": "Polysix"
+        },
+        {
+          "program": 58,
+          "name": "Popcorn"
+        },
+        {
+          "program": 59,
+          "name": "Pump Up"
+        },
+        {
+          "program": 60,
+          "name": "Reso Brass"
+        },
+        {
+          "program": 61,
+          "name": "Resobrss"
+        },
+        {
+          "program": 62,
+          "name": "Reso Mix"
+        },
+        {
+          "program": 63,
+          "name": "Saga Poly"
+        },
+        {
+          "program": 64,
+          "name": "Sei Dabei"
+        },
+        {
+          "program": 65,
+          "name": "Sequence Fun"
+        },
+        {
+          "program": 66,
+          "name": "Sequential 1"
+        },
+        {
+          "program": 67,
+          "name": "Sequential 2"
+        },
+        {
+          "program": 68,
+          "name": "Sequential 3"
+        },
+        {
+          "program": 69,
+          "name": "Sequential 4"
+        },
+        {
+          "program": 70,
+          "name": "Sequez"
+        },
+        {
+          "program": 71,
+          "name": "Seufz"
+        },
+        {
+          "program": 72,
+          "name": "Simple Song"
+        },
+        {
+          "program": 73,
+          "name": "Soft Sequence"
+        },
+        {
+          "program": 74,
+          "name": "Sol Frust"
+        },
+        {
+          "program": 75,
+          "name": "Star Pads"
+        },
+        {
+          "program": 76,
+          "name": "String Reverse"
+        },
+        {
+          "program": 77,
+          "name": "Super Max"
+        },
+        {
+          "program": 78,
+          "name": "Super Max2"
+        },
+        {
+          "program": 79,
+          "name": "Sweep Long"
+        },
+        {
+          "program": 80,
+          "name": "Sync Maze"
+        },
+        {
+          "program": 81,
+          "name": "Sync Banana"
+        },
+        {
+          "program": 82,
+          "name": "Sync Horns"
+        },
+        {
+          "program": 83,
+          "name": "Syn Pac"
+        },
+        {
+          "program": 84,
+          "name": "Syn Pizz"
+        },
+        {
+          "program": 85,
+          "name": "Tangram"
+        },
+        {
+          "program": 86,
+          "name": "Techno 1"
+        },
+        {
+          "program": 87,
+          "name": "Techno 2"
+        },
+        {
+          "program": 88,
+          "name": "Techno 3"
+        },
+        {
+          "program": 89,
+          "name": "Technoxx2"
+        },
+        {
+          "program": 90,
+          "name": "Technoxxy"
+        },
+        {
+          "program": 91,
+          "name": "Tekno 9mm"
+        },
+        {
+          "program": 92,
+          "name": "UK Sequence"
+        },
+        {
+          "program": 93,
+          "name": "UK Sequence 2"
+        },
+        {
+          "program": 94,
+          "name": "VX Dom 1"
+        },
+        {
+          "program": 95,
+          "name": "Acid Bass"
+        },
+        {
+          "program": 96,
+          "name": "Acid Harp"
+        },
+        {
+          "program": 97,
+          "name": "Acou Synth"
+        },
+        {
+          "program": 98,
+          "name": "Active"
+        },
+        {
+          "program": 99,
+          "name": "ARP Funk"
+        },
+        {
+          "program": 100,
+          "name": "Bass Line 2"
+        },
+        {
+          "program": 101,
+          "name": "Bass Line 3"
+        },
+        {
+          "program": 102,
+          "name": "Bass Line 4"
+        },
+        {
+          "program": 103,
+          "name": "Bass Line 5"
+        },
+        {
+          "program": 104,
+          "name": "Bass Line 6"
+        },
+        {
+          "program": 105,
+          "name": "Bass Line"
+        },
+        {
+          "program": 106,
+          "name": "Basso Con"
+        },
+        {
+          "program": 107,
+          "name": "Basso Nat"
+        },
+        {
+          "program": 108,
+          "name": "Bass Stat"
+        },
+        {
+          "program": 109,
+          "name": "Birdland"
+        },
+        {
+          "program": 110,
+          "name": "Blubb"
+        },
+        {
+          "program": 111,
+          "name": "Clear Bass"
+        },
+        {
+          "program": 112,
+          "name": "Cry Line"
+        },
+        {
+          "program": 113,
+          "name": "Deep Bass"
+        },
+        {
+          "program": 114,
+          "name": "Deep Mini"
+        },
+        {
+          "program": 115,
+          "name": "Detroit"
+        },
+        {
+          "program": 116,
+          "name": "Djax Pad"
+        },
+        {
+          "program": 117,
+          "name": "Djax Up"
+        },
+        {
+          "program": 118,
+          "name": "Euro Bass"
+        },
+        {
+          "program": 119,
+          "name": "Fat Line"
+        },
+        {
+          "program": 120,
+          "name": "Fat Bass"
+        },
+        {
+          "program": 121,
+          "name": "Filter Bass"
+        },
+        {
+          "program": 122,
+          "name": "Filter Moog"
+        },
+        {
+          "program": 123,
+          "name": "Filter Open"
+        },
+        {
+          "program": 124,
+          "name": "FM AcBass"
+        },
+        {
+          "program": 125,
+          "name": "Fretless"
+        },
+        {
+          "program": 126,
+          "name": "Hardcast"
+        },
+        {
+          "program": 127,
+          "name": "Hard MS-20"
+        }
+      ]
+    },
+    {
+      "bank": "B",
+      "programs": [
+        {
+          "program": 0,
+          "name": "JukeBass"
+        },
+        {
+          "program": 1,
+          "name": "Killer"
+        },
+        {
+          "program": 2,
+          "name": "La Bass"
+        },
+        {
+          "program": 3,
+          "name": "Land Bird"
+        },
+        {
+          "program": 4,
+          "name": "Lo Bass"
+        },
+        {
+          "program": 5,
+          "name": "Low Bass1"
+        },
+        {
+          "program": 6,
+          "name": "Low Bass2"
+        },
+        {
+          "program": 7,
+          "name": "MC-202 1"
+        },
+        {
+          "program": 8,
+          "name": "MC-202 2"
+        },
+        {
+          "program": 9,
+          "name": "Micromoog 2"
+        },
+        {
+          "program": 10,
+          "name": "Micromoog3"
+        },
+        {
+          "program": 11,
+          "name": "Micromoog"
+        },
+        {
+          "program": 12,
+          "name": "MixFrmt"
+        },
+        {
+          "program": 13,
+          "name": "MKS Bass1"
+        },
+        {
+          "program": 14,
+          "name": "MKS Bass2"
+        },
+        {
+          "program": 15,
+          "name": "MKS Bass3"
+        },
+        {
+          "program": 16,
+          "name": "Moog 1"
+        },
+        {
+          "program": 17,
+          "name": "Moog 2"
+        },
+        {
+          "program": 18,
+          "name": "Moog Bass2"
+        },
+        {
+          "program": 19,
+          "name": "Moog Me1"
+        },
+        {
+          "program": 20,
+          "name": "Moogy"
+        },
+        {
+          "program": 21,
+          "name": "Moogy2"
+        },
+        {
+          "program": 22,
+          "name": "Morph"
+        },
+        {
+          "program": 23,
+          "name": "MS-20 Bass"
+        },
+        {
+          "program": 24,
+          "name": "MS-20 Bass2"
+        },
+        {
+          "program": 25,
+          "name": "Norlin X"
+        },
+        {
+          "program": 26,
+          "name": "Pitch 303"
+        },
+        {
+          "program": 27,
+          "name": "Pitch Bass"
+        },
+        {
+          "program": 28,
+          "name": "Pulse Bass"
+        },
+        {
+          "program": 29,
+          "name": "Rave Bass"
+        },
+        {
+          "program": 30,
+          "name": "Reef Bass"
+        },
+        {
+          "program": 31,
+          "name": "Reso Bass"
+        },
+        {
+          "program": 32,
+          "name": "Rise Bass"
+        },
+        {
+          "program": 33,
+          "name": "SH-101 Bass"
+        },
+        {
+          "program": 34,
+          "name": "Sine Bass"
+        },
+        {
+          "program": 35,
+          "name": "Slap Bass1"
+        },
+        {
+          "program": 36,
+          "name": "Slide"
+        },
+        {
+          "program": 37,
+          "name": "Slow Bass"
+        },
+        {
+          "program": 38,
+          "name": "Taurus"
+        },
+        {
+          "program": 39,
+          "name": "TB-303 1"
+        },
+        {
+          "program": 40,
+          "name": "TB-303 2"
+        },
+        {
+          "program": 41,
+          "name": "TB-303 3"
+        },
+        {
+          "program": 42,
+          "name": "TB-303 4"
+        },
+        {
+          "program": 43,
+          "name": "TB-303 p"
+        },
+        {
+          "program": 44,
+          "name": "Tora Tora"
+        },
+        {
+          "program": 45,
+          "name": "V Moogy"
+        },
+        {
+          "program": 46,
+          "name": "V1 Moogy"
+        },
+        {
+          "program": 47,
+          "name": "Ve BassLine"
+        },
+        {
+          "program": 48,
+          "name": "Velo303"
+        },
+        {
+          "program": 49,
+          "name": "Vox Bass"
+        },
+        {
+          "program": 50,
+          "name": "VX Bass"
+        },
+        {
+          "program": 51,
+          "name": "Warm Bass"
+        },
+        {
+          "program": 52,
+          "name": "Wet Synth"
+        },
+        {
+          "program": 53,
+          "name": "Acoustic Guitar"
+        },
+        {
+          "program": 54,
+          "name": "Bambus"
+        },
+        {
+          "program": 55,
+          "name": "Bottle"
+        },
+        {
+          "program": 56,
+          "name": "Choir"
+        },
+        {
+          "program": 57,
+          "name": "Chorus"
+        },
+        {
+          "program": 58,
+          "name": "Clavinet"
+        },
+        {
+          "program": 59,
+          "name": "Clean Guitar"
+        },
+        {
+          "program": 60,
+          "name": "Clean Guitar 2"
+        },
+        {
+          "program": 61,
+          "name": "\"Duuh\""
+        },
+        {
+          "program": 62,
+          "name": "E Piano"
+        },
+        {
+          "program": 63,
+          "name": "FM Jazz"
+        },
+        {
+          "program": 64,
+          "name": "Italo Piano"
+        },
+        {
+          "program": 65,
+          "name": "Melloch"
+        },
+        {
+          "program": 66,
+          "name": "Pan Flute"
+        },
+        {
+          "program": 67,
+          "name": "Piano 1"
+        },
+        {
+          "program": 68,
+          "name": "Piano 2"
+        },
+        {
+          "program": 69,
+          "name": "Piano 3"
+        },
+        {
+          "program": 70,
+          "name": "Piccolo"
+        },
+        {
+          "program": 71,
+          "name": "Steel Guitar"
+        },
+        {
+          "program": 72,
+          "name": "Wurlitzer 1"
+        },
+        {
+          "program": 73,
+          "name": "Farfisa 1"
+        },
+        {
+          "program": 74,
+          "name": "Farfisa 2"
+        },
+        {
+          "program": 75,
+          "name": "Hammond"
+        },
+        {
+          "program": 76,
+          "name": "Helge S"
+        },
+        {
+          "program": 77,
+          "name": "Hot Keys"
+        },
+        {
+          "program": 78,
+          "name": "House MKS"
+        },
+        {
+          "program": 79,
+          "name": "House Organ"
+        },
+        {
+          "program": 80,
+          "name": "MKS Organ"
+        },
+        {
+          "program": 81,
+          "name": "Rave Organ1"
+        },
+        {
+          "program": 82,
+          "name": "Rave Organ2"
+        },
+        {
+          "program": 83,
+          "name": "Rave Organ3"
+        },
+        {
+          "program": 84,
+          "name": "Rave Organ4"
+        },
+        {
+          "program": 85,
+          "name": "Rave Organ5"
+        },
+        {
+          "program": 86,
+          "name": "Slow Leslie"
+        },
+        {
+          "program": 87,
+          "name": "Aliens 1"
+        },
+        {
+          "program": 88,
+          "name": "Aliens 2"
+        },
+        {
+          "program": 89,
+          "name": "Analog Brass"
+        },
+        {
+          "program": 90,
+          "name": "Angles"
+        },
+        {
+          "program": 91,
+          "name": "Atlas"
+        },
+        {
+          "program": 92,
+          "name": "Bambum"
+        },
+        {
+          "program": 93,
+          "name": "Banana"
+        },
+        {
+          "program": 94,
+          "name": "BanaVox"
+        },
+        {
+          "program": 95,
+          "name": "BellBana"
+        },
+        {
+          "program": 96,
+          "name": "BentCold"
+        },
+        {
+          "program": 97,
+          "name": "Blas mit"
+        },
+        {
+          "program": 98,
+          "name": "Child Pad"
+        },
+        {
+          "program": 99,
+          "name": "Clear OBX"
+        },
+        {
+          "program": 100,
+          "name": "Cloud 9"
+        },
+        {
+          "program": 101,
+          "name": "CMI Vox1"
+        },
+        {
+          "program": 102,
+          "name": "Cnox Sweep"
+        },
+        {
+          "program": 103,
+          "name": "Day Dream"
+        },
+        {
+          "program": 104,
+          "name": "Fast Bamb"
+        },
+        {
+          "program": 105,
+          "name": "Fast Foehn"
+        },
+        {
+          "program": 106,
+          "name": "Fast Flange"
+        },
+        {
+          "program": 107,
+          "name": "Fast CMI"
+        },
+        {
+          "program": 108,
+          "name": "Fast Choir"
+        },
+        {
+          "program": 109,
+          "name": "Fat Strings"
+        },
+        {
+          "program": 110,
+          "name": "Fettfett"
+        },
+        {
+          "program": 111,
+          "name": "Flang Ch"
+        },
+        {
+          "program": 112,
+          "name": "Foehn"
+        },
+        {
+          "program": 113,
+          "name": "Four Voice"
+        },
+        {
+          "program": 114,
+          "name": "Glider"
+        },
+        {
+          "program": 115,
+          "name": "Halopad"
+        },
+        {
+          "program": 116,
+          "name": "Hohner Strings"
+        },
+        {
+          "program": 117,
+          "name": "Iron Strings"
+        },
+        {
+          "program": 118,
+          "name": "Japanese"
+        },
+        {
+          "program": 119,
+          "name": "Jewelry"
+        },
+        {
+          "program": 120,
+          "name": "JP Long"
+        },
+        {
+          "program": 121,
+          "name": "JP Long Strings"
+        },
+        {
+          "program": 122,
+          "name": "JP Strings"
+        },
+        {
+          "program": 123,
+          "name": "Juno Strings"
+        },
+        {
+          "program": 124,
+          "name": "Liquid X"
+        },
+        {
+          "program": 125,
+          "name": "Lucky Sweep"
+        },
+        {
+          "program": 126,
+          "name": "Matrix"
+        },
+        {
+          "program": 127,
+          "name": "Mellotron"
+        }
+      ]
+    },
+    {
+      "bank": "C",
+      "programs": [
+        {
+          "program": 0,
+          "name": "Mix String"
+        },
+        {
+          "program": 1,
+          "name": "MKS String"
+        },
+        {
+          "program": 2,
+          "name": "Moony"
+        },
+        {
+          "program": 3,
+          "name": "MS-20 Sweep"
+        },
+        {
+          "program": 4,
+          "name": "OBi Percs"
+        },
+        {
+          "program": 5,
+          "name": "OBX Brass"
+        },
+        {
+          "program": 6,
+          "name": "Oct Sweep"
+        },
+        {
+          "program": 7,
+          "name": "Omni"
+        },
+        {
+          "program": 8,
+          "name": "Omni Sweep"
+        },
+        {
+          "program": 9,
+          "name": "Over Home"
+        },
+        {
+          "program": 10,
+          "name": "Pad Percs"
+        },
+        {
+          "program": 11,
+          "name": "Pitch Sweep"
+        },
+        {
+          "program": 12,
+          "name": "PolyMix"
+        },
+        {
+          "program": 13,
+          "name": "Poly Pad"
+        },
+        {
+          "program": 14,
+          "name": "Soft Tech"
+        },
+        {
+          "program": 15,
+          "name": "Spaceri"
+        },
+        {
+          "program": 16,
+          "name": "Space Sweep"
+        },
+        {
+          "program": 17,
+          "name": "Space Sweep"
+        },
+        {
+          "program": 18,
+          "name": "Spring"
+        },
+        {
+          "program": 19,
+          "name": "Sunrise"
+        },
+        {
+          "program": 20,
+          "name": "Sweep"
+        },
+        {
+          "program": 21,
+          "name": "Sweepy 1"
+        },
+        {
+          "program": 22,
+          "name": "Sweepy 2"
+        },
+        {
+          "program": 23,
+          "name": "Swell Vox"
+        },
+        {
+          "program": 24,
+          "name": "Swell Juno"
+        },
+        {
+          "program": 25,
+          "name": "Synth Strings"
+        },
+        {
+          "program": 26,
+          "name": "True Space"
+        },
+        {
+          "program": 27,
+          "name": "Vitalize"
+        },
+        {
+          "program": 28,
+          "name": "Voc Clock"
+        },
+        {
+          "program": 29,
+          "name": "Voice Chord"
+        },
+        {
+          "program": 30,
+          "name": "Voice"
+        },
+        {
+          "program": 31,
+          "name": "Voice Rel"
+        },
+        {
+          "program": 32,
+          "name": "Vox Filter"
+        },
+        {
+          "program": 33,
+          "name": "VS Choir"
+        },
+        {
+          "program": 34,
+          "name": "VS Clock"
+        },
+        {
+          "program": 35,
+          "name": "VX 600"
+        },
+        {
+          "program": 36,
+          "name": "VX 600 Pad"
+        },
+        {
+          "program": 37,
+          "name": "Warm Brass"
+        },
+        {
+          "program": 38,
+          "name": "Warm OBX"
+        },
+        {
+          "program": 39,
+          "name": "Wet String"
+        },
+        {
+          "program": 40,
+          "name": "XpressMe"
+        },
+        {
+          "program": 41,
+          "name": "Yuppie"
+        },
+        {
+          "program": 42,
+          "name": "Dreieck"
+        },
+        {
+          "program": 43,
+          "name": "P-50"
+        },
+        {
+          "program": 44,
+          "name": "P-60"
+        },
+        {
+          "program": 45,
+          "name": "Pulse 30"
+        },
+        {
+          "program": 46,
+          "name": "Pulse 75"
+        },
+        {
+          "program": 47,
+          "name": "Resonant 1"
+        },
+        {
+          "program": 48,
+          "name": "Resonant 2"
+        },
+        {
+          "program": 49,
+          "name": "Resonant 3"
+        },
+        {
+          "program": 50,
+          "name": "Resonant 4"
+        },
+        {
+          "program": 51,
+          "name": "Resonant 5"
+        },
+        {
+          "program": 52,
+          "name": "Resonant 6"
+        },
+        {
+          "program": 53,
+          "name": "Resonant 7"
+        },
+        {
+          "program": 54,
+          "name": "Saw Zahn"
+        },
+        {
+          "program": 55,
+          "name": "Sinus"
+        },
+        {
+          "program": 56,
+          "name": "Soft Sine"
+        },
+        {
+          "program": 57,
+          "name": "Space Saw"
+        },
+        {
+          "program": 58,
+          "name": "Velo Reso"
+        },
+        {
+          "program": 59,
+          "name": "FM Glass"
+        },
+        {
+          "program": 60,
+          "name": "FM Vibe"
+        },
+        {
+          "program": 61,
+          "name": "Glokenspiel"
+        },
+        {
+          "program": 62,
+          "name": "Mallet"
+        },
+        {
+          "program": 63,
+          "name": "Music Box"
+        },
+        {
+          "program": 64,
+          "name": "Plingy"
+        },
+        {
+          "program": 65,
+          "name": "Tinker Bell"
+        },
+        {
+          "program": 66,
+          "name": "Tinkle 1"
+        },
+        {
+          "program": 67,
+          "name": "Tinkle 2"
+        },
+        {
+          "program": 68,
+          "name": "Vibe Tremolo 2"
+        },
+        {
+          "program": 69,
+          "name": "Vibe Tremolo 3"
+        },
+        {
+          "program": 70,
+          "name": "Vibe Tremolo"
+        },
+        {
+          "program": 71,
+          "name": "Alp Dream"
+        },
+        {
+          "program": 72,
+          "name": "Analog LFO"
+        },
+        {
+          "program": 73,
+          "name": "Berlin 71"
+        },
+        {
+          "program": 74,
+          "name": "Cross Osz"
+        },
+        {
+          "program": 75,
+          "name": "Dirty FM"
+        },
+        {
+          "program": 76,
+          "name": "Door"
+        },
+        {
+          "program": 77,
+          "name": "Dreaming"
+        },
+        {
+          "program": 78,
+          "name": "Duester"
+        },
+        {
+          "program": 79,
+          "name": "Echo Vox"
+        },
+        {
+          "program": 80,
+          "name": "Echo sx"
+        },
+        {
+          "program": 81,
+          "name": "Effector 2"
+        },
+        {
+          "program": 82,
+          "name": "Effector"
+        },
+        {
+          "program": 83,
+          "name": "FM Race"
+        },
+        {
+          "program": 84,
+          "name": "Metal 1"
+        },
+        {
+          "program": 85,
+          "name": "Space Pad"
+        },
+        {
+          "program": 86,
+          "name": "Space Vib"
+        },
+        {
+          "program": 87,
+          "name": "Splatter"
+        },
+        {
+          "program": 88,
+          "name": "Square LFO"
+        },
+        {
+          "program": 89,
+          "name": "Step"
+        },
+        {
+          "program": 90,
+          "name": "Sweller"
+        },
+        {
+          "program": 91,
+          "name": "Vocoder 1"
+        },
+        {
+          "program": 92,
+          "name": "Vocoder 2"
+        },
+        {
+          "program": 93,
+          "name": "Vocoder 3"
+        },
+        {
+          "program": 94,
+          "name": "Alien HB"
+        },
+        {
+          "program": 95,
+          "name": "Avilyn"
+        },
+        {
+          "program": 96,
+          "name": "Bubble Gum"
+        },
+        {
+          "program": 97,
+          "name": "Comic"
+        },
+        {
+          "program": 98,
+          "name": "Critters"
+        },
+        {
+          "program": 99,
+          "name": "Crumble"
+        },
+        {
+          "program": 100,
+          "name": "Deepest"
+        },
+        {
+          "program": 101,
+          "name": "Defekt"
+        },
+        {
+          "program": 102,
+          "name": "Duck Tale"
+        },
+        {
+          "program": 103,
+          "name": "Fall Down 2"
+        },
+        {
+          "program": 104,
+          "name": "Fall Down"
+        },
+        {
+          "program": 105,
+          "name": "Fraggles"
+        },
+        {
+          "program": 106,
+          "name": "Fresh Air"
+        },
+        {
+          "program": 107,
+          "name": "Higher"
+        },
+        {
+          "program": 108,
+          "name": "Industry"
+        },
+        {
+          "program": 109,
+          "name": "Long Berta"
+        },
+        {
+          "program": 110,
+          "name": "Moog Zap"
+        },
+        {
+          "program": 111,
+          "name": "Nine2Ten"
+        },
+        {
+          "program": 112,
+          "name": "Nintendo"
+        },
+        {
+          "program": 113,
+          "name": "Noiser"
+        },
+        {
+          "program": 114,
+          "name": "Noise Shot"
+        },
+        {
+          "program": 115,
+          "name": "OrchiTexture"
+        },
+        {
+          "program": 116,
+          "name": "Ring Fun"
+        },
+        {
+          "program": 117,
+          "name": "Scrat Met"
+        },
+        {
+          "program": 118,
+          "name": "SF a1"
+        },
+        {
+          "program": 119,
+          "name": "SF a2"
+        },
+        {
+          "program": 120,
+          "name": "SF a3"
+        },
+        {
+          "program": 121,
+          "name": "SF a4"
+        },
+        {
+          "program": 122,
+          "name": "SF a5"
+        },
+        {
+          "program": 123,
+          "name": "SF a6"
+        },
+        {
+          "program": 124,
+          "name": "SF a7"
+        },
+        {
+          "program": 125,
+          "name": "Space Frog"
+        },
+        {
+          "program": 126,
+          "name": "Storm"
+        },
+        {
+          "program": 127,
+          "name": "Strike"
+        }
+      ]
+    },
+    {
+      "bank": "D",
+      "programs": [
+        {
+          "program": 0,
+          "name": "Take Off"
+        },
+        {
+          "program": 1,
+          "name": "Terminate"
+        },
+        {
+          "program": 2,
+          "name": "U-96"
+        },
+        {
+          "program": 3,
+          "name": "World War"
+        },
+        {
+          "program": 4,
+          "name": "Experimantal 1"
+        },
+        {
+          "program": 5,
+          "name": "Experimantal 2"
+        },
+        {
+          "program": 6,
+          "name": "Experimantal 3"
+        },
+        {
+          "program": 7,
+          "name": "Experimantal 4"
+        },
+        {
+          "program": 8,
+          "name": "Experimantal 5"
+        },
+        {
+          "program": 9,
+          "name": "Experimantal 6"
+        },
+        {
+          "program": 10,
+          "name": "Experimantal 7"
+        },
+        {
+          "program": 11,
+          "name": "Experimantal 8"
+        },
+        {
+          "program": 12,
+          "name": "Analog Cymbal"
+        },
+        {
+          "program": 13,
+          "name": "Analog Electrik"
+        },
+        {
+          "program": 14,
+          "name": "Analog Guiro"
+        },
+        {
+          "program": 15,
+          "name": "Analog Klok"
+        },
+        {
+          "program": 16,
+          "name": "Analog Perc"
+        },
+        {
+          "program": 17,
+          "name": "Analog SFX"
+        },
+        {
+          "program": 18,
+          "name": "Agogo"
+        },
+        {
+          "program": 19,
+          "name": "Analog Kick1"
+        },
+        {
+          "program": 20,
+          "name": "Analog Kick2"
+        },
+        {
+          "program": 21,
+          "name": "Analog Kick3"
+        },
+        {
+          "program": 22,
+          "name": "Analog Kick4"
+        },
+        {
+          "program": 23,
+          "name": "Analog Kick5"
+        },
+        {
+          "program": 24,
+          "name": "Analog Tom"
+        },
+        {
+          "program": 25,
+          "name": "Bass Drum"
+        },
+        {
+          "program": 26,
+          "name": "Bell Tree"
+        },
+        {
+          "program": 27,
+          "name": "Bongo"
+        },
+        {
+          "program": 28,
+          "name": "Cabasa"
+        },
+        {
+          "program": 29,
+          "name": "Castanet"
+        },
+        {
+          "program": 30,
+          "name": "China"
+        },
+        {
+          "program": 31,
+          "name": "Clave"
+        },
+        {
+          "program": 32,
+          "name": "Closed HH"
+        },
+        {
+          "program": 33,
+          "name": "Cowbell"
+        },
+        {
+          "program": 34,
+          "name": "Conga 2"
+        },
+        {
+          "program": 35,
+          "name": "Conga 1"
+        },
+        {
+          "program": 36,
+          "name": "CR78 Cymbal"
+        },
+        {
+          "program": 37,
+          "name": "CR78 Conga"
+        },
+        {
+          "program": 38,
+          "name": "CR78 Kick"
+        },
+        {
+          "program": 39,
+          "name": "CR78 Guiro"
+        },
+        {
+          "program": 40,
+          "name": "CR78 Tambourine"
+        },
+        {
+          "program": 41,
+          "name": "CR78 Snare"
+        },
+        {
+          "program": 42,
+          "name": "CR78 Rim"
+        },
+        {
+          "program": 43,
+          "name": "CR78 Hat"
+        },
+        {
+          "program": 44,
+          "name": "Crash 2"
+        },
+        {
+          "program": 45,
+          "name": "Crash 1"
+        },
+        {
+          "program": 46,
+          "name": "Cuica"
+        },
+        {
+          "program": 47,
+          "name": "Drum FX1"
+        },
+        {
+          "program": 48,
+          "name": "Drum FX2"
+        },
+        {
+          "program": 49,
+          "name": "Effect Shaker"
+        },
+        {
+          "program": 50,
+          "name": "Gated"
+        },
+        {
+          "program": 51,
+          "name": "Guiro"
+        },
+        {
+          "program": 52,
+          "name": "Guiro 2"
+        },
+        {
+          "program": 53,
+          "name": "Linn Snare"
+        },
+        {
+          "program": 54,
+          "name": "Linn Tom"
+        },
+        {
+          "program": 55,
+          "name": "Long Whistle"
+        },
+        {
+          "program": 56,
+          "name": "Maracas"
+        },
+        {
+          "program": 57,
+          "name": "MS-20 P"
+        },
+        {
+          "program": 58,
+          "name": "Open Hat"
+        },
+        {
+          "program": 59,
+          "name": "Resonant"
+        },
+        {
+          "program": 60,
+          "name": "Ride"
+        },
+        {
+          "program": 61,
+          "name": "Scratch 1"
+        },
+        {
+          "program": 62,
+          "name": "Scratch 2"
+        },
+        {
+          "program": 63,
+          "name": "Sine Kick"
+        },
+        {
+          "program": 64,
+          "name": "Slap"
+        },
+        {
+          "program": 65,
+          "name": "Snare"
+        },
+        {
+          "program": 66,
+          "name": "Snare 2"
+        },
+        {
+          "program": 67,
+          "name": "Stick"
+        },
+        {
+          "program": 68,
+          "name": "Sticks"
+        },
+        {
+          "program": 69,
+          "name": "Synth Tom 1"
+        },
+        {
+          "program": 70,
+          "name": "Synth Tom 2"
+        },
+        {
+          "program": 71,
+          "name": "Synth Tom 3"
+        },
+        {
+          "program": 72,
+          "name": "Triangle"
+        },
+        {
+          "program": 73,
+          "name": "Tambourine"
+        },
+        {
+          "program": 74,
+          "name": "Timbali"
+        },
+        {
+          "program": 75,
+          "name": "Tom"
+        },
+        {
+          "program": 76,
+          "name": "TR-606 Kick"
+        },
+        {
+          "program": 77,
+          "name": "TR-606 Cymbal"
+        },
+        {
+          "program": 78,
+          "name": "TR-606 ClsdHat"
+        },
+        {
+          "program": 79,
+          "name": "TR-606 OpenHat"
+        },
+        {
+          "program": 80,
+          "name": "TR-606 Snare"
+        },
+        {
+          "program": 81,
+          "name": "TR-606 Tom"
+        },
+        {
+          "program": 82,
+          "name": "TR-808 Kick"
+        },
+        {
+          "program": 83,
+          "name": "TR-808 Hat"
+        },
+        {
+          "program": 84,
+          "name": "TR-808 Clap"
+        },
+        {
+          "program": 85,
+          "name": "TR-808 Conga1"
+        },
+        {
+          "program": 86,
+          "name": "TR-808 Conga2"
+        },
+        {
+          "program": 87,
+          "name": "TR-808 Cowbell"
+        },
+        {
+          "program": 88,
+          "name": "TR-808 Ride"
+        },
+        {
+          "program": 89,
+          "name": "TR-808 Open Hat"
+        },
+        {
+          "program": 90,
+          "name": "TR-808 Rim"
+        },
+        {
+          "program": 91,
+          "name": "TR-808 Snare"
+        },
+        {
+          "program": 92,
+          "name": "TR-808 Tom"
+        },
+        {
+          "program": 93,
+          "name": "TR-909 Kick"
+        },
+        {
+          "program": 94,
+          "name": "TR-909 Hat"
+        },
+        {
+          "program": 95,
+          "name": "TR-909 Clap"
+        },
+        {
+          "program": 96,
+          "name": "TR-909 Open Hat"
+        },
+        {
+          "program": 97,
+          "name": "TR-909 Snare"
+        },
+        {
+          "program": 98,
+          "name": "TR-909 Stick"
+        },
+        {
+          "program": 99,
+          "name": "TR-909 Tom"
+        },
+        {
+          "program": 100,
+          "name": "Vibra"
+        },
+        {
+          "program": 101,
+          "name": "Voc Hit"
+        },
+        {
+          "program": 102,
+          "name": "Voco Kick"
+        },
+        {
+          "program": 103,
+          "name": "Voco Pop"
+        },
+        {
+          "program": 104,
+          "name": "Voco Zist"
+        },
+        {
+          "program": 105,
+          "name": "Yeti"
+        },
+        {
+          "program": 106,
+          "name": "Zap"
+        },
+        {
+          "program": 107,
+          "name": "Zapping"
+        },
+        {
+          "program": 108,
+          "name": "Zlip"
+        },
+        {
+          "program": 109,
+          "name": "Zip"
+        },
+        {
+          "program": 110,
+          "name": "Zip Up"
+        },
+        {
+          "program": 111,
+          "name": "Standard Kit"
+        },
+        {
+          "program": 112,
+          "name": "TR-808 Kit"
+        },
+        {
+          "program": 113,
+          "name": "TR-909 Kit"
+        },
+        {
+          "program": 114,
+          "name": "Analog"
+        },
+        {
+          "program": 115,
+          "name": "TR-606 Kit"
+        },
+        {
+          "program": 116,
+          "name": "CR-78 Kit"
+        },
+        {
+          "program": 117,
+          "name": "Linn Kit"
+        },
+        {
+          "program": 118,
+          "name": "Rock Kit"
+        },
+        {
+          "program": 119,
+          "name": "Modular 1 Kit"
+        },
+        {
+          "program": 120,
+          "name": "Modular 2 Kit"
+        },
+        {
+          "program": 121,
+          "name": "Kick & Snare Kit"
+        },
+        {
+          "program": 122,
+          "name": "Vintage Kit"
+        },
+        {
+          "program": 123,
+          "name": "Dry Kit"
+        },
+        {
+          "program": 124,
+          "name": "Dance Kit"
+        },
+        {
+          "program": 125,
+          "name": "Noisy SFX Kit"
+        },
+        {
+          "program": 126,
+          "name": "Old Box Kit"
+        },
+        {
+          "program": 127,
+          "name": "Silence"
+        }
+      ]
+    }
+  ],
+  "channel_10_drum_kits": [
+    {
+      "program": 0,
+      "name": "Standard Kit"
+    },
+    {
+      "program": 1,
+      "name": "TR-808"
+    },
+    {
+      "program": 2,
+      "name": "TR-909"
+    },
+    {
+      "program": 3,
+      "name": "Analog"
+    },
+    {
+      "program": 4,
+      "name": "TR-606"
+    },
+    {
+      "program": 5,
+      "name": "CR-78"
+    },
+    {
+      "program": 6,
+      "name": "Linn"
+    },
+    {
+      "program": 7,
+      "name": "Rock"
+    },
+    {
+      "program": 8,
+      "name": "Modular 1"
+    },
+    {
+      "program": 9,
+      "name": "Modular 2"
+    },
+    {
+      "program": 10,
+      "name": "Kick & Snare"
+    },
+    {
+      "program": 11,
+      "name": "Vintage"
+    },
+    {
+      "program": 12,
+      "name": "Dry"
+    },
+    {
+      "program": 13,
+      "name": "Dance"
+    },
+    {
+      "program": 14,
+      "name": "Noisy SFX"
+    },
+    {
+      "program": 15,
+      "name": "Old Box"
+    },
+    {
+      "program": 16,
+      "name": "TR-909 2"
+    },
+    {
+      "program": 17,
+      "name": "TR-808 2"
+    },
+    {
+      "program": 18,
+      "name": "Effects"
+    },
+    {
+      "program": 19,
+      "name": "Pan"
+    },
+    {
+      "program": 20,
+      "name": "Beat Box"
+    },
+    {
+      "program": 21,
+      "name": "Vintage 2"
+    },
+    {
+      "program": 22,
+      "name": "Modular 3"
+    },
+    {
+      "program": 23,
+      "name": "Standard 2"
+    },
+    {
+      "program": 24,
+      "name": "User 1"
+    },
+    {
+      "program": 25,
+      "name": "User 2"
+    },
+    {
+      "program": 26,
+      "name": "User 3"
+    },
+    {
+      "program": 27,
+      "name": "User 4"
+    },
+    {
+      "program": 28,
+      "name": "User 5"
+    },
+    {
+      "program": 29,
+      "name": "User 6"
+    },
+    {
+      "program": 30,
+      "name": "User 7"
+    },
+    {
+      "program": 31,
+      "name": "User 8"
+    }
+  ],
+  "controllers": [
+    {
+      "cc": 0,
+      "name": "Bank Select"
+    },
+    {
+      "cc": 1,
+      "name": "Modulation"
+    },
+    {
+      "cc": 5,
+      "name": "Portamento Time"
+    },
+    {
+      "cc": 6,
+      "name": "Data Entry"
+    },
+    {
+      "cc": 7,
+      "name": "Volume"
+    },
+    {
+      "cc": 10,
+      "name": "Pan"
+    },
+    {
+      "cc": 64,
+      "name": "Hold Pedal"
+    },
+    {
+      "cc": 65,
+      "name": "Portamento On/Off"
+    },
+    {
+      "cc": 67,
+      "name": "Soft Pedal"
+    },
+    {
+      "cc": 80,
+      "name": "FX1-Type"
+    },
+    {
+      "cc": 81,
+      "name": "FX2-Type"
+    },
+    {
+      "cc": 82,
+      "name": "Arp. Resolution"
+    },
+    {
+      "cc": 83,
+      "name": "Arp. Speed"
+    },
+    {
+      "cc": 91,
+      "name": "FX1-Send"
+    },
+    {
+      "cc": 93,
+      "name": "FX2-Send"
+    },
+    {
+      "cc": 98,
+      "name": "NPRN LSB"
+    },
+    {
+      "cc": 99,
+      "name": "NPRN MSB"
+    },
+    {
+      "cc": 100,
+      "name": "RPN LSB"
+    },
+    {
+      "cc": 101,
+      "name": "RPN MSB"
+    },
+    {
+      "cc": 120,
+      "name": "All Sounds Off"
+    },
+    {
+      "cc": 121,
+      "name": "Reset Controllers"
+    },
+    {
+      "cc": 123,
+      "name": "All Notes Off"
+    },
+    {
+      "cc": 124,
+      "name": "Omni Off"
+    },
+    {
+      "cc": 125,
+      "name": "Omni On"
+    },
+    {
+      "cc": 126,
+      "name": "Mono On"
+    },
+    {
+      "cc": 127,
+      "name": "Poly On"
+    }
+  ],
+  "drum_map_sections": [
+    "Technox Standard",
+    "Technox 808",
+    "Technox 909",
+    "Technox Analog",
+    "Technox 606",
+    "Technox CR-78",
+    "Technox Linn",
+    "Technox Rock",
+    "Technox Modular 1",
+    "Technox Modular 2",
+    "Technox Kicks & Snares",
+    "Technox Vintage",
+    "Technox Dry",
+    "Technox Dance",
+    "Technox Noisy SFX",
+    "Technox Old Box",
+    "Technox 909 II",
+    "Technox 808 II",
+    "Technox Effects",
+    "Technox Pan Effects",
+    "Technox Beat Box",
+    "Technox Vintage II",
+    "Technox Modular 3",
+    "Technox Standard II"
+  ],
+  "drum_map_program_assignments": [
+    {
+      "bank": 4,
+      "program": 0,
+      "map": "Technox Standard"
+    },
+    {
+      "bank": 4,
+      "program": 1,
+      "map": "Technox 808"
+    },
+    {
+      "bank": 4,
+      "program": 2,
+      "map": "Technox 909"
+    },
+    {
+      "bank": 4,
+      "program": 3,
+      "map": "Technox Analog"
+    },
+    {
+      "bank": 4,
+      "program": 4,
+      "map": "Technox 606"
+    },
+    {
+      "bank": 4,
+      "program": 5,
+      "map": "Technox CR-78"
+    },
+    {
+      "bank": 4,
+      "program": 6,
+      "map": "Technox Linn"
+    },
+    {
+      "bank": 4,
+      "program": 7,
+      "map": "Technox Rock"
+    },
+    {
+      "bank": 4,
+      "program": 8,
+      "map": "Technox Modular 1"
+    },
+    {
+      "bank": 4,
+      "program": 9,
+      "map": "Technox Modular 2"
+    },
+    {
+      "bank": 4,
+      "program": 10,
+      "map": "Technox Kicks & Snares"
+    },
+    {
+      "bank": 4,
+      "program": 11,
+      "map": "Technox Vintage"
+    },
+    {
+      "bank": 4,
+      "program": 12,
+      "map": "Technox Dry"
+    },
+    {
+      "bank": 4,
+      "program": 13,
+      "map": "Technox Dance"
+    },
+    {
+      "bank": 4,
+      "program": 14,
+      "map": "Technox Noisy SFX"
+    },
+    {
+      "bank": 4,
+      "program": 15,
+      "map": "Technox Old Box"
+    },
+    {
+      "bank": 4,
+      "program": 16,
+      "map": "Technox 909 II"
+    },
+    {
+      "bank": 4,
+      "program": 17,
+      "map": "Technox 808 II"
+    },
+    {
+      "bank": 4,
+      "program": 18,
+      "map": "Technox Effects"
+    },
+    {
+      "bank": 4,
+      "program": 19,
+      "map": "Technox Pan Effects"
+    },
+    {
+      "bank": 4,
+      "program": 20,
+      "map": "Technox Beat Box"
+    },
+    {
+      "bank": 4,
+      "program": 21,
+      "map": "Technox Vintage II"
+    },
+    {
+      "bank": 4,
+      "program": 22,
+      "map": "Technox Modular 3"
+    },
+    {
+      "bank": 4,
+      "program": 23,
+      "map": "Technox Standard II"
+    },
+    {
+      "bank": 3,
+      "program": 111,
+      "map": "Technox Standard"
+    },
+    {
+      "bank": 3,
+      "program": 112,
+      "map": "Technox 808"
+    },
+    {
+      "bank": 3,
+      "program": 113,
+      "map": "Technox 909"
+    },
+    {
+      "bank": 3,
+      "program": 114,
+      "map": "Technox Analog"
+    },
+    {
+      "bank": 3,
+      "program": 115,
+      "map": "Technox 606"
+    },
+    {
+      "bank": 3,
+      "program": 116,
+      "map": "Technox CR-78"
+    },
+    {
+      "bank": 3,
+      "program": 117,
+      "map": "Technox Linn"
+    },
+    {
+      "bank": 3,
+      "program": 118,
+      "map": "Technox Rock"
+    },
+    {
+      "bank": 3,
+      "program": 119,
+      "map": "Technox Modular 1"
+    },
+    {
+      "bank": 3,
+      "program": 120,
+      "map": "Technox Modular 2"
+    },
+    {
+      "bank": 3,
+      "program": 121,
+      "map": "Technox Kicks & Snares"
+    },
+    {
+      "bank": 3,
+      "program": 122,
+      "map": "Technox Vintage"
+    },
+    {
+      "bank": 3,
+      "program": 123,
+      "map": "Technox Dry"
+    },
+    {
+      "bank": 3,
+      "program": 124,
+      "map": "Technox Dance"
+    },
+    {
+      "bank": 3,
+      "program": 125,
+      "map": "Technox Noisy SFX"
+    },
+    {
+      "bank": 3,
+      "program": 126,
+      "map": "Technox Old Box"
+    }
+  ],
+  "bank_select_method": "1",
+  "controller_semantics": [
+    {
+      "cc": 0,
+      "name": "Bank Select",
+      "kind": "standard",
+      "meaning": "Manual specifies values 0–3: 0=A, 1=B, 2=C, 3=D; follow with Program Change 0–127."
+    },
+    {
+      "cc": 1,
+      "name": "Modulation",
+      "kind": "standard",
+      "meaning": "Modulation wheel; manual says the default modulation-matrix route controls tone/cutoff."
+    },
+    {
+      "cc": 5,
+      "name": "Portamento Time",
+      "kind": "standard",
+      "meaning": "Portamento time controller."
+    },
+    {
+      "cc": 6,
+      "name": "Data Entry",
+      "kind": "standard",
+      "meaning": "Writes the value selected by NRPN or RPN."
+    },
+    {
+      "cc": 7,
+      "name": "Volume",
+      "kind": "standard",
+      "meaning": "Channel volume."
+    },
+    {
+      "cc": 10,
+      "name": "Panorama-position",
+      "kind": "standard",
+      "meaning": "Channel panorama."
+    },
+    {
+      "cc": 64,
+      "name": "Hold-Pedal",
+      "kind": "standard",
+      "meaning": "Hold/sustain pedal."
+    },
+    {
+      "cc": 65,
+      "name": "Porta on/off",
+      "kind": "standard",
+      "meaning": "Portamento switch."
+    },
+    {
+      "cc": 67,
+      "name": "Soft Pedal",
+      "kind": "standard",
+      "meaning": "Soft-pedal switch."
+    },
+    {
+      "cc": 80,
+      "name": "FX1-Type",
+      "kind": "technox",
+      "meaning": "Selects FX1 algorithm; value table is described in the FX1 section of the manual."
+    },
+    {
+      "cc": 81,
+      "name": "FX2-Type",
+      "kind": "technox",
+      "meaning": "Selects FX2 algorithm; value table is described in the FX2 section of the manual."
+    },
+    {
+      "cc": 82,
+      "name": "Arp. Resolution",
+      "kind": "technox",
+      "meaning": "Arpeggiator resolution."
+    },
+    {
+      "cc": 83,
+      "name": "Arp. Speed",
+      "kind": "technox",
+      "meaning": "Arpeggiator speed."
+    },
+    {
+      "cc": 91,
+      "name": "FX1-Send",
+      "kind": "technox",
+      "meaning": "FX1 send level."
+    },
+    {
+      "cc": 93,
+      "name": "FX2-Send",
+      "kind": "technox",
+      "meaning": "FX2 send level."
+    },
+    {
+      "cc": 98,
+      "name": "NRPN LSB",
+      "kind": "standard",
+      "meaning": "Selects NRPN parameter LSB."
+    },
+    {
+      "cc": 99,
+      "name": "NRPN MSB",
+      "kind": "standard",
+      "meaning": "Selects NRPN parameter MSB."
+    },
+    {
+      "cc": 100,
+      "name": "RPN LSB",
+      "kind": "standard",
+      "meaning": "Selects RPN parameter LSB."
+    },
+    {
+      "cc": 101,
+      "name": "RPN MSB",
+      "kind": "standard",
+      "meaning": "Selects RPN parameter MSB."
+    },
+    {
+      "cc": 120,
+      "name": "All Sounds Off",
+      "kind": "standard",
+      "meaning": "All sounds off."
+    },
+    {
+      "cc": 121,
+      "name": "Reset Controllers",
+      "kind": "standard",
+      "meaning": "Reset controllers."
+    },
+    {
+      "cc": 123,
+      "name": "All Notes Off",
+      "kind": "standard",
+      "meaning": "All notes off."
+    },
+    {
+      "cc": 124,
+      "name": "Omni Off",
+      "kind": "standard",
+      "meaning": "Omni mode off."
+    },
+    {
+      "cc": 125,
+      "name": "Omni On",
+      "kind": "standard",
+      "meaning": "Omni mode on."
+    },
+    {
+      "cc": 126,
+      "name": "Mono On",
+      "kind": "standard",
+      "meaning": "Mono mode on."
+    },
+    {
+      "cc": 127,
+      "name": "Poly On",
+      "kind": "standard",
+      "meaning": "Poly mode on."
+    }
+  ],
+  "sysex_parameter_mapping": {
+    "status": "documented",
+    "source": "Quasimidi TechnoX Owner's Manual, sections 17–18, printed pages 32–38",
+    "note": "The 24 Part parameter offsets are documented. The MIDI CC/NRPN/RPN control mappings are documented separately. Do not assume every CC maps one-to-one to a Part SysEx byte."
+  },
+  "part_parameter_map": [
+    {
+      "offset": 0,
+      "hexOffset": "00",
+      "id": "bankNumber",
+      "name": "Bank number",
+      "minimum": 0,
+      "maximum": 3,
+      "notes": "0=A, 1=B, 2=C, 3=D"
+    },
+    {
+      "offset": 1,
+      "hexOffset": "01",
+      "id": "soundNumber",
+      "name": "Sound number",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Zero-based program number"
+    },
+    {
+      "offset": 2,
+      "hexOffset": "02",
+      "id": "trackMode",
+      "name": "Track mode",
+      "minimum": 0,
+      "maximum": 3,
+      "notes": "0=muted, 1=poly, 2=mono, 3=lead"
+    },
+    {
+      "offset": 3,
+      "hexOffset": "03",
+      "id": "level",
+      "name": "Level",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Part volume"
+    },
+    {
+      "offset": 4,
+      "hexOffset": "04",
+      "id": "panorama",
+      "name": "Panorama",
+      "minimum": 0,
+      "maximum": 20,
+      "notes": "Off, fixed L/R, random, key-follow, velocity-follow"
+    },
+    {
+      "offset": 5,
+      "hexOffset": "05",
+      "id": "fx1Send",
+      "name": "FX1 send",
+      "minimum": 0,
+      "maximum": 63,
+      "notes": "Send to FX1"
+    },
+    {
+      "offset": 6,
+      "hexOffset": "06",
+      "id": "fx2Send",
+      "name": "FX2 send",
+      "minimum": 0,
+      "maximum": 63,
+      "notes": "Send to FX2"
+    },
+    {
+      "offset": 7,
+      "hexOffset": "07",
+      "id": "transpose",
+      "name": "Transpose",
+      "minimum": 0,
+      "maximum": 48,
+      "notes": "Display value = raw - 24 semitones"
+    },
+    {
+      "offset": 8,
+      "hexOffset": "08",
+      "id": "tune",
+      "name": "Tune",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 9,
+      "hexOffset": "09",
+      "id": "cutoffFrequency",
+      "name": "Cutoff frequency",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 10,
+      "hexOffset": "0A",
+      "id": "resonanceFrequency",
+      "name": "Resonance frequency",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 11,
+      "hexOffset": "0B",
+      "id": "egAttack",
+      "name": "EG attack",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 12,
+      "hexOffset": "0C",
+      "id": "egDecay",
+      "name": "EG decay",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 13,
+      "hexOffset": "0D",
+      "id": "egRelease",
+      "name": "EG release",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 14,
+      "hexOffset": "0E",
+      "id": "vibratoRate",
+      "name": "Vibrato rate",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 15,
+      "hexOffset": "0F",
+      "id": "vibratoDepth",
+      "name": "Vibrato depth",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 16,
+      "hexOffset": "10",
+      "id": "vibratoDelay",
+      "name": "Vibrato delay",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 17,
+      "hexOffset": "11",
+      "id": "velocityCurve",
+      "name": "Velocity curve number",
+      "minimum": 0,
+      "maximum": 14,
+      "notes": "Named curves listed in manual"
+    },
+    {
+      "offset": 18,
+      "hexOffset": "12",
+      "id": "holdPedal",
+      "name": "Hold pedal",
+      "minimum": 0,
+      "maximum": 1,
+      "notes": "0=off, 1=on"
+    },
+    {
+      "offset": 19,
+      "hexOffset": "13",
+      "id": "modulationDepth",
+      "name": "Modulation depth",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Per-part modulation amount"
+    },
+    {
+      "offset": 20,
+      "hexOffset": "14",
+      "id": "pitchSensitivity",
+      "name": "Pitch sensitivity",
+      "minimum": 0,
+      "maximum": 24,
+      "notes": "Display value = raw - 12 semitones"
+    },
+    {
+      "offset": 21,
+      "hexOffset": "15",
+      "id": "volumeModSensitivity",
+      "name": "Volume modulation sensitivity",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 22,
+      "hexOffset": "16",
+      "id": "toneModSensitivity",
+      "name": "Tone modulation sensitivity",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Display value = raw - 64"
+    },
+    {
+      "offset": 23,
+      "hexOffset": "17",
+      "id": "portamentoTime",
+      "name": "Portamento time",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Portamento time"
+    }
+  ],
+  "nrpn_parameter_map": [
+    {
+      "msb": 1,
+      "lsb": 8,
+      "name": "Pitch modulation speed"
+    },
+    {
+      "msb": 1,
+      "lsb": 9,
+      "name": "Pitch modulation depth"
+    },
+    {
+      "msb": 1,
+      "lsb": 10,
+      "name": "Pitch modulation delay"
+    },
+    {
+      "msb": 1,
+      "lsb": 32,
+      "name": "Cutoff frequency"
+    },
+    {
+      "msb": 1,
+      "lsb": 33,
+      "name": "Resonance"
+    },
+    {
+      "msb": 1,
+      "lsb": 99,
+      "name": "EG attack"
+    },
+    {
+      "msb": 1,
+      "lsb": 100,
+      "name": "EG decay"
+    },
+    {
+      "msb": 1,
+      "lsb": 102,
+      "name": "EG release"
+    },
+    {
+      "msb": 24,
+      "lsb": "key number",
+      "name": "Drum pitch"
+    },
+    {
+      "msb": 26,
+      "lsb": "key number",
+      "name": "Drum level"
+    },
+    {
+      "msb": 28,
+      "lsb": "key number",
+      "name": "Drum panning position"
+    },
+    {
+      "msb": 29,
+      "lsb": "key number",
+      "name": "Drum instrument FX1 send"
+    },
+    {
+      "msb": 30,
+      "lsb": "key number",
+      "name": "Drum instrument FX2 send"
+    }
+  ],
+  "rpn_parameter_map": [
+    {
+      "msb": 0,
+      "lsb": 0,
+      "name": "Pitch-bend range"
+    },
+    {
+      "msb": 0,
+      "lsb": 1,
+      "name": "Fine tune"
+    },
+    {
+      "msb": 0,
+      "lsb": 2,
+      "name": "Coarse tune"
+    }
+  ],
+  "performance_sysex_layout": {
+    "status": "documented",
+    "header": "F0 3F <device/system-channel> 22 44",
+    "performance_address_high_byte_offset": 5,
+    "block_selector_offset": 6,
+    "bulk_dump_data_offset": 7,
+    "performance_address_high_range": "0x05..0x36 (50 Performances)",
+    "block_selectors": {
+      "0": "common",
+      "1": "Part 13",
+      "2": "Part 14",
+      "3": "Part 15",
+      "4": "Part 16",
+      "5": "Performance name"
+    },
+    "note": "The supplied bulk dump omits an explicit low address-offset byte; data begins at byte 7, matching the 24 Part parameter bytes and 65-byte common block described in the manual."
+  },
+  "common_parameter_map": [
+    {
+      "offset": 0,
+      "hexOffset": "00",
+      "id": "performanceLevel",
+      "name": "Performance level",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 1,
+      "hexOffset": "01",
+      "id": "performanceMode",
+      "name": "Performance mode",
+      "minimum": 0,
+      "maximum": 3
+    },
+    {
+      "offset": 2,
+      "hexOffset": "02",
+      "id": "reserved02",
+      "name": "Reserved"
+    },
+    {
+      "offset": 3,
+      "hexOffset": "03",
+      "id": "reserved03",
+      "name": "Reserved"
+    },
+    {
+      "offset": 4,
+      "hexOffset": "04",
+      "id": "freeControllerNumber",
+      "name": "Free controller number",
+      "minimum": 0,
+      "maximum": 97
+    },
+    {
+      "offset": 5,
+      "hexOffset": "05",
+      "id": "footControllerNumber",
+      "name": "Foot controller number",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 6,
+      "hexOffset": "06",
+      "id": "footControlOnValue",
+      "name": "Foot control on value",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 7,
+      "hexOffset": "07",
+      "id": "footControlOffValue",
+      "name": "Foot control off value",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 8,
+      "hexOffset": "08",
+      "id": "footControlToggleMode",
+      "name": "Foot control toggle mode",
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "offset": 9,
+      "hexOffset": "09",
+      "id": "modulationMatrix",
+      "name": "Modulation matrix depths",
+      "count": 32,
+      "maximum": 127,
+      "notes": "Offsets 0x09–0x28; 4 sources × 8 destinations; raw 0..127 represents -64..+63"
+    },
+    {
+      "offset": 41,
+      "hexOffset": "29",
+      "id": "fx1Activity",
+      "name": "FX1 activity",
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "offset": 42,
+      "hexOffset": "2A",
+      "id": "fx1Type",
+      "name": "FX1 type",
+      "minimum": 0,
+      "maximum": 21
+    },
+    {
+      "offset": 43,
+      "hexOffset": "2B",
+      "id": "fx1Page1",
+      "name": "FX1 parameter page 1",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 44,
+      "hexOffset": "2C",
+      "id": "fx1Page2",
+      "name": "FX1 parameter page 2",
+      "minimum": 0,
+      "maximum": 63
+    },
+    {
+      "offset": 45,
+      "hexOffset": "2D",
+      "id": "fx1Page3",
+      "name": "FX1 parameter page 3",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 46,
+      "hexOffset": "2E",
+      "id": "fx1Page4",
+      "name": "FX1 parameter page 4",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 47,
+      "hexOffset": "2F",
+      "id": "fx1Page5",
+      "name": "FX1 parameter page 5",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 48,
+      "hexOffset": "30",
+      "id": "fx1Page6",
+      "name": "FX1 parameter page 6",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 49,
+      "hexOffset": "31",
+      "id": "fx2Activity",
+      "name": "FX2 activity",
+      "minimum": 0,
+      "maximum": 1
+    },
+    {
+      "offset": 50,
+      "hexOffset": "32",
+      "id": "fx2Type",
+      "name": "FX2 type",
+      "minimum": 0,
+      "maximum": 21
+    },
+    {
+      "offset": 51,
+      "hexOffset": "33",
+      "id": "fx2Page1",
+      "name": "FX2 parameter page 1",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 52,
+      "hexOffset": "34",
+      "id": "fx2Page2",
+      "name": "FX2 parameter page 2",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 53,
+      "hexOffset": "35",
+      "id": "fx2Page3",
+      "name": "FX2 parameter page 3",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 54,
+      "hexOffset": "36",
+      "id": "fx2Page4",
+      "name": "FX2 parameter page 4",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 55,
+      "hexOffset": "37",
+      "id": "fx2Page5",
+      "name": "FX2 parameter page 5",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 56,
+      "hexOffset": "38",
+      "id": "fx2Page6",
+      "name": "FX2 parameter page 6",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 57,
+      "hexOffset": "39",
+      "id": "fx2Page7",
+      "name": "FX2 parameter page 7",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 58,
+      "hexOffset": "3A",
+      "id": "fx2Page8",
+      "name": "FX2 parameter page 8",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 59,
+      "hexOffset": "3B",
+      "id": "fx2Page9",
+      "name": "FX2 parameter page 9",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 60,
+      "hexOffset": "3C",
+      "id": "arpeggiatorPack1",
+      "name": "Arpeggiator pack 1",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Bit fields: bit 2 arp on/off; bits 0–1 resolution 4/8/16/32"
+    },
+    {
+      "offset": 61,
+      "hexOffset": "3D",
+      "id": "arpeggiatorSpeed",
+      "name": "Arpeggiator speed",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 62,
+      "hexOffset": "3E",
+      "id": "arpeggiatorGate",
+      "name": "Arpeggiator gate",
+      "minimum": 0,
+      "maximum": 127
+    },
+    {
+      "offset": 63,
+      "hexOffset": "3F",
+      "id": "arpeggiatorPack2",
+      "name": "Arpeggiator pack 2",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Bit fields: bits 5 sync; bits 3–4 direction; bit 1 hold"
+    },
+    {
+      "offset": 64,
+      "hexOffset": "40",
+      "id": "arpeggiatorPack3",
+      "name": "Arpeggiator pack 3",
+      "minimum": 0,
+      "maximum": 127,
+      "notes": "Bit fields: bits 3–6 target track; bit 1 arpeggiator output"
+    }
+  ],
+  "performance_common_frame_layout": {
+    "frameBytes": 73,
+    "dataBytes": 65,
+    "dataStartByte": 7,
+    "dataEndByte": 71,
+    "terminatorByte": 72,
+    "parameterOffsets": "0x00–0x40"
+  }
+}
