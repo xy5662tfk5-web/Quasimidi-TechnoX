@@ -52,6 +52,10 @@ Status: **partially mapped at firmware level; physical device/protocol still unc
 
 - [x] Static IC4 provenance: reachable writer at `0x3829` sets IRAM bit `0x1B` iff SFR `0x8E == 1` at the check; `0xAF05` conditionally switches SFR `0x8E` from 1 to 2 for one `MOVX @R0,A), then restores 1.
 - [x] Identify P3 control activity: P3.2 is cleared at `0x34EB`, `0xAF1A`, and `0xB34D`, and set at `0xAF73`; P3.1/P3.4/P3.5 are also actively sequenced around external reads. These are firmware-level observations, not confirmed pin functions.
+- [x] Decode the host-port helper structure: `0x0DB7` writes R5 selector + R2/R3/R4 payload; `0x0DCE` synchronizes its internal phase bit to R4.7, emits `0x40/0xC0` on offset 3 only when the phase changes, then reads back offsets 1–3 into R2/R3/R4; `0x0E21` is a separate phase-code + selector operation.
+- [x] Add P3 write provenance: port writes now retain PC, previous/new latch, changed mask, P2 and SFR `0x8E`; separate P3.2 control writes are retained even when the bit does not change. The real-ROM boot test asserts P3.2 write sites `0xAF1A` and `0xAF73`. Full CTest/unit-test workflow passed 29/29 steps.
+- [ ] Establish the external semantics of the phase-triggered offset-2 read. Its return value is discarded by IC4 immediately, so it may be a read-side-effect handshake, but this must be verified rather than labelled ACK.
+
 - [ ] Create a single chronological merged report of each `0x8000–0x8003` transaction with instruction/caller PC, P2/P3, SFR `0x8E`, P3.2 level, IC51 selection, cycle, and preceding/following `0xFF10` and IC51 activity. Existing per-byte contexts exist; the cross-interface timeline is still missing.
 - [ ] Separate boot/configuration, external-memory load, Note On, Note Off, pitch, controller, and FX traffic using isolated stimuli.
 - [ ] Determine the four host-register meanings only from repeatable evidence; retain neutral register names until then.
