@@ -67,9 +67,9 @@ Therefore, the current C++ name `soundDeviceResetReleased` is a **working hypoth
 
 ## 3. P3.1, P3.4 and P3.5 are actively sequenced
 
-The reachable routine around `0xB385–0xB3BB` reads three control bits (P3.0, P3.1 and P3.2 in the code's bit-address representation used there) and conditionally clears P3.5, P3.4 and P3.1, performs external reads, then restores those output bits. The resource/IC51 code also repeatedly toggles P3.5, P3.4 and P3.1 around byte reads.
+The reachable routine around `0xB385–0xB3BB` tests bit addresses `0xE0`, `0xE1` and `0xE2` (ACC.0–ACC.2), then conditionally clears P3.5, P3.4 and P3.1, performs external reads, and restores those output bits. The resource/IC51 code also repeatedly toggles P3.5, P3.4 and P3.1 around byte reads.
 
-This confirms that P3 is not merely a static reset word: several individual lines participate in address/select/transfer sequencing. Existing code already uses the P3 patterns to decide when IC51 is selected. Keep signal names neutral (P3.1, P3.2, P3.4, P3.5) until the electrical mapping is checked against a board schematic or pin capture.
+This confirms that P3 is not merely a static reset word: several individual lines participate in address/select/transfer sequencing. Existing code already uses P3 patterns to decide when IC51 is selected. Keep signal names neutral (P3.1, P3.2, P3.4, P3.5) until the electrical mapping is checked against a board schematic or pin capture.
 
 Only two reachable whole-port P3 writes were found in this pass: `0x34DF: MOV P3,#0xFF` and reset-vector `0xEB35: MOV P3,#0xFF`. Most later changes are bit-address writes. The MCS-51 core's bit-write path updates the whole port latch through `writeInternal`, so the machine trace can capture both whole-port writes and bit transitions if it stores the instruction PC and previous/new latch values.
 
