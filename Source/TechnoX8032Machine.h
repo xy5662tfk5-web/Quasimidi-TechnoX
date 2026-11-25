@@ -2060,10 +2060,15 @@ private:
     void recordPitchSourceDataAccess(std::uint16_t address,
                                       std::uint8_t value,
                                       bool write) noexcept {
+        const bool indexedCurveSourceAddress =
+            address >= 0x7c29u && address <= 0x7d91u &&
+            ((address - 0x7c29u) % 0x18u) == 0u;
         const bool pitchSourceAddress =
             (address >= 0x0081u && address <= 0x0083u) ||
             (address >= 0x0091u && address <= 0x0093u) ||
-            address == 0x2018u || address == 0x2019u;
+            (address >= 0x2000u && address <= 0x201fu) ||
+            (address >= 0x2054u && address <= 0x2063u) ||
+            indexedCurveSourceAddress;
         if (!pitchSourceAddress)
             return;
         auto& event = pitchSourceDataAccessTrace_[
