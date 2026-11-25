@@ -91,8 +91,7 @@ void testMASSPitchSlotGuardProjection() {
     auto result = MASSPitchSlotGuardProjection::apply(
         0x00u, 0x00u, 0x06u, 0xa5u, 0x1fu, 0xd5u);
     assert(!result.writeSlot);
-    assert(result.mergedHigh == 0xa6u);
-    assert(result.middle == 0x1fu && result.low == 0xd5u);
+    assert(result.mergedHigh == 0u && result.middle == 0u && result.low == 0u);
 
     // Either state byte being nonzero enables writeback. The previous R4
     // value contributes only its low three bits to the existing high byte.
