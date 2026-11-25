@@ -53,3 +53,45 @@ The next discriminating firmware/hardware test is to map the 8032 port and P3 st
 ## Important limitation
 
 This note is a testable hardware hypothesis, not a chip identification. The generic oscillator backend remains a test backend; no original TechnoX audio is produced yet.
+
+## Protocol-layer audit after the FX stream runtime trace
+
+The current firmware evidence is best treated as three distinct external-bus paths. They must not be collapsed into one assumed SAM9407 interface:
+
+1. **Four-byte command window (0x8000..0x8003).** Firmware helper 0x0DB7 writes [R5, R2, R3, R4] after selecting P2 page 0x80. Helper 0x0DCE conditionally toggles bit 0x0C, writes 0x40 or 0xC0 to offset 3, then reads offset 2. The machine model records these events and their P2/P3, SFR 0x8E, PC, return-PC and cycle context. The first byte is retained as an opaque command/latch byte; no SAM9407 register number is assigned.
+
+2. **Mode-dependent byte aperture (0xFF10).** In the current 8032 bus model, reads/writes outside bus mode 2 are treated as device status/data traffic; in mode 2, the same address is the external sound-memory aperture. The IC51 FX upload routines 0xAF93 and 0xB015 send their decoded resource bytes through this path. A startup read value of 0xAC is injected by the current regression fixture; it is not an observed hardware response.
+
+3. **Paged external memory (0xC000..0xFFFF).** IC4 copies a 13,647-byte IC51 payload into this 16-KiB window. The mapping is verified byte-for-byte against execution of the firmware, but the destination's physical memory owner and the copied block's role are not yet known.
+
+### What the FX runtime regression now proves
+
+The IC4 FX2 loader at 0x88D1 is executed against the real ROM for Equalizr1 (index 14). The test verifies that the Stream-A data sent to 0xFF10 in mode 2 matches the IC51 resolver byte-for-byte: selector 0x42, source address 0x4F02, count 0x3A, preamble 15 00, and 174 payload bytes (177 writes including the count and preamble). Stream B selector 0x43 skips leading byte 0x74 and terminates on zero count at 0x4D6D, so it emits no upload bytes for this algorithm. This confirms the firmware-to-resource transport path, not the receiver's interpretation or the audible Equalizer algorithm.
+
+The two stream encodings are different:
+- 0xAF93: count byte, two preamble bytes, then count * 3 payload bytes.
+- 0xB015: circular-right-rotated count, three preamble bytes, then count payload bytes; its pointer walk skips the leading/inter-block separator bytes.
+
+### SAM9407 pin-level discriminator
+
+The February 1996 Dream SAM9407 data sheet describes a 144-pin device with a host interface that uses A0-A2, CS/, RD/, WR/, SBHE/ and a 16-bit D0-D15 bus. Its register map is eight locations: 0/1 are MPU-401 UART, 2/3 are the 16-bit burst port, and 4-7 are auxiliary/game-compatible registers. The datasheet pinout gives the following inspection targets:
+
+| Signal | SAM9407 pin |
+|---|---:|
+| A0 / A1 / A2 | 89 / 101 / 102 |
+| RD/ / WR/ / CS/ | 99 / 97 / 134 |
+| RESET/ / BOOT | 19 / 37 |
+| S0 / S1 / RUN | 136 / 139 / 26 |
+| P0 / P1 / P2 / P3 | 57 / 58 / 59 / 60 |
+
+The TechnoX trace does not yet map the 8032 pins or external latches to these SAM9407 pins. A four-byte XDATA window is not itself evidence of an eight-register SAM9407 host interface: external address decoding or glue logic could alter the mapping, but that possibility must be demonstrated from P2/P3/SFR 0x8E transitions or a board-level connection trace.
+
+### Required compatibility checks before implementing a SAM9407 model
+
+- Identify the marking/package on the TechnoX sound IC. A SAM9407 hypothesis must be confirmed by the actual part marking or an unambiguous board-level trace.
+- Reconstruct the active-low CS/, RD/, WR/, RESET/ and BOOT waveforms from every relevant P2/P3/SFR 0x8E transition, not just the byte written to XDATA.
+- Determine whether the two 256-entry sweeps at caller 0x0E6A are host register initialization, memory address/data phases, or something else. Do not equate them with the datasheet's 256-word bootstrap transfer.
+- Trace the 0xFF10 status-read loop and the origin of the expected 0xAC without the synthetic test override.
+- Follow subsequent reads of the C000-FFFF image and establish which device drives that memory window.
+
+**Implementation decision:** keep the current receiver model open-bus/conservative and retain neutral signal names until these checks establish the hardware mapping. A SAM9407 P16/DSP/MMU/FX implementation must not be added merely because the chip family is plausible. Once identified, the firmware-derived FX upload streams can be connected to the confirmed host/memory interface, then FX1/FX2 DSP behavior can be reconstructed against the manuals and the IC51 resource data.
