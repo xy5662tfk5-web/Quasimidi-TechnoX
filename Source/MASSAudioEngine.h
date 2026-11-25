@@ -13,6 +13,7 @@ namespace technox {
 class MASSResourceProgramCatalog;
 class MASSFX1ResourceCatalog;
 class MASSFX2ResourceCatalog;
+class MASSFXUploadPlanCatalog;
 class MASSIC51ExternalSoundMemoryImage;
 
 class MASSPartParameterStore {
@@ -413,6 +414,7 @@ public:
     virtual void setProgramCatalog(const MASSResourceProgramCatalog*) noexcept {}
     virtual void setFX1ResourceCatalog(const MASSFX1ResourceCatalog*) noexcept {}
     virtual void setFX2ResourceCatalog(const MASSFX2ResourceCatalog*) noexcept {}
+    virtual void setFXUploadPlanCatalog(const MASSFXUploadPlanCatalog*) noexcept {}
     virtual void setExternalSoundMemoryImage(
         const MASSIC51ExternalSoundMemoryImage*) noexcept {}
     virtual void setDrumSet(int /*partIndex*/, int /*drumSet*/) noexcept {}
@@ -470,6 +472,7 @@ public:
         backend_->setProgramCatalog(programCatalog_);
         backend_->setFX1ResourceCatalog(fx1ResourceCatalog_);
         backend_->setFX2ResourceCatalog(fx2ResourceCatalog_);
+        backend_->setFXUploadPlanCatalog(fxUploadPlanCatalog_);
         backend_->setExternalSoundMemoryImage(externalSoundMemoryImage_);
         for (std::size_t part = 0; part < MASSDrumSetStore::kPartCount; ++part)
             backend_->setDrumSet(static_cast<int>(part), drumSets_.get(static_cast<int>(part)));
@@ -505,6 +508,17 @@ public:
     }
     const MASSFX2ResourceCatalog* fx2ResourceCatalog() const noexcept {
         return fx2ResourceCatalog_;
+    }
+
+    // Exact FX1/FX2 FF10 wire images prebuilt at processor startup. The
+    // backend can select an immutable byte plan without ROM parsing or
+    // allocation on the audio thread; this does not interpret DSP commands.
+    void setFXUploadPlanCatalog(const MASSFXUploadPlanCatalog* catalog) noexcept {
+        fxUploadPlanCatalog_ = catalog;
+        backend_->setFXUploadPlanCatalog(fxUploadPlanCatalog_);
+    }
+    const MASSFXUploadPlanCatalog* fxUploadPlanCatalog() const noexcept {
+        return fxUploadPlanCatalog_;
     }
 
     // Immutable, firmware-reconstructed C000-FFFF image. The DSP backend
@@ -895,6 +909,7 @@ private:
     const MASSResourceProgramCatalog* programCatalog_ = nullptr;
     const MASSFX1ResourceCatalog* fx1ResourceCatalog_ = nullptr;
     const MASSFX2ResourceCatalog* fx2ResourceCatalog_ = nullptr;
+    const MASSFXUploadPlanCatalog* fxUploadPlanCatalog_ = nullptr;
     const MASSIC51ExternalSoundMemoryImage* externalSoundMemoryImage_ = nullptr;
     double preparedSampleRate_ = 44100.0;
     int preparedMaximumBlockSize_ = 0;
