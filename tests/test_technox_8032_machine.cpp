@@ -1618,6 +1618,28 @@ int main(int argc, char** argv) {
                 technox::MASSFXProcessorFamily::fx2, 2, 14) == nullptr);
             assert(fxUploadPlans.find(
                 technox::MASSFXProcessorFamily::fx2, 0, 21) == nullptr);
+            assert(fxUploadPlans.find(
+                static_cast<technox::MASSFXProcessorFamily>(0xffu), 0, 0) == nullptr);
+            for (int bank = 0; bank < 2; ++bank) {
+                for (int effect = 0; effect < 21; ++effect) {
+                    const auto* fx1Source = fx1Catalog.find(bank, effect);
+                    const auto* fx2Source = fx2Catalog.find(bank, effect);
+                    const auto* fx1Plan = fxUploadPlans.find(
+                        technox::MASSFXProcessorFamily::fx1, bank, effect);
+                    const auto* fx2Plan = fxUploadPlans.find(
+                        technox::MASSFXProcessorFamily::fx2, bank, effect);
+                    assert(fx1Source != nullptr && fx2Source != nullptr);
+                    assert(fx1Plan != nullptr && fx2Plan != nullptr);
+                    assert(fx1Plan->bank == bank && fx1Plan->effectIndex == effect);
+                    assert(fx2Plan->bank == bank && fx2Plan->effectIndex == effect);
+                    assert(fx1Plan->totalPortBytes() ==
+                           fx1Source->streamAResource.portWriteByteCount +
+                           fx1Source->streamBResource.portWriteByteCount);
+                    assert(fx2Plan->totalPortBytes() ==
+                           fx2Source->streamAResource.portWriteByteCount +
+                           fx2Source->streamBResource.portWriteByteCount);
+                }
+            }
 
             // Execute the original FX1 loader at 0x8004. The two firmware
             // routines must emit the same ordered bytes as the prebuilt plan.
