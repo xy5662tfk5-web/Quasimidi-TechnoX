@@ -884,7 +884,7 @@ void testOriginalVoiceProgramRuntime(const char* romPath) {
     std::uint8_t memoryByte = 0;
     assert(runtime.readExternalSoundMemory(0xc000u, memoryByte));
     assert(!runtime.readExternalSoundMemory(0xbfffu, memoryByte));
-    assert(!runtime.readExternalSoundMemory(0xffffu + 1u, memoryByte));
+    assert(!runtime.readExternalSoundMemory(0x0000u, memoryByte));
 
     runtime.noteOff(4);
     assert(runtime.bindingForVoice(4)->releasing);
@@ -921,12 +921,16 @@ void testOriginalVoiceProgramRuntime(const char* romPath) {
     voice.velocity = 104;
     voice.bankNumber = 0;
     voice.soundNumber = 0;
-    assert(backend.noteOn(1, voice), true);
+    backend.noteOn(1, voice);
     const auto* liveBinding = backend.originalProgramBindingForTesting(1);
     assert(liveBinding != nullptr && liveBinding->active);
-    assert(backend.originalProgramCommandForTesting(1, false, 0) ==
-           backend.originalProgramCommandForTesting(1, true, 0) ||
-           backend.originalProgramCommandForTesting(1, false, 0) != nullptr);
+    assert(liveBinding->variants[0] != nullptr && liveBinding->variants[1] != nullptr);
+    const auto* normalCommand = backend.originalProgramCommandForTesting(1, false, 0);
+    const auto* flagACommand = backend.originalProgramCommandForTesting(1, true, 0);
+    assert(normalCommand == (liveBinding->variants[0]->stream.commands.empty()
+        ? nullptr : &liveBinding->variants[0]->stream.commands[0]));
+    assert(flagACommand == (liveBinding->variants[1]->stream.commands.empty()
+        ? nullptr : &liveBinding->variants[1]->stream.commands[0]));
     assert(backend.readOriginalSoundMemoryForTesting(0xc000u, memoryByte));
     backend.noteOff(1, voice);
     assert(backend.originalProgramBindingForTesting(1)->releasing);
