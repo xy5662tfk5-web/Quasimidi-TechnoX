@@ -95,3 +95,35 @@ The TechnoX trace does not yet map the 8032 pins or external latches to these SA
 - Follow subsequent reads of the C000-FFFF image and establish which device drives that memory window.
 
 **Implementation decision:** keep the current receiver model open-bus/conservative and retain neutral signal names until these checks establish the hardware mapping. A SAM9407 P16/DSP/MMU/FX implementation must not be added merely because the chip family is plausible. Once identified, the firmware-derived FX upload streams can be connected to the confirmed host/memory interface, then FX1/FX2 DSP behavior can be reconstructed against the manuals and the IC51 resource data.
+
+## IC4 startup signature poll traced to instructions
+
+The new FF10 read trace was run through the real descrambled IC4 v1.05 image. The reachable disassembly at `AF1A..AF92` shows the following control flow:
+
+- `AF1A` starts the IC51 bulk-loader sequence, clears firmware bit `0xB2`, selects P2=`0xFF` and R0=`0x10`, then writes `0xFF` through `MOVX @R0` at `AF29`.
+- After the resource transfer loop, `AF73` sets bit `0xB2` and performs a fixed delay.
+- `AF7D` again selects P2=`0xFF` and R0=`0x10`. At `AF88`, `MOVX A,@R0` reads the resulting `0xFF10` byte.
+- `AF89` optionally restores SFR `0x8E` to `0x01` when firmware bit `0x1B` is set. `AF8F` compares the read byte with `0xAC`: mismatch jumps back to `AF1A` and restarts the loader sequence; match falls through to `AF92 RET`.
+
+The firmware therefore demonstrably expects the signature byte `0xAC` at this post-transfer read. This is a code-level firmware expectation, not proof that the physical device returns that value or that `0xAC` has been decoded as a documented chip status bit pattern.
+
+### Regression trace from CI run 1552
+
+With the test fixture deliberately injecting `0xAC`, the new trace captured exactly one read:
+
+| Field | Captured value |
+|---|---:|
+| XDATA address | `0xFF10` |
+| Read instruction PC | `0xAF88` |
+| Caller return PC | `0x38F4` |
+| P2 / P3 | `0xFF / 0xFE` |
+| SFR `0x8E` at read | `0x00` |
+| Sound-device reset | released |
+| Returned byte | `0xAC` (test injection only) |
+| Machine cycle | `3001381` |
+
+The read occurs with firmware bit `0x1B` clear, so the conditional `0x8E` mode-2 setup at `AF85` is skipped. This capture establishes the exact code path and bus context for the synthetic-ready test. It does not establish the physical status response.
+
+### Next discriminator
+
+Trace all writes and state transitions affecting bit `0x1B` and SFR `0x8E` through both bulk-resource loading and the `0xAF05` byte-write helper. Their relationship must be understood before assigning mode 0/1/2 to physical CS/RD/WR, SRAM or DSP operations. Keep the receiver model conservative until the actual IC marking or pin-level mapping confirms the device.
