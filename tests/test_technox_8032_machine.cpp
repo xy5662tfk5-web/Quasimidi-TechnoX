@@ -4190,7 +4190,7 @@ int main(int argc, char** argv) {
         constexpr std::size_t kIndexedCurveCallerCount = 3u;
         const auto callerIndex = [](std::uint16_t returnPC) noexcept {
             if (returnPC == 0x3f1bu) return 0;
-            if (returnPC == 0x484eu) return 1;
+            if (returnPC == 0x484cu) return 1;
             if (returnPC == 0x4c8eu) return 2;
             return -1;
         };
