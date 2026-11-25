@@ -4118,6 +4118,62 @@ int main(int argc, char** argv) {
         };
         assert(hasNote72ResourceRead(0x2019u, 0x06u, 0x1e4bu));
         assert(hasNote72ResourceRead(0x2018u, 0x00u, 0x1e51u));
+
+        // Handler 0x6D81 implements guard = abs(source - 0x18).
+        // Its source byte is read from the synthetic 0x7C00-0x7FFF
+        // endpoint at 0x7C29 + 0x18*slot (PC 0x6D91), then the normalized
+        // guard is written to XDATA 0x2054 + slot (PC 0x6DAB/0x6DC4).
+        std::array<std::array<bool, 2>, 16> curveSourceSeen{};
+        std::array<std::array<bool, 2>, 16> curveGuardSeen{};
+        std::array<std::array<std::uint8_t, 2>, 16> curveSourceValue{};
+        std::array<std::array<std::uint8_t, 2>, 16> curveGuardValue{};
+        const auto curveCallerIndex = [](std::uint16_t returnPC) noexcept {
+            return returnPC == 0x6f19u ? 0 :
+                   returnPC == 0xbdadu ? 1 : -1;
+        };
+        for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
+            const auto& access =
+                firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+            const int callerIndex = curveCallerIndex(access.stackReturnPC);
+            if (callerIndex < 0)
+                continue;
+            if (!access.write && access.instructionPC == 0x6d91u &&
+                access.address >= 0x7c29u && access.address <= 0x7d91u &&
+                ((access.address - 0x7c29u) % 0x18u) == 0u) {
+                const auto slot = static_cast<std::size_t>(
+                    (access.address - 0x7c29u) / 0x18u);
+                curveSourceSeen[slot][static_cast<std::size_t>(callerIndex)] = true;
+                curveSourceValue[slot][static_cast<std::size_t>(callerIndex)] =
+                    access.value;
+            }
+            if (access.write &&
+                (access.instructionPC == 0x6dabu ||
+                 access.instructionPC == 0x6dc4u) &&
+                access.address >= 0x2054u && access.address <= 0x2063u) {
+                const auto slot = static_cast<std::size_t>(
+                    access.address - 0x2054u);
+                curveGuardSeen[slot][static_cast<std::size_t>(callerIndex)] = true;
+                curveGuardValue[slot][static_cast<std::size_t>(callerIndex)] =
+                    access.value;
+            }
+        }
+        std::size_t curveSourceGuardPairs = 0;
+        for (std::size_t slot = 0; slot < curveSourceSeen.size(); ++slot) {
+            for (std::size_t caller = 0; caller < curveSourceSeen[slot].size(); ++caller) {
+                if (!curveSourceSeen[slot][caller] ||
+                    !curveGuardSeen[slot][caller])
+                    continue;
+                const auto source = curveSourceValue[slot][caller];
+                const auto expectedGuard = static_cast<std::uint8_t>(
+                    source >= 0x18u ? source - 0x18u : 0x18u - source);
+                assert(curveGuardValue[slot][caller] == expectedGuard);
+                ++curveSourceGuardPairs;
+            }
+        }
+        assert(curveSourceGuardPairs >= 16u);
+        std::printf("NOTE72 PARAMETER-20 SOURCE -> GUARD: %zu matched slot/caller pairs "
+                    "(guard=abs(source-0x18)); source window is synthetic test RAM\\n",
+                    curveSourceGuardPairs);
         std::printf("NOTE72 PITCH SOURCE ACCESS: count=%zu\\n",
                     note72PitchSourceAccessCount);
         for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
