@@ -46,3 +46,24 @@ The ring buffer retains 4,096 unmapped accesses. Existing 0x7000-0x7FFF read/wri
 ## Current sound-engine status
 
 This trace is reverse-engineering instrumentation, not a working audio engine. The IC51 transfer into the modeled 0xC000-0xFFFF window is verified byte-for-byte, but sample encoding, sample boundaries, voice commands, physical device identity, and playback timing remain unresolved.
+
+
+## Adjacent 0x7BD9–0x7BDC FX event mailbox
+
+The FX event path exposes a second, adjacent external-input group immediately below the original 0x7Cxx trace window. It is not an IC51 stream address and it is not the FX selector destination:
+
+- `0x306A` reads `XDATA[0x7BDC]`; its value selects one of two event branches.
+- When the value is zero, IC4 enters the `0x3070` branch. When nonzero, it enters `0x307A`.
+- Both branches call `0x40C4`, which reads the command byte from `0x7BD9` and selects a value byte from `0x7BDA` or `0x7BDB`.
+- The selected event fields are forwarded to `0x57A8` as the three-register tuple R7/R5/R3. The subsequent Part fan-out and subcommand dispatcher can route FX commands `0x50` and `0x51` to their separate store handlers `0x53F3` and `0x5429`.
+- Those terminal handlers require `XDATA[0x3702] == IRAM[0x68]` and a **nonzero** `XDATA[0x3708]` gate before storing the clamped effect selector at `0x7BFE` or `0x7C06`.
+
+Instruction anchors for the mailbox reads are `0x306D` (7BDC), `0x40CF` (7BD9), `0x40D6` (7BDA), and `0x40DE` (7BDB). The reachable disassembly contains explicit read constructions for these addresses; it does not show a corresponding explicit IC4 MOVX write to the four-byte mailbox. Its physical writer/device is therefore still unidentified. Indirectly constructed writes or another processor remain possible and must not be ruled out by the static scan alone.
+
+The regression harness now includes explicit test-overlay bytes and checks the real IC4 execution from `0x306A` through the branch, `0x40C4`, `0x57A8`, Part fan-out and FX handler. It also checks the recorded read PCs/address/value for 7BDC → 7BD9 → the selected 7BDA/7BDB source. These are deterministic firmware-path tests, not a capture from a physical TechnoX board.
+
+Keep this region separate from:
+- `0x7BFE/0x7C06`: IC4-written FX selector slots;
+- `0x7C00–0x7FFF`: status/resource peripheral window under investigation;
+- `0x8000–0x8003`: four-byte SoundHost command/readback port;
+- `0xFF10`: mode-dependent IC51 FX upload/status port.
