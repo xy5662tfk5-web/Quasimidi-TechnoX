@@ -3980,6 +3980,7 @@ int main(int argc, char** argv) {
         const auto note72PacketStart = firmwareMachine.soundCommandPacketCount();
         const auto note72VelocityHelperCallStart =
             firmwareMachine.watchedCallCount(0x1848u);
+        const auto note72IC51TraceStart = firmwareMachine.ic51ReadTraceCount();
         firmwareMachine.clearInstructionWatchForTesting();
         firmwareMachine.clearIndexedPairMathWatchForTesting();
         firmwareMachine.clearSlotInterpolationDataAccessTraceForTesting();
@@ -3988,6 +3989,7 @@ int main(int argc, char** argv) {
         runRealMidiStage("Note On pitch 72 after releasing pitch 66",
                          note72On.data(), note72On.size());
         firmwareMachine.disableExecutionTraceForTesting();
+        const auto note72IC51TraceEnd = firmwareMachine.ic51ReadTraceCount();
         const auto note72PacketCount =
             firmwareMachine.soundCommandPacketCount() - note72PacketStart;
         assert(note72PacketCount == 549u);
@@ -4174,6 +4176,165 @@ int main(int argc, char** argv) {
         std::printf("NOTE72 PARAMETER-20 SOURCE -> GUARD: %zu matched slot/caller pairs "
                     "(guard=abs(source-0x18)); source window is synthetic test RAM\\n",
                     curveSourceGuardPairs);
+
+        // Correlate the 4x24-byte Part payload copied by IC4 loader 0xB475
+        // with the exact IC51 bank-0 bytes read by B4D8 and the 7Cxx overlay
+        // bytes later consumed by parameter handler 0x6D81.
+        struct Note72IC51PerformanceTransfer {
+            bool hasPointerHigh = false;
+            bool hasPointerLow = false;
+            bool addressSequenceValid = true;
+            std::uint16_t pointerTableAddress = 0;
+            std::uint16_t sourceAddress = 0;
+            std::uint8_t pointerHigh = 0;
+            std::uint8_t pointerLow = 0;
+            std::size_t nameReads = 0;
+            std::size_t commonReads = 0;
+            std::size_t partReads = 0;
+            std::size_t dataCount = 0;
+            std::array<std::uint8_t, 169> data{};
+        };
+        constexpr std::size_t kMaxNote72IC51Transfers = 8u;
+        constexpr std::size_t kNoNote72IC51Transfer =
+            static_cast<std::size_t>(-1);
+        std::array<Note72IC51PerformanceTransfer,
+                   kMaxNote72IC51Transfers> note72IC51Transfers{};
+        std::size_t note72IC51TransferCount = 0;
+        std::size_t activeNote72IC51Transfer = kNoNote72IC51Transfer;
+        const auto firstRetainedIC51Read = note72IC51TraceEnd > 16384u
+            ? note72IC51TraceEnd - 16384u : 0u;
+        const auto firstNote72IC51Read =
+            std::max(note72IC51TraceStart, firstRetainedIC51Read);
+        for (std::size_t i = firstNote72IC51Read;
+             i < note72IC51TraceEnd; ++i) {
+            const auto& event = firmwareMachine.ic51ReadTraceAt(i);
+            if (event.bank != 0u || event.returnPC != 0xb8e2u)
+                continue;
+
+            if (event.instructionPC == 0xb48bu) {
+                assert(note72IC51TransferCount <
+                       note72IC51Transfers.size());
+                activeNote72IC51Transfer = note72IC51TransferCount++;
+                auto& transfer =
+                    note72IC51Transfers[activeNote72IC51Transfer];
+                transfer.pointerTableAddress = event.address;
+                transfer.pointerHigh = event.value;
+                transfer.hasPointerHigh = true;
+                continue;
+            }
+            if (event.instructionPC == 0xb48eu) {
+                assert(activeNote72IC51Transfer != kNoNote72IC51Transfer);
+                auto& transfer =
+                    note72IC51Transfers[activeNote72IC51Transfer];
+                assert(transfer.hasPointerHigh);
+                assert(event.address == static_cast<std::uint16_t>(
+                    transfer.pointerTableAddress + 1u));
+                transfer.pointerLow = event.value;
+                transfer.hasPointerLow = true;
+                transfer.sourceAddress = static_cast<std::uint16_t>(
+                    (static_cast<std::uint16_t>(transfer.pointerHigh) << 8u) |
+                    transfer.pointerLow);
+                continue;
+            }
+
+            const bool nameRead = event.instructionPC == 0xb4a2u;
+            const bool commonRead = event.instructionPC == 0xb4bdu;
+            const bool partRead = event.instructionPC == 0xb4d8u;
+            if (!nameRead && !commonRead && !partRead)
+                continue;
+            assert(activeNote72IC51Transfer != kNoNote72IC51Transfer);
+            auto& transfer =
+                note72IC51Transfers[activeNote72IC51Transfer];
+            assert(transfer.hasPointerHigh && transfer.hasPointerLow);
+            const auto dataIndex = transfer.dataCount;
+            if (nameRead) {
+                assert(dataIndex < 8u);
+                ++transfer.nameReads;
+            } else if (commonRead) {
+                assert(dataIndex >= 8u && dataIndex < 73u);
+                ++transfer.commonReads;
+            } else {
+                assert(dataIndex >= 73u && dataIndex < 169u);
+                ++transfer.partReads;
+            }
+            const auto expectedAddress = static_cast<std::uint16_t>(
+                transfer.sourceAddress + dataIndex);
+            if (event.address != expectedAddress)
+                transfer.addressSequenceValid = false;
+            assert(event.address == expectedAddress);
+            transfer.data[dataIndex] = event.value;
+            ++transfer.dataCount;
+        }
+
+        std::array<bool, 4> note72Part20DestinationSeen{};
+        std::array<std::uint8_t, 4> note72Part20DestinationValue{};
+        constexpr std::array<std::uint16_t, 4> kNote72Part20Destination{{
+            0x7d49u, 0x7d61u, 0x7d79u, 0x7d91u
+        }};
+        for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
+            const auto& access =
+                firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+            if (!access.write || access.instructionPC != 0xb4dcu ||
+                access.stackReturnPC != 0xb8e2u)
+                continue;
+            for (std::size_t part = 0;
+                 part < kNote72Part20Destination.size(); ++part) {
+                if (access.address != kNote72Part20Destination[part])
+                    continue;
+                note72Part20DestinationSeen[part] = true;
+                note72Part20DestinationValue[part] = access.value;
+            }
+        }
+
+        std::size_t completeNote72IC51Transfers = 0;
+        std::size_t matchedNote72IC51PartPayloads = 0;
+        for (std::size_t transferIndex = 0;
+             transferIndex < note72IC51TransferCount; ++transferIndex) {
+            const auto& transfer = note72IC51Transfers[transferIndex];
+            if (!transfer.hasPointerHigh || !transfer.hasPointerLow ||
+                transfer.dataCount != 169u)
+                continue;
+            ++completeNote72IC51Transfers;
+            assert(transfer.addressSequenceValid);
+            assert(transfer.nameReads == 8u);
+            assert(transfer.commonReads == 65u);
+            assert(transfer.partReads == 96u);
+
+            bool matchesCurrentPartRecords = true;
+            for (std::size_t part = 0; part < 4u; ++part) {
+                const auto sourceIndex = 8u + 65u + 24u * part + 20u;
+                const auto slot = 12u + part;
+                assert(note72Part20DestinationSeen[part]);
+                const auto copiedValue = transfer.data[sourceIndex];
+                if (copiedValue != note72Part20DestinationValue[part])
+                    matchesCurrentPartRecords = false;
+                for (std::size_t caller = 0; caller < 2u; ++caller) {
+                    assert(curveSourceSeen[slot][caller]);
+                    if (curveSourceValue[slot][caller] != copiedValue)
+                        matchesCurrentPartRecords = false;
+                }
+            }
+            if (matchesCurrentPartRecords) {
+                ++matchedNote72IC51PartPayloads;
+                std::printf("NOTE72 IC51->PERFORMANCE->PITCH SENSITIVITY: "
+                            "bank=0 pointer[%04X]=%04X, 169 bytes (8/65/96); "
+                            "Part13..16 +20 = %02X/%02X/%02X/%02X, "
+                            "overlay and 6D81 reads matched\\n",
+                            static_cast<unsigned>(transfer.pointerTableAddress),
+                            static_cast<unsigned>(transfer.sourceAddress),
+                            static_cast<unsigned>(transfer.data[93]),
+                            static_cast<unsigned>(transfer.data[117]),
+                            static_cast<unsigned>(transfer.data[141]),
+                            static_cast<unsigned>(transfer.data[165]));
+            }
+        }
+        assert(completeNote72IC51Transfers > 0u);
+        assert(matchedNote72IC51PartPayloads > 0u);
+        std::printf("NOTE72 IC51 169-BYTE TRANSFERS: complete=%zu matched-Part-payload=%zu "
+                    "scanned reads=%zu\\n",
+                    completeNote72IC51Transfers, matchedNote72IC51PartPayloads,
+                    note72IC51TraceEnd - firstNote72IC51Read);
+
         std::printf("NOTE72 PITCH SOURCE ACCESS: count=%zu\\n",
                     note72PitchSourceAccessCount);
         for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
