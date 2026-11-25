@@ -97,6 +97,12 @@ A future backend should support:
 
 Do not select a codec or synthesis algorithm from ROM entropy alone. First identify the complete ROM set, decode candidate sample structures, and compare dry reference recordings from a real TechnoX.
 
+### Verified FX upload-plan handoff
+
+The original IC4 FX1/FX2 loader streams are now serialized into exact ordered `0xFF10` bytes and prebuilt into an immutable `MASSFXUploadPlanCatalog` for both IC51 banks and all 21 indices in each family (84 plans). The JUCE processor creates this catalog during startup and passes it through `MASSAudioEngine` / `IMASSVoiceBackend::setFXUploadPlanCatalog`; backend replacement preserves the pointer. Lookup is fixed-index and does not parse ROM data or allocate in the real-time callback.
+
+This closes the verified resource-to-backend byte transport handoff only. The catalog does not identify the receiving DSP's register map or interpret the stream bytes, and no original FX algorithm is rendered. FX1/FX2 selector provenance from a real Performance edit to the physical external XDATA slots remains under investigation. See `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`.
+
 ## 6. Effects and modulation
 
 The manual confirms FX1/FX2 selection and send controls, modulation and arpeggiator CC paths, and a set of NRPN parameters. The first implementation should therefore separate:
