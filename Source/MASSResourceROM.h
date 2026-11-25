@@ -2304,6 +2304,72 @@ private:
     }
 };
 
+// Immutable startup-built table of exact FF10 upload byte streams. This
+// removes even the serializer from the real-time/backend handoff: the future
+// SoundHost backend receives already materialized bytes for every family,
+// bank and effect index. These plans describe transport only, not DSP meaning.
+class MASSFXUploadPlanCatalog {
+public:
+    static constexpr std::size_t kBankCount = 2u;
+    static constexpr std::size_t kProgramCount = 21u;
+
+    bool load(const MASSFX1ResourceCatalog& fx1,
+              const MASSFX2ResourceCatalog& fx2) {
+        if (!fx1.isLoaded() || !fx2.isLoaded())
+            return false;
+
+        std::array<std::array<MASSFXUploadProgramImage, kProgramCount>, kBankCount>
+            parsedFX1{};
+        std::array<std::array<MASSFXUploadProgramImage, kProgramCount>, kBankCount>
+            parsedFX2{};
+
+        for (int bank = 0; bank < static_cast<int>(kBankCount); ++bank) {
+            for (int effect = 0; effect < static_cast<int>(kProgramCount); ++effect) {
+                auto& fx1Plan = parsedFX1[static_cast<std::size_t>(bank)]
+                                          [static_cast<std::size_t>(effect)];
+                auto& fx2Plan = parsedFX2[static_cast<std::size_t>(bank)]
+                                          [static_cast<std::size_t>(effect)];
+                if (!MASSFXUploadPlanBuilder::buildFX1(fx1, bank, effect, fx1Plan) ||
+                    !MASSFXUploadPlanBuilder::buildFX2(fx2, bank, effect, fx2Plan))
+                    return false;
+            }
+        }
+
+        fx1Plans_ = std::move(parsedFX1);
+        fx2Plans_ = std::move(parsedFX2);
+        loaded_ = true;
+        return true;
+    }
+
+    bool isLoaded() const noexcept { return loaded_; }
+
+    const MASSFXUploadProgramImage* find(MASSFXProcessorFamily family,
+                                         int bank,
+                                         int effectIndex) const noexcept {
+        if (!loaded_ || bank < 0 || bank >= static_cast<int>(kBankCount) ||
+            effectIndex < 0 || effectIndex >= static_cast<int>(kProgramCount))
+            return nullptr;
+        const auto bankIndex = static_cast<std::size_t>(bank);
+        const auto programIndex = static_cast<std::size_t>(effectIndex);
+        return family == MASSFXProcessorFamily::fx1
+            ? &fx1Plans_[bankIndex][programIndex]
+            : &fx2Plans_[bankIndex][programIndex];
+    }
+
+    void clear() noexcept {
+        fx1Plans_ = {};
+        fx2Plans_ = {};
+        loaded_ = false;
+    }
+
+private:
+    std::array<std::array<MASSFXUploadProgramImage, kProgramCount>, kBankCount>
+        fx1Plans_{};
+    std::array<std::array<MASSFXUploadProgramImage, kProgramCount>, kBankCount>
+        fx2Plans_{};
+    bool loaded_ = false;
+};
+
 // Firmware XDATA addressing for MOVX @R0: P2 selects the page and R0 is
 // the eight-bit offset. Incrementing R0 wraps within the selected page.
 struct MASSXDataAddress {
