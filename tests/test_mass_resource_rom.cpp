@@ -881,6 +881,25 @@ void testOriginalVoiceProgramRuntime(const char* romPath) {
            (flagA->stream.commands.empty() ? nullptr : &flagA->stream.commands[0]));
     assert(runtime.commandForVoice(4, false, normal->stream.commands.size()) == nullptr);
 
+    // The runtime cursor is fixed-size and allocation-free. It walks the
+    // decoded firmware command list independently for both transient flag
+    // variants and can be rewound when the host voice is restarted.
+    runtime.rewindCommandStream(4, false);
+    runtime.rewindCommandStream(4, true);
+    if (!normal->stream.commands.empty()) {
+        assert(runtime.nextCommand(4, false) == &normal->stream.commands[0]);
+        assert(runtime.commandCursor(4, false) == 1u);
+        assert(runtime.commandCursor(4, true) == 0u);
+        runtime.rewindCommandStream(4, false);
+        assert(runtime.commandCursor(4, false) == 0u);
+        assert(runtime.nextCommand(4, false) == &normal->stream.commands[0]);
+    }
+    while (runtime.nextCommand(4, false) != nullptr) {}
+    assert(runtime.commandCursor(4, false) == normal->stream.commands.size());
+    assert(runtime.nextCommand(4, false) == nullptr);
+    while (runtime.nextCommand(4, true) != nullptr) {}
+    assert(runtime.commandCursor(4, true) == flagA->stream.commands.size());
+
     std::uint8_t memoryByte = 0;
     assert(runtime.readExternalSoundMemory(0xc000u, memoryByte));
     assert(!runtime.readExternalSoundMemory(0xbfffu, memoryByte));
