@@ -94,14 +94,23 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
             massEngine.setExternalSoundMemoryImage(&externalSoundMemoryImage);
         }
 
-        if (resourceFX1Catalog.load(
-                resourceROM, firmwareCode.data(), firmwareCode.size())) {
+        const bool fx1Loaded = resourceFX1Catalog.load(
+            resourceROM, firmwareCode.data(), firmwareCode.size());
+        if (fx1Loaded)
             massEngine.setFX1ResourceCatalog(&resourceFX1Catalog);
-        }
 
-        if (resourceFX2Catalog.load(
-                resourceROM, firmwareCode.data(), firmwareCode.size())) {
+        const bool fx2Loaded = resourceFX2Catalog.load(
+            resourceROM, firmwareCode.data(), firmwareCode.size());
+        if (fx2Loaded)
             massEngine.setFX2ResourceCatalog(&resourceFX2Catalog);
+
+        // Materialize the exact FF10 byte streams for all 21 FX1 and 21 FX2
+        // types in both IC51 banks. These vectors are built once at startup;
+        // a future SoundHost backend receives read-only plans and never parses
+        // descriptors or allocates memory inside processBlock().
+        if (fx1Loaded && fx2Loaded &&
+            resourceFXUploadPlans.load(resourceFX1Catalog, resourceFX2Catalog)) {
+            massEngine.setFXUploadPlanCatalog(&resourceFXUploadPlans);
         }
     }
 
