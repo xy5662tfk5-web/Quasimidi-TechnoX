@@ -96,3 +96,19 @@ The Dallas DS5001/DS5002 SFR map has no direct-byte SFR at `0x8E`; therefore an 
 These are distinct 16-bit XDATA addresses and different firmware call paths, not aliases. `0xFF10` is used for both reads and writes. The current generic 8032 test run has firmware bit `0x1B=0`, so its conditional direct-`0x8E` transitions are skipped; the synthetic `0xAC` response proves only the loader's expected code path, not physical ready behavior or an AUXR-enabled bus waveform.
 
 Do not hard-code an Atmel CPU identity. The next hardware-model test is to add a selectable AUXR-compatible bus profile, keep the generic 8032 behavior unchanged, and compare actual IC4 execution across both. Capture P2, R0/DPTR, P0, P3.6/P3.7, direct SFR `0x8E`, PC, and cycle at each MOVX so logical XDATA transactions are not mistaken for pin-level ALE/RD/WR proof.
+
+
+### AUXR-compatible XRAM aperture and the firmware's 0x1B mode test
+
+The official AT89C51RD2/ED2 data sheet narrows the possible XRAM overlay: its on-chip XRAM is configurable from 256 to 1792 bytes (768 bytes by default) and occupies only the *first bytes* of the external data address space. With EXTRAM=0, MOVX accesses inside that configured low-address window are intercepted internally; accesses above the configured XRAM size still reach the external bus. With EXTRAM=1, MOVX uses the standard external bus. See the official expanded-RAM section and AUXR table: https://ww1.microchip.com/downloads/en/DeviceDoc/doc4235.pdf.
+
+This means that, even on this Atmel candidate, `0x8000–0x8003`, `0xFF10`, and `0xC000–0xFFFF` are outside the internal XRAM window and remain external addresses in both EXTRAM states. The compatibility uncertainty is instead the low IC51 pointer/resource windows (e.g. `0x0000–0x02FF`) which may overlap internal XRAM when EXTRAM=0. The present generic 8032 model routes these low addresses according to its external IC51 select logic and does not model that derivative-specific overlay.
+
+A second instruction-level discriminator is the firmware's initialization at `0x381C–0x3829`:
+- `0x381C` calls board/peripheral setup `0x34D8`.
+- `0x381F` reads direct SFR byte `0x8E` into R7.
+- `0x3822` compares the byte with `0x01`.
+- `0x3825` sets carry only on equality; `0x3828` clears carry on the other path.
+- `0x3829` writes carry into firmware bit `0x1B`.
+
+Thus the special `0x1B` wrapper mode is enabled only when the initial direct-byte value at `0x8E` equals `0x01`. The `AF05` and FX upload helpers then switch `0x8E` to `0x02` for each external MOVX write and restore `0x01` afterward. This supports a two-state external-bus mode interpretation, but the initial reset value and exact fitted CPU must still be tied to the PCB marking. It is not sufficient to assume AT89C51RD2/ED2 solely because its AUXR layout resembles the firmware sequence.
