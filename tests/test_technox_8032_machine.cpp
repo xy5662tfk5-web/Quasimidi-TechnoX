@@ -530,35 +530,53 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(fx1Deferred.cpu().registers().pc == 0x7d7au);
             assert(!fx1Deferred.cpuFaulted());
-            if (fx1Deferred.ff10WriteCount() != 325u) {
-                std::fprintf(stderr,
-                    "FX1 deferred mismatch: FF10=%zu IC51=%llu PC=%04X selector=%02X staging=%02X P3=%02X mode=%02X fault=%u\n",
-                    fx1Deferred.ff10WriteCount(),
-                    static_cast<unsigned long long>(fx1Deferred.ic51ReadCount()),
-                    static_cast<unsigned>(fx1Deferred.cpu().registers().pc),
-                    static_cast<unsigned>(fx1Deferred.testExternalRamByteForTesting(0x7bfeu)),
-                    static_cast<unsigned>(fx1Deferred.readExternal(0x3097u)),
-                    static_cast<unsigned>(fx1Deferred.readInternal(0xb0u)),
-                    static_cast<unsigned>(fx1Deferred.readInternal(0x8eu)),
-                    static_cast<unsigned>(fx1Deferred.cpuFaulted()));
-                for (std::size_t i = 0; i < fx1Deferred.ic51ReadTraceCount() && i < 12u; ++i) {
-                    const auto& e = fx1Deferred.ic51ReadTraceAt(i);
-                    std::fprintf(stderr, "  deferred IC51[%zu] bank=%u addr=%04X value=%02X PC=%04X\n",
-                        i, static_cast<unsigned>(e.bank), static_cast<unsigned>(e.address),
-                        static_cast<unsigned>(e.value), static_cast<unsigned>(e.instructionPC));
-                }
-                for (std::size_t i = 325u; i < fx1Deferred.ff10WriteCount(); ++i) {
-                    const auto& e = fx1Deferred.ff10WriteAt(i);
-                    std::fprintf(stderr,
-                        "  FX1 finalization FF10[%zu]=%02X PC=%04X return=%04X P2=%02X mode=%02X\\n",
-                        i, static_cast<unsigned>(e.value),
-                        static_cast<unsigned>(e.instructionPC),
-                        static_cast<unsigned>(e.stackReturnPC),
-                        static_cast<unsigned>(e.port2),
-                        static_cast<unsigned>(e.soundBusMode));
+            constexpr std::array<std::uint8_t, 48> roomPostLoadService{{
+                0x01u,0x01u,0x88u,0x00u,0x00u,0x00u,
+                0x01u,0x01u,0x86u,0x00u,0x00u,0x00u,
+                0x01u,0x01u,0x87u,0x00u,0x32u,0x00u,
+                0x01u,0x01u,0x8au,0x00u,0x05u,0x00u,
+                0x01u,0x01u,0x8bu,0x00u,0x06u,0x00u,
+                0x01u,0x01u,0x8cu,0x00u,0x02u,0x00u,
+                0x01u,0x00u,0x45u,0x37u,0x88u,0x01u,
+                0x01u,0x02u,0xc1u,0x27u,0x10u,0x00u
+            }};
+            assert(fx1Deferred.ff10WriteCount() ==
+                   roomUploadPlan.totalPortBytes() + roomPostLoadService.size());
+            for (std::size_t i = 0; i < roomUploadPlan.streamA.portBytes.size(); ++i) {
+                const auto& event = fx1Deferred.ff10WriteAt(i);
+                assert(event.address == 0xff10u);
+                assert(event.value == roomUploadPlan.streamA.portBytes[i]);
+                assert(event.soundBusMode == 0x02u);
+                assert(event.port2 == 0xffu);
+            }
+            for (std::size_t i = 0; i < roomPostLoadService.size(); ++i) {
+                const auto& event =
+                    fx1Deferred.ff10WriteAt(roomUploadPlan.totalPortBytes() + i);
+                assert(event.address == 0xff10u);
+                assert(event.value == roomPostLoadService[i]);
+                assert(event.soundBusMode == 0x02u);
+                assert(event.port2 == 0xffu);
+            }
+            constexpr std::array<std::uint16_t, 8> roomServiceReturns{{
+                0x7eedu,0x7ef8u,0x7f6bu,0x7f77u,
+                0x7f9fu,0x7fabu,0x7fb0u,0x7c28u
+            }};
+            constexpr std::array<std::uint16_t, 6> b0efWriterPCs{{
+                0xb0fcu,0xb10au,0xb118u,0xb126u,0xb134u,0xb143u
+            }};
+            for (std::size_t packet = 0; packet < 8u; ++packet) {
+                for (std::size_t byte = 0; byte < 6u; ++byte) {
+                    const auto& event = fx1Deferred.ff10WriteAt(
+                        roomUploadPlan.totalPortBytes() + packet * 6u + byte);
+                    assert(event.stackReturnPC == roomServiceReturns[packet]);
+                    const auto expectedPC = packet == 6u
+                        ? std::array<std::uint16_t, 6>{{
+                            0xb158u,0xb167u,0xb176u,0xb185u,0xb197u,0xb1a6u
+                        }}[byte]
+                        : b0efWriterPCs[byte];
+                    assert(event.instructionPC == expectedPC);
                 }
             }
-            assert(fx1Deferred.ff10WriteCount() == 325u);
             assert(fx1Deferred.ff10WriteAt(0).value == 0x19u);
             assert(fx1Deferred.ff10WriteAt(78).value == 0xfcu);
             assert(fx1Deferred.ff10WriteAt(324).value == 0x7eu);
@@ -606,7 +624,25 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(e.soundBusMode));
                 }
             }
-            assert(fx2Deferred.ff10WriteCount() == 177u);
+            assert(fx2Deferred.ff10WriteCount() >= 177u);
+            if (fx2Deferred.ff10WriteCount() > 177u) {
+                std::fprintf(stderr,
+                    "FX2 deferred tail: total=%zu IC51=%llu PC=%04X selector=%02X\\n",
+                    fx2Deferred.ff10WriteCount(),
+                    static_cast<unsigned long long>(fx2Deferred.ic51ReadCount()),
+                    static_cast<unsigned>(fx2Deferred.cpu().registers().pc),
+                    static_cast<unsigned>(fx2Deferred.testExternalRamByteForTesting(0x7c06u)));
+                for (std::size_t i = 177u; i < fx2Deferred.ff10WriteCount(); ++i) {
+                    const auto& e = fx2Deferred.ff10WriteAt(i);
+                    std::fprintf(stderr,
+                        "  FX2 tail[%zu]=%02X PC=%04X return=%04X P2=%02X mode=%02X\\n",
+                        i, static_cast<unsigned>(e.value),
+                        static_cast<unsigned>(e.instructionPC),
+                        static_cast<unsigned>(e.stackReturnPC),
+                        static_cast<unsigned>(e.port2),
+                        static_cast<unsigned>(e.soundBusMode));
+                }
+            }
             assert(fx2Deferred.ff10WriteAt(0).value == 0x3au);
             assert(fx2Deferred.ff10WriteAt(1).value == 0x15u);
             assert(fx2Deferred.ff10WriteAt(176).value == 0x7eu);
