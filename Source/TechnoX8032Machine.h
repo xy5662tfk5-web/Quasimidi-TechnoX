@@ -102,13 +102,14 @@ public:
         std::uint16_t instructionPC = 0;
         std::uint64_t machineCycle = 0;
     };
-    struct P3Bit2TransitionEvent {
+    struct P3Bit2ControlWriteEvent {
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
         std::uint8_t previousPort3 = 0xff;
         std::uint8_t port3 = 0xff;
         std::uint8_t port2 = 0xff;
         std::uint8_t soundBusMode = 0;
+        bool bit2Changed = false;
         std::uint64_t machineCycle = 0;
     };
     struct PortReadEvent {
@@ -562,8 +563,8 @@ public:
         soundHostBurstLowInstructionPC_ = 0;
         portWriteTrace_.fill(PortWriteEvent{});
         portWriteCount_ = 0;
-        p3Bit2TransitionTrace_.fill(P3Bit2TransitionEvent{});
-        p3Bit2TransitionCount_ = 0;
+        p3Bit2ControlWriteTrace_.fill(P3Bit2ControlWriteEvent{});
+        p3Bit2ControlWriteCount_ = 0;
         portReadTrace_.fill(PortReadEvent{});
         portReadCount_ = 0;
         watchedCallCounts_.fill(0);
@@ -1185,17 +1186,19 @@ public:
             if (port == 3) {
                 if (((previousPins ^ value) & 0x20u) != 0)
                     ++p35TransitionCount_;
-                if (((previousPins ^ value) & 0x04u) != 0) {
-                    auto& transition = p3Bit2TransitionTrace_[
-                        p3Bit2TransitionCount_ % p3Bit2TransitionTrace_.size()];
-                    transition.instructionPC = instructionPC;
-                    transition.returnPC = currentStackReturnPC();
-                    transition.previousPort3 = previousPins;
-                    transition.port3 = value;
-                    transition.port2 = portPins_[2];
-                    transition.soundBusMode = internal_[0x8e];
-                    transition.machineCycle = elapsedMachineCycles_;
-                    ++p3Bit2TransitionCount_;
+                if (isP3Bit2ControlWrite(instructionPC)) {
+                    auto& controlWrite = p3Bit2ControlWriteTrace_[
+                        p3Bit2ControlWriteCount_ % p3Bit2ControlWriteTrace_.size()];
+                    controlWrite.instructionPC = instructionPC;
+                    controlWrite.returnPC = currentStackReturnPC();
+                    controlWrite.previousPort3 = previousPins;
+                    controlWrite.port3 = value;
+                    controlWrite.port2 = portPins_[2];
+                    controlWrite.soundBusMode = internal_[0x8e];
+                    controlWrite.bit2Changed =
+                        ((previousPins ^ value) & 0x04u) != 0;
+                    controlWrite.machineCycle = elapsedMachineCycles_;
+                    ++p3Bit2ControlWriteCount_;
                 }
                 const bool wasReleased = (previousPins & 0x04u) != 0;
                 const bool nowReleased = (value & 0x04u) != 0;
@@ -1937,11 +1940,11 @@ public:
     const PortWriteEvent& portWriteAt(std::size_t index) const noexcept {
         return portWriteTrace_[index % portWriteTrace_.size()];
     }
-    std::size_t p3Bit2TransitionCount() const noexcept {
-        return p3Bit2TransitionCount_;
+    std::size_t p3Bit2ControlWriteCount() const noexcept {
+        return p3Bit2ControlWriteCount_;
     }
-    const P3Bit2TransitionEvent& p3Bit2TransitionAt(std::size_t index) const noexcept {
-        return p3Bit2TransitionTrace_[index % p3Bit2TransitionTrace_.size()];
+    const P3Bit2ControlWriteEvent& p3Bit2ControlWriteAt(std::size_t index) const noexcept {
+        return p3Bit2ControlWriteTrace_[index % p3Bit2ControlWriteTrace_.size()];
     }
     std::size_t portReadCount() const noexcept { return portReadCount_; }
     const PortReadEvent& portReadAt(std::size_t index) const noexcept {
@@ -2181,6 +2184,25 @@ private:
         ++executionDataAccessTraceCount_;
     }
 
+    bool isP3Bit2ControlWrite(std::uint16_t instructionPC) const noexcept {
+        const auto opcode = readCode(instructionPC);
+        const auto operand = readCode(static_cast<std::uint16_t>(instructionPC + 1u));
+        const auto third = readCode(static_cast<std::uint16_t>(instructionPC + 2u));
+        const bool bitWrite =
+            (opcode == 0x10u || opcode == 0x92u || opcode == 0xb2u ||
+             opcode == 0xc2u || opcode == 0xd2u) && operand == 0xb2u;
+        const bool wholePortWrite =
+            (opcode == 0x75u && operand == 0xb0u) ||
+            (opcode == 0xf5u && operand == 0xb0u) ||
+            (opcode == 0x85u && third == 0xb0u) ||
+            ((opcode == 0x43u || opcode == 0x53u || opcode == 0x63u ||
+              opcode == 0x42u || opcode == 0x52u || opcode == 0x62u ||
+              opcode == 0x05u || opcode == 0x15u || opcode == 0xc5u ||
+              opcode == 0xd0u || opcode == 0xd5u ||
+              (opcode >= 0x86u && opcode <= 0x8fu)) && operand == 0xb0u);
+        return bitWrite || wholePortWrite;
+    }
+
     std::uint16_t currentWriteInstructionPC(std::uint8_t directAddress) const noexcept {
         const auto pcAfterInstructionFetch = cpu_.registers().pc;
         const auto twoBytePC = static_cast<std::uint16_t>(pcAfterInstructionFetch - 2u);
@@ -2351,8 +2373,8 @@ private:
     std::size_t ic51BusProbeTraceCount_ = 0;
     std::array<PortWriteEvent, 4096> portWriteTrace_{};
     std::size_t portWriteCount_ = 0;
-    std::array<P3Bit2TransitionEvent, 128> p3Bit2TransitionTrace_{};
-    std::size_t p3Bit2TransitionCount_ = 0;
+    std::array<P3Bit2ControlWriteEvent, 128> p3Bit2ControlWriteTrace_{};
+    std::size_t p3Bit2ControlWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
     mutable std::size_t portReadCount_ = 0;
     std::array<std::uint64_t, 24> watchedCallCounts_{};
