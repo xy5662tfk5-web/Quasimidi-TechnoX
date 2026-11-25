@@ -48,12 +48,15 @@ Exit condition: a deterministic Note On/Off/velocity/pitch/Part differential pro
 
 ### B. Identify and model the external sound device
 
-Status: **blocked by missing hardware/protocol evidence**
+Status: **partially mapped at firmware level; physical device/protocol still unconfirmed**
 
-- [ ] Correlate each byte write/read at `0x8000–0x8003` with instruction PC, caller/return PC, P2/P3, `0x8E` bus mode, reset state, device-index latch, cycle count, and preceding IC51/FF10 activity.
-- [ ] Split boot/configuration traffic from program load, Note On, Note Off, pitch, controller, and FX traffic using isolated stimuli.
+- [x] Static IC4 provenance: reachable writer at `0x3829` sets IRAM bit `0x1B` iff SFR `0x8E == 1` at the check; `0xAF05` conditionally switches SFR `0x8E` from 1 to 2 for one `MOVX @R0,A), then restores 1.
+- [x] Identify P3 control activity: P3.2 is cleared at `0x34EB`, `0xAF1A`, and `0xB34D`, and set at `0xAF73`; P3.1/P3.4/P3.5 are also actively sequenced around external reads. These are firmware-level observations, not confirmed pin functions.
+- [ ] Create a single chronological merged report of each `0x8000–0x8003` transaction with instruction/caller PC, P2/P3, SFR `0x8E`, P3.2 level, IC51 selection, cycle, and preceding/following `0xFF10` and IC51 activity. Existing per-byte contexts exist; the cross-interface timeline is still missing.
+- [ ] Separate boot/configuration, external-memory load, Note On, Note Off, pitch, controller, and FX traffic using isolated stimuli.
 - [ ] Determine the four host-register meanings only from repeatable evidence; retain neutral register names until then.
-- [ ] Establish ready/busy/ack behavior, read semantics, strobe timing, reset sequencing, and device selection. Current open-bus and synthetic-ready responses are test fixtures, not hardware behavior.
+- [ ] Establish ready/busy/ack behavior, read semantics, control-phase timing, and device selection. The `0x40/0xC0` writes to offset 3 are observed control-phase values, not yet decoded as ACK/BUSY. Current open-bus and synthetic-ready responses are test fixtures, not hardware behavior.
+- [ ] Resolve P3.2 polarity/function. The C++ `soundDeviceResetReleased` label is a working compatibility hypothesis only: firmware clears P3.2 for the bulk transfer and memory test, and existing SoundHost contexts include P3.2-low states.
 - [ ] Identify the physical processor/DSP from board markings, schematics, service documentation, or a verified bus capture. SAM9407 remains a hypothesis, not an established identity.
 - [ ] Determine the external memory topology and the path to the advertised multi-megabyte waveform store. Do not treat the 128-KiB IC51 dump or the 16-KiB startup image as the complete sample ROM.
 
@@ -122,6 +125,7 @@ Status: **test backend builds; authentic engine not release-ready**
 - `docs/research/MASS_RESOURCE_TO_VOICE_DISPATCH.md` — nested IC51 record transfer.
 - `docs/research/SINE_SLOT1_SOUNDHOST_WRITER_TRACE.md` and `docs/research/SINE_SLOT_RECORD_ACCUMULATOR_TRACE.md` — slot-state to SoundHost writer evidence.
 - `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md` — FX dispatch and upload-plan evidence.
+- `docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md` — SFR 0x8E/bit 0x1B provenance, P3 control-line sites, SoundHost/FF10/external-memory separation and Section B experiments.
 - `tests/test_technox_8032_machine.cpp` — real-ROM firmware/MIDI/bus integration fixtures.
 - `tests/test_mass_resource_rom.cpp` — IC51 descriptors, streams, catalogs, arithmetic and backend hand-off tests.
 
