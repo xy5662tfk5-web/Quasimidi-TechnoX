@@ -295,3 +295,18 @@ A dedicated machine regression executes the original `0x8004 -> AF93 -> B015` FX
 - `IRAM[0x6A]` has multiple code writers (including copies from `0x28F2`, `0x28FD`, table/lookup paths and context-specific clears). It is a shared scratch/parameter register, not a globally persistent FX setting.
 - The generic validator path `0x5ECD/0x5F6E/0x5D75` uses `0x28F7` to select a 12-byte entry at `0x612F + index*0x0C`, copies its first two bytes as a parameter XDATA address, and takes the final two bytes as bounds for a separate validation operation. Its two direct `0x5F6E` callers are `0x6015` and `0x601C`. This path has not been proven to be the producer for the FX store handlers and must not be treated as such.
 - Details and next trace: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`. The remaining priority is to identify the actual dispatcher entry and the instruction that supplies `IRAM[0x6A]` immediately before each FX handler, using a real Performance/controller stimulus instead of synthetic XDATA values.
+
+
+## FX deferred-request scheduler and 54-byte FF10 service stream
+
+- Executing IC4 `0x7C29` confirms that it is a request scheduler, not the FX1/FX2 IC51 stream loader. It merges the new R7/R5 request flags with any already-pending values and writes independent pending bytes to XDATA `0x308B` (FX1) and `0x308D` (FX2).
+- It copies R3 to `0x3097`, sets `0x309C=1`, then calls B14B, six B0EF packet writers, B2ED and one final B0EF writer.
+- With firmware bit `0x1B` enabled, that code emits exactly 54 ordered writes to XDATA `0xFF10`. The byte stream is pinned in `tests/test_technox_8032_machine.cpp` for two cases: only FX1 pending and only FX2 pending. Every event is checked for address `0xFF10`, byte value, bus mode `0x02`, and P2 `0xFF`.
+- At the end of `0x7C29`, it reads XDATA `0x7BFF`, `0x7C00`, `0x7C07`, and `0x30BA` into `0x309A`, `0x309D`, `0x309B`, and `0x309E`. Device identity and response semantics are still unknown.
+- The later FX1 consumer at `0x7D67` checks `0x308B`; if set, it reads `0x3097` and calls `0x7FF2`, then clears the pending byte and refreshes status from `0x7BFF/0x7C00`.
+- The later FX2 consumer at `0x7D34` checks `0x308D`; if set, it reads `0x3097` and calls `0x88D1`, then clears its pending byte and samples `0x7C07/0x30BA`.
+- The fixed 54-byte service stream is not the decoded IC51 effect payload. The actual FX1/FX2 resource bytes remain a separate subsequent data path into `0xFF10`; their immutable 84-plan catalog is now attached to the M.A.S.S. backend interface.
+- An adjacent FX2-preparation block at `0x7D21` calls B28D, then calls B08B if FX2 is pending. B08B performs repeated header/zero-byte writes through `0xFF10`; this path is documented separately from the `0x7D34 -> 0x88D1` loader and its physical purpose remains unclassified.
+- Full dispatch/source provenance remains open: the real Performance/controller path that populates IRAM `0x6A` and enters `0x5407/0x543D` has not yet been established. Current machine tests explicitly enter those blocks or provide low-XDATA selector bytes through a synthetic test overlay.
+
+Details: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`.
