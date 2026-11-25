@@ -1505,7 +1505,7 @@ int main(int argc, char** argv) {
             assert(roomUploadPlan.streamA.resourceIndex == 0u);
             assert(roomUploadPlan.streamA.sourceAddress == 0x24d4u);
             assert(roomUploadPlan.streamA.blockCount == 2u);
-            assert(roomUploadPlan.streamA.portBytes.size() == 837u);
+            assert(roomUploadPlan.streamA.portBytes.size() == 325u);
             assert(roomUploadPlan.streamA.portBytes[0] == 0x19u);
             assert(roomUploadPlan.streamA.portBytes[1] == 0x00u);
             assert(roomUploadPlan.streamA.portBytes[2] == 0xcfu);
@@ -1514,8 +1514,10 @@ int main(int argc, char** argv) {
             assert(roomUploadPlan.streamB.portBytes.empty());
             assert(roomUploadPlan.streamB.skippedLeadingByte);
             assert(roomUploadPlan.streamB.leadingByteValue == 0x7fu);
+            assert(roomUploadPlan.streamA.terminatorAddress == 0x2619u);
+            assert(roomUploadPlan.streamA.sourceBytesConsumed == 326u);
             assert(roomUploadPlan.streamB.terminatorAddress == 0x2852u);
-            assert(roomUploadPlan.totalPortBytes() == 837u);
+            assert(roomUploadPlan.totalPortBytes() == 325u);
 
             technox::MASSFXUploadProgramImage equalizr1UploadPlan{};
             assert(technox::MASSFXUploadPlanBuilder::buildFX2(
@@ -1826,7 +1828,8 @@ int main(int argc, char** argv) {
                     for (const auto& block : streamAResource.blocks) {
                         assert(block.preambleByteCount == 2u);
                         assert(block.payload.size() ==
-                               static_cast<std::size_t>(block.sourceCount) * 3u);
+                               static_cast<std::uint8_t>(
+                                   static_cast<unsigned>(block.sourceCount) * 3u));
                         assert(block.portWriteByteCount == block.payload.size() + 3u);
                         assert(block.sourceBytesConsumed == block.portWriteByteCount);
                         assert(block.wireHeader == block.sourceCount);
@@ -1866,9 +1869,13 @@ int main(int argc, char** argv) {
             assert(roomStreamABlock2.preambleByteCount == 2u);
             assert(roomStreamABlock2.preamble[0] == 0x19u);
             assert(roomStreamABlock2.preamble[1] == 0x08u);
-            assert(roomStreamABlock2.payload.size() == 756u);
+            assert(roomStreamABlock2.payload.size() == 244u);
             assert(roomStreamABlock2.payload.front() == 0x16u);
-            assert(roomStreamABlock2.portWriteByteCount == 759u);
+            assert(roomStreamABlock2.portWriteByteCount == 247u);
+            assert(roomStreamABlock2.sourceBytesConsumed == 247u);
+            assert(roomStreamA.terminatorAddress == 0x2619u);
+            assert(roomStreamA.portWriteByteCount == 325u);
+            assert(roomStreamA.sourceBytesConsumed == 326u);
             assert(roomStreamABlock.preamble[0] == 0x00u);
             assert(roomStreamABlock.preamble[1] == 0xcfu);
             assert(roomStreamABlock.payload.size() == 75u);
