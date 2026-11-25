@@ -746,7 +746,11 @@ public:
             if (pc == 0x210fu)
                 executionTraceActive_ = false;
         }
-        if (pc == 0x210fu || pc == 0x1848u ||
+        if (pc == 0x02d1u || pc == 0x02dfu || pc == 0x0339u ||
+            pc == 0x034fu || pc == 0x0354u || pc == 0x0358u ||
+            pc == 0x035cu || pc == 0x0392u || pc == 0x039eu ||
+            pc == 0x03a2u ||
+            pc == 0x210fu || pc == 0x1848u ||
             pc == 0x1fc9u || pc == 0x2027u ||
             pc == 0x5671u || pc == 0x4256u ||
             pc == 0x1494u || pc == 0xac00u || pc == 0xac16u ||
