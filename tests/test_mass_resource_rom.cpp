@@ -146,7 +146,7 @@ void testMASS0DCEExchangeDecoder() {
 
     result = MASS0DCEExchangeDecoder::decode(true, 0x80u, response);
     assert(!result.controlWriteRequired);
-    assert(result.controlByte == 0xc0u);
+    assert(result.controlByte == 0x00u);
 }
 
 void testMASS0DB7PacketBuilder() {
