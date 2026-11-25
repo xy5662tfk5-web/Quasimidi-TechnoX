@@ -82,11 +82,20 @@ The earlier phrase "SFR 0x8E selects sound-bus modes" describes the current mach
 
 The descrambled IC4 v1.05 image contains both direct-byte operations (`MOV 0x8E,#0x02`, `MOV 0x8E,#0x01`, `MOV R7,0x8E`, and `MOV 0x8E,R4`) and a bit-address operation `SETB bit 0x8E` at PC `0x3510`. In the standard MCS-51 bit map, bit address `0x8E` is `TCON.6/TR1` (Timer 1 run control); it is not bit 0 of the direct SFR byte at address `0x8E`.
 
-A strong derivative match is Atmel AT89C51RD2/ED2: direct byte SFR `AUXR` is at `0x8E`; bit 1 EXTRAM selects on-chip XRAM versus the external MOVX bus, and bit 0 AO suppresses free-running ALE while retaining ALE during MOVX/MOVC. On that family, firmware values `0x02` and `0x01` mean EXTRAM=1/AO=0 and EXTRAM=0/AO=1. This explains why IC4 brackets external MOVX writes with those values, but it does **not** identify the fitted MCU.
+Two MCU families now provide a documented AUXR-family match for the direct-byte behavior at `0x8E`; the exact fitted part remains unidentified.
 
-The Dallas DS5001/DS5002 SFR map has no direct-byte SFR at `0x8E`; therefore an earlier DS5002FP reference is not proof of the IC4 CPU model. See the dedicated investigation in the repository's hardware notes and the Atmel/Dallas data sheets:
+1. **Intel 8XC51RA/RB/RC family:** its hardware reference defines AUXR at direct address `0x8E` (not bit-addressable). Bit 1 EXTRAM selects internal ERAM versus the external MOVX bus; bit 0 DISALE selects continuous ALE versus ALE only during MOVX/MOVC. With EXTRAM=0, the documented internal ERAM aperture is `0x0000–0x00FF`; addresses above `0x00FF` remain external. Firmware values `0x02` and `0x01` therefore correspond to external bus with continuous ALE, then internal-low-ERAM mode with ALE suppressed between external cycles.
+2. **Atmel AT89C51RD2/ED2 family:** it also defines AUXR at direct address `0x8E`; bit 1 EXTRAM selects internal XRAM versus external MOVX, and bit 0 AO suppresses free-running ALE while retaining ALE during MOVX/MOVC. Its XRAM aperture is selectable from 256 to 1792 bytes (768 bytes by default), so its low-address overlay can be larger than the Intel 8XC51RA/RB/RC aperture.
+
+Both families explain the firmware's `0x02/0x01` pair at the register level, but their internal-RAM apertures differ. Thus the current opcode evidence identifies an **AUXR-like bus-control contract**, not a vendor/model. The generic MAME Intel 8032 configuration is not evidence of the physical chip marking; nor is the Atmel match sufficient to claim an Atmel part.
+
+The Dallas DS5001/DS5002 SFR map has no direct-byte SFR at `0x8E`; therefore an earlier DS5002FP reference is not proof of the IC4 CPU model. References:
+- Intel 8XC51RA/RB/RC hardware description: https://www.keil.com/dd/docs/datashts/intel/8xc51ra_rb_rc_hd.pdf
 - Atmel AT89C51RD2/ED2: https://media.digikey.com/pdf/Data%20Sheets/Atmel%20PDFs/AT89C51ED2%2CRD2_Rev06.pdf
+- Atmel internal XRAM configuration: https://ww1.microchip.com/downloads/en/DeviceDoc/doc4235.pdf
 - Dallas DS5001/DS5002 guide: https://www.keil.com/dd/docs/datashts/dallas/secure_ug.pdf
+
+**Implementation consequence:** keep the default generic 8032 path unchanged. Before adding an optional AUXR variant, trace low XDATA addresses under both EXTRAM states. In particular, the IC51 pointer table and descriptor accesses at `0x0000–0x02FF` must be classified as internal ERAM/XRAM or externally decoded IC51 reads for the fitted derivative. The high windows `0x8000–0x8003`, `0xFF10`, and `0xC000–0xFFFF` are outside both cited variants' internal-RAM apertures and remain external XDATA addresses in either mode.
 
 ### Confirmed XDATA address distinction
 
