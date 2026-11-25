@@ -169,6 +169,12 @@ Firmware uses `0xFF10` for resource uploads and also reads it in a status/ready-
 
 IC51 bank 0 source `0x3C64`, length `0x354F` (13,647 bytes), is transferred through the verified address map at IC4 `0xADDD` into the `0xC000–0xFFFF` window. The byte-exact memory reconstruction is established. The memory device, physical topology and contents' interpretation as PCM are not established.
 
+### Public reference cross-check
+
+The current public MAME skeleton driver [`src/mame/skeleton/qmquasar.cpp`](https://github.com/mamedev/mame/blob/master/src/mame/skeleton/qmquasar.cpp) confirms the known Intel 8032/ACIA/LCD structure and the two dumped TechnoX ROM regions: IC4 firmware (128 KiB) and IC51 (128 KiB). Its external map leaves `0x8000–0x8003`, `0x7C00–0x7FFF`, and `0xFF10` as no-op/unimplemented accesses; it does not identify or emulate the external sound device. The driver declares the TechnoX machine `MACHINE_NO_SOUND | MACHINE_NOT_WORKING`. This is evidence of the current emulation gap, not evidence that the physical machine has no additional DSP or sample-memory hardware.
+
+Independent public TechnoX specifications describe a 64-MB sample/wave ROM bank ([Vintage Synth Explorer](https://www.vintagesynth.com/quasimidi/technox), [Sound Programming](https://soundprogramming.net/synthesizers/quasimidi/quasimidi-technox/)). These are secondary specification sources, not a verified board-level memory map. Even so, they make one boundary especially clear: the 128-KiB IC51 dump and the 13,647-byte firmware bulk-transfer block cannot responsibly be called the complete waveform library. The larger sample-memory device/path and its dump or electrical map are still missing.
+
 ## 5. SAM9407 compatibility check
 
 The Dream SAM9407 datasheet describes a 16-bit host interface with three address inputs, chip-select/read/write controls and a 16-bit data bus, plus separate sample-memory address/data signals and an active-low reset. This is a plausible general architecture for a sample-based synth DSP. The TechnoX firmware evidence presently available is a four-byte 8-bit XDATA aperture plus a separate `0xFF10` transfer/status path and a mapped external-memory window.
