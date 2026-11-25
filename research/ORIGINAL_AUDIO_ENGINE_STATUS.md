@@ -310,3 +310,12 @@ A dedicated machine regression executes the original `0x8004 -> AF93 -> B015` FX
 - Full dispatch/source provenance remains open: the real Performance/controller path that populates IRAM `0x6A` and enters `0x5407/0x543D` has not yet been established. Current machine tests explicitly enter those blocks or provide low-XDATA selector bytes through a synthetic test overlay.
 
 Details: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`.
+
+
+## FX command-dispatch path identified
+
+- Static IC4 v1.05 tracing now recovers the three-field event staging at `0x57A8`: R7/R5/R3 are copied to IRAM `0x60/0x61/0x62`. The Part fan-out then calls `0x5671`; its class-`0x0B` path forwards the subcommand and payload to `0x51B6`.
+- `0x51B6` stores the subcommand/value in `0x69/0x6A` and dispatches through `0xED30` using table `0x51C1`. Record `53 F3 50` routes subcommand `0x50` to the FX1 store handler; record `54 29 51` routes `0x51` to FX2.
+- The FX1/FX2 handlers then apply the already documented `0x3702/0x3708` gates, clamp 0..20 and write `0x7BFE/0x7C06`, respectively, before calling scheduler `0x7C29`.
+- A machine regression now executes `0x51B6 -> ED30 -> FX handler` for both commands with boundary values 0, 1, 20, 21 and 127. This validates the original table dispatch and store under synthetic context inputs.
+- Still unproven: the real Performance/controller/MIDI producer of the three input bytes and the exact producer of IRAM `0x6A` in that event context. Details: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`.
