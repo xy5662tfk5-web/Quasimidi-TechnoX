@@ -500,6 +500,89 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Exercise the deferred consumers from their real IC4 entry PCs.
+        // A set pending flag must pass staging byte 0x3097 as R7, enter the
+        // family-specific loader, upload the selected IC51 resource stream,
+        // and return to the caller's post-loader continuation. A clear flag
+        // must skip the resource loader.
+        {
+            TechnoX8032Machine fx1Deferred;
+            assert(fx1Deferred.loadIC4Rom(realRom.data(), realRom.size()));
+            assert(fx1Deferred.loadIC51Rom(realIC51.data(), realIC51.size()));
+            fx1Deferred.reset();
+            fx1Deferred.enableTestExternalRamWindow7000(0x00u);
+            fx1Deferred.setTestExternalRamByte(0x7bfeu, 0x00u); // FX1 Room
+            fx1Deferred.writeExternal(0x308bu, 0x01u); // FX1 pending
+            fx1Deferred.writeExternal(0x3097u, 0x35u); // staging parameter, not FX index
+            fx1Deferred.writeInternal(0x23u, 0x08u); // mode-2 FF10 upload enabled
+            fx1Deferred.cpuForTesting().registersForTesting().pc = 0x7d67u;
+            const auto executed =
+                fx1Deferred.runUntilProgramCounter(0x7d7au, 100000u);
+            assert(executed > 0u);
+            assert(fx1Deferred.cpu().registers().pc == 0x7d7au);
+            assert(!fx1Deferred.cpuFaulted());
+            assert(fx1Deferred.ff10WriteCount() == 325u);
+            assert(fx1Deferred.ff10WriteAt(0).value == 0x19u);
+            assert(fx1Deferred.ff10WriteAt(78).value == 0xfcu);
+            assert(fx1Deferred.ff10WriteAt(324).value == 0x7eu);
+            // The consumer has returned from the upload and reached the flag
+            // clear instruction, but has not executed that instruction yet.
+            assert(fx1Deferred.readExternal(0x308bu) == 0x01u);
+            assert(fx1Deferred.readExternal(0x3097u) == 0x35u);
+        }
+
+        {
+            TechnoX8032Machine fx2Deferred;
+            assert(fx2Deferred.loadIC4Rom(realRom.data(), realRom.size()));
+            assert(fx2Deferred.loadIC51Rom(realIC51.data(), realIC51.size()));
+            fx2Deferred.reset();
+            fx2Deferred.enableTestExternalRamWindow7000(0x00u);
+            fx2Deferred.setTestExternalRamByte(0x7c06u, 0x0eu); // FX2 Equalizr1
+            fx2Deferred.writeExternal(0x308du, 0x01u); // FX2 pending
+            fx2Deferred.writeExternal(0x3097u, 0x51u);
+            fx2Deferred.writeInternal(0x23u, 0x08u);
+            fx2Deferred.cpuForTesting().registersForTesting().pc = 0x7d34u;
+            const auto executed =
+                fx2Deferred.runUntilProgramCounter(0x7d42u, 100000u);
+            assert(executed > 0u);
+            assert(fx2Deferred.cpu().registers().pc == 0x7d42u);
+            assert(!fx2Deferred.cpuFaulted());
+            assert(fx2Deferred.ff10WriteCount() == 177u);
+            assert(fx2Deferred.ff10WriteAt(0).value == 0x3au);
+            assert(fx2Deferred.ff10WriteAt(1).value == 0x15u);
+            assert(fx2Deferred.ff10WriteAt(176).value == 0x7eu);
+            assert(fx2Deferred.readExternal(0x308du) == 0x01u);
+            assert(fx2Deferred.readExternal(0x3097u) == 0x51u);
+        }
+
+        {
+            TechnoX8032Machine noFX1Request;
+            assert(noFX1Request.loadIC4Rom(realRom.data(), realRom.size()));
+            noFX1Request.reset();
+            noFX1Request.enableTestExternalRamWindow7000(0x00u);
+            noFX1Request.writeExternal(0x308bu, 0x00u);
+            noFX1Request.cpuForTesting().registersForTesting().pc = 0x7d67u;
+            const auto executed =
+                noFX1Request.runUntilProgramCounter(0x7ee2u, 64u);
+            assert(executed > 0u);
+            assert(noFX1Request.cpu().registers().pc == 0x7ee2u);
+            assert(noFX1Request.ff10WriteCount() == 0u);
+        }
+
+        {
+            TechnoX8032Machine noFX2Request;
+            assert(noFX2Request.loadIC4Rom(realRom.data(), realRom.size()));
+            noFX2Request.reset();
+            noFX2Request.enableTestExternalRamWindow7000(0x00u);
+            noFX2Request.writeExternal(0x308du, 0x00u);
+            noFX2Request.cpuForTesting().registersForTesting().pc = 0x7d34u;
+            const auto executed =
+                noFX2Request.runUntilProgramCounter(0x7d42u, 32u);
+            assert(executed > 0u);
+            assert(noFX2Request.cpu().registers().pc == 0x7d42u);
+            assert(noFX2Request.ff10WriteCount() == 0u);
+        }
+
         // IC4 maintains FX selectors in two external XDATA slots before
         // their loader reads them back. The overlay is intentionally a test
         // stand-in for the still-unidentified physical 0x7Bxx/0x7Cxx target.
