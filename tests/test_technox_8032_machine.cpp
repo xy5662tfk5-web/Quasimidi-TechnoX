@@ -2103,15 +2103,23 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
         const auto statusReadsAfterResume = firmwareMachine.ff10ReadCount();
         assert(statusReadsAfterResume > statusReadsBeforeResume);
-        assert(firmwareMachine.ff10ReadAt(statusReadsAfterResume - 1u).value == 0xacu);
-        std::printf("FF10 status reads after synthetic-ready injection: %zu\\n",
+        const auto& readyPoll = firmwareMachine.ff10ReadAt(statusReadsAfterResume - 1u);
+        assert(readyPoll.address == 0xff10u);
+        assert(readyPoll.value == 0xacu);
+        assert(readyPoll.instructionPC == 0xaf88u);
+        assert(readyPoll.stackReturnPC == 0x38f4u);
+        assert(readyPoll.port2 == 0xffu);
+        assert(readyPoll.port3 == 0xfeu);
+        assert(readyPoll.soundBusMode == 0x00u);
+        assert(readyPoll.soundDeviceResetReleased);
+        std::printf("FF10 status reads after synthetic-ready injection: %zu\n",
                     statusReadsAfterResume - statusReadsBeforeResume);
         const auto firstRetainedStatusRead = statusReadsAfterResume > 4096u
             ? statusReadsAfterResume - 4096u : statusReadsBeforeResume;
         for (std::size_t i = firstRetainedStatusRead; i < statusReadsAfterResume; ++i) {
             if (i < statusReadsBeforeResume) continue;
             const auto& event = firmwareMachine.ff10ReadAt(i);
-            std::printf("  FF10 R=%02X pc=%04X ret=%04X P2=%02X P3=%02X mode=%02X reset=%u cycle=%llu\\n",
+            std::printf("  FF10 R=%02X pc=%04X ret=%04X P2=%02X P3=%02X mode=%02X reset=%u cycle=%llu\n",
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned>(event.instructionPC),
                         static_cast<unsigned>(event.stackReturnPC),
