@@ -277,3 +277,21 @@ For FX1 Room, IC51 bank 0:
 - Stream B resource 1 skips leading byte `0x7F` at `0x2851` and reads a zero count at `0x2852`; it sends no bytes.
 
 A dedicated machine regression executes the original `0x8004 -> AF93 -> B015` FX1 path and compares every `FF10` write against the serialized IC51 plan. This supersedes the earlier 837-byte estimate for this resource; no DSP register meaning or audible effect algorithm is inferred from the stream.
+
+
+## Immutable FX upload-plan catalog connected to the backend
+
+- Added `MASSFXUploadPlanCatalog`: startup/offline construction of exact ordered `FF10` write bytes for every FX1 and FX2 effect index in both IC51 banks (84 immutable plans).
+- `QuasimidiTechnoXAudioProcessor` builds the catalog only after both FX resource catalogs load. It passes the read-only pointer through `MASSAudioEngine` and `IMASSVoiceBackend::setFXUploadPlanCatalog`; `setBackend()` forwards the same catalog to replacement backends.
+- The audio-thread/backend handoff is now a fixed-index lookup. ROM parsing, descriptor decoding and vector allocation remain on the startup/control thread.
+- C++ regression now checks all 84 plans against their decoded stream byte counts, rejects invalid family/bank/effect keys, and verifies that a replacement backend receives and resolves FX1 Room (325 bytes) and FX2 Equalizr1 (177 bytes).
+- This is byte-transport/resource plumbing only. It does not emulate the receiver, name DSP registers, render original FX algorithms or establish that the physical Performance selector source has been mapped.
+
+## FX selector and IRAM[0x6A] provenance checkpoint
+
+- IC4 has separate FX1 and FX2 handler blocks: `0x5407–0x5426` clamps `IRAM[0x6A]` to 0..20 and stores it at `0x7BFE`; `0x543D–0x545C` does the same for `0x7C06`. Both have a preceding `0x3702`/ `0x3708` status gate, call `0x7C29`, set `0x2B94`, then continue through `0x563E`.
+- The FX1 loader helper `0x7FF2` reads `0x7BFE` and copies/clamps it to `0x3098` before indexing the FX1 table at `0x8423`. FX2's loader at `0x88D1` reads `0x7C06` and uses the separate table at `0x8F99`.
+- The real-ROM Note On fixture reaches the FX1 `0x7D72 -> 0x7FF2` call path, but its low `0x7Bxx/0x7Cxx` target is supplied by the explicitly synthetic test overlay. That confirms the CPU code path under the test fixture, not the physical source of the selector. FX2's loader runtime test also supplies its selector through a test fixture.
+- `IRAM[0x6A]` has multiple code writers (including copies from `0x28F2`, `0x28FD`, table/lookup paths and context-specific clears). It is a shared scratch/parameter register, not a globally persistent FX setting.
+- The generic validator path `0x5ECD/0x5F6E/0x5D75` uses `0x28F7` to select a 12-byte entry at `0x612F + index*0x0C`, copies its first two bytes as a parameter XDATA address, and takes the final two bytes as bounds for a separate validation operation. Its two direct `0x5F6E` callers are `0x6015` and `0x601C`. This path has not been proven to be the producer for the FX store handlers and must not be treated as such.
+- Details and next trace: `docs/research/FX_SELECTOR_DISPATCH_AND_UPLOAD_PLANS.md`. The remaining priority is to identify the actual dispatcher entry and the instruction that supplies `IRAM[0x6A]` immediately before each FX handler, using a real Performance/controller stimulus instead of synthetic XDATA values.
