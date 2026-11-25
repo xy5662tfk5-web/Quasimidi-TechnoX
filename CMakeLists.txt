@@ -54,6 +54,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSModulationMatrix.h
     Source/MASSAudioEngine.h
     Source/MASSResourceROM.h
+    Source/MASSOriginalVoiceProgramRuntime.h
     Source/BasicMASSVoiceBackend.h
     Source/MCS51Core.h
     Source/TechnoX8032Machine.h
