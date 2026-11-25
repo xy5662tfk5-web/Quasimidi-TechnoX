@@ -4197,7 +4197,7 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < ic4CurveCode.size(); ++i)
             ic4CurveCode[i] = firmwareMachine.readCode(
                 static_cast<std::uint16_t>(i));
-        MASSFirmwareROMView indexedPairFirmware;
+        technox::MASSFirmwareROMView indexedPairFirmware;
         assert(indexedPairFirmware.attach(
             ic4CurveCode.data(), ic4CurveCode.size()));
 
@@ -4238,12 +4238,13 @@ int main(int argc, char** argv) {
             // byte into A, and JZ has not yet taken the zero-guard bypass.
             if (event.instructionPC == 0x02e0u && indexedPairPending &&
                 event.returnPC == indexedPairPendingReturn &&
-                event.ram28 == 0x0cu)
+                event.ram28 == 0x0cu) {
                 indexedPairPendingGuard = event.accumulator;
                 indexedPairGuardCaptured = true;
-                const auto projected = MASSIndexedPairMathProjection::apply(
-                    indexedPairFirmware, indexedPairPendingGuard,
-                    indexedPairPendingR29, indexedPairPendingR2A);
+                const auto projected =
+                    technox::MASSIndexedPairMathProjection::apply(
+                        indexedPairFirmware, indexedPairPendingGuard,
+                        indexedPairPendingR29, indexedPairPendingR2A);
                 assert(projected.valid);
                 if (projected.zeroGuardBypass)
                     assert(projected.value == 0u);
@@ -4315,9 +4316,10 @@ int main(int argc, char** argv) {
                 const auto actual = static_cast<std::uint16_t>(
                     (static_cast<std::uint16_t>(indexedPairActualHigh) << 8u) |
                     event.accumulator);
-                const auto projected = MASSIndexedPairMathProjection::apply(
-                    indexedPairFirmware, indexedPairPendingGuard,
-                    indexedPairPendingR29, indexedPairPendingR2A);
+                const auto projected =
+                    technox::MASSIndexedPairMathProjection::apply(
+                        indexedPairFirmware, indexedPairPendingGuard,
+                        indexedPairPendingR29, indexedPairPendingR2A);
                 assert(projected.valid && projected.value == actual);
                 ++note72IndexedPairMathCompared;
                 indexedPairPending = false;
