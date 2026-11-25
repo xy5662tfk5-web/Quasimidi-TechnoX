@@ -740,7 +740,8 @@ public:
 
     MCS51StepResult step() noexcept {
         const auto pc = cpu_.registers().pc;
-        if (pc == 0x02d1u || pc == 0x02dfu || pc == 0x02e2u ||
+        if (pc == 0x02d1u || pc == 0x02dfu || pc == 0x02e0u ||
+            pc == 0x02e2u ||
             pc == 0x0339u || pc == 0x034fu || pc == 0x0354u ||
             pc == 0x0358u ||
             pc == 0x035cu || pc == 0x0392u || pc == 0x039eu ||
