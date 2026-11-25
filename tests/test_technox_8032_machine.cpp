@@ -122,6 +122,11 @@ int main(int argc, char** argv) {
     machine.writeExternal(0xff10, 0x5a);
     assert(machine.lastSoundDeviceWrite() == 0x5a);
     assert(machine.readExternal(0xff10) == 0xff);
+    assert(machine.ff10ReadCount() == 1u);
+    const auto& openBusStatusRead = machine.ff10ReadAt(0);
+    assert(openBusStatusRead.address == 0xff10u);
+    assert(openBusStatusRead.value == 0xffu);
+    assert(openBusStatusRead.soundBusMode == 0x01u);
 
     // Unmapped/stub windows remain open bus instead of being fabricated as RAM.
     machine.writeExternal(0x3900, 0xaa);
@@ -2083,6 +2088,7 @@ int main(int argc, char** argv) {
         const auto loadedBlockWrites = firmwareMachine.soundMemoryWriteCount();
         firmwareMachine.enableTestExternalRamWindow7000(0x00u);
         firmwareMachine.setTestExternalReadOverride(0x7bd5u, 0x01u);
+        const auto statusReadsBeforeResume = firmwareMachine.ff10ReadCount();
         firmwareMachine.setSoundDeviceResponseForTesting(0xacu);
         const auto resumedToMain = firmwareMachine.runUntilProgramCounter(0x32b0u, 2000000u);
         std::printf("IC4 after synthetic SoundHost-ready response: instructions=%llu PC=%04X "
@@ -2095,6 +2101,26 @@ int main(int argc, char** argv) {
         assert(resumedToMain != 0u);
         assert(firmwareMachine.cpu().registers().pc == 0x32b0u);
         assert(firmwareMachine.soundMemoryWriteCount() == loadedBlockWrites);
+        const auto statusReadsAfterResume = firmwareMachine.ff10ReadCount();
+        assert(statusReadsAfterResume > statusReadsBeforeResume);
+        assert(firmwareMachine.ff10ReadAt(statusReadsAfterResume - 1u).value == 0xacu);
+        std::printf("FF10 status reads after synthetic-ready injection: %zu\\n",
+                    statusReadsAfterResume - statusReadsBeforeResume);
+        const auto firstRetainedStatusRead = statusReadsAfterResume > 4096u
+            ? statusReadsAfterResume - 4096u : statusReadsBeforeResume;
+        for (std::size_t i = firstRetainedStatusRead; i < statusReadsAfterResume; ++i) {
+            if (i < statusReadsBeforeResume) continue;
+            const auto& event = firmwareMachine.ff10ReadAt(i);
+            std::printf("  FF10 R=%02X pc=%04X ret=%04X P2=%02X P3=%02X mode=%02X reset=%u cycle=%llu\\n",
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.stackReturnPC),
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.port3),
+                        static_cast<unsigned>(event.soundBusMode),
+                        event.soundDeviceResetReleased ? 1u : 0u,
+                        static_cast<unsigned long long>(event.machineCycle));
+        }
         const auto bootBurstWords = firmwareMachine.soundHostBurstWordCount();
         const auto bootTransactions = firmwareMachine.soundCommandPacketCount();
         const auto hostWrites = firmwareMachine.soundHostWriteCount();
