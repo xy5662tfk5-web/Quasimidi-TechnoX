@@ -1960,7 +1960,11 @@ private:
 
             if (format ==
                 MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets) {
-                payloadSize = static_cast<std::size_t>(count) * 3u;
+                // IC4 AFCA executes MUL AB with B=3 and copies only A (low
+                // product byte) into R1. DJNZ R1 therefore consumes the low
+                // eight bits of count*3, not the full 16-bit product.
+                payloadSize = static_cast<std::uint8_t>(
+                    static_cast<unsigned>(count) * 3u);
                 totalSourceSize = 3u + payloadSize;
                 if (cursor + totalSourceSize > MASSResourceROM::kBankSize)
                     return false;
@@ -2273,7 +2277,8 @@ private:
                     ? 2u : 3u;
             const auto expectedPayloadBytes =
                 source.format == MASSIC51PortStreamFormat::headerAndTwoBytePreambleAndTriplets
-                    ? static_cast<std::size_t>(block.sourceCount) * 3u
+                    ? static_cast<std::uint8_t>(
+                          static_cast<unsigned>(block.sourceCount) * 3u)
                     : static_cast<std::size_t>(block.sourceCount);
             if (block.sourceCount == 0u ||
                 block.preambleByteCount != expectedPreambleBytes ||
