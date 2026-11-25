@@ -748,8 +748,10 @@ int main(int argc, char** argv) {
             std::uint16_t destination;
         };
         constexpr std::array<FXHardwareEventVector, 2> fxHardwareEvents{{
-            {0x3070u,0x30a4u,0x00u,0x01u,0x50u,0x15u,0x01u,0x14u,0x7bfeu},
-            {0x307au,0x3085u,0x01u,0x01u,0x51u,0x01u,0x7fu,0x14u,0x7c06u}
+            // 7BDC=0 takes 3070; SETB C makes R7 nonzero, so 40C4 reads 7BDA.
+            {0x306au,0x30a4u,0x00u,0x00u,0x50u,0x15u,0x01u,0x14u,0x7bfeu},
+            // 7BDC=1 takes 307A; bit1A=1 is complemented to zero, so 40C4 reads 7BDB.
+            {0x306au,0x30a4u,0x01u,0x01u,0x51u,0x01u,0x7fu,0x14u,0x7c06u}
         }};
         for (const auto& event : fxHardwareEvents) {
             TechnoX8032Machine fxEventProbe;
@@ -775,6 +777,29 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(fxEventProbe.cpu().registers().pc == event.exit);
             assert(!fxEventProbe.cpuFaulted());
+            const auto sourceValueAddress =
+                event.xdata7bdc == 0u ? 0x7bdau : 0x7bdbu;
+            bool sawBDC = false;
+            bool sawCommand = false;
+            bool sawSelectedValue = false;
+            for (std::size_t i = 0; i < fxEventProbe.unmappedBusTraceCount(); ++i) {
+                const auto& trace = fxEventProbe.unmappedBusTraceAt(i);
+                if (!trace.syntheticTestOverlay || trace.write)
+                    continue;
+                sawBDC = sawBDC ||
+                    (trace.address == 0x7bdcu && trace.instructionPC == 0x306du &&
+                     trace.value == event.xdata7bdc);
+                sawCommand = sawCommand ||
+                    (trace.address == 0x7bd9u && trace.instructionPC == 0x40cfu &&
+                     trace.value == event.command);
+                const auto sourcePC = event.xdata7bdc == 0u ? 0x40d6u : 0x40deu;
+                const auto sourceValue = event.xdata7bdc == 0u
+                    ? event.valueDA : event.valueDB;
+                sawSelectedValue = sawSelectedValue ||
+                    (trace.address == sourceValueAddress &&
+                     trace.instructionPC == sourcePC && trace.value == sourceValue);
+            }
+            assert(sawBDC && sawCommand && sawSelectedValue);
             const auto storedSelector =
                 fxEventProbe.testExternalRamByteForTesting(event.destination);
             if (storedSelector != expected) {
