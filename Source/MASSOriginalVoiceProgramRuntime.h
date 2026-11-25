@@ -40,6 +40,7 @@ public:
         std::uint8_t outputSlotsWritten = 0;
         std::uint8_t fillerSlotsWritten = 0;
         std::size_t commandCount = 0;
+        std::array<std::size_t, kFirmwareVariantCount> commandCursors{};
     };
 
     void setProgramCatalog(const MASSResourceProgramCatalog* catalog) noexcept {
@@ -131,6 +132,34 @@ public:
         if (program == nullptr || commandIndex >= program->stream.commands.size())
             return nullptr;
         return &program->stream.commands[commandIndex];
+    }
+
+    void rewindCommandStream(int voiceIndex, bool firmwareFlag0ASet) noexcept {
+        if (!validVoice(voiceIndex))
+            return;
+        auto& binding = voices_[static_cast<std::size_t>(voiceIndex)];
+        binding.commandCursors[firmwareFlag0ASet ? 1u : 0u] = 0;
+    }
+
+    const MASSResourceCommand* nextCommand(
+        int voiceIndex, bool firmwareFlag0ASet) noexcept {
+        if (!validVoice(voiceIndex))
+            return nullptr;
+        const auto variant = firmwareFlag0ASet ? 1u : 0u;
+        auto& binding = voices_[static_cast<std::size_t>(voiceIndex)];
+        const auto* program = binding.active ? binding.variants[variant] : nullptr;
+        if (program == nullptr)
+            return nullptr;
+        auto& cursor = binding.commandCursors[variant];
+        if (cursor >= program->stream.commands.size())
+            return nullptr;
+        return &program->stream.commands[cursor++];
+    }
+
+    std::size_t commandCursor(int voiceIndex, bool firmwareFlag0ASet) const noexcept {
+        const auto* binding = bindingForVoice(voiceIndex);
+        return binding != nullptr
+            ? binding->commandCursors[firmwareFlag0ASet ? 1u : 0u] : 0u;
     }
 
     // Read access to the reconstructed startup memory window is intentionally
