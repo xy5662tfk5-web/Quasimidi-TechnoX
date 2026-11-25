@@ -715,6 +715,60 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Exercise the original 0x3070/0x307A -> 0x40C4 -> 0x57A8
+        // producer path, not a direct call to the terminal 0x51B6 dispatcher.
+        // 0x40C4 forms R7=0xB0+XDATA[0x3702], takes R5 from 0x7BD9,
+        // and chooses R3 from 0x7BDA or 0x7BDB according to its selector.
+        struct FXHardwareEventVector {
+            std::uint16_t entry;
+            std::uint16_t exit;
+            std::uint8_t xdata7bdc;
+            std::uint8_t bit1aInitial;
+            std::uint8_t command;
+            std::uint8_t valueDA;
+            std::uint8_t valueDB;
+            std::uint8_t expected;
+            std::uint16_t destination;
+        };
+        constexpr std::array<FXHardwareEventVector, 2> fxHardwareEvents{{
+            {0x3070u,0x30a4u,0x00u,0x01u,0x50u,0x15u,0x01u,0x14u,0x7bfeu},
+            {0x307au,0x3085u,0x01u,0x01u,0x51u,0x01u,0x7fu,0x14u,0x7c06u}
+        }};
+        for (const auto& event : fxHardwareEvents) {
+            TechnoX8032Machine fxEventProbe;
+            assert(fxEventProbe.loadIC4Rom(realRom.data(), realRom.size()));
+            fxEventProbe.reset();
+            fxEventProbe.enableTestExternalRamWindow7000(0x00u);
+            fxEventProbe.writeExternal(0x3702u, 0x0cu); // Part/context C
+            fxEventProbe.writeExternal(0x3708u, 0x00u); // handler gate
+            fxEventProbe.writeExternal(0x7d95u, 0x01u); // event dispatcher ready
+            fxEventProbe.writeExternal(0x7bd5u, 0x01u); // enable Part C fan-out
+            fxEventProbe.writeExternal(0x7bd9u, event.command);
+            fxEventProbe.writeExternal(0x7bdau, event.valueDA);
+            fxEventProbe.writeExternal(0x7bdbu, event.valueDB);
+            fxEventProbe.writeExternal(0x7bdcu, event.xdata7bdc);
+            // Bit 0x1A is also the B0/DB selector input; bit 0x1B
+            // enables the external FF10 MOVX write wrapper.
+            fxEventProbe.writeInternal(0x23u,
+                static_cast<std::uint8_t>((event.bit1aInitial ? 0x04u : 0u) | 0x08u));
+            fxEventProbe.cpuForTesting().registersForTesting().pc = event.entry;
+            const auto executed =
+                fxEventProbe.runUntilProgramCounter(event.exit, 100000u);
+            const auto expected = event.expected;
+            assert(executed > 0u);
+            assert(fxEventProbe.cpu().registers().pc == event.exit);
+            assert(!fxEventProbe.cpuFaulted());
+            assert(fxEventProbe.testExternalRamByteForTesting(
+                event.destination) == expected);
+            // The selector handler calls the 0x7C29 deferred scheduler:
+            // one 54-byte service transaction, separate from the later
+            // decoded IC51 resource stream.
+            assert(fxEventProbe.ff10WriteCount() == 54u);
+            assert(fxEventProbe.readExternal(0x308bu) == 0x01u);
+            assert(fxEventProbe.readExternal(0x308du) == 0x01u);
+            assert(fxEventProbe.readExternal(0x3097u) == expected);
+        }
+
         for (const auto& vector : fxClampVectors) {
             TechnoX8032Machine fxIndexProbe;
             assert(fxIndexProbe.loadIC4Rom(realRom.data(), realRom.size()));
