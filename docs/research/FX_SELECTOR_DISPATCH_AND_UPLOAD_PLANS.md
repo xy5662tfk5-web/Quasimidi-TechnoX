@@ -116,10 +116,44 @@ The regression resolves every plan across all 84 family/bank/effect combinations
 
 **Evidence boundary:** this closes the byte-exact resource-to-backend *data handoff*. It does not yet send these plans to a modeled physical DSP during playback, interpret their contents as DSP registers, or produce original FX audio. The receiving device, acknowledgement protocol and algorithm semantics remain unresolved.
 
-## 5. Next trace
 
-1. Capture the actual event/dispatch entry that reaches `0x5407` and `0x543D`, including the caller and the instruction that populated `IRAM[0x6A]`.
-2. Compare the real Performance FX values with the values stored at `0x7BFE` and `0x7C06`; do not rely on the synthetic low-XDATA overlay.
-3. Trace the `0x7C29` continuation and determine whether it schedules an upload, status poll, or unrelated control transaction.
-4. Keep the verified `0xFF10` upload byte plan separate from the still-unidentified `0x8000–0x8003` four-byte command protocol.
-5. Identify the receiving chip/board routing before implementing any FX DSP state machine or algorithm.
+
+## 6. Event-command path into the FX1/FX2 store handlers
+
+The static IC4 v1.05 bytes recover the subcommand dispatcher that leads to the two store blocks. It is a distinct layer from both `0x7C29` (request scheduling) and the `0x7FF2/0x88D1` resource loaders.
+
+### Three-field event staging
+
+At `0x57A8`, the firmware stores its incoming register tuple without reinterpretation:
+
+| Input register | Staging byte | Later role |
+|---|---:|---|
+| `R7` | IRAM `0x60` | high-nibble event class and low-nibble Part/context selector |
+| `R5` | IRAM `0x61` | subcommand within the event class |
+| `R3` | IRAM `0x62` | subcommand value / selector byte |
+
+The helper splits `IRAM[0x60]` into its low nibble at `0x63` and high nibble in `0x60`. The fan-out code around `0x597E–0x59B7` selects Part/context values `0x0C–0x0F`, passes the class/subcommand fields into `0x5671`, and copies the staged value `IRAM[0x62]` into `IRAM[0x67]`.
+
+For the class-`0x0B` branch, `0x5671` enters `0x56C9`. That branch restores the staged context to R7, copies the subcommand from `IRAM[0x66]` to R5, and copies the payload from `IRAM[0x67]` to R3 before calling `0x51B6`. `0x51B6` stores those values in `0x68/0x69/0x6A` and calls `0xED30`.
+
+### Exact command table records
+
+`0xED30` uses its caller return address (`0x51C1`) as a code-table base, scans three-byte records, and performs a computed jump to the first two bytes of the record whose third byte matches R0. The two relevant records are:
+
+| Table address | Record bytes | Subcommand | Handler |
+|---:|---|---:|---:|
+| `0x51DC` | `53 F3 50` | `0x50` | `0x53F3` — FX1 selector handler |
+| `0x51DF` | `54 29 51` | `0x51` | `0x5429` — FX2 selector handler |
+
+From those entries, the handler body checks the `0x3702` context and `0x3708` gate, clamps R3/IRAM `0x6A` to 0..20, then writes to `0x7BFE` (FX1) or `0x7C06` (FX2). It calls `0x7C29` only after the selector store.
+
+This establishes the *firmware command dispatch table* and the three-byte staging contract. It does **not** yet prove which real panel, Performance edit, MIDI, or SysEx producer supplies a given tuple, nor which instruction is the final producer of IRAM `0x6A` on that real path. `0x6A` remains a shared scratch/parameter byte with multiple writers. The remaining provenance trace must begin at the real caller of `0x57A8` and retain its R7/R5/R3 values through the Part fan-out.
+
+The machine regression added alongside this note runs the original `0x51B6 -> ED30` dispatcher for both command IDs and values `00, 01, 14, 15, 7F`, then checks the exact destination write after clamping. It validates the code table and handler route under explicit `0x3702/0x3708` fixture values; it is not a captured hardware event.
+## 7. Next trace
+
+1. Trace the real caller(s) of `0x57A8` and recover the origin of the incoming R7/R5/R3 tuple, including real Performance FX1/FX2 edits; do not substitute the synthetic selector overlay.
+2. Identify the instruction and context that produces IRAM `0x62` / `0x67` immediately before subcommand `0x50` or `0x51` reaches `0x51B6`.
+3. Compare the real Performance values with the stored bytes at `0x7BFE` and `0x7C06`, and then with the subsequent reads by the `0x7D67` and `0x7D34` deferred consumers.
+4. Keep the verified 54-byte `0x7C29` service request, the decoded IC51 resource upload plans, and the separate `0x8000–0x8003` four-byte command protocol as three distinct transactions.
+5. Identify the receiving chip/board routing and its acknowledgement behavior before implementing any FX DSP state machine or algorithm.
