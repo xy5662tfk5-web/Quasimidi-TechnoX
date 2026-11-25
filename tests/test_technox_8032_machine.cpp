@@ -2674,8 +2674,13 @@ int main(int argc, char** argv) {
             const auto& event = firmwareMachine.portWriteAt(p3Writes - 1u - age);
             if (event.port != 3u) continue;
             ++shownP3Writes;
-            std::printf("  P3=%02X cycle=%llu\\n",
+            std::printf("  P3=%02X prev=%02X changed=%02X pc=%04X P2=%02X 8E=%02X cycle=%llu\\n",
                         static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.previousValue),
+                        static_cast<unsigned>(event.changedMask),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.soundBusMode),
                         static_cast<unsigned long long>(event.machineCycle));
         }
         assert(firmwareMachine.p35TransitionCount() > 0u);
@@ -6871,9 +6876,14 @@ int main(int argc, char** argv) {
         std::printf("Recent IC4 port writes (newest first):\\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
             const auto& event = injectedResponseMachine.portWriteAt(portWrites - 1u - portAge);
-            std::printf("  P%u=%02X cycle=%llu\\n",
+            std::printf("  P%u=%02X prev=%02X changed=%02X pc=%04X P2=%02X 8E=%02X cycle=%llu\\n",
                         static_cast<unsigned>(event.port),
                         static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.previousValue),
+                        static_cast<unsigned>(event.changedMask),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.soundBusMode),
                         static_cast<unsigned long long>(event.machineCycle));
         }
         std::printf("IC4 P1/P3 trace (newest first):\\n");
