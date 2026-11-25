@@ -150,10 +150,76 @@ From those entries, the handler body checks the `0x3702` context and `0x3708` ga
 This establishes the *firmware command dispatch table* and the three-byte staging contract. It does **not** yet prove which real panel, Performance edit, MIDI, or SysEx producer supplies a given tuple, nor which instruction is the final producer of IRAM `0x6A` on that real path. `0x6A` remains a shared scratch/parameter byte with multiple writers. The remaining provenance trace must begin at the real caller of `0x57A8` and retain its R7/R5/R3 values through the Part fan-out.
 
 The machine regression added alongside this note runs the original `0x51B6 -> ED30` dispatcher for both command IDs and values `00, 01, 14, 15, 7F`, then checks the exact destination write after clamping. It validates the code table and handler route under explicit `0x3702/0x3708` fixture values; it is not a captured hardware event.
-## 7. Next trace
 
-1. Trace the real caller(s) of `0x57A8` and recover the origin of the incoming R7/R5/R3 tuple, including real Performance FX1/FX2 edits; do not substitute the synthetic selector overlay.
-2. Identify the instruction and context that produces IRAM `0x62` / `0x67` immediately before subcommand `0x50` or `0x51` reaches `0x51B6`.
-3. Compare the real Performance values with the stored bytes at `0x7BFE` and `0x7C06`, and then with the subsequent reads by the `0x7D67` and `0x7D34` deferred consumers.
-4. Keep the verified 54-byte `0x7C29` service request, the decoded IC51 resource upload plans, and the separate `0x8000–0x8003` four-byte command protocol as three distinct transactions.
-5. Identify the receiving chip/board routing and its acknowledgement behavior before implementing any FX DSP state machine or algorithm.
+
+## 7. Gate polarity and external 0x7BDx event source
+
+The two selector handlers have now been checked at instruction level, not inferred from the test fixture:
+
+- At `0x53F3` (FX1) and `0x5429` (FX2), the first condition reads `XDATA[0x3702]`, XORs it with `IRAM[0x68]`, and skips to `0x563E` if they differ.
+- The second condition reads `XDATA[0x3708]` and executes `JNZ` over the skip branch. Therefore the handler requires **nonzero** `XDATA[0x3708]`; zero disables the selector write.
+- A prior direct-dispatch test fixture incorrectly supplied zero at `0x3708`. That fixture was corrected to one; the direct handler path and the higher-level event path now use the observed polarity.
+
+The upstream entry points at `0x3070` and `0x307A` call helper `0x40C4`, which forms the three fields passed to `0x57A8`:
+
+1. `XDATA[0x3702] + 0xB0` is staged as R7 (the event class plus context).
+2. `XDATA[0x7BD9]` is staged as R5 (the command/subcommand).
+3. R3 is selected from either `XDATA[0x7BDA]` or `XDATA[0x7BDB]`, depending on incoming R7.
+
+The two event entry paths select those data bytes differently:
+
+- `0x3070` sets bit `0x1A` before the rotate and enters `0x40C4` with R7=0, selecting `0x7BDA`.
+- `0x307A` complements bit `0x1A` before the rotate. Entering with bit `0x1A=0` produces R7=1 and selects `0x7BDB`.
+
+A new runtime test is being added to run both real IC4 entry blocks, through `0x40C4 -> 0x57A8 -> Part fan-out -> 0x5671 -> 0x51B6 -> ED30`, then verify the corresponding FX selector address and the 54-byte scheduler service request. The source bytes are visible in the descrambled ROM at `0x3070`, `0x307A`, and `0x40C4`. The XDATA window values remain synthetic test stimuli; their physical producer/device has not yet been identified.
+
+## 8. Deferred FX load: payload and post-load service are distinct transactions
+
+Executing the deferred consumers with the real IC4 and IC51 images shows that the complete consumer emits more than the selected resource payload:
+
+### FX1 Room, bank 0
+
+- IC51 upload: 325 writes to `0xFF10` (75+244 payload bytes and their two block headers/preambles).
+- Post-load service: 48 additional writes, eight six-byte transactions. They are emitted by the B0EF/B14B writer code after the resource stream returns.
+- Total at the deferred consumer boundary: 373 writes.
+
+Post-load service bytes, in order:
+
+```
+01 01 88 00 00 00
+01 01 86 00 00 00
+01 01 87 00 32 00
+01 01 8A 00 05 00
+01 01 8B 00 06 00
+01 01 8C 00 02 00
+01 00 45 37 88 01
+01 02 C1 27 10 00
+```
+
+The first six packets and the final packet are emitted through B0EF; the seventh uses B14B. Their recorded return-PC groups are `7EED`, `7EF8`, `7F6B`, `7F77`, `7F9F`, `7FAB`, `7FB0`, and `7C28`. Byte-writer PCs are B0FC/B10A/B118/B126/B134/B143 for B0EF; the B14B packet uses B158/B167/B176/B185/B197/B1A6.
+
+### FX2 Equalizr1, bank 0
+
+- IC51 upload: 177 writes to `0xFF10`.
+- Post-load service: 18 writes, three six-byte B0EF transactions.
+- Total at the deferred consumer boundary: 195 writes.
+
+Post-load bytes:
+
+```
+01 03 F8 00 0F 00
+01 03 F9 00 0F 00
+01 03 FA 00 0F 00
+```
+
+All three packets have return-PC `0x8765` and use writer PCs B0FC/B10A/B118/B126/B134/B143.
+
+These post-load transactions are not part of the IC51 resources and must not be appended to the immutable 325-byte/177-byte effect upload plans. Their device-level meaning remains unclassified until the receiver and acknowledgement behavior are identified. Regression checks now assert the 325+48 and 177+18 sequences separately, including address, byte value, mode, P2, writer PC and caller return context.
+
+## 9. Next trace
+
+1. Identify the physical producer of the external XDATA source bytes at `0x7BD9–0x7BDC` and map which panel/Performance/controller operation updates them.
+2. Trace the real Performance/controller/MIDI caller of `0x3070` or `0x307A`, retaining the input bit-0x1A state and the R7/R5/R3 tuple through `0x40C4` and `0x57A8`.
+3. Compare real Performance FX1/FX2 values with stored `0x7BFE/0x7C06` and subsequent deferred consumers `0x7D67/0x7D34`.
+4. Keep the 54-byte `0x7C29` scheduler request, the 325/177-byte IC51 resource payloads, their 48/18-byte post-load sequences, and the separate `0x8000–0x8003` command protocol as distinct transactions.
+5. Identify the receiving chip/board routing and acknowledgement behavior before implementing any FX DSP state machine or algorithm.
