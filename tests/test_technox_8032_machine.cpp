@@ -607,6 +607,47 @@ int main(int argc, char** argv) {
             {0x00u, 0x00u}, {0x01u, 0x01u}, {0x13u, 0x13u},
             {0x14u, 0x14u}, {0x15u, 0x14u}, {0x7fu, 0x14u}
         }};
+        // The normal event path receives (R7,R5,R3), stores them at
+        // IRAM 0x60..0x62, then dispatches class 0x0B / subcommands 0x50
+        // (FX1) and 0x51 (FX2) through table 0x51C1 -> ED30. Execute the
+        // original dispatch entry at 0x51B6 so the test covers the table,
+        // command handlers, selector clamp and destination XDATA write.
+        struct FXCommandDispatchVector {
+            std::uint8_t subcommand;
+            std::uint16_t destination;
+        };
+        constexpr std::array<FXCommandDispatchVector, 2> fxDispatchVectors{{
+            {0x50u, 0x7bfeu}, {0x51u, 0x7c06u}
+        }};
+        constexpr std::array<std::uint8_t, 5> fxCommandValues{{
+            0x00u, 0x01u, 0x14u, 0x15u, 0x7fu
+        }};
+        for (const auto& dispatch : fxDispatchVectors) {
+            for (const auto input : fxCommandValues) {
+                TechnoX8032Machine fxDispatchProbe;
+                assert(fxDispatchProbe.loadIC4Rom(realRom.data(), realRom.size()));
+                fxDispatchProbe.reset();
+                fxDispatchProbe.enableTestExternalRamWindow7000(0x00u);
+                // Handler preconditions observed at the two table targets:
+                // active Part/slot 0x0C and the zero-valued 0x3708 gate.
+                fxDispatchProbe.writeExternal(0x3702u, 0x0cu);
+                fxDispatchProbe.writeExternal(0x3708u, 0x00u);
+                fxDispatchProbe.writeInternal(0xd0u, 0x00u); // register bank 0
+                fxDispatchProbe.writeInternal(0x07u, 0x0cu); // R7: Part/context
+                fxDispatchProbe.writeInternal(0x05u, dispatch.subcommand); // R5: FX1/FX2
+                fxDispatchProbe.writeInternal(0x03u, input); // R3: zero-based algorithm
+                fxDispatchProbe.cpuForTesting().registersForTesting().pc = 0x51b6u;
+                const auto executed =
+                    fxDispatchProbe.runUntilProgramCounter(0x563eu, 2048u);
+                const auto expected = input >= 0x15u ? 0x14u : input;
+                assert(executed > 0u);
+                assert(fxDispatchProbe.cpu().registers().pc == 0x563eu);
+                assert(!fxDispatchProbe.cpuFaulted());
+                assert(fxDispatchProbe.testExternalRamByteForTesting(
+                    dispatch.destination) == expected);
+            }
+        }
+
         for (const auto& vector : fxClampVectors) {
             TechnoX8032Machine fxIndexProbe;
             assert(fxIndexProbe.loadIC4Rom(realRom.data(), realRom.size()));
@@ -1603,6 +1644,29 @@ int main(int argc, char** argv) {
             assert(firmwareMachine.readCode(0x7d72u) == 0x12u);
             assert(firmwareMachine.readCode(0x7d73u) == 0x7fu);
             assert(firmwareMachine.readCode(0x7d74u) == 0xf2u);
+
+            // Original three-byte event dispatch: 57A8 stores R7/R5/R3
+            // at 0x60/0x61/0x62; 51B6 forwards the second and third fields
+            // to ED30's table at 0x51C1.
+            assert(firmwareMachine.readCode(0x57a8u) == 0x8fu);
+            assert(firmwareMachine.readCode(0x57a9u) == 0x60u);
+            assert(firmwareMachine.readCode(0x57aau) == 0x8du);
+            assert(firmwareMachine.readCode(0x57abu) == 0x61u);
+            assert(firmwareMachine.readCode(0x57acu) == 0x8bu);
+            assert(firmwareMachine.readCode(0x57adu) == 0x62u);
+            assert(firmwareMachine.readCode(0x51b6u) == 0x8fu);
+            assert(firmwareMachine.readCode(0x51b7u) == 0x68u);
+            assert(firmwareMachine.readCode(0x51b8u) == 0x8du);
+            assert(firmwareMachine.readCode(0x51b9u) == 0x69u);
+            assert(firmwareMachine.readCode(0x51bau) == 0x8bu);
+            assert(firmwareMachine.readCode(0x51bbu) == 0x6au);
+            // ED30 dispatch records: 0x50 -> 0x53F3 (FX1), 0x51 -> 0x5429 (FX2).
+            assert(firmwareMachine.readCode(0x51dcu) == 0x53u);
+            assert(firmwareMachine.readCode(0x51ddu) == 0xf3u);
+            assert(firmwareMachine.readCode(0x51deu) == 0x50u);
+            assert(firmwareMachine.readCode(0x51dfu) == 0x54u);
+            assert(firmwareMachine.readCode(0x51e0u) == 0x29u);
+            assert(firmwareMachine.readCode(0x51e1u) == 0x51u);
 
             // Pin the independent FX2 firmware loader to the real IC4 image:
             // XDATA 0x7C06 supplies the type index, values >= 0x15 clamp to
