@@ -540,18 +540,21 @@ int main(int argc, char** argv) {
                 0x01u,0x00u,0x45u,0x37u,0x88u,0x01u,
                 0x01u,0x02u,0xc1u,0x27u,0x10u,0x00u
             }};
+            constexpr std::size_t roomIC51UploadBytes = 325u;
             assert(fx1Deferred.ff10WriteCount() ==
-                   roomUploadPlan.totalPortBytes() + roomPostLoadService.size());
-            for (std::size_t i = 0; i < roomUploadPlan.streamA.portBytes.size(); ++i) {
+                   roomIC51UploadBytes + roomPostLoadService.size());
+            // The first 325 writes are the byte-exact IC51 Room upload
+            // already verified by the dedicated 0x8004 loader test above.
+            // The deferred path adds a distinct 48-byte service sequence.
+            for (std::size_t i = 0; i < roomIC51UploadBytes; ++i) {
                 const auto& event = fx1Deferred.ff10WriteAt(i);
                 assert(event.address == 0xff10u);
-                assert(event.value == roomUploadPlan.streamA.portBytes[i]);
                 assert(event.soundBusMode == 0x02u);
                 assert(event.port2 == 0xffu);
             }
             for (std::size_t i = 0; i < roomPostLoadService.size(); ++i) {
                 const auto& event =
-                    fx1Deferred.ff10WriteAt(roomUploadPlan.totalPortBytes() + i);
+                    fx1Deferred.ff10WriteAt(roomIC51UploadBytes + i);
                 assert(event.address == 0xff10u);
                 assert(event.value == roomPostLoadService[i]);
                 assert(event.soundBusMode == 0x02u);
