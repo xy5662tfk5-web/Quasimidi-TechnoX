@@ -2346,7 +2346,10 @@ public:
     const MASSFXUploadProgramImage* find(MASSFXProcessorFamily family,
                                          int bank,
                                          int effectIndex) const noexcept {
-        if (!loaded_ || bank < 0 || bank >= static_cast<int>(kBankCount) ||
+        if (!loaded_ ||
+            (family != MASSFXProcessorFamily::fx1 &&
+             family != MASSFXProcessorFamily::fx2) ||
+            bank < 0 || bank >= static_cast<int>(kBankCount) ||
             effectIndex < 0 || effectIndex >= static_cast<int>(kProgramCount))
             return nullptr;
         const auto bankIndex = static_cast<std::size_t>(bank);
