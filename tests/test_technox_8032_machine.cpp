@@ -4234,9 +4234,11 @@ int main(int argc, char** argv) {
                 }
             }
 
-            if (event.instructionPC == 0x02e2u && indexedPairPending &&
+            // At 0x02E0 the MOVX at 0x02DF has already loaded the guard
+            // byte into A, and JZ has not yet taken the zero-guard bypass.
+            if (event.instructionPC == 0x02e0u && indexedPairPending &&
                 event.returnPC == indexedPairPendingReturn &&
-                event.ram28 == 0x0cu) {
+                event.ram28 == 0x0cu)
                 indexedPairPendingGuard = event.accumulator;
                 indexedPairGuardCaptured = true;
                 const auto projected = MASSIndexedPairMathProjection::apply(
