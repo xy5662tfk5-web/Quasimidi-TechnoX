@@ -1055,7 +1055,7 @@ public:
             secondProduct >> 8u);
         const auto secondProductLow = static_cast<std::uint8_t>(
             secondProduct & 0xffu);
-        (void) secondProductLow; // retained below as the firmware's R3 value
+        (void) secondProductLow; // MUL's low byte is not consumed by this routine
 
         const auto lowScaleSum =
             static_cast<unsigned>(firstProductLow) + secondProductHigh;
