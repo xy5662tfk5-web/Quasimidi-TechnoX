@@ -1056,7 +1056,7 @@ public:
         const bool changePhase = requestedPhase != currentInternalBit0C;
         return {
             changePhase,
-            static_cast<std::uint8_t>(requestedPhase ? 0xc0u : 0x40u),
+            static_cast<std::uint8_t>(changePhase ? (requestedPhase ? 0xc0u : 0x40u) : 0x00u),
             responseOffsets[4],
             responseOffsets[0],
             responseOffsets[1],
