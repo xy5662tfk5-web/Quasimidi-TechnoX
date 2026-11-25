@@ -97,3 +97,18 @@ The shared 0x0DB7 writer stores `[R5, R2, R3, R4 & 0xBF]` to XDATA `0x8000..0x80
 
 The resource command decoder is also regression-tested against the captured seven-byte IC51 group-08 record `08 20 18 A0 F6 00 00`, preserving the firmware register order `R2,R3,R4,R7,R6,R5`. This ties the resource record to raw handler inputs, and the pitch-slot guard ties the subsequent register writeback to the two XDATA state bytes. Physical units and the external receiver's interpretation are still unassigned.
 
+
+
+## IC51 group-08 record to pitch-slot staging: evidence chain
+
+The focused 1C61 live trace records the selected IC51 bank and seven consecutive bytes at 0x160C..0x1612:
+
+`08 20 18 A0 F6 00 00`
+
+The field decoder preserves these as opcode 0x08 and register inputs `R2=20, R3=18, R4=A0, R7=F6, R6=00, R5=00`. The handler then stages the descriptor fields in the current selected-page record area, including the group byte at offset 0x80 and the descriptor byte at offset 0x83. The later correction/writeback trace shows the actual pitch slot being populated high-to-low at PCs 0x1E60/0x1E63/0x1E66, with final bytes at XDATA 0x0081..0x0083; the 0x09B9 consumer reads those same three bytes low-to-high.
+
+The secondary lookup is independently reproducible from the descrambled IC4 code ROM: the computed MOVC addresses are 0x397E, 0x39FE, and 0x3A7E, containing `05 43 02`. The packed-field decoder reproduces the live register tuple `R2=80, R3=60, R4=48, R5=05, R6=43, R7=02`. The 1C61 accumulator model then reproduces the intermediate `D5:1E:02`; the subsequent correction is a distinct step and yields the final slot vector `D5:1F:A2` in the Note 66 fixture. The later 09B9 consumer's high-byte mask and interpolation remain separate from this descriptor-field reconstruction.
+
+A separate IC51 Performance 1 / Part 13 resource-stream decode finds a seven-byte group-08 pitch-parameter command at stream offset 0x0179 (`0E 64 CC 05 9E 0C 5C`). It is consistent with the same handler class, but the current evidence does not prove that this exact stream record is the pointer source for the 0x160C..0x1612 bytes in the live Note 66 capture. Keep the two observations linked as a candidate relationship, not a completed pointer chain, until the command-stream cursor is captured through the pointer-table lookup.
+
+This now connects a real IC51 record to the firmware register tuple, the 1C61 transform, the three-byte XDATA pitch slot, the 09B9 consumer, and the 0x0A4F packet writer. It still does not map the raw values to Hz, semitones, sample addresses, amplitude, or named external-device registers.
