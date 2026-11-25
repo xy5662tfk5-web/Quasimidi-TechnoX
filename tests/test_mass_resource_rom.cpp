@@ -1,5 +1,7 @@
 #include "../Source/MASSResourceROM.h"
 #include "../Source/MASSAudioEngine.h"
+#include "../Source/MASSOriginalVoiceProgramRuntime.h"
+#include "../Source/BasicMASSVoiceBackend.h"
 
 #include <algorithm>
 #include <array>
@@ -818,6 +820,120 @@ void testActualFirmwareROMTables(const char* path) {
         assert(view.lookupNonlinearScale(static_cast<std::uint8_t>(index), value));
 }
 
+void testOriginalVoiceProgramRuntime(const char* romPath) {
+    std::ifstream input(romPath, std::ios::binary);
+    assert(input.good());
+    std::vector<std::uint8_t> bytes(
+        (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    MASSResourceROM rom;
+    assert(rom.load(bytes.data(), bytes.size()));
+
+    MASSResourceProgramCatalog catalog;
+    assert(catalog.loadBothFirmwareFlagVariants(rom));
+
+    // Use an identity logical-page map only to exercise the resource binding
+    // and bounded memory hand-off. This is not the device's verified board map.
+    std::vector<std::uint8_t> firmwareCode(
+        static_cast<std::size_t>(MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress) +
+        MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize, 0);
+    for (std::size_t i = 0; i < MASSIC51ExternalSoundMemoryImage::kFirmwareMapSize; ++i)
+        firmwareCode[MASSIC51ExternalSoundMemoryImage::kFirmwareMapAddress + i] =
+            static_cast<std::uint8_t>(i);
+    MASSIC51ExternalSoundMemoryImage externalImage;
+    assert(externalImage.load(
+        rom, firmwareCode.data(), firmwareCode.size()));
+    assert(externalImage.isLoaded());
+
+    MASSOriginalVoiceProgramRuntime runtime;
+    runtime.setProgramCatalog(&catalog);
+    runtime.setExternalSoundMemoryImage(&externalImage);
+
+    VoiceSlot voice{};
+    voice.active = true;
+    voice.part = 2;
+    voice.channel = 3;
+    voice.note = 65;
+    voice.velocity = 104;
+    voice.bankNumber = 0;
+    voice.soundNumber = 0;
+    voice.drumSetNumber = 0xffu;
+
+    assert(runtime.noteOn(4, voice));
+    const auto* binding = runtime.bindingForVoice(4);
+    assert(binding != nullptr && binding->active);
+    assert(binding->part == voice.part && binding->note == voice.note);
+    assert(binding->bankNumber == 0 && binding->soundNumber == 0);
+    assert(binding->variants[0] != nullptr && binding->variants[1] != nullptr);
+    assert(!binding->variants[0]->firmwareFlag0ASet);
+    assert(binding->variants[1]->firmwareFlag0ASet);
+    assert(binding->descriptorAddress == binding->variants[0]->descriptorAddress);
+    assert(binding->streamPointer ==
+           binding->variants[0]->descriptor.commandStreamPointer);
+    assert(binding->commandCount == binding->variants[0]->stream.commands.size());
+
+    // Both transient firmware-flag paths remain separately addressable.
+    const auto* normal = runtime.programForVoice(4, false);
+    const auto* flagA = runtime.programForVoice(4, true);
+    assert(normal != nullptr && flagA != nullptr);
+    assert(runtime.commandForVoice(4, false, 0) ==
+           (normal->stream.commands.empty() ? nullptr : &normal->stream.commands[0]));
+    assert(runtime.commandForVoice(4, true, 0) ==
+           (flagA->stream.commands.empty() ? nullptr : &flagA->stream.commands[0]));
+    assert(runtime.commandForVoice(4, false, normal->stream.commands.size()) == nullptr);
+
+    std::uint8_t memoryByte = 0;
+    assert(runtime.readExternalSoundMemory(0xc000u, memoryByte));
+    assert(!runtime.readExternalSoundMemory(0xbfffu, memoryByte));
+    assert(!runtime.readExternalSoundMemory(0xffffu + 1u, memoryByte));
+
+    runtime.noteOff(4);
+    assert(runtime.bindingForVoice(4)->releasing);
+
+    // Legato retargeting and program changes flow through the VoiceSlot even
+    // when the host does not call backend noteOn again.
+    voice.note = 67;
+    voice.velocity = 96;
+    voice.bankNumber = 1;
+    voice.soundNumber = 5;
+    assert(runtime.synchronizeVoice(4, voice));
+    binding = runtime.bindingForVoice(4);
+    assert(binding->note == 67 && binding->velocity == 96);
+    assert(binding->bankNumber == 1 && binding->soundNumber == 5);
+    assert(binding->variants[0] != nullptr && binding->variants[1] != nullptr);
+    assert(!binding->releasing);
+
+    voice.active = false;
+    assert(!runtime.synchronizeVoice(4, voice));
+    assert(runtime.bindingForVoice(4) != nullptr &&
+           !runtime.bindingForVoice(4)->active);
+
+    // The live backend receives the same catalogs through IMASSVoiceBackend
+    // and binds the selected program on each allocated voice. Its audio output
+    // is still the explicitly generic diagnostic oscillator at this stage.
+    BasicMASSVoiceBackend backend;
+    backend.setProgramCatalog(&catalog);
+    backend.setExternalSoundMemoryImage(&externalImage);
+    backend.prepare(48000.0, 256);
+    voice.active = true;
+    voice.part = 2;
+    voice.channel = 3;
+    voice.note = 65;
+    voice.velocity = 104;
+    voice.bankNumber = 0;
+    voice.soundNumber = 0;
+    assert(backend.noteOn(1, voice), true);
+    const auto* liveBinding = backend.originalProgramBindingForTesting(1);
+    assert(liveBinding != nullptr && liveBinding->active);
+    assert(backend.originalProgramCommandForTesting(1, false, 0) ==
+           backend.originalProgramCommandForTesting(1, true, 0) ||
+           backend.originalProgramCommandForTesting(1, false, 0) != nullptr);
+    assert(backend.readOriginalSoundMemoryForTesting(0xc000u, memoryByte));
+    backend.noteOff(1, voice);
+    assert(backend.originalProgramBindingForTesting(1)->releasing);
+    backend.resetVoice(1, voice);
+    assert(!backend.originalProgramBindingForTesting(1)->active);
+}
+
 void testPointerTableAndPartMapping() {
     std::vector<std::uint8_t> image(MASSResourceROM::kImageSize, 0xff);
     writePointerBE(image, MASSResourceBank::bank0, 5, 0x1234);
@@ -1607,6 +1723,7 @@ int main(int argc, char** argv) {
         testActualIC51(argv[1]);
         testActualBulkBlockLoader(argv[1]);
         testBankProgramResolver(argv[1]);
+        testOriginalVoiceProgramRuntime(argv[1]);
     }
     return 0;
 }
