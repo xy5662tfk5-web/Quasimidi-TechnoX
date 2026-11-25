@@ -643,6 +643,9 @@ public:
     std::size_t indexedPairMathWatchCountForTesting() const noexcept {
         return indexedPairMathWatchCount_;
     }
+    std::size_t indexedPairMathWatchCapacityForTesting() const noexcept {
+        return indexedPairMathWatchTrace_.size();
+    }
     const IndexedPairMathWatchEvent& indexedPairMathWatchAtForTesting(
         std::size_t index) const noexcept {
         return indexedPairMathWatchTrace_[index % indexedPairMathWatchTrace_.size()];
