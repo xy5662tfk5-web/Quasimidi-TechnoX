@@ -605,28 +605,28 @@ int main(int argc, char** argv) {
             assert(executed > 0u);
             assert(fx2Deferred.cpu().registers().pc == 0x7d42u);
             assert(!fx2Deferred.cpuFaulted());
-            if (fx2Deferred.ff10WriteCount() != 177u) {
-                std::fprintf(stderr,
-                    "FX2 deferred tail: total=%zu IC51=%llu PC=%04X selector=%02X\\n",
-                    fx2Deferred.ff10WriteCount(),
-                    static_cast<unsigned long long>(fx2Deferred.ic51ReadCount()),
-                    static_cast<unsigned>(fx2Deferred.cpu().registers().pc),
-                    static_cast<unsigned>(fx2Deferred.testExternalRamByteForTesting(0x7c06u)));
-                for (std::size_t i = 177u; i < fx2Deferred.ff10WriteCount(); ++i) {
-                    const auto& e = fx2Deferred.ff10WriteAt(i);
-                    std::fprintf(stderr,
-                        "  FX2 tail[%zu]=%02X PC=%04X return=%04X P2=%02X mode=%02X\\n",
-                        i, static_cast<unsigned>(e.value),
-                        static_cast<unsigned>(e.instructionPC),
-                        static_cast<unsigned>(e.stackReturnPC),
-                        static_cast<unsigned>(e.port2),
-                        static_cast<unsigned>(e.soundBusMode));
-                }
-            }
-            assert(fx2Deferred.ff10WriteCount() >= 177u);
+            constexpr std::array<std::uint8_t, 18> equalizr1PostLoadService{{
+                0x01u,0x03u,0xf8u,0x00u,0x0fu,0x00u,
+                0x01u,0x03u,0xf9u,0x00u,0x0fu,0x00u,
+                0x01u,0x03u,0xfau,0x00u,0x0fu,0x00u
+            }};
+            assert(fx2Deferred.ff10WriteCount() ==
+                   177u + equalizr1PostLoadService.size());
             assert(fx2Deferred.ff10WriteAt(0).value == 0x3au);
             assert(fx2Deferred.ff10WriteAt(1).value == 0x15u);
-            assert(fx2Deferred.ff10WriteAt(176).value == 0x7eu);
+            assert(fx2Deferred.ff10WriteAt(176).address == 0xff10u);
+            for (std::size_t i = 0; i < equalizr1PostLoadService.size(); ++i) {
+                const auto& event = fx2Deferred.ff10WriteAt(177u + i);
+                assert(event.address == 0xff10u);
+                assert(event.value == equalizr1PostLoadService[i]);
+                assert(event.soundBusMode == 0x02u);
+                assert(event.port2 == 0xffu);
+                assert(event.stackReturnPC == 0x8765u);
+                constexpr std::array<std::uint16_t, 6> writerPCs{{
+                    0xb0fcu,0xb10au,0xb118u,0xb126u,0xb134u,0xb143u
+                }};
+                assert(event.instructionPC == writerPCs[i % 6u]);
+            }
             assert(fx2Deferred.readExternal(0x308du) == 0x01u);
             assert(fx2Deferred.readExternal(0x3097u) == 0x51u);
         }
