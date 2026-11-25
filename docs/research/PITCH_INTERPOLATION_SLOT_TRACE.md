@@ -64,3 +64,20 @@ Despite that reduction, the interpolation trace still records two entries at `0x
 - `0x0091–0x0093`: `01 00 48`.
 
 This is decisive negative evidence against assigning one interpolation triplet to each enabled Performance Part. The pitch slots are independent from the number of candidate Part events selected by the Common layer mode. They may represent two interpolation lanes or another internal pair of parameter states, but their exact ownership/semantics remain unidentified. The physical sound device and sample format are still unknown.
+
+
+## 0x2018/0x2019 guard and exact slot writeback model
+
+The later Note 72 instruction trace narrows the two-byte state pair's role in the pitch handler:
+
+1. At 0x1E4B, the firmware reads XDATA 0x2019.
+2. At 0x1E4C, XCH A,R4 exchanges that byte with the incoming R4 value; at 0x1E4D, MOV B,A preserves the incoming R4 in B.
+3. At 0x1E51, it reads XDATA 0x2018. The OR at 0x1E53 combines the two state bytes only to decide whether the following JZ at 0x1E54 skips the slot update.
+4. On the nonzero route, the existing high slot byte is read, masked with 0xF8, and ORed with B. The handler then writes R3 and R2 as the middle and low bytes. Thus the saved incoming R4 contributes only its low three bits to the existing high byte.
+
+The repository now models this as `MASSPitchSlotGuardProjection` and tests both zero-guard and nonzero-write cases. This is a byte/register-level model of the observed handler, not a semantic naming of the state pair.
+
+### Provenance boundary for the state pair
+
+A separate static/cycle trace identifies the generic writer chain: 0x02D1 performs table-driven arithmetic using code tables at 0x0098 and 0x00C8, routes the two-byte result through 0x0392, and reaches the final XDATA stores at 0x039E and 0x03A2 in the indexed 0x2000 region. In the Note 72 fixture these writes occur after the handler's reads of 0x2019/0x2018. The writer is therefore identified, but the upstream caller and the initial source operands that seed this calculation are not yet proven. Do not claim that the 0x02D1 table inputs or outputs are pitch units until that producer chain is captured.
+
