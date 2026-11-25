@@ -62,7 +62,7 @@ Branch: `research/original-technox-audio-engine`
 ## FX resource and host-stream layer
 
 - Recovered the 21-entry IC4 FX directory at `0x8423` (32-byte records), including the exact first/second IC51 resource selectors used by firmware calls at `0xAF93` and `0xB015`.
-- Added startup/offline parsers for the two byte-stream formats sent through XDATA `0xFF10`: count + two-byte preamble + `count*3` payload bytes, and circularly-rotated count + three fixed preamble bytes + `count` payload bytes. Zero-count blocks are represented as no-write resources.
+- Added startup/offline parsers for the two byte-stream formats sent through XDATA `0xFF10`: count + two-byte preamble + `(count*3) mod 256` payload bytes (the original `AFCA`/`DJNZ R1` loop truncates the `MUL AB` product to A), and circularly-rotated count + three fixed preamble bytes + `count` payload bytes. Zero-count blocks are represented as no-write resources.
 - Regression tests compare every FX label and resource pair with the real descrambled IC4 ROM, then resolve both resource formats for every effect in both IC51 banks.
 - This gives a second verified IC51 path beyond the descriptor/command-stream catalog. It is resource transport metadata only; no FX algorithm, PCM format, or physical DSP has been identified.
 
@@ -264,3 +264,16 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 2. Run one-coefficient-at-a-time tests for record bytes `+1/+2/+3` and the source coefficients at `0x28C8/0x2888/0x2898` (plus slot-1 equivalents), checking which intermediate/output bytes change.
 3. Trace the producer of `RAM[0x36/0x37]` backwards into the `0x04B5–0x0550` sine/slot consumer to connect each multiplier operand and saturation rule.
 4. Keep SoundHost byte meaning and the physical DSP protocol explicitly unresolved until supported by external documentation or a hardware capture.
+
+
+### FX1 upload-count correction from executed IC4 firmware
+
+The new standalone execution of the original FX1 loader at PC `0x8004` resolves a mismatch between the earlier offline parser and the actual `AF93` loop. `AFCA` multiplies the block count by three, but the firmware copies only the low product byte into R1 before `DJNZ R1`. The actual payload loop is therefore `(count * 3) mod 256`, not a full 16-bit `count * 3`.
+
+For FX1 Room, IC51 bank 0:
+- Block 1: source `0x24D4`, count `0x19`, preamble `00 CF`, 75 payload bytes, 78 total writes.
+- Block 2: source `0x2522`, count `0xFC`, preamble `19 08`, 244 payload bytes because `0xFC * 3 = 0x02F4` but R1 receives `0xF4`; 247 total writes.
+- The zero terminator is read at `0x2619`. Stream A sends exactly 325 bytes.
+- Stream B resource 1 skips leading byte `0x7F` at `0x2851` and reads a zero count at `0x2852`; it sends no bytes.
+
+A dedicated machine regression executes the original `0x8004 -> AF93 -> B015` FX1 path and compares every `FF10` write against the serialized IC51 plan. This supersedes the earlier 837-byte estimate for this resource; no DSP register meaning or audible effect algorithm is inferred from the stream.
