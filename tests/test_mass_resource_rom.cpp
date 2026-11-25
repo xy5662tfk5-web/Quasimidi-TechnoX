@@ -655,6 +655,76 @@ void testMASS1890Arithmetic() {
     assert(MASS1890Arithmetic::apply(0x20, 0x40) == 0x4f);
 }
 
+void testMASSIndexedPairMathProjection() {
+    // The fixed IC4 coefficient tables are copied byte-for-byte from the
+    // descrambled v1.05 ROM at code addresses 0x0098 and 0x00C8.
+    constexpr std::array<std::uint8_t, 48> negativeTable{{
+        0x00u,0x00u,0x0eu,0x5eu, 0x0eu,0x5eu,0x0du,0x90u,
+        0x1bu,0xeeu,0x0cu,0xcdu, 0x28u,0xbbu,0x0cu,0x15u,
+        0x34u,0xd0u,0x0bu,0x67u, 0x40u,0x37u,0x0au,0xc4u,
+        0x4au,0xfbu,0x0au,0x29u, 0x55u,0x24u,0x09u,0x97u,
+        0x5eu,0xbbu,0x09u,0x0du, 0x67u,0xc8u,0x08u,0x8bu,
+        0x70u,0x53u,0x08u,0x10u, 0x78u,0x63u,0x07u,0x9du
+    }};
+    constexpr std::array<std::uint8_t, 48> positiveTable{{
+        0x00u,0x00u,0x07u,0x9cu, 0x07u,0x9cu,0x08u,0x11u,
+        0x0fu,0xadu,0x08u,0x8bu, 0x18u,0x38u,0x09u,0x0du,
+        0x21u,0x45u,0x09u,0x97u, 0x2au,0xdcu,0x0au,0x29u,
+        0x35u,0x05u,0x0au,0xc4u, 0x3fu,0xc9u,0x0bu,0x67u,
+        0x4bu,0x30u,0x0cu,0x15u, 0x57u,0x45u,0x0cu,0xcdu,
+        0x64u,0x12u,0x0du,0x90u, 0x71u,0xa2u,0x0eu,0x5eu
+    }};
+    std::array<std::uint8_t, 0x1408> romBytes{};
+    std::copy(negativeTable.begin(), negativeTable.end(),
+              romBytes.begin() + MASSIndexedPairMathProjection::kNegativeTableAddress);
+    std::copy(positiveTable.begin(), positiveTable.end(),
+              romBytes.begin() + MASSIndexedPairMathProjection::kPositiveTableAddress);
+    MASSFirmwareROMView firmware;
+    assert(firmware.attach(romBytes.data(), romBytes.size()));
+
+    // Note 72 slot 12: both independent firmware callers (RAM[0x29]=0
+    // and RAM[0x29]=1) select the positive table's first record and produce
+    // the captured pair 00 06 with guard=0x0F and RAM[0x2A]=0x40.
+    auto result = MASSIndexedPairMathProjection::apply(
+        firmware, 0x0fu, 0x00u, 0x40u);
+    assert(result.valid && !result.zeroGuardBypass && !result.negativeInput);
+    assert(result.scale == 0xf0u);
+    assert(result.tableAddress == 0x00c8u && result.recordAddress == 0x00c8u);
+    assert(result.base == 0x0000u && result.slope == 0x079cu);
+    assert(result.fraction == 0x00efu);
+    assert(result.interpolated == 0x0006u && result.value == 0x0006u);
+
+    result = MASSIndexedPairMathProjection::apply(
+        firmware, 0x0fu, 0x01u, 0x40u);
+    assert(result.valid && result.value == 0x0006u);
+
+    // A higher segment selects record 3 at 0x00D4; the projected output
+    // includes its ROM base plus the firmware's three-product interpolation.
+    result = MASSIndexedPairMathProjection::apply(
+        firmware, 0x0fu, 0x00u, 0x50u);
+    assert(result.valid && !result.negativeInput);
+    assert(result.tableIndex == 0x0cu && result.recordAddress == 0x00d4u);
+    assert(result.base == 0x1838u && result.slope == 0x090du);
+    assert(result.fraction == 0xc0efu);
+    assert(result.interpolated == 0x06d2u);
+    assert(result.value == 0x1f0au);
+
+    // Sign-selected table and final two's-complement path.
+    result = MASSIndexedPairMathProjection::apply(
+        firmware, 0x02u, 0x00u, 0x00u);
+    assert(result.valid && result.negativeInput);
+    assert(result.tableAddress == 0x0098u && result.recordAddress == 0x009cu);
+    assert(result.base == 0x0e5eu && result.slope == 0x0d90u);
+    assert(result.value == 0xe4dfu);
+
+    // The real routine branches around all coefficient and multiply work
+    // when the selected per-slot guard byte is zero.
+    result = MASSIndexedPairMathProjection::apply(
+        firmware, 0x00u, 0x55u, 0xaau);
+    assert(result.valid && result.zeroGuardBypass);
+    assert(result.value == 0u && result.tableAddress == 0u);
+}
+
 void testMASS1848Arithmetic() {
     const auto ordinary = MASS1848Arithmetic::execute(0x01, 0x4d, 0x5d);
     assert(ordinary.value == 0x5d && !ordinary.carryOut &&
@@ -1520,6 +1590,7 @@ int main(int argc, char** argv) {
     testMASS1890Arithmetic();
     testMASS2381AddressBuilder();
     testMASSModulationScaleMode41();
+    testMASSIndexedPairMathProjection();
     testMASS1848Arithmetic();
     testFirmwareROMTableView();
     if (argc > 2)
