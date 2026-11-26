@@ -157,6 +157,21 @@ int main() {
     MASSAudioEngine engine(&backend);
     engine.prepare(48000.0, 512);
 
+    // The concrete backend must receive the immutable raw waveform view and
+    // perform bounds-checked byte access without assigning PCM semantics.
+    constexpr std::array<std::uint8_t, 5> rawWaveformBytes{{
+        0x00, 0x7F, 0x80, 0xFE, 0xFF
+    }};
+    MASSWaveformMemoryView rawWaveformView;
+    assert(rawWaveformView.attach(rawWaveformBytes.data(), rawWaveformBytes.size()));
+    backend.setWaveformMemoryView(&rawWaveformView);
+    std::uint8_t rawWaveformByte = 0;
+    assert(backend.readWaveformMemoryByteForTesting(2, rawWaveformByte));
+    assert(rawWaveformByte == 0x80);
+    assert(!backend.readWaveformMemoryByteForTesting(rawWaveformBytes.size(), rawWaveformByte));
+    backend.setWaveformMemoryView(nullptr);
+    assert(!backend.readWaveformMemoryByteForTesting(2, rawWaveformByte));
+
     // Set a clearly audible test patch. These are generic prototype mappings,
     // not claimed to be verified TechnoX DSP parameter laws.
     assert(engine.setPartParameter(12, PartParameter::level, 127));
