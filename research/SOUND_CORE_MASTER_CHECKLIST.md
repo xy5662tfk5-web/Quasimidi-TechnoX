@@ -38,6 +38,8 @@ The following are still absent: a validated 8032-to-confirmed-sound-device host-
 
 ## Remaining work — ordered by dependency
 
+- [x] Add a bounded-memory integrity inspector for candidate external waveform dumps (size, CRC32, SHA-256 and byte histogram) plus four standalone Python tests; register the tests with CTest. This validates acquired bytes only and deliberately does not decode PCM.
+
 ### A. Finish the firmware-to-command data path
 
 Status: **in progress / partial evidence**
