@@ -1200,12 +1200,21 @@ void testFirmwareResourceCommandPlanner() {
 
     command = {};
     command.kind = MASSResourceCommandKind::marker;
+    command.opcode = 0x38u;
+    command.length = 1u;
+    command.bytes[0] = 0x38u;
     plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
     assert(plan.status == MASSFirmwarePacketPlanStatus::fillerSlotOnly);
 
     command.kind = MASSResourceCommandKind::singleByteAdvance;
+    command.opcode = 0x28u;
+    command.bytes[0] = 0x28u;
     plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
     assert(plan.status == MASSFirmwarePacketPlanStatus::streamAdvanceOnly);
+
+    command.length = 2u;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::invalidCommand);
 }
 
 void testCommandRegisterFieldDecoders() {
