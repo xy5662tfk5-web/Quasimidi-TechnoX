@@ -921,28 +921,32 @@ void testActualFirmwareROMTables(const char* path) {
     assert(note66Fields.r5 == 0x05u && note66Fields.r6 == 0x43u &&
            note66Fields.r7 == 0x02u);
 
-    MASSResourceCommand note66PitchCommand{};
-    note66PitchCommand.kind = MASSResourceCommandKind::pitchParameter;
-    note66PitchCommand.opcode = 0x08u;
-    note66PitchCommand.length = 7u;
-    note66PitchCommand.bytes = {{
+    // Stage-projection fixture: the raw register snapshot and address inputs
+    // are explicit test values. This validates the real ROM lookup bytes,
+    // packed decoder and accumulator composition without claiming that these
+    // synthetic seven bytes are the complete live Note-66 command chain.
+    MASSResourceCommand pitchProjectionFixture{};
+    pitchProjectionFixture.kind = MASSResourceCommandKind::pitchParameter;
+    pitchProjectionFixture.opcode = 0x08u;
+    pitchProjectionFixture.length = 7u;
+    pitchProjectionFixture.bytes = {{
         0x08u, 0x80u, 0x18u, 0xa0u, 0x00u, 0x00u, 0x00u
     }};
-    MASS1C61PitchExecutionSnapshot note66Snapshot{};
-    note66Snapshot.interpolationControl2067 = 0x00u;
-    note66Snapshot.hasCapturedInterpolationControl = true;
-    note66Snapshot.secondaryTableBasePointer = 0x3966u;
-    note66Snapshot.secondaryTableIndexR3 = 0x18u;
-    note66Snapshot.secondaryTableBankSelectR4 = 0xa0u;
-    note66Snapshot.hasCapturedSecondaryAddressInputs = true;
-    const auto note66Projection =
+    MASS1C61PitchExecutionSnapshot pitchProjectionSnapshot{};
+    pitchProjectionSnapshot.interpolationControl2067 = 0x00u;
+    pitchProjectionSnapshot.hasCapturedInterpolationControl = true;
+    pitchProjectionSnapshot.secondaryTableBasePointer = 0x3966u;
+    pitchProjectionSnapshot.secondaryTableIndexR3 = 0x18u;
+    pitchProjectionSnapshot.secondaryTableBankSelectR4 = 0xa0u;
+    pitchProjectionSnapshot.hasCapturedSecondaryAddressInputs = true;
+    const auto pitchProjection =
         MASS1C61PitchParameterExecutionProjection::execute(
-            view, note66PitchCommand, note66Snapshot);
-    assert(note66Projection.ready());
-    assert(note66Projection.secondaryFetchAddress.address == 0x397eu);
-    assert(note66Projection.accumulator.r2 == 0xd5u);
-    assert(note66Projection.accumulator.r3 == 0x1eu);
-    assert(note66Projection.accumulator.r4 == 0x02u);
+            view, pitchProjectionFixture, pitchProjectionSnapshot);
+    assert(pitchProjection.ready());
+    assert(pitchProjection.secondaryFetchAddress.address == 0x397eu);
+    assert(pitchProjection.accumulator.r2 == 0xd5u);
+    assert(pitchProjection.accumulator.r3 == 0x1eu);
+    assert(pitchProjection.accumulator.r4 == 0x02u);
 }
 
 void testOriginalVoiceProgramRuntime(
