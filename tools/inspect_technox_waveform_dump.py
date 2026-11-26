@@ -17,7 +17,7 @@ from typing import Any
 
 DEFAULT_CHUNK_SIZE = 1024 * 1024
 REPORTED_WAVEFORM_CAPACITY = (
-    "64 MB (secondary specification listing; not a verified dump size)"
+    "6 MB (contemporary 1995 sources; later 64 MB listings conflict; not verified on this board)"
 )
 
 
