@@ -239,6 +239,7 @@ public:
         std::uint8_t directRam30 = 0;
         std::uint8_t directRam31 = 0;
         std::uint8_t directRam32 = 0;
+        std::uint8_t directRam34 = 0;
         std::uint8_t directRam36 = 0;
         std::uint8_t directRam37 = 0;
         std::uint8_t directRam20 = 0;
@@ -980,7 +981,15 @@ public:
             pc == 0x1c83u || pc == 0x1c84u || pc == 0x1c86u ||
             pc == 0x1c87u || pc == 0x1c89u || pc == 0x1c8au ||
             pc == 0x1c91u ||
-            pc == 0x1d2fu || pc == 0x1d95u || pc == 0x1d9du ||
+            pc == 0x1d2fu || pc == 0x1d45u || pc == 0x1d46u ||
+            pc == 0x1d47u || pc == 0x1d51u || pc == 0x1d53u ||
+            pc == 0x1d56u || pc == 0x1d59u || pc == 0x1d5bu ||
+            pc == 0x1d5du || pc == 0x1d5eu || pc == 0x1d61u ||
+            pc == 0x1d63u || pc == 0x1d65u || pc == 0x1d68u ||
+            pc == 0x1d6au || pc == 0x1d6cu || pc == 0x1d6du ||
+            pc == 0x1d70u || pc == 0x1d71u || pc == 0x1d73u ||
+            pc == 0x1d74u || pc == 0x1d76u || pc == 0x1d78u ||
+            pc == 0x1d95u || pc == 0x1d9du ||
             pc == 0x1dc8u || pc == 0x1e04u ||
             pc == 0x1c97u || pc == 0x1c9bu || pc == 0x1c9cu || pc == 0x1c9eu ||
             pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
@@ -1049,6 +1058,7 @@ public:
             event.directRam30 = readInternal(0x30u);
             event.directRam31 = readInternal(0x31u);
             event.directRam32 = readInternal(0x32u);
+            event.directRam34 = readInternal(0x34u);
             event.directRam36 = readInternal(0x36u);
             event.directRam37 = readInternal(0x37u);
             event.directRam20 = readInternal(0x20u);
