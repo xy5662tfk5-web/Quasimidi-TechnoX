@@ -27,14 +27,14 @@ Purpose: one authoritative work queue for the original-audio reconstruction. Thi
 - Per-voice bank/program identity and immutable program/FX/upload-plan catalogs reach the backend without parsing or allocation in the render callback.
 - Firmware traces cover Note On/Off, velocity-sensitive command bytes, two-Part event expansion, IC51 nested-record copying, pitch interpolation operands, SoundHost writes/reads, and FF10 resource uploads.
 - The 8032 firmware is emulated; the external sound processor and its original audio algorithms are not.
-- DREAM SAM9407 is the primary working architecture for the TechnoX synthesis path, supported by the SAM9407 datasheet and public application references naming TechnoX/Quasar/Raven; the fitted chip and its pin-level connection still need board or bus confirmation.
+- DREAM SAM9407 is an unverified candidate for the TechnoX synthesis path. Public application references name TechnoX/Quasar/Raven, but only a readable board marking and pin-level connection can confirm the fitted device.
 - ADSP-2105 is a separate candidate for FX1/FX2 based on Quasimidi-family reports; its presence and exact connection in this TechnoX unit are not yet physically confirmed.
 
 ## Current implementation truth
 
-The external synthesis target is now the **DREAM SAM9407 architecture**; the separate FX target under investigation is **ADSP-2105**. These are implementation targets based on the available public documentation and Quasimidi-family evidence, not completed physical board identification or a decoded bus-level device map.
+The external synthesis candidate under comparison is **DREAM SAM9407**; the separate FX candidate is **ADSP-2105**. Neither device is confirmed on the TechnoX board. Do not bind the emulator to either chip until board markings or a hardware capture establish the actual parts and bus mapping.
 
-The following are still absent: a validated 8032-to-SAM9407 host-port bridge, decoded full waveform store, original sample playback, proven original voice/filter/envelope behavior, and the separate original FX DSP implementation. `BasicMASSVoiceBackend` remains a generic diagnostic oscillator. Do not describe the plugin as an authentic-sounding TechnoX emulator until these components are implemented and compared with hardware/reference audio.
+The following are still absent: a validated 8032-to-confirmed-sound-device host-port bridge, decoded full waveform store, original sample playback, proven original voice/filter/envelope behavior, and the separate original FX DSP implementation. `BasicMASSVoiceBackend` remains a generic diagnostic oscillator. Do not describe the plugin as an authentic-sounding TechnoX emulator until these components are implemented and compared with hardware/reference audio.
 
 ## Remaining work — ordered by dependency
 
@@ -73,7 +73,7 @@ Status: **partially mapped at firmware level; physical device/protocol still unc
 - [ ] Determine the four host-register meanings only from repeatable evidence; retain neutral register names until then.
 - [ ] Establish ready/busy/ack behavior, read semantics, control-phase timing, and device selection. The `0x40/0xC0` writes to offset 3 are observed control-phase values, not yet decoded as ACK/BUSY. Current open-bus and synthetic-ready responses are test fixtures, not hardware behavior.
 - [ ] Resolve P3.2 polarity/function. The C++ `soundDeviceResetReleased` label is a working compatibility hypothesis only: firmware clears P3.2 for the bulk transfer and memory test, and existing SoundHost contexts include P3.2-low states.
-- [ ] Verify the fitted SAM9407 against readable TechnoX board markings, schematics or a hardware capture, then map the 8032 host aperture/glue logic to its 16-bit host interface. SAM9407 is the primary synthesis architecture target; the board-level proof and bridge remain open.
+- [ ] Identify the fitted synthesis device from readable TechnoX board markings, schematics or a hardware capture, then map the 8032 host aperture/glue logic to its actual host interface. SAM9407 remains only one candidate until this is proven.
 - [ ] Determine the external memory topology and the path to the advertised multi-megabyte waveform store. Do not treat the 128-KiB IC51 dump or the 16-KiB startup image as the complete sample ROM.
 
 Exit condition: documented host protocol and memory topology with enough evidence to implement a device model without guessed register meanings.
