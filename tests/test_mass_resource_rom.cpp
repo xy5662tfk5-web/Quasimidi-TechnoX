@@ -2013,6 +2013,29 @@ void testBankProgramResolver(const char* path) {
         (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     assert(image.size() == MASSResourceROM::kImageSize);
 
+    // The live IC4 0x1C61 fixture reads this exact seven-byte group-08
+    // record from IC51 bank 1, offset 0x160C. Assert that the raw image
+    // contains exactly one such byte sequence before testing stream decoding.
+    constexpr std::array<std::uint8_t, 7> note72Group08Bytes{{
+        0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u
+    }};
+    std::size_t rawNote72Matches = 0;
+    std::size_t rawNote72Address = image.size();
+    for (std::size_t offset = 0;
+         offset + note72Group08Bytes.size() <= image.size(); ++offset) {
+        if (std::equal(note72Group08Bytes.begin(), note72Group08Bytes.end(),
+                       image.begin() + static_cast<std::ptrdiff_t>(offset))) {
+            ++rawNote72Matches;
+            rawNote72Address = offset;
+        }
+    }
+    assert(rawNote72Matches == 1u);
+    assert(rawNote72Address ==
+           MASSResourceROM::kBankSize + static_cast<std::size_t>(0x160cu));
+    std::printf(
+        "IC51 UNIQUE NOTE72 GROUP08 RECORD: matches=%zu absolute=%05zX bank=1 offset=160C\\n",
+        rawNote72Matches, rawNote72Address);
+
     MASSResourceROM rom;
     assert(rom.load(image.data(), image.size()));
 
