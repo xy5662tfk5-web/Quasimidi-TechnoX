@@ -13,7 +13,7 @@ The project already has a substantial firmware/resource foundation:
 - Firmware-side command planning and pitch/slot arithmetic projections produce evidence-backed packet bytes for covered paths.
 - FX1/FX2 directories and upload byte streams are reconstructed separately.
 
-**The original sound generator is not complete.** `BasicMASSVoiceBackend` still renders a diagnostic oscillator. The 16-KiB C000–FFFF image is a verified firmware memory-transfer result, not a decoded waveform library. The fitted synthesis chip/host-port bridge, larger waveform store, sample format and original DSP playback behavior are not yet verified. Recent pitch-probe changes also have no confirmed CI result at this checkpoint.
+**The Intel macOS workflow has now built AU, VST3 and Standalone on x86_64 and passed 11/11 CTest tests plus the Python suite (run 45862138151). The artifact is linked in the status report; actual Logic loading on the user's Monterey system remains to be confirmed.\n\nThe original sound generator is not complete.** `BasicMASSVoiceBackend` still renders a diagnostic oscillator. The 16-KiB C000–FFFF image is a verified firmware memory-transfer result, not a decoded waveform library. The fitted synthesis chip/host-port bridge, larger waveform store, sample format and original DSP playback behavior are not yet verified. Recent pitch-probe changes also have no confirmed CI result at this checkpoint.
 
 ## Short completion path
 
@@ -43,8 +43,8 @@ FX1/FX2 remain a separate completion item: upload resources are reconstructed, b
 ### 4. Release validation
 
 - Run the current full CTest and Python regression suites against the final source revision.
-- Produce x86_64 Intel macOS builds for AU, VST3 and Standalone.
-- Verify the actual plugin artifacts on macOS Monterey and load the AU in Logic.
+- [x] Produce x86_64 Intel macOS builds for AU, VST3 and Standalone. Workflow 45862138151 passed; all three bundles were built and packaged.
+- [ ] Install/load the AU in Logic on the user's macOS Monterey system and compare against a physical TechnoX or trusted reference capture.
 - Compare controlled notes and a small set of factory Performances against a physical TechnoX or a trusted reference capture.
 - Keep any unmatched behavior explicitly listed; do not label the emulator authentic until sample playback and the original processing path are demonstrated.
 
@@ -56,7 +56,7 @@ FX1/FX2 remain a separate completion item: upload resources are reconstructed, b
 | One original waveform | Verified source memory plus decoded sample and golden vector | Blocked on waveform dump / memory evidence |
 | Original voice renderer | One voice plays that waveform through a verified playback model | Not implemented |
 | Original FX | Confirmed receiver/protocol and effect processing | Resource uploads only |
-| Intel release | Passing final tests, AU/VST3/Standalone artifacts and Logic check | Must be revalidated on final revision |
+| Intel release | Passing CTest/Python, x86_64 AU/VST3/Standalone artifacts, then Logic check | Build/tests pass on the same code blobs as current branch; Logic/device check pending |
 
 ## Practical stopping rule
 
