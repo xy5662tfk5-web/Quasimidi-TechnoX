@@ -242,7 +242,7 @@ The pitch-source data-access probe now includes XDATA `0x2067`, in addition to t
 
 The new real Note-72 trace resolves the previously missing values:
 
-- IC51 group-08 record: `08 20 18 A0 F6 00 00`.
+- IC51 group-08 record: `08 20 18 A0 F6 00 00`. A scan of the raw 128-KiB IC51 image finds this exact seven-byte sequence exactly once, at absolute address `0x1160C` (bank 1, offset `0x160C`). The firmware dispatch table bytes at `0x1BC7..0x1BC9` select handler `0x1C61`; the separate Note 65 typed-record trace captures reads from `0x160C..0x1612` and the seven register bytes.
 - XDATA `0x2067=00` at PC `0x1CCC`: firmware takes the zero-control bypass rather than performing the interpolation-table lookup.
 - At PC `0x1D95`, before the final address add: base DPTR `0x3903`, R3 `0x18`, R4 `0xA0`, RAM `0x2F=75`, and live normalized R7 `75`. The normalization path computes `18+75=8D`, then subtracts `0C` twice to reach `75`. R4.4 is clear, so bank offset is zero.
 - The firmware adds this normalized R7 exactly once: the first MOVC at PC `0x1D9D` uses DPTR `0x3978`. The actual IC4 ROM bytes at `3978/39F8/3A78` are `53/99/01`.
@@ -250,4 +250,4 @@ The new real Note-72 trace resolves the previously missing values:
 - The upstream R2 producer is now an executable projection: with `R4.5=1`, firmware clears A, adds direct RAM `0x34=80`, observes `OV=0`, and stores `R2=80`; the normalized R7 remains `75`. On OV with the sum's bit 7 clear, the firmware decrements R7 and changes `FF` to `0B`; with bit 7 set, it increments R7 and changes `80` to `74`.
 - The accumulator returns low/middle/high `BE/7F/01`. At the trace boundary PC `0x1E04`, the event is captured before `MOV R4,A`, so the register still reads `FF` while A already holds the masked output `01`.
 
-The Note 72 values are now represented by a real-ROM projection and live 8032 assertions. One separate unresolved point remains: the Note 66 downstream slot value differs by one in R3 (`D5:1E:02` before the slot guard vs `D5:1F:A2` after it); the exact instruction that produces that delta remains open.
+The Note 72 values are now represented by a real-ROM projection and live 8032 assertions. The raw IC51 record is uniquely located, and the firmware handler reads that bank-1 window in the typed-record path. The remaining provenance question is which top-level bank/program descriptor and stream cursor supply this nested window in the specific Note 72 run; the exact pointer/cursor chain is not yet asserted. A separate unresolved Note 66 issue remains: the downstream slot value differs by one in R3 (`D5:1E:02` before the slot guard vs `D5:1F:A2` after it); the exact instruction that produces that delta remains open.
