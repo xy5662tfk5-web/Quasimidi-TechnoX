@@ -1124,6 +1124,7 @@ void testOriginalVoiceProgramRuntime(
             pitchSnapshot.secondaryTableIndexR3 = pitchFields.r3;
             pitchSnapshot.secondaryTableBankSelectR4 = pitchFields.r4;
             pitchSnapshot.ram2F = 0u;
+            pitchSnapshot.hasCapturedDirectRamAccumulatorInputs = true;
 
             runtime.rewindCommandStream(4, false);
             for (std::size_t commandIndex = 0;
