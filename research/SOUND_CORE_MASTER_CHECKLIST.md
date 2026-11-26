@@ -3,6 +3,8 @@
 Branch: `research/original-technox-audio-engine`
 Purpose: one authoritative work queue for the original-audio reconstruction. This file separates proven firmware facts, unresolved hardware facts, implementation work, and validation. Update this checklist when a milestone is completed; do not reopen a completed item unless new evidence contradicts it.
 
+**Current finishing mode:** prioritize one verified waveform, the first resource-backed voice, and Intel release validation. Freeze address-by-address research unless it directly blocks one of those results. The short ordered path and completion gates are in [`research/FINALIZATION_PLAN.md`](FINALIZATION_PLAN.md); the detailed open probes below remain reference material, not a reason to keep expanding scope.
+
 ## Ground rules
 
 1. The target is the original TechnoX sound path, not a sound-alike.
