@@ -124,8 +124,9 @@ Exit condition: FX1 and FX2 produce independently validated original behavior, n
 Status: **test backend builds; authentic engine not release-ready**
 
 - [ ] Add golden tests for decoded waveform data, voice commands, playback timing, envelopes, pitch, modulation and FX.
-- [ ] Run the full CTest/Python regression suite after CPU, bus, resource, or decoder changes.
-- [ ] Build x86_64 Intel AU, VST3 and Standalone for macOS Monterey-compatible deployment; confirm the actual artifacts and load them in Logic.
+- [x] Run the full CTest/Python regression suite on the current audio-engine/test sources: Intel workflow 45862138151 completed successfully; CTest 11/11 passed, including waveform-memory view and dump-inspector tests, and the Python job passed.
+- [x] Build x86_64 Intel AU, VST3 and Standalone for macOS Monterey-compatible deployment; artifacts verified and uploaded by workflow 45862138151.
+- [ ] Install/load the AU in Logic on the user's macOS Monterey system and compare real factory sounds against a physical TechnoX/reference captures.
 - [ ] Compare controlled notes/Performances against a physical TechnoX or trusted recordings. Record what is and is not matched.
 - [ ] Only then mark the sound engine authentic/complete.
 
