@@ -23,7 +23,7 @@ constexpr int kPartStateBytesV6 = kPartStateBytesV5 + 1;
 
 QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      voiceBackend(std::make_unique<technox::BasicMASSVoiceBackend>()),
+      voiceBackend(std::make_unique<technox::SAM9407VoiceBackend>()),
       massEngine(voiceBackend.get())
 {
     for (auto& performance : partValues)
@@ -160,6 +160,138 @@ void QuasimidiTechnoXAudioProcessor::unloadWaveformMemoryFile() noexcept
     massEngine.setWaveformMemoryView(nullptr);
     waveformMemoryView.detach();
     waveformMemoryFile.reset();
+}
+
+bool QuasimidiTechnoXAudioProcessor::loadSAM9407SampleMapFile(const juce::File& file)
+{
+    auto* backend = dynamic_cast<technox::SAM9407VoiceBackend*>(voiceBackend.get());
+    if (backend == nullptr || !file.existsAsFile())
+        return false;
+
+    const auto root = juce::JSON::parse(file.loadFileAsString());
+    const auto* rootObject = root.getDynamicObject();
+    if (rootObject == nullptr ||
+        rootObject->getProperty("format").toString() != "technox-sam9407-map-v1")
+        return false;
+
+    const auto entriesValue = rootObject->getProperty("entries");
+    const auto* entries = entriesValue.getArray();
+    if (entries == nullptr || entries->isEmpty() ||
+        entries->size() > static_cast<int>(technox::SAM9407VoiceBackend::kMaximumSampleMappings))
+        return false;
+
+    auto readInteger = [](const juce::DynamicObject& object,
+                          const char* key, std::int64_t& destination) -> bool
+    {
+        const auto value = object.getProperty(juce::Identifier(key));
+        if (!value.isInt() && !value.isInt64() && !value.isDouble())
+            return false;
+        destination = static_cast<std::int64_t>(value);
+        return true;
+    };
+
+    std::array<technox::SAM9407SampleMapEntry,
+               technox::SAM9407VoiceBackend::kMaximumSampleMappings> parsed{};
+    std::size_t parsedCount = 0;
+
+    for (const auto& item : *entries) {
+        const auto* object = item.getDynamicObject();
+        if (object == nullptr)
+            return false;
+
+        std::int64_t bank = 0, program = 0, start = 0, end = 0;
+        std::int64_t sampleRate = 44100, rootNote = 60, tuneCents = 0;
+        std::int64_t gain = 127, pan = 64, loopStart = 0, loopEnd = 0;
+        if (!readInteger(*object, "bank", bank) ||
+            !readInteger(*object, "program", program) ||
+            !readInteger(*object, "start_word", start) ||
+            !readInteger(*object, "end_word", end) ||
+            bank < 0 || bank > 255 || program < 0 || program > 255 ||
+            start < 0 || end < 0)
+            return false;
+
+        const auto optionalInteger = [&](const char* key, std::int64_t& value) {
+            return !object->hasProperty(juce::Identifier(key)) ||
+                readInteger(*object, key, value);
+        };
+        if (!optionalInteger("sample_rate", sampleRate) ||
+            !optionalInteger("root_note", rootNote) ||
+            !optionalInteger("tune_cents", tuneCents) ||
+            !optionalInteger("gain", gain) ||
+            !optionalInteger("pan", pan) ||
+            !optionalInteger("loop_start_word", loopStart) ||
+            !optionalInteger("loop_end_word", loopEnd))
+            return false;
+
+        technox::SAM9407SampleMapEntry entry{};
+        entry.bank = static_cast<std::uint8_t>(bank);
+        entry.program = static_cast<std::uint8_t>(program);
+        if (end > static_cast<std::int64_t>(technox::SAM9407VoiceBackend::kMaximumWordAddress) ||
+            start > end || sampleRate < 0 || sampleRate > 192000 ||
+            rootNote < 0 || rootNote > 127 ||
+            tuneCents < -1200 || tuneCents > 1200 ||
+            gain < 0 || gain > 127 || pan < 0 || pan > 127 ||
+            loopStart < 0 || loopEnd < 0)
+            return false;
+
+        entry.startWord = static_cast<std::uint32_t>(start);
+        entry.endWord = static_cast<std::uint32_t>(end);
+        entry.sampleRate = static_cast<std::uint32_t>(sampleRate);
+        entry.rootNote = static_cast<std::uint8_t>(rootNote);
+        entry.tuneCents = static_cast<std::int16_t>(tuneCents);
+        entry.gain = static_cast<std::uint8_t>(gain);
+        entry.pan = static_cast<std::uint8_t>(pan);
+        entry.loopStartWord = static_cast<std::uint32_t>(loopStart);
+        entry.loopEndWord = static_cast<std::uint32_t>(loopEnd);
+
+        const auto byteOrder = object->getProperty("byte_order").toString().toLowerCase();
+        if (byteOrder == "little_endian")
+            entry.byteOrder = technox::SAM9407SampleByteOrder::littleEndian;
+        else if (byteOrder == "big_endian")
+            entry.byteOrder = technox::SAM9407SampleByteOrder::bigEndian;
+        else
+            return false;
+
+        const auto loopMode = object->getProperty("loop_mode").toString().toLowerCase();
+        if (loopMode == "one_shot" || loopMode.isEmpty())
+            entry.loopMode = technox::SAM9407LoopMode::oneShot;
+        else if (loopMode == "forward")
+            entry.loopMode = technox::SAM9407LoopMode::forward;
+        else if (loopMode == "alternating")
+            entry.loopMode = technox::SAM9407LoopMode::alternating;
+        else
+            return false;
+
+        parsed[parsedCount++] = entry;
+    }
+
+    // Validate the complete replacement before publishing it to the backend.
+    technox::SAM9407VoiceBackend validator;
+    for (std::size_t i = 0; i < parsedCount; ++i)
+        if (!validator.addSampleMapping(parsed[i]))
+            return false;
+
+    backend->clearSampleMappings();
+    for (std::size_t i = 0; i < parsedCount; ++i) {
+        if (!backend->addSampleMapping(parsed[i])) {
+            backend->clearSampleMappings();
+            return false;
+        }
+    }
+    return true;
+}
+
+void QuasimidiTechnoXAudioProcessor::clearSAM9407SampleMap() noexcept
+{
+    if (auto* backend = dynamic_cast<technox::SAM9407VoiceBackend*>(voiceBackend.get()))
+        backend->clearSampleMappings();
+}
+
+std::size_t QuasimidiTechnoXAudioProcessor::getSAM9407SampleMappingCount() const noexcept
+{
+    const auto* backend =
+        dynamic_cast<const technox::SAM9407VoiceBackend*>(voiceBackend.get());
+    return backend != nullptr ? backend->sampleMappingCount() : 0u;
 }
 
 void QuasimidiTechnoXAudioProcessor::initialisePartStates()
