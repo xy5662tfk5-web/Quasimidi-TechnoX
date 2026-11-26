@@ -85,3 +85,26 @@ The implementation should be separated into independent components:
 ## Primary source
 
 DREAM SAM9407, *Integrated Sound Studio*, objective specification, February 1996: [datasheet PDF](https://dosdays.co.uk/media/dream/SAM9407.PDF). Architecture, P16/DSP division, process slots and RAM banks are described in section 2; host bus and pin groups are described in sections 3 and 7.
+
+## Evidence update — 27 November 2026
+
+The SAM9407 data sheet provides a more specific target model than a generic sample player:
+
+- The objective specification lists 16-bit samples at 44.1 kHz, alternate looping and a 24 dB digital filter for each voice.
+- Its external-memory pins expose a 25-bit word address and a 16-bit data bus; the data sheet describes support up to 32M 16-bit words / 64M 8-bit samples, depending on the memory configuration.
+- The chip contains a P16 control processor and a separate programmable RISC synthesis/DSP engine. The P16 updates DSP parameter RAM; the DSP executes resident algorithms and accesses sample/delay-line data through the MMU.
+- This means the often-repeated 64 MB figure is at least a documented *maximum capability* of the SAM9407 memory interface. It must not be treated as proof that the TechnoX contains a 64 MB waveform image. The contemporary April 1995 *The Mix* TechnoX review reports 6 MB of sample memory. Until the actual board/memory devices are identified, retain 6 MB as the contemporary product report and 64 MB as the chip/interface capability or later secondary listing—not as interchangeable measurements.
+
+A separately available Linux SAM9407 driver package (version 1.0.4, 2003) and the open-source libmikmod SAM9407 backend provide a useful generic software cross-check. The libmikmod backend loads signed 16-bit samples into sample handles and submits separate voice events for sample assignment, start/loop/end positions, forward/reverse loop mode, pitch, stereo send, output volume, start and stop. This confirms the *kind* of state a generic SAM9407 voice needs. It does not expose the TechnoX M.A.S.S. P16 firmware, the TechnoX waveform bank, or the bridge from IC4's 8-bit ports; those card-driver event codes must not be copied into the TechnoX protocol.
+
+The TechnoX association with SAM9407 is supported by public chip-application references, and the architecture is a strong working target. However, the SAM9407 data sheet itself does not name TechnoX, and no readable marking/pin trace from this particular board has yet been recorded. Physical confirmation remains open.
+
+### Revised immediate sequence
+
+1. Keep the IC4/MIDI/IC51 work frozen as the verified controller-side foundation.
+2. Use the SAM9407 data sheet and generic driver only to model the *separate* P16/DSP/sample-memory domains. Do not map any IC4 packet byte to a SAM register by resemblance.
+3. Resolve the board bridge: correlate IC4 writes at `0x8000–0x8003`, `0xFF10`, P2/P3 and SFR `0x8E` against the visible DSP/glue-logic and sample-memory pinout. A board IC marking or measured bus capture is the decisive discriminator.
+4. Acquire a repeated, hash-verified dump of the actual sample memory (expected size must come from the fitted memory topology), then decode one known waveform and connect it to one factory program.
+5. Only after that golden sample renders correctly should the project expand to other programs, voice modulation and FX.
+
+Sources: [DREAM SAM9407 objective specification](https://dosdays.co.uk/media/dream/SAM9407.PDF); [Linux SAM9407 driver 1.0.4 package index](https://www.ibiblio.org/pub/micro/pc-stuff/Linux/kernel/sound/); [libmikmod SAM9407 backend](https://github.com/sezero/mikmod/blob/d27e9c85aabce9a8e3cb8762913cf39b0fc1a0b8/libmikmod/drivers/drv_sam9407.c); [April 1995 *The Mix* TechnoX review](https://www.muzines.co.uk/articles/revolt-into-style/12193?theme=2).
