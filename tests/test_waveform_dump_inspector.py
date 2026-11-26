@@ -10,7 +10,7 @@ import zlib
 from contextlib import redirect_stdout
 from pathlib import Path
 
-SCRIPT = Path(__file__).with_name("inspect_technox_waveform_dump.py")
+SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "inspect_technox_waveform_dump.py"
 SPEC = importlib.util.spec_from_file_location("waveform_inspector", SCRIPT)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
