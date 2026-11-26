@@ -91,9 +91,11 @@ struct MASS1C61SecondaryTableAddress {
     std::uint16_t bankOffset = 0;
 };
 
-// Models the 0x1D2F..0x1D98 address selection before three MOVC reads.
+// Models the address-selection inputs prepared by 0x1D2F..0x1D45 and
+// the base/bank pointer selected before the final ADD A,R7 at 0x1D95.
 // R3+RAM[0x2F] is wrapped into 0..0x7F by repeated +/-0x0C steps.
-// R4.4 selects the secondary area by adding 0x180 to the base pointer.
+// That normalized result is the live R7 consumed at 0x1D95. R4.4 selects
+// the secondary area by adding 0x180 to the loaded base pointer.
 class MASS1C61SecondaryTableAddressBuilder {
 public:
     static MASS1C61SecondaryTableAddress resolve(std::uint16_t basePointer,
@@ -109,7 +111,7 @@ public:
         }
         const std::uint16_t bankOffset = (r4 & 0x10u) != 0 ? 0x0180u : 0u;
         return {
-            static_cast<std::uint16_t>(basePointer + bankOffset + index),
+            static_cast<std::uint16_t>(basePointer + bankOffset),
             index,
             bankOffset
         };
@@ -121,14 +123,15 @@ struct MASS1C61SecondaryTableFetchAddress {
     bool pageCarry = false;
 };
 
-// At 0x1D95 the original R7 is added to DPL; carry increments DPH before
-// the first MOVC. This CY only affects the fetch address.
+// At 0x1D95 the normalized R7 produced by 0x1D2F..0x1D45 is added to DPL;
+// carry increments DPH before the first MOVC. The group-08 record's original
+// byte R7 has already been replaced by this normalized value.
 class MASS1C61SecondaryTableFetchAddressBuilder {
 public:
-    static MASS1C61SecondaryTableFetchAddress addOriginalR7(
-        std::uint16_t baseAddress, std::uint8_t originalR7) noexcept {
-        const auto lowSum = static_cast<unsigned>(baseAddress & 0xffu) + originalR7;
-        const auto address = static_cast<std::uint16_t>(baseAddress + originalR7);
+    static MASS1C61SecondaryTableFetchAddress addNormalizedIndex(
+        std::uint16_t baseAddress, std::uint8_t normalizedR7) noexcept {
+        const auto lowSum = static_cast<unsigned>(baseAddress & 0xffu) + normalizedR7;
+        const auto address = static_cast<std::uint16_t>(baseAddress + normalizedR7);
         return {address, lowSum > 0xffu};
     }
 };
@@ -320,20 +323,13 @@ public:
 
     static bool read(const MASSFirmwareROMView& rom,
                      const MASS1C61SecondaryTableAddress& address,
-                     std::uint8_t originalR7,
                      MASS1C61SecondaryTableBytes& result,
                      MASS1C61SecondaryTableFetchAddress* resolved = nullptr) noexcept {
-        const auto fetch = MASS1C61SecondaryTableFetchAddressBuilder::addOriginalR7(
-            address.address, originalR7);
+        const auto fetch = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
+            address.address, address.normalizedIndex);
         if (resolved != nullptr)
             *resolved = fetch;
         return read(rom, fetch.address, result);
-    }
-
-    static bool read(const MASSFirmwareROMView& rom,
-                     const MASS1C61SecondaryTableAddress& address,
-                     MASS1C61SecondaryTableBytes& result) noexcept {
-        return read(rom, address.address, result);
     }
 
     static bool read(const MASSFirmwareROMView& rom,
