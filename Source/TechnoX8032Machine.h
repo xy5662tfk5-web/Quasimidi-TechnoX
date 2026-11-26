@@ -63,6 +63,7 @@ public:
         std::uint8_t value = 0xff;
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
         std::uint8_t deviceIndex = 0;
         std::uint8_t port2 = 0xff;
@@ -76,6 +77,7 @@ public:
         std::uint8_t value = 0;
         std::uint16_t instructionPC = 0;
         std::uint16_t returnPC = 0;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
         std::uint8_t deviceIndex = 0;
         std::uint8_t port2 = 0xff;
@@ -101,6 +103,7 @@ public:
         std::uint8_t port3 = 0xff;
         std::uint8_t soundBusMode = 0;
         std::uint16_t instructionPC = 0;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct P3Bit2ControlWriteEvent {
@@ -111,6 +114,7 @@ public:
         std::uint8_t port2 = 0xff;
         std::uint8_t soundBusMode = 0;
         bool bit2Changed = false;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct SoundBusModeWriteEvent {
@@ -121,6 +125,7 @@ public:
         std::uint8_t port2 = 0xff;
         std::uint8_t port3 = 0xff;
         bool ic51Selected = false;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct PortReadEvent {
@@ -138,6 +143,7 @@ public:
         std::uint8_t port3 = 0xff;
         std::uint8_t soundBusMode = 0;
         bool ic51Selected = false;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct SoundMemoryWriteEvent {
@@ -149,6 +155,7 @@ public:
         std::uint8_t port2 = 0xff;
         std::uint8_t port3 = 0xff;
         bool ic51Selected = false;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct SoundMemoryReadEvent {
@@ -160,6 +167,7 @@ public:
         std::uint8_t port2 = 0xff;
         std::uint8_t port3 = 0xff;
         bool ic51Selected = false;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct IC51BusProbeEvent {
@@ -310,6 +318,7 @@ public:
         std::uint8_t soundBusMode = 0;
         bool ic51Selected = false;
         bool soundDeviceResetReleased = true;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct FF10WriteEvent {
@@ -322,6 +331,7 @@ public:
         std::uint8_t soundBusMode = 0;
         bool ic51Selected = false;
         bool soundDeviceResetReleased = true;
+        std::uint64_t eventSequence = 0;
         std::uint64_t machineCycle = 0;
     };
     struct XdataWatchEvent {
@@ -639,6 +649,7 @@ public:
         lcdData_ = 0;
         lcdInstruction_ = 0;
         elapsedMachineCycles_ = 0;
+        traceEventSequence_ = 0;
         soundDeviceResetReleased_ = true;
         soundDeviceWrite_ = 0;
         soundDeviceResponse_ = 0xff; // external sound-device response is unknown/open bus
@@ -1205,6 +1216,7 @@ public:
             portEvent.port3 = portPins_[3];
             portEvent.soundBusMode = internal_[0x8e];
             portEvent.instructionPC = instructionPC;
+            portEvent.eventSequence = ++traceEventSequence_;
             portEvent.machineCycle = elapsedMachineCycles_;
             ++portWriteCount_;
             if (port == 3) {
@@ -1221,6 +1233,7 @@ public:
                     controlWrite.soundBusMode = internal_[0x8e];
                     controlWrite.bit2Changed =
                         ((previousPins ^ value) & 0x04u) != 0;
+                    controlWrite.eventSequence = portEvent.eventSequence;
                     controlWrite.machineCycle = elapsedMachineCycles_;
                     ++p3Bit2ControlWriteCount_;
                 }
@@ -1267,6 +1280,7 @@ public:
                 event.port2 = portPins_[2];
                 event.port3 = portPins_[3];
                 event.ic51Selected = isIC51Selected();
+                event.eventSequence = ++traceEventSequence_;
                 event.machineCycle = elapsedMachineCycles_;
                 ++soundBusModeWriteTraceCount_;
             }
@@ -1365,6 +1379,7 @@ public:
             event.port3 = portPins_[3];
             event.soundBusMode = internal_[0x8e];
             event.ic51Selected = ic51Selected;
+            event.eventSequence = ++traceEventSequence_;
             event.machineCycle = elapsedMachineCycles_;
             ++ic51ReadTraceCount_;
             return value;
@@ -1391,6 +1406,7 @@ public:
             event.soundBusMode = internal_[0x8e];
             event.ic51Selected = ic51Selected;
             event.soundDeviceResetReleased = soundDeviceResetReleased_;
+            event.eventSequence = ++traceEventSequence_;
             ++soundHostReadCount_;
             return value;
         }
@@ -1407,6 +1423,7 @@ public:
             event.soundBusMode = internal_[0x8e];
             event.ic51Selected = ic51Selected;
             event.soundDeviceResetReleased = soundDeviceResetReleased_;
+            event.eventSequence = ++traceEventSequence_;
             event.machineCycle = elapsedMachineCycles_;
             ++ff10ReadCount_;
             return event.value;
@@ -1430,6 +1447,7 @@ public:
                 soundEvent.port2 = portPins_[2];
                 soundEvent.port3 = portPins_[3];
                 soundEvent.ic51Selected = ic51Selected;
+                soundEvent.eventSequence = ++traceEventSequence_;
                 soundEvent.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryReadTraceCount_;
             }
@@ -1476,6 +1494,7 @@ public:
                 event.port2 = portPins_[2];
                 event.port3 = portPins_[3];
                 event.ic51Selected = ic51Selected;
+                event.eventSequence = ++traceEventSequence_;
                 event.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryReadTraceCount_;
             }
@@ -1618,6 +1637,7 @@ public:
             event.soundBusMode = internal_[0x8e];
             event.ic51Selected = ic51Selected;
             event.soundDeviceResetReleased = soundDeviceResetReleased_;
+            event.eventSequence = ++traceEventSequence_;
             event.machineCycle = elapsedMachineCycles_;
             ++ff10WriteCount_;
         }
@@ -1701,6 +1721,7 @@ public:
                 const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
                 event.returnPC = static_cast<std::uint16_t>(
                     (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
+                event.eventSequence = ++traceEventSequence_;
                 event.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryWriteTraceCount_;
             }
@@ -1759,6 +1780,7 @@ public:
             hostWrite.soundBusMode = internal_[0x8e];
             hostWrite.ic51Selected = isIC51Selected();
             hostWrite.soundDeviceResetReleased = soundDeviceResetReleased_;
+            hostWrite.eventSequence = ++traceEventSequence_;
             ++soundHostWriteCount_;
 
             // Only a contiguous 0,1,2,3 sequence is captured as a complete
@@ -2455,6 +2477,7 @@ private:
     std::uint8_t lcdData_ = 0;
     std::uint8_t lcdInstruction_ = 0;
     std::uint64_t elapsedMachineCycles_ = 0;
+    std::uint64_t traceEventSequence_ = 0;
     bool soundDeviceResetReleased_ = true;
     std::uint8_t soundDeviceWrite_ = 0;
     std::array<FF10ReadEvent, 4096> ff10ReadTrace_{};
