@@ -183,7 +183,7 @@ public:
         const auto* command = nextCommand(voiceIndex, firmwareFlag0ASet);
         if (command == nullptr) {
             MASS1C61PitchExecutionResult exhausted{};
-            exhausted.status = MASS1C61PitchExecutionStatus::invalidCommand;
+            exhausted.status = MASS1C61PitchExecutionStatus::commandStreamExhausted;
             return exhausted;
         }
         return MASS1C61PitchParameterExecutionProjection::execute(
