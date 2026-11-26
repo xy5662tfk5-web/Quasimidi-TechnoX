@@ -70,6 +70,13 @@ public:
     // processor; this is the integration point for the recovered original DSP.
     bool installVoiceBackend(std::unique_ptr<technox::IMASSVoiceBackend> backend) noexcept;
 
+    // Call only while audio processing is stopped. This maps a separately acquired
+    // raw waveform-memory image read-only; it does not assume a PCM format.
+    bool loadWaveformMemoryFile(const juce::File& file);
+    void unloadWaveformMemoryFile() noexcept;
+    bool hasWaveformMemoryFile() const noexcept { return waveformMemoryView.isAttached(); }
+    std::size_t getWaveformMemoryFileSize() const noexcept { return waveformMemoryView.sizeInBytes(); }
+
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
@@ -77,6 +84,8 @@ private:
     technox::PerformanceBank performanceBank;
     technox::SoundCatalog soundCatalog;
     technox::MASSResourceROM resourceROM;
+    std::unique_ptr<juce::MemoryMappedFile> waveformMemoryFile;
+    technox::MASSWaveformMemoryView waveformMemoryView;
     technox::MASSIC51ExternalSoundMemoryImage externalSoundMemoryImage;
     technox::MASSResourceProgramCatalog resourceProgramCatalog;
     technox::MASSFX1ResourceCatalog resourceFX1Catalog;
