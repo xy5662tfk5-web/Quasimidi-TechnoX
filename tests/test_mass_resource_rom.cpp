@@ -438,6 +438,23 @@ void testMASS1C61PitchParameterExecutionProjection() {
 }
 
 void testMASS1C61SecondaryTableAddress() {
+    const auto note72R2 = MASS1C61AccumulatorInputRouteProjection::apply(
+        0x20u, 0xa0u, 0x80u, 0x75u);
+    assert(note72R2.clearedAFromR4Bit5 && note72R2.initialA == 0x00u);
+    assert(note72R2.sum == 0x80u && !note72R2.overflow);
+    assert(note72R2.accumulatorR2 == 0x80u && note72R2.normalizedR7 == 0x75u);
+
+    const auto positiveOverflow = MASS1C61AccumulatorInputRouteProjection::apply(
+        0x60u, 0x00u, 0x30u, 0x55u);
+    assert(positiveOverflow.overflow && positiveOverflow.accumulatorR2 == 0x10u);
+    assert(positiveOverflow.normalizedR7 == 0x54u);
+
+    const auto negativeOverflowWrap = MASS1C61AccumulatorInputRouteProjection::apply(
+        0x90u, 0x00u, 0x90u, 0x00u);
+    assert(negativeOverflowWrap.overflow &&
+           negativeOverflowWrap.accumulatorR2 == 0xa0u);
+    assert(negativeOverflowWrap.normalizedR7 == 0x0bu);
+
     const auto normal = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0x30, 0x20, 0x00);
     assert(normal.normalizedIndex == 0x50 && normal.bankOffset == 0);
@@ -1063,14 +1080,20 @@ void testActualFirmwareROMTables(const char* path) {
     note72PitchSnapshot.secondaryTableBankSelectR4 = 0xa0u;
     note72PitchSnapshot.ram2F = 0x75u;
     note72PitchSnapshot.hasCapturedSecondaryAddressInputs = true;
-    note72PitchSnapshot.accumulatorInputR2 = 0x80u;
-    note72PitchSnapshot.hasCapturedAccumulatorInputR2 = true;
+    note72PitchSnapshot.directRam34 = 0x80u;
+    note72PitchSnapshot.hasCapturedAccumulatorInputSource = true;
     const auto note72Pitch = MASS1C61PitchParameterExecutionProjection::execute(
         view, note72PitchCommand, note72PitchSnapshot);
     assert(note72Pitch.ready());
     assert(note72Pitch.commandFields.r7 == 0xf6u); // resource byte, not live fetch R7
     assert(note72Pitch.secondaryAddress.address == 0x3903u);
     assert(note72Pitch.secondaryAddress.normalizedIndex == 0x75u);
+    assert(note72Pitch.accumulatorInputRoute.clearedAFromR4Bit5);
+    assert(note72Pitch.accumulatorInputRoute.initialA == 0x00u);
+    assert(note72Pitch.accumulatorInputRoute.sum == 0x80u);
+    assert(!note72Pitch.accumulatorInputRoute.overflow);
+    assert(note72Pitch.accumulatorInputRoute.accumulatorR2 == 0x80u);
+    assert(note72Pitch.accumulatorInputRoute.normalizedR7 == 0x75u);
     assert(note72Pitch.secondaryFetchAddress.address == 0x3978u);
     assert(!note72Pitch.secondaryFetchAddress.pageCarry);
     assert((note72Pitch.secondaryTableBytes.bytes ==
