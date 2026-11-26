@@ -1,0 +1,77 @@
+name: Intel macOS build and regression tests
+
+on:
+  push:
+    branches:
+      - research/original-technox-audio-engine
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  intel-macos:
+    name: x86_64 AU, VST3, Standalone and CTest
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install CMake and Ninja
+        run: |
+          brew list cmake >/dev/null 2>&1 || brew install cmake
+          brew list ninja >/dev/null 2>&1 || brew install ninja
+
+      - name: Configure Intel build
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON
+
+      - name: Build AU, VST3, Standalone and test targets
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Run complete CTest suite
+        run: ctest --test-dir build --output-on-failure --parallel 2
+
+      - name: Verify Intel plugin bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for extension in component vst3 app; do
+            bundle="$(find build -type d -name "*.${extension}" -print -quit)"
+            if [[ -z "${bundle}" ]]; then
+              echo "Missing plugin bundle: *.${extension}" >&2
+              exit 1
+            fi
+            executable="$(find "${bundle}/Contents/MacOS" -maxdepth 1 -type f -print -quit)"
+            if [[ -z "${executable}" ]]; then
+              echo "Missing executable inside ${bundle}" >&2
+              exit 1
+            fi
+            architectures="$(xcrun lipo -archs "${executable}")"
+            echo "${bundle}: ${architectures}"
+            grep -qw x86_64 <<< "${architectures}"
+            /usr/bin/ditto "${bundle}" "dist/$(basename "${bundle}")"
+          done
+
+      - name: Upload Intel plugin bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quasimidi-TechnoX-Intel-macOS
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
