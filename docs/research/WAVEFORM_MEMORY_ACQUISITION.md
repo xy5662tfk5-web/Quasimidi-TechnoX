@@ -25,7 +25,7 @@ Never read or remove a device from a powered board. Do not select a voltage or p
 
 The engine exposes `MASSWaveformMemoryView`, a non-owning immutable view over a caller-owned byte image. The memory owner must outlive the view and keep its bytes unchanged while the backend can access it. `MASSAudioEngine::setWaveformMemoryView()` forwards the view to the active backend and carries it across backend replacement. The current `BasicMASSVoiceBackend` only exposes raw-byte test access; it does not interpret or render the image.
 
-`QuasimidiTechnoXAudioProcessor::loadWaveformMemoryFile(file)` now maps a selected file read-only with `juce::MemoryMappedFile`, validates the mapped pointer/size, and publishes the view to the engine. `hasWaveformMemoryFile()` and `getWaveformMemoryFileSize()` report the mapped state; `unloadWaveformMemoryFile()` disconnects the backend before releasing the OS mapping. Call load/unload only while audio processing is stopped. No UI file chooser is wired yet, and loading a dump does not imply that it is decoded or audible.
+`QuasimidiTechnoXAudioProcessor::loadWaveformMemoryFile(file)` now maps a selected file read-only with `juce::MemoryMappedFile`, validates the mapped pointer/size, and publishes the view to the engine. `hasWaveformMemoryFile()` and `getWaveformMemoryFileSize()` report the mapped state; `unloadWaveformMemoryFile()` disconnects the backend before releasing the OS mapping. Call load/unload only while audio processing is stopped. Do not resize or modify the mapped file until it has been unloaded; JUCE documents resizing a mapped file as undefined behavior. No UI file chooser is wired yet, and loading a dump does not imply that it is decoded or audible.
 
 ## Integrity inspection
 
