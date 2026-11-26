@@ -2358,13 +2358,25 @@ private:
 
     std::uint16_t currentIndirectWriteInstructionPC() const noexcept {
         const auto pcAfterFetch = cpu_.registers().pc;
+        const auto oneBytePC = static_cast<std::uint16_t>(pcAfterFetch - 1u);
+        const auto oneByteOpcode = readCode(oneBytePC);
+        // These indirect-Ri destination instructions are one byte long.
+        if (oneByteOpcode == 0x06u || oneByteOpcode == 0x07u ||
+            oneByteOpcode == 0x16u || oneByteOpcode == 0x17u ||
+            oneByteOpcode == 0x46u || oneByteOpcode == 0x47u ||
+            oneByteOpcode == 0x56u || oneByteOpcode == 0x57u ||
+            oneByteOpcode == 0x66u || oneByteOpcode == 0x67u ||
+            oneByteOpcode == 0xc6u || oneByteOpcode == 0xc7u ||
+            oneByteOpcode == 0xf6u || oneByteOpcode == 0xf7u)
+            return oneBytePC;
+
         const auto twoBytePC = static_cast<std::uint16_t>(pcAfterFetch - 2u);
-        const auto opcode = readCode(twoBytePC);
+        const auto twoByteOpcode = readCode(twoBytePC);
         // MOV @Ri,#data and MOV @Ri,direct consume one operand byte.
-        if (opcode == 0x76u || opcode == 0x77u ||
-            opcode == 0xa6u || opcode == 0xa7u)
+        if (twoByteOpcode == 0x76u || twoByteOpcode == 0x77u ||
+            twoByteOpcode == 0xa6u || twoByteOpcode == 0xa7u)
             return twoBytePC;
-        return static_cast<std::uint16_t>(pcAfterFetch - 1u);
+        return oneBytePC;
     }
 
     void recordInternalRamWriteForTesting(
