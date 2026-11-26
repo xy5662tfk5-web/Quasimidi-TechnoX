@@ -374,6 +374,8 @@ void testMASS1C61PitchParameterExecutionProjection() {
     assert(missingAddress.status ==
            MASS1C61PitchExecutionStatus::requiresSecondaryAddressSnapshot);
     snapshot.hasCapturedSecondaryAddressInputs = true;
+    snapshot.accumulatorInputR2 = 0x80u;
+    snapshot.hasCapturedAccumulatorInputR2 = true;
 
     const auto result = MASS1C61PitchParameterExecutionProjection::execute(
         firmwareROM, command, snapshot);
@@ -405,11 +407,14 @@ void testMASS1C61PitchParameterExecutionProjection() {
     command.opcode = 0x08u;
     command.bytes[0] = 0x08u;
     command.bytes[1] = 0x00u; // exercise the direct-RAM accumulator bypass
+    snapshot.accumulatorInputR2 = 0x00u;
     auto missingBypass = MASS1C61PitchParameterExecutionProjection::execute(
         firmwareROM, command, snapshot);
     assert(missingBypass.status ==
            MASS1C61PitchExecutionStatus::requiresDirectRamBypassSnapshot);
     snapshot.hasCapturedDirectRamAccumulatorInputs = true;
+    snapshot.hasCapturedAccumulatorInputR2 = true;
+    snapshot.accumulatorInputR2 = 0x00u;
     snapshot.directRam05 = 0x45u;
     snapshot.directRam06 = 0x56u;
     snapshot.directRam07 = 0x67u;
@@ -1058,6 +1063,8 @@ void testActualFirmwareROMTables(const char* path) {
     note72PitchSnapshot.secondaryTableBankSelectR4 = 0xa0u;
     note72PitchSnapshot.ram2F = 0x75u;
     note72PitchSnapshot.hasCapturedSecondaryAddressInputs = true;
+    note72PitchSnapshot.accumulatorInputR2 = 0x80u;
+    note72PitchSnapshot.hasCapturedAccumulatorInputR2 = true;
     const auto note72Pitch = MASS1C61PitchParameterExecutionProjection::execute(
         view, note72PitchCommand, note72PitchSnapshot);
     assert(note72Pitch.ready());
@@ -1075,7 +1082,7 @@ void testActualFirmwareROMTables(const char* path) {
     assert(note72Pitch.packedFields.r7 == 0x01u);
     assert(note72Pitch.accumulator.r2 == 0xbeu);
     assert(note72Pitch.accumulator.r3 == 0x7fu);
-    assert(note72Pitch.accumulator.r4 == 0xffu);
+    assert(note72Pitch.accumulator.r4 == 0x01u);
 
     // Known Note-66 secondary lookup: the real descrambled IC4 code image
     // contains three MOVC bytes at 0x397E / +0x80 / +0x100.
