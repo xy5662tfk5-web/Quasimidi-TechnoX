@@ -26,6 +26,7 @@ struct MASS1C61PitchExecutionSnapshot {
 
 enum class MASS1C61PitchExecutionStatus : std::uint8_t {
     ready,
+    commandStreamExhausted,
     invalidCommand,
     firmwareROMUnavailable,
     interpolationLookupFailed,
