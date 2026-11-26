@@ -13,6 +13,7 @@ namespace technox {
 // it does not turn IC51 bytes directly into guessed SAM9407 register writes.
 enum class MASSFirmwarePacketPlanStatus : std::uint8_t {
     ready,
+    commandStreamExhausted,
     fillerSlotOnly,
     streamAdvanceOnly,
     extendedBranchSuppressed,
