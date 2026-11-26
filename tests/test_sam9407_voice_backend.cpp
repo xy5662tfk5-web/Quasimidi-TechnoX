@@ -165,6 +165,40 @@ int main() {
         retargetCommon, retargetPerformance, retargetDrums);
     assert(retargetLeft[0] < -0.05f);
 
+    // Resources may be attached after MIDI Note On (for example, after a
+    // user loads a waveform image/sample map while the processor is stopped).
+    // The active voice must recover instead of remaining permanently silent.
+    SAM9407VoiceBackend lateBackend;
+    MASSAudioEngine lateEngine(&lateBackend);
+    lateEngine.prepare(44100.0, 8);
+    assert(lateEngine.setPartParameter(0, PartParameter::level, 127));
+    lateEngine.noteOn(0, 1, 60, 127);
+    std::array<float, 4> lateLeft{}, lateRight{};
+    float* lateChannels[] = {lateLeft.data(), lateRight.data()};
+    lateEngine.render(lateChannels, 2, 4);
+    assert(energy(lateLeft, lateRight) == 0.0);
+
+    std::array<std::uint8_t, 8> latePcm{{
+        0x00, 0x40, 0x00, 0x40, 0x00, 0xc0, 0x00, 0xc0
+    }};
+    MASSWaveformMemoryView lateMemory;
+    assert(lateMemory.attach(latePcm.data(), latePcm.size()));
+    SAM9407SampleMapEntry lateEntry{};
+    lateEntry.bank = 0;
+    lateEntry.program = 0;
+    lateEntry.startWord = 0;
+    lateEntry.endWord = 4;
+    lateEntry.sampleRate = 44100;
+    lateEntry.rootNote = 60;
+    lateEntry.gain = 127;
+    lateEntry.pan = 64;
+    assert(lateBackend.addSampleMapping(lateEntry));
+    lateEngine.setWaveformMemoryView(&lateMemory);
+    lateLeft.fill(0.0f);
+    lateRight.fill(0.0f);
+    lateEngine.render(lateChannels, 2, 4);
+    assert(energy(lateLeft, lateRight) > 0.2);
+
     // Invalid loops and out-of-range sample descriptors are rejected early.
     SAM9407VoiceBackend validationBackend;
     SAM9407SampleMapEntry invalid = entry;
