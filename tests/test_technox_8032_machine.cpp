@@ -1222,6 +1222,7 @@ int main(int argc, char** argv) {
             consumerMachine.writeInternal(0x47u, 0x01u);
             consumerMachine.writeInternal(0x49u, 0x00u);
 
+            consumerMachine.clearInternalRamWriteTraceForTesting();
             cpuRegisters.pc = 0x044cu;
             const auto consumerInstructions =
                 consumerMachine.runUntilProgramCounter(0x0550u, 4096u);
@@ -1233,6 +1234,47 @@ int main(int argc, char** argv) {
             assert(consumerMachine.readInternal(0x41u) == 0x33u);
             assert(consumerMachine.readInternal(0x36u) != 0u ||
                    consumerMachine.readInternal(0x37u) != 0u);
+            bool sawInternal36Write = false;
+            std::printf("SINE/SLOT IRAM RESULT WRITES: count=%zu\\n",
+                        consumerMachine.internalRamWriteTraceCountForTesting());
+            for (std::size_t writeIndex = 0;
+                 writeIndex < consumerMachine.internalRamWriteTraceCountForTesting();
+                 ++writeIndex) {
+                const auto& write =
+                    consumerMachine.internalRamWriteTraceAtForTesting(writeIndex);
+                assert(write.address == 0x36u || write.address == 0x37u);
+                sawInternal36Write = sawInternal36Write || write.address == 0x36u;
+                std::printf("  IRAM[%02X] %02X->%02X %s pc=%04X bytes=%02X/%02X/%02X "
+                            "ret=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
+                            "R0-R7=%02X/%02X/%02X/%02X/%02X/%02X/%02X/%02X "
+                            "P2/P3=%02X/%02X cycle=%llu seq=%llu\\n",
+                            static_cast<unsigned>(write.address),
+                            static_cast<unsigned>(write.previousValue),
+                            static_cast<unsigned>(write.value),
+                            write.indirectAddressing ? "@Ri" : "direct",
+                            static_cast<unsigned>(write.instructionPC),
+                            static_cast<unsigned>(write.opcodeBytes[0]),
+                            static_cast<unsigned>(write.opcodeBytes[1]),
+                            static_cast<unsigned>(write.opcodeBytes[2]),
+                            static_cast<unsigned>(write.returnPC),
+                            static_cast<unsigned>(write.accumulator),
+                            static_cast<unsigned>(write.b),
+                            static_cast<unsigned>(write.psw),
+                            static_cast<unsigned>(write.dptr),
+                            static_cast<unsigned>(write.registers[0]),
+                            static_cast<unsigned>(write.registers[1]),
+                            static_cast<unsigned>(write.registers[2]),
+                            static_cast<unsigned>(write.registers[3]),
+                            static_cast<unsigned>(write.registers[4]),
+                            static_cast<unsigned>(write.registers[5]),
+                            static_cast<unsigned>(write.registers[6]),
+                            static_cast<unsigned>(write.registers[7]),
+                            static_cast<unsigned>(write.port2),
+                            static_cast<unsigned>(write.port3),
+                            static_cast<unsigned long long>(write.machineCycle),
+                            static_cast<unsigned long long>(write.eventSequence));
+            }
+            assert(sawInternal36Write);
             assert(consumerMachine.soundCommandPacketCount() == 0u);
             assert(consumerMachine.soundHostWriteCount() == 0u);
             assert(consumerMachine.soundHostReadCount() == 0u);
