@@ -380,7 +380,8 @@ void testMASS1C61PitchParameterExecutionProjection() {
     assert(result.ready());
     assert(result.commandFields.r2 == 0x80u);
     assert(result.interpolatedInput.value24 == 0x001880u);
-    assert(result.secondaryAddress.address == 0x397eu);
+    assert(result.secondaryAddress.address == 0x3966u);
+    assert(result.secondaryAddress.normalizedIndex == 0x18u);
     assert(result.secondaryFetchAddress.address == 0x397eu);
     assert((result.secondaryTableBytes.bytes ==
             std::array<std::uint8_t, 3>{{0x05u, 0x43u, 0x02u}}));
@@ -435,25 +436,37 @@ void testMASS1C61SecondaryTableAddress() {
     const auto normal = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0x30, 0x20, 0x00);
     assert(normal.normalizedIndex == 0x50 && normal.bankOffset == 0);
-    assert(normal.address == 0x4050);
+    assert(normal.address == 0x4000);
+    const auto normalFetch = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
+        normal.address, normal.normalizedIndex);
+    assert(normalFetch.address == 0x4050 && !normalFetch.pageCarry);
 
     const auto upper = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0x30, 0x20, 0x10);
     assert(upper.normalizedIndex == 0x50 && upper.bankOffset == 0x180);
-    assert(upper.address == 0x41d0);
+    assert(upper.address == 0x4180);
+    const auto upperFetch = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
+        upper.address, upper.normalizedIndex);
+    assert(upperFetch.address == 0x41d0 && !upperFetch.pageCarry);
 
     const auto negativeWrapped = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0x80, 0x05, 0x00);
-    assert(negativeWrapped.normalizedIndex == 0x79 && negativeWrapped.address == 0x4079);
+    assert(negativeWrapped.normalizedIndex == 0x79 && negativeWrapped.address == 0x4000);
+    const auto negativeFetch = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
+        negativeWrapped.address, negativeWrapped.normalizedIndex);
+    assert(negativeFetch.address == 0x4079);
 
     const auto positiveWrapped = MASS1C61SecondaryTableAddressBuilder::resolve(
         0x4000, 0xc0, 0x00, 0x00);
-    assert(positiveWrapped.normalizedIndex == 0x08 && positiveWrapped.address == 0x4008);
+    assert(positiveWrapped.normalizedIndex == 0x08 && positiveWrapped.address == 0x4000);
+    const auto positiveFetch = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
+        positiveWrapped.address, positiveWrapped.normalizedIndex);
+    assert(positiveFetch.address == 0x4008);
 
-    const auto noCarry = MASS1C61SecondaryTableFetchAddressBuilder::addOriginalR7(
+    const auto noCarry = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
         0x4050, 0x10);
     assert(noCarry.address == 0x4060 && !noCarry.pageCarry);
-    const auto withCarry = MASS1C61SecondaryTableFetchAddressBuilder::addOriginalR7(
+    const auto withCarry = MASS1C61SecondaryTableFetchAddressBuilder::addNormalizedIndex(
         0x40f0, 0x20);
     assert(withCarry.address == 0x4110 && withCarry.pageCarry);
 
@@ -1026,6 +1039,43 @@ void testActualFirmwareROMTables(const char* path) {
     }
     for (std::size_t index = 0; index < 128; ++index)
         assert(view.lookupNonlinearScale(static_cast<std::uint8_t>(index), value));
+
+    // Full Note-72 1C61 execution snapshot recovered from the live IC4 trace:
+    // group-08 command R7=F6 is replaced by normalized R7=75 at 0x1D45;
+    // loaded base DPTR=3903 is then advanced to 3978 at 0x1D95.
+    MASSResourceCommand note72PitchCommand{};
+    note72PitchCommand.kind = MASSResourceCommandKind::pitchParameter;
+    note72PitchCommand.opcode = 0x08u;
+    note72PitchCommand.length = 7u;
+    note72PitchCommand.bytes = {{
+        0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u
+    }};
+    MASS1C61PitchExecutionSnapshot note72PitchSnapshot{};
+    note72PitchSnapshot.interpolationControl2067 = 0x00u;
+    note72PitchSnapshot.hasCapturedInterpolationControl = true;
+    note72PitchSnapshot.secondaryTableBasePointer = 0x3903u;
+    note72PitchSnapshot.secondaryTableIndexR3 = 0x18u;
+    note72PitchSnapshot.secondaryTableBankSelectR4 = 0xa0u;
+    note72PitchSnapshot.ram2F = 0x75u;
+    note72PitchSnapshot.hasCapturedSecondaryAddressInputs = true;
+    const auto note72Pitch = MASS1C61PitchParameterExecutionProjection::execute(
+        view, note72PitchCommand, note72PitchSnapshot);
+    assert(note72Pitch.ready());
+    assert(note72Pitch.commandFields.r7 == 0xf6u); // resource byte, not live fetch R7
+    assert(note72Pitch.secondaryAddress.address == 0x3903u);
+    assert(note72Pitch.secondaryAddress.normalizedIndex == 0x75u);
+    assert(note72Pitch.secondaryFetchAddress.address == 0x3978u);
+    assert(!note72Pitch.secondaryFetchAddress.pageCarry);
+    assert((note72Pitch.secondaryTableBytes.bytes ==
+            std::array<std::uint8_t, 3>{{0x53u, 0x99u, 0x01u}}));
+    assert(note72Pitch.packedFields.r3 == 0x2au);
+    assert(note72Pitch.packedFields.r4 == 0x33u);
+    assert(note72Pitch.packedFields.r5 == 0x53u);
+    assert(note72Pitch.packedFields.r6 == 0x99u);
+    assert(note72Pitch.packedFields.r7 == 0x01u);
+    assert(note72Pitch.accumulator.r2 == 0xbeu);
+    assert(note72Pitch.accumulator.r3 == 0x7fu);
+    assert(note72Pitch.accumulator.r4 == 0xffu);
 
     // Known Note-66 secondary lookup: the real descrambled IC4 code image
     // contains three MOVC bytes at 0x397E / +0x80 / +0x100.
