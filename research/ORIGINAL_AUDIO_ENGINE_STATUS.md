@@ -383,6 +383,15 @@ Evidence boundary: RAM `0x36/0x37` have multiple firmware uses. The `0x1494` res
 
 
 
+## Intel macOS release build and regression checkpoint — 27 November 2026
+
+- Existing workflow run [45862138151](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45862138151) completed successfully on commit `084b02201fa0340f367693f4787d330a39575fec`.
+- Built all three Intel formats: AU (`QuasimidiTechnoX_AU`), VST3 (`QuasimidiTechnoX_VST3`) and Standalone (`QuasimidiTechnoX_Standalone`). The configured `CMAKE_OSX_ARCHITECTURES=x86_64` and the executable's Mach-O build record confirms `minos 10.15`, compatible with the project's Monterey target.
+- All 11 CTest tests passed, including `technox_waveform_memory_view_tests` and `technox_waveform_dump_inspector_tests`. The Python unit-test job also completed successfully.
+- Plugin archive artifact: [technox-intel-plugins](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45862138151/artifacts/15139047541), 5,941,444 bytes, SHA-256 `bfad2725f916b1ab896b1070e4c29e79166ae23ed5dc9e3f16da2e298c9f7dc7`.
+- The relevant CMake, processor, audio-engine, memory-view, backend and test file blobs on the current branch were compared with the tested commit and are identical. Later changes since that run are documentation/workflow housekeeping only.
+- The build proves x86_64 compilation and regression tests; it does not prove actual loading in Logic on the user's Monterey machine or authentic TechnoX sound. `BasicMASSVoiceBackend` remains a diagnostic oscillator until a verified waveform and original playback/DSP behavior are available.
+
 ## Pitch pipeline integration and real-ROM provenance probes — 26 November 2026
 
 - Added `Source/MASSFirmwarePitchInterpolationPacketProjection.h`: captured slot bytes + step/sign + R5 → exact 0x09B9 arithmetic → 0x0A4F R2/R3/R4 + 0x0DB7 packet/mask/bit-0x0C mirror.
