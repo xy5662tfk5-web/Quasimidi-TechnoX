@@ -238,3 +238,11 @@ if (BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
     )
 endif()
+
+# Bounded-memory integrity checks for candidate external TechnoX waveform dumps.
+if (BUILD_TESTING)
+    add_test(NAME technox_waveform_dump_inspector_tests
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_waveform_dump_inspector.py"
+    )
+endif()
