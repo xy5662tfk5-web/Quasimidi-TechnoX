@@ -175,11 +175,28 @@ The current public MAME skeleton driver [`src/mame/skeleton/qmquasar.cpp`](https
 
 Independent public TechnoX specifications describe a 64-MB sample/wave ROM bank ([Vintage Synth Explorer](https://www.vintagesynth.com/quasimidi/technox), [Sound Programming](https://soundprogramming.net/synthesizers/quasimidi/quasimidi-technox/)). These are secondary specification sources, not a verified board-level memory map. Even so, they make one boundary especially clear: the 128-KiB IC51 dump and the 13,647-byte firmware bulk-transfer block cannot responsibly be called the complete waveform library. The larger sample-memory device/path and its dump or electrical map are still missing.
 
-## 5. SAM9407 compatibility check
+## 5. Primary synthesis target: DREAM SAM9407; interface mapping remains open
 
-The Dream SAM9407 datasheet describes a 16-bit host interface with three address inputs, chip-select/read/write controls and a 16-bit data bus, plus separate sample-memory address/data signals and an active-low reset. This is a plausible general architecture for a sample-based synth DSP. The TechnoX firmware evidence presently available is a four-byte 8-bit XDATA aperture plus a separate `0xFF10` transfer/status path and a mapped external-memory window.
+The current reconstruction now uses **DREAM SAM9407 as the primary working architecture for the TechnoX synthesis engine**, rather than treating it as one arbitrary candidate among unrelated DSPs. This is an evidence-based engineering target, not yet a verified pin-for-pin board identification.
 
-Those facts are not yet reconciled into a SAM9407 pin-level interface. External glue logic could translate the 8032 interface, but no verified TechnoX PCB marking, schematic or bus capture has yet established that. Keep SAM9407 as a research lead, not the emulated chip identity. Reference: [Dream SAM9407 datasheet](https://dosdays.co.uk/media/dream/SAM9407.PDF).
+### Evidence supporting the target
+
+- The SAM9407 datasheet describes the relevant class of single-chip wavetable synthesizer: a 16-bit P16 control processor, a dedicated synthesis/DSP engine, internal parameter RAM, a 16-bit host interface, and an external sample-memory interface.
+- Public application lists for the SAM9407 explicitly include Quasimidi TechnoX alongside Quasar and Raven. This is stronger than inferring the chip solely from the general Quasimidi product family.
+- Contemporary TechnoX documentation describes the M.A.S.S. sound engine, 21-note polyphony and multiple simultaneous Parts. Public discussion of the Quasar/Raven family further supports a shared-generation M.A.S.S. architecture.
+- The TechnoX 8032 firmware has a command-oriented external-device interface and an external sound-memory path. That architecture is compatible in broad purpose with a sample-based synthesis coprocessor, but it is not yet a decoded SAM9407 host-port protocol.
+
+### Working model boundaries
+
+1. **Synthesis:** use SAM9407 documentation and architecture as the reference target for reconstructing voice/sample/DSP behavior. Do not invent SAM9407 register numbers or parameter meanings from IC4 packet bytes.
+2. **External memory:** treat the advertised TechnoX sample-memory capacity as a product configuration claim, not as a byte-exact recovered dump. The IC51 128-KiB image and the 13,647-byte startup transfer are not the complete waveform store.
+3. **Effects:** ADSP-2105 is a secondary, plausible target for the separate FX1/FX2 path based on Quasimidi-family reports. Its presence in this specific TechnoX board and its exact routing/firmware remain unverified. Keep effect traffic separate from the SAM9407 synthesis path until board or protocol evidence joins them.
+4. **Host interface:** the SAM9407 datasheet's 16-bit host interface does not directly match the currently observed 8-bit 8032 aperture at `0x8000–0x8003` plus the mode-dependent `0xFF10` path. External glue logic or an intermediate controller may bridge them, but no pin-level mapping has been demonstrated.
+5. **Physical confirmation:** a readable TechnoX PCB marking, schematic, chip-top photograph, or hardware bus capture is still required to call the fitted part physically confirmed.
+
+The C++ machine therefore continues to expose neutral host-register names and preserve byte order, instruction PCs, cycle timing and bus-control context. The SAM9407 is the **primary architecture to target**, but its host-port command decoder is not yet implemented. ADSP-2105 remains a separate FX hypothesis, not a confirmed populated component.
+
+Reference: [DREAM SAM9407 datasheet](https://dosdays.co.uk/media/dream/SAM9407.PDF).
 
 ## 6. Next experiments — ordered, no duplicate MIDI work
 
