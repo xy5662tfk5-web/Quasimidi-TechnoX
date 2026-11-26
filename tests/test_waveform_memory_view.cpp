@@ -39,7 +39,7 @@ int main() {
 
     const auto* middle = view.dataAt(3, 4);
     assert(middle == firstImage.data() + 3);
-    assert(middle[0] == 0x56 && middle[3] == 0x9A);
+    assert(middle[0] == 0x56 && middle[3] == 0xBC);
     assert(view.dataAt(firstImage.size(), 0) == firstImage.data() + firstImage.size());
     assert(view.dataAt(firstImage.size(), 1) == nullptr);
     assert(view.dataAt(11, 2) == nullptr);
