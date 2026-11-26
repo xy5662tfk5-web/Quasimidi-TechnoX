@@ -1755,7 +1755,7 @@ void testBankProgramResolver(const char* path) {
         std::printf("Performance 1 resource bank=%d sound=%d pointerBank=%u "
                     "pointerIndex=%02X P3=%02X descriptor=%04X stream=%04X "
                     "bytes=%zu commands=%zu slots=%u output=%u filler=%u "
-                    "kindCounts=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\\n",
+                    "kindCounts=%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu\n",
                     request.first, request.second,
                     static_cast<unsigned>(resolved.selection.bank),
                     static_cast<unsigned>(resolved.selection.pointerIndex),
@@ -1772,7 +1772,7 @@ void testBankProgramResolver(const char* path) {
         for (std::size_t i = 0; i < previewCount; ++i) {
             const auto& command = resolved.stream.commands[i];
             std::printf("  PERF1-CMD[%zu] offset=%04X opcode=%02X kind=%u len=%u "
-                        "bytes=%02X %02X %02X %02X %02X %02X %02X %02X\\n",
+                        "bytes=%02X %02X %02X %02X %02X %02X %02X %02X\n",
                         i, static_cast<unsigned>(command.bankOffset),
                         static_cast<unsigned>(command.opcode),
                         static_cast<unsigned>(command.kind),
@@ -1922,7 +1922,7 @@ void testActualIC51(const char* path) {
         assert(plannerStatusCounts[flagIndex][5] == 0u);
         std::printf(
             "IC51 planner flag0A=%u: ready=%zu filler=%zu stream-only=%zu "
-            "pitch-context=%zu conditional-context=%zu invalid=%zu\\n",
+            "pitch-context=%zu conditional-context=%zu invalid=%zu\n",
             static_cast<unsigned>(flagIndex),
             plannerStatusCounts[flagIndex][0],
             plannerStatusCounts[flagIndex][1],
