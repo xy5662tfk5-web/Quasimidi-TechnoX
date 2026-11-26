@@ -109,6 +109,24 @@ The field decoder preserves these as opcode 0x08 and register inputs `R2=20, R3=
 
 The secondary lookup is independently reproducible from the descrambled IC4 code ROM: the computed MOVC addresses are 0x397E, 0x39FE, and 0x3A7E, containing `05 43 02`. The packed-field decoder reproduces the live register tuple `R2=80, R3=60, R4=48, R5=05, R6=43, R7=02`. The 1C61 accumulator model then reproduces the intermediate `D5:1E:02`; the subsequent correction is a distinct step and yields the final slot vector `D5:1F:A2` in the Note 66 fixture. The later 09B9 consumer's high-byte mask and interpolation remain separate from this descriptor-field reconstruction.
 
+### Executable group-08 projection
+
+The repository now composes the recovered parts in `Source/MASSFirmwarePitchParameterExecution.h`:
+
+1. Decode the seven-byte group-08 entry into the original IC4 register fields (`R2,R3,R4,R7,R6,R5`).
+2. Resolve the signed interpolation coefficient from the caller-supplied XDATA `0x2067` snapshot and run the existing 24-bit fixed-point interpolation projection.
+3. Resolve the secondary MOVC base from an explicit handler-boundary snapshot (`basePointer`, address-selection `R3/R4`, `RAM[0x2F]`), then add the command's original `R7` as the firmware does at `0x1D95`.
+4. Read the three actual code-ROM locations at `DPTR`, `DPTR+0x80`, and `DPTR+0x100`; decode the packed fields and run the `0x1DC8..0x1E04` accumulator transform.
+5. Return the raw pre-slot-correction 24-bit result, without assigning Hz, semitone, sample-address or DSP-register meaning.
+
+The snapshot carries explicit validity flags for the interpolation control, secondary-address inputs and the direct-RAM `0x05–0x07` bypass (required when interpolated `R2==0`). The projection refuses to continue when any required boundary snapshot is missing. It does not assume that the address-selection values can be derived from the raw IC51 record.
+
+`MASSOriginalVoiceProgramRuntime::planNextPitchCommand()` now consumes the next group-08 command from the selected voice's IC51 stream and passes it through this projection. The runtime regression locates a real factory group-08 record and checks the cursor handoff using an explicitly synthetic code-ROM boundary fixture. Separately, the CMake test now supplies the actual descrambled IC4 ROM; the real-ROM test checks that addresses `0x397E/0x39FE/0x3A7E` contain `05 43 02`, decodes `R3=60,R4=48,R5=05,R6=43,R7=02`, and reproduces the known pre-slot accumulator vector `D5:1E:02` from explicit test snapshots.
+
+This is an executable composition of recovered firmware stages, not proof that the original group-08 record's pointer chain or every Note-66 handler input is fully resolved. The final `D5:1F:A2` slot correction remains a separate `0x1E4B..0x1E66` stage, and the 09B9 consumer remains separate. The original host-device response and actual SAM9407 register mapping are still unknown.
+
+
+
 A separate IC51 Performance 1 / Part 13 resource-stream decode finds a seven-byte group-08 pitch-parameter command at stream offset 0x0179 (`0E 64 CC 05 9E 0C 5C`). It is consistent with the same handler class, but the current evidence does not prove that this exact stream record is the pointer source for the 0x160C..0x1612 bytes in the live Note 66 capture. Keep the two observations linked as a candidate relationship, not a completed pointer chain, until the command-stream cursor is captured through the pointer-table lookup.
 
 This now connects a real IC51 record to the firmware register tuple, the 1C61 transform, the three-byte XDATA pitch slot, the 09B9 consumer, and the 0x0A4F packet writer. It still does not map the raw values to Hz, semitones, sample addresses, amplitude, or named external-device registers.
