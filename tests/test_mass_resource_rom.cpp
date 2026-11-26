@@ -909,6 +909,40 @@ void testActualFirmwareROMTables(const char* path) {
     }
     for (std::size_t index = 0; index < 128; ++index)
         assert(view.lookupNonlinearScale(static_cast<std::uint8_t>(index), value));
+
+    // Known Note-66 secondary lookup: the real descrambled IC4 code image
+    // contains three MOVC bytes at 0x397E / +0x80 / +0x100.
+    MASS1C61SecondaryTableBytes note66Table{};
+    assert(MASS1C61SecondaryTableReader::read(view, 0x397eu, note66Table));
+    assert((note66Table.bytes ==
+            std::array<std::uint8_t, 3>{{0x05u, 0x43u, 0x02u}}));
+    const auto note66Fields = MASS1C61PackedLookupDecoder::decode(note66Table);
+    assert(note66Fields.r3 == 0x60u && note66Fields.r4 == 0x48u);
+    assert(note66Fields.r5 == 0x05u && note66Fields.r6 == 0x43u &&
+           note66Fields.r7 == 0x02u);
+
+    MASSResourceCommand note66PitchCommand{};
+    note66PitchCommand.kind = MASSResourceCommandKind::pitchParameter;
+    note66PitchCommand.opcode = 0x08u;
+    note66PitchCommand.length = 7u;
+    note66PitchCommand.bytes = {{
+        0x08u, 0x80u, 0x18u, 0xa0u, 0x00u, 0x00u, 0x00u
+    }};
+    MASS1C61PitchExecutionSnapshot note66Snapshot{};
+    note66Snapshot.interpolationControl2067 = 0x00u;
+    note66Snapshot.hasCapturedInterpolationControl = true;
+    note66Snapshot.secondaryTableBasePointer = 0x3966u;
+    note66Snapshot.secondaryTableIndexR3 = 0x18u;
+    note66Snapshot.secondaryTableBankSelectR4 = 0xa0u;
+    note66Snapshot.hasCapturedSecondaryAddressInputs = true;
+    const auto note66Projection =
+        MASS1C61PitchParameterExecutionProjection::execute(
+            view, note66PitchCommand, note66Snapshot);
+    assert(note66Projection.ready());
+    assert(note66Projection.secondaryFetchAddress.address == 0x397eu);
+    assert(note66Projection.accumulator.r2 == 0xd5u);
+    assert(note66Projection.accumulator.r3 == 0x1eu);
+    assert(note66Projection.accumulator.r4 == 0x02u);
 }
 
 void testOriginalVoiceProgramRuntime(
