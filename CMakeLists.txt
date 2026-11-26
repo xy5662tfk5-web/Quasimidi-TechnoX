@@ -145,17 +145,34 @@ if (BUILD_TESTING)
     )
 endif()
 
-# Dependency-free IC51 directory, descriptor and command-stream decoder tests.
+# Dependency-free IC51 directory, descriptor, pitch and command-stream tests.
 if (BUILD_TESTING)
+    set(TECHNOX_DESCRAMBLED_IC4 "${CMAKE_CURRENT_BINARY_DIR}/technox_ic4_descrambled.bin")
+    add_custom_command(
+        OUTPUT "${TECHNOX_DESCRAMBLED_IC4}"
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/analyze_technox_rom.py"
+            --write-descrambled-ic4 "${TECHNOX_DESCRAMBLED_IC4}"
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/analyze_technox_rom.py"
+        COMMENT "Building descrambled IC4 firmware fixture for resource/pitch tests"
+        VERBATIM
+    )
+    add_custom_target(technox_descrambled_ic4_fixture
+        DEPENDS "${TECHNOX_DESCRAMBLED_IC4}"
+    )
+
     add_executable(technox_mass_resource_rom_tests
         tests/test_mass_resource_rom.cpp
     )
+    add_dependencies(technox_mass_resource_rom_tests technox_descrambled_ic4_fixture)
     target_compile_features(technox_mass_resource_rom_tests PRIVATE cxx_std_17)
     target_compile_options(technox_mass_resource_rom_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_mass_resource_rom_tests
         COMMAND technox_mass_resource_rom_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC51_nm27c010_v105.bin"
-            "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
+            "${TECHNOX_DESCRAMBLED_IC4}"
     )
 endif()
 
