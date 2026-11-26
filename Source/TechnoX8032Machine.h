@@ -98,6 +98,7 @@ public:
         std::uint8_t value = 0xff;
         std::uint8_t changedMask = 0;
         std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
         std::uint8_t soundBusMode = 0;
         std::uint16_t instructionPC = 0;
         std::uint64_t machineCycle = 0;
@@ -112,6 +113,16 @@ public:
         bool bit2Changed = false;
         std::uint64_t machineCycle = 0;
     };
+    struct SoundBusModeWriteEvent {
+        std::uint8_t previousValue = 0;
+        std::uint8_t value = 0;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t returnPC = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        bool ic51Selected = false;
+        std::uint64_t machineCycle = 0;
+    };
     struct PortReadEvent {
         std::uint8_t port = 0;
         std::uint8_t value = 0xff;
@@ -123,6 +134,10 @@ public:
         std::uint16_t returnPC = 0;
         std::uint8_t bank = 0;
         std::uint8_t value = 0xff;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        bool ic51Selected = false;
         std::uint64_t machineCycle = 0;
     };
     struct SoundMemoryWriteEvent {
@@ -131,6 +146,9 @@ public:
         std::uint16_t returnPC = 0;
         std::uint8_t value = 0;
         std::uint8_t mode = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        bool ic51Selected = false;
         std::uint64_t machineCycle = 0;
     };
     struct SoundMemoryReadEvent {
@@ -139,6 +157,9 @@ public:
         std::uint16_t returnPC = 0;
         std::uint8_t value = 0xff;
         std::uint8_t mode = 0;
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        bool ic51Selected = false;
         std::uint64_t machineCycle = 0;
     };
     struct IC51BusProbeEvent {
@@ -563,6 +584,8 @@ public:
         soundHostBurstLowInstructionPC_ = 0;
         portWriteTrace_.fill(PortWriteEvent{});
         portWriteCount_ = 0;
+        soundBusModeWriteTrace_.fill(SoundBusModeWriteEvent{});
+        soundBusModeWriteTraceCount_ = 0;
         p3Bit2ControlWriteTrace_.fill(P3Bit2ControlWriteEvent{});
         p3Bit2ControlWriteCount_ = 0;
         portReadTrace_.fill(PortReadEvent{});
@@ -1179,6 +1202,7 @@ public:
             portEvent.value = value;
             portEvent.changedMask = static_cast<std::uint8_t>(previousPins ^ value);
             portEvent.port2 = portPins_[2];
+            portEvent.port3 = portPins_[3];
             portEvent.soundBusMode = internal_[0x8e];
             portEvent.instructionPC = instructionPC;
             portEvent.machineCycle = elapsedMachineCycles_;
@@ -1232,8 +1256,20 @@ public:
                 event.machineCycle = elapsedMachineCycles_;
                 ++internalFlagWriteTraceCount_;
             }
-            if (address == 0x8eu)
+            if (address == 0x8eu) {
                 ++soundBusModeWriteCount_;
+                auto& event = soundBusModeWriteTrace_[
+                    soundBusModeWriteTraceCount_ % soundBusModeWriteTrace_.size()];
+                event.previousValue = previousValue;
+                event.value = value;
+                event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+                event.returnPC = currentStackReturnPC();
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.ic51Selected = isIC51Selected();
+                event.machineCycle = elapsedMachineCycles_;
+                ++soundBusModeWriteTraceCount_;
+            }
         }
     }
 
@@ -1325,6 +1361,10 @@ public:
                 (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
             event.bank = static_cast<std::uint8_t>(bank);
             event.value = value;
+            event.port2 = portPins_[2];
+            event.port3 = portPins_[3];
+            event.soundBusMode = internal_[0x8e];
+            event.ic51Selected = ic51Selected;
             event.machineCycle = elapsedMachineCycles_;
             ++ic51ReadTraceCount_;
             return value;
@@ -1387,6 +1427,9 @@ public:
                 soundEvent.returnPC = currentStackReturnPC();
                 soundEvent.value = value;
                 soundEvent.mode = static_cast<std::uint8_t>(mode);
+                soundEvent.port2 = portPins_[2];
+                soundEvent.port3 = portPins_[3];
+                soundEvent.ic51Selected = ic51Selected;
                 soundEvent.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryReadTraceCount_;
             }
@@ -1430,6 +1473,9 @@ public:
                     (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
                 event.value = xdata_[address];
                 event.mode = static_cast<std::uint8_t>(mode);
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.ic51Selected = ic51Selected;
                 event.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryReadTraceCount_;
             }
@@ -1642,6 +1688,9 @@ public:
                 event.address = address;
                 event.value = value;
                 event.mode = static_cast<std::uint8_t>(mode);
+                event.port2 = portPins_[2];
+                event.port3 = portPins_[3];
+                event.ic51Selected = ic51Selected;
                 event.instructionPC = static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
                 auto stackPointer = cpu_.registers().sp;
                 // AF05 saves R0 before the sound-RAM MOVX at AF10; skip that
@@ -1977,6 +2026,12 @@ public:
         return ic51BusProbeTrace_[index % ic51BusProbeTrace_.size()];
     }
     std::uint64_t soundBusModeWriteCount() const noexcept { return soundBusModeWriteCount_; }
+    std::size_t soundBusModeWriteTraceCount() const noexcept {
+        return soundBusModeWriteTraceCount_;
+    }
+    const SoundBusModeWriteEvent& soundBusModeWriteTraceAt(std::size_t index) const noexcept {
+        return soundBusModeWriteTrace_[index % soundBusModeWriteTrace_.size()];
+    }
     std::uint64_t p35TransitionCount() const noexcept { return p35TransitionCount_; }
     std::uint16_t lastSoundMemoryWriteAddress() const noexcept { return lastSoundMemoryWriteAddress_; }
     std::uint8_t lastSoundMemoryWriteValue() const noexcept { return lastSoundMemoryWriteValue_; }
@@ -2373,6 +2428,8 @@ private:
     std::size_t ic51BusProbeTraceCount_ = 0;
     std::array<PortWriteEvent, 4096> portWriteTrace_{};
     std::size_t portWriteCount_ = 0;
+    std::array<SoundBusModeWriteEvent, 512> soundBusModeWriteTrace_{};
+    std::size_t soundBusModeWriteTraceCount_ = 0;
     std::array<P3Bit2ControlWriteEvent, 128> p3Bit2ControlWriteTrace_{};
     std::size_t p3Bit2ControlWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
