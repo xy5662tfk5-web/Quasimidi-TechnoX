@@ -303,9 +303,13 @@ void testMASS1C61PitchParameterExecutionProjection() {
     assert(bypass.accumulator.r4 == 0x67u);
 
     command.bytes[1] = 0x80u;
-    snapshot.secondaryTableBasePointer = 0xffffu;
+    std::vector<std::uint8_t> shortCodeROM(
+        MASSFirmwareROMView::kMinimumImageSize, 0xffu);
+    MASSFirmwareROMView shortFirmwareROM;
+    assert(shortFirmwareROM.attach(shortCodeROM.data(), shortCodeROM.size()));
+    snapshot.secondaryTableBasePointer = 0x1300u;
     const auto missingTable = MASS1C61PitchParameterExecutionProjection::execute(
-        firmwareROM, command, snapshot);
+        shortFirmwareROM, command, snapshot);
     assert(missingTable.status ==
            MASS1C61PitchExecutionStatus::secondaryTableReadFailed);
 }
