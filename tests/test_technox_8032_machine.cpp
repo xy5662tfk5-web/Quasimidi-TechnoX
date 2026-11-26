@@ -5338,7 +5338,7 @@ int main(int argc, char** argv) {
                 ++note72SecondaryAddressSnapshots;
                 std::printf(
                     "NOTE72 1C61 ADDRESS SNAP pc=%04X ret=%04X DPTR=%04X "
-                    "R3=%02X R4=%02X R7=%02X RAM2F=%02X P2=%02X cycle=%llu\\n",
+                    "R3=%02X R4=%02X R7=%02X RAM2F=%02X P2=%02X cycle=%llu\n",
                     static_cast<unsigned>(event.instructionPC),
                     static_cast<unsigned>(event.returnPC),
                     static_cast<unsigned>(event.dptr),
@@ -5355,7 +5355,7 @@ int main(int argc, char** argv) {
                 std::printf(
                     "NOTE72 1C61 ACC SNAP pc=%04X ret=%04X "
                     "R2/R3/R4/R5/R6/R7=%02X/%02X/%02X/%02X/%02X/%02X "
-                    "A=%02X B=%02X direct05/06/07=%02X/%02X/%02X\\n",
+                    "A=%02X B=%02X direct05/06/07=%02X/%02X/%02X\n",
                     static_cast<unsigned>(event.instructionPC),
                     static_cast<unsigned>(event.returnPC),
                     static_cast<unsigned>(event.registers[2]),
@@ -5377,7 +5377,7 @@ int main(int argc, char** argv) {
             if (!access.write && access.address == 0x2067u) {
                 ++note72InterpolationControlReads;
                 std::printf(
-                    "NOTE72 XDATA 2067 READ value=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                    "NOTE72 XDATA 2067 READ value=%02X pc=%04X ret=%04X cycle=%llu\n",
                     static_cast<unsigned>(access.value),
                     static_cast<unsigned>(access.instructionPC),
                     static_cast<unsigned>(access.stackReturnPC),
@@ -5392,7 +5392,7 @@ int main(int argc, char** argv) {
         assert(note72PitchGuardStateAccesses > 0u);
         std::printf(
             "NOTE72 PITCH INPUT PROVENANCE: addressSnapshots=%zu accumulatorSnapshots=%zu "
-            "X2067-reads=%zu guard2018/19-accesses=%zu\\n",
+            "X2067-reads=%zu guard2018/19-accesses=%zu\n",
             note72SecondaryAddressSnapshots, note72AccumulatorSnapshots,
             note72InterpolationControlReads, note72PitchGuardStateAccesses);
 
