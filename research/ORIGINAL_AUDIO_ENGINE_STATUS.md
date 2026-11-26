@@ -262,7 +262,7 @@ The meaning of the resulting arithmetic value and its eventual DSP field is stil
 
 1. Decode the complete `0x09DA–0x0A55` fixed-point expression into named, neutral-width arithmetic stages, retaining exact byte order and carry/sign handling.
 2. Run one-coefficient-at-a-time tests for record bytes `+1/+2/+3` and the source coefficients at `0x28C8/0x2888/0x2898` (plus slot-1 equivalents), checking which intermediate/output bytes change.
-3. Trace the producer of `RAM[0x36/0x37]` backwards into the `0x04B5–0x0550` sine/slot consumer to connect each multiplier operand and saturation rule.
+3. Review the new direct/indirect IRAM `0x36/0x37` write trace from the isolated `0x044C–0x0550` sine/slot fixture. It captures opcode bytes, PC/caller, A/B/PSW, DPTR, R0–R7, P2/P3, machine cycle and sequence ID. Existing one-variable tests link the final cached 16-bit state to `0x2020+slot` and `0x2B61+slot`; the exact write-side arithmetic chain still needs opcode-by-opcode validation.
 4. Keep SoundHost byte meaning and the physical DSP protocol explicitly unresolved until supported by external documentation or a hardware capture.
 
 
@@ -330,11 +330,11 @@ A fresh reachability-guided static pass over the validated, descrambled IC4 v1.0
 - P3.2 (8051 bit address `0xB2`) is actively changed: cleared at `0x34EB`, `0xAF1A`, and `0xB34D`; set at `0xAF73`. In the `0xAF1A` bulk loader it brackets the IC51 upload and is set before the subsequent `0xFF10` marker poll. The `0xB34D` external-memory test also clears it and does not locally set it before returning. Existing SoundHost event contexts include P3 values with bit 2 low. Therefore P3.2 is a proven control transition but **not a proven active-low reset**.
 - P3.1, P3.4 and P3.5 are also repeatedly sequenced around external reads. The routine at `0xB385–0xB3BB` tests ACC.0–ACC.2 (bit addresses `0xE0–0xE2`) and conditionally toggles P3.5/P3.4/P3.1; it does not test P3.0–P3.2. These lines remain neutrally named until board-level evidence is available.
 - The three paths remain distinct: `0x8000–0x8003` four-byte host transactions; `0xFF10` mode-dependent resource/status traffic; and the `0xC000–0xFFFF` memory window populated by the 13,647-byte IC51 bulk transfer. The synthetic `0xAC` ready byte is still not a hardware response.
-- SAM9407 remains a candidate only. Its datasheet describes a 16-bit host interface and separate sample-memory bus; the current IC4 traces do not yet establish the pin-level translation or identify a SAM9407 on the TechnoX board.
+- DREAM SAM9407 is now the primary working architecture for the synthesis path, supported by its datasheet and public application lists naming TechnoX/Quasar/Raven. The specific fitted marking and the pin-level translation from the observed 8-bit IC4 apertures to the SAM9407 16-bit host interface still require board or hardware-capture confirmation. ADSP-2105 remains a separate, unverified candidate for FX1/FX2.
 
 Detailed evidence, opcode excerpts, caveats and next experiments: [`docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md`](../docs/research/SOUND_DEVICE_BUS_SIGNAL_AUDIT.md). The master work queue has been updated in [`research/SOUND_CORE_MASTER_CHECKLIST.md`](SOUND_CORE_MASTER_CHECKLIST.md).
 
-**Next technical action:** add instruction-PC and previous/new latch context to P3 write events, then produce one merged cold-boot timeline across P3 transitions, SFR `0x8E`, P2, IC51 reads, `0xFF10` and `0x8000–0x8003`. Do not implement DSP register semantics until that timeline and a board-level signal map agree.
+**Next technical action:** use the merged `(machineCycle,eventSequence)` timeline to separate boot upload, external-memory traffic, Note On/Off and FX windows. Do not implement DSP register semantics until the bus transactions can be reconciled with board-level signal evidence or a verified SAM9407 interface specification.
 
 
 ## SoundHost 0x8000–0x8003 phase/readback protocol refinement — 26 November 2026
@@ -355,3 +355,16 @@ A fresh straight-line disassembly of the IC4 v1.05 helper region resolves more o
 - GitHub Actions run [1613](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45682441974) has passed all 29 unit-test steps, including the TechnoX 8032 machine test. The macOS Intel plug-in-format build was still running at the last status check; no build success is claimed until its final result is available.
 
 **Next:** merge the P3/SFR8E/P2/IC51/FF10/SoundHost event streams into one cycle-ordered trace; then compare real firmware-controlled external read values against hardware evidence. Physical DSP identity, actual read responses, external-memory meaning and all DSP/audio algorithms remain unresolved.
+
+
+## Sequenced external-bus timeline and IRAM 0x36/0x37 writer probe — 26 November 2026
+
+- Added `Source/TechnoXSoundDeviceTimeline.h`, an offline diagnostic merger for IC51 reads, `0x8000–0x8003` host reads/writes, `0xFF10`, `0xC000–0xFFFF` memory reads/writes, P3 port writes, P3.2-specialized writes and SFR `0x8E` writes.
+- All retained bus event classes now carry a shared monotonic sequence number in addition to machine cycle. The merger sorts on `(machineCycle,eventSequence)`, so operations that share an 8032 cycle retain their observed trace order. The P3.2-specialized view shares its parent P3-write sequence, and a mode-2 `0xFF10` write plus its high-address memory classification share one sequence rather than appearing as two separate bus operations.
+- The real-ROM regression now checks nondecreasing cycle/sequence order, confirms that host writes and SFR `0x8E` transitions appear in the merged report, and prints the last bounded window. This is instrumentation only; it does not emulate a SAM9407 response or assign register meanings.
+- Added a focused bounded trace for writes to internal RAM `0x36/0x37`, covering direct and indirect writes. Each event records old/new data, addressing form, inferred instruction PC and opcode bytes, caller return PC, A/B/PSW/DPTR, R0–R7, P2/P3, SFR `0x8E`, machine cycle and shared event sequence.
+- The isolated `0x044C–0x0550` sine/slot fixture now clears and prints that trace after the setup stage. Earlier controlled input changes established that the resulting cached 16-bit state responds independently to the slot-local multiplier at `0x2020+slot` and the sine-gain byte at `0x2B61+slot`; the new trace is intended to reveal the exact writer instructions and intermediate CPU state.
+- The indirect-write PC decoder accounts for one-byte indirect destination operations, two-byte `MOV @Ri,#data` / `MOV @Ri,direct`, and `XCHD A,@Ri`. The trace has not yet been confirmed by a passing CI run, so its observed instruction addresses and values remain pending execution review.
+- Latest code change: `3b17b82b749d0532c6613818a395d6b1a7fddd04`. GitHub combined status currently exposes no check records for the documentation checkpoint; this is not a passing build result.
+
+Evidence boundary: RAM `0x36/0x37` have multiple firmware uses. The `0x1494` resource-selection path loads them as a descriptor pointer, while the isolated sine/slot consumer uses them as scratch/cached state. Never assign them one global semantic name.
