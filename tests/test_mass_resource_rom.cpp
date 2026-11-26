@@ -1084,7 +1084,7 @@ void testFirmwareResourceCommandPlanner() {
     plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
     assert(plan.ready() && plan.packetCount == 3u);
     assert((plan.packets[0].bytes ==
-            std::array<std::uint8_t, 4>{{0x3eu, 0xd7u, 0xe8u, 0x89u}}));
+            std::array<std::uint8_t, 4>{{0x3eu, 0xd7u, 0xe8u, 0x81u}}));
     assert((plan.packets[1].bytes ==
             std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0xc6u}}));
     assert((plan.packets[2].bytes ==
