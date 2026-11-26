@@ -47,10 +47,17 @@ struct MASSFirmwareCommandBoundaryState {
     std::uint8_t direct07 = 0;
 };
 
+struct MASSFirmwarePlannedPacket {
+    std::array<std::uint8_t, 4> bytes{};
+    // IC4 helper 0x0DB7 copies outgoing R4.7 into internal bit 0x0C.
+    bool setsInternalBit0C = false;
+};
+
 struct MASSFirmwarePacketPlan {
     MASSFirmwarePacketPlanStatus status = MASSFirmwarePacketPlanStatus::invalidCommand;
-    std::array<MASSHardwareCommandPacket, 3> packets{};
+    std::array<MASSFirmwarePlannedPacket, 3> packets{};
     std::uint8_t packetCount = 0;
+    bool finalInternalBit0C = false;
 
     bool ready() const noexcept {
         return status == MASSFirmwarePacketPlanStatus::ready;
@@ -86,8 +93,7 @@ public:
                 if (!MASSResourceHardwareCommandBuilder::buildConditionalExtendedPacket(
                         command, state.ram2B, false, packet))
                     return result;
-                result.packets[0] = packet;
-                result.packetCount = 1;
+                appendTransportPacket(result, packet);
                 result.status = MASSFirmwarePacketPlanStatus::ready;
                 return result;
             }
@@ -121,8 +127,7 @@ public:
                     sequence.count > result.packets.size())
                     return result;
                 for (std::size_t i = 0; i < sequence.count; ++i)
-                    result.packets[i].bytes = sequence.packets[i].bytes;
-                result.packetCount = static_cast<std::uint8_t>(sequence.count);
+                    appendTransportPacket(result, sequence.packets[i]);
                 result.status = MASSFirmwarePacketPlanStatus::ready;
                 return result;
             }
@@ -145,8 +150,7 @@ public:
                 if (!MASSResourceHardwareCommandBuilder::buildFourByteParameterPacket(
                         command, state.ram2B, false, packet))
                     return result;
-                result.packets[0] = packet;
-                result.packetCount = 1;
+                appendTransportPacket(result, packet);
                 result.status = MASSFirmwarePacketPlanStatus::ready;
                 return result;
             }
@@ -156,8 +160,7 @@ public:
                 if (!MASSResourceHardwareCommandBuilder::buildTerminalPacket(
                         command, state.ram2B, state.direct07, state.direct02, packet))
                     return result;
-                result.packets[0] = packet;
-                result.packetCount = 1;
+                appendTransportPacket(result, packet);
                 result.status = MASSFirmwarePacketPlanStatus::ready;
                 return result;
             }
@@ -178,6 +181,19 @@ public:
         }
 
         return result;
+    }
+
+private:
+    static void appendTransportPacket(
+        MASSFirmwarePacketPlan& plan,
+        const MASSHardwareCommandPacket& packet) noexcept {
+        const auto transport = MASS0DB7PacketBuilder::build(
+            packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3]);
+        auto& destination = plan.packets[plan.packetCount];
+        destination.bytes = transport.bytes;
+        destination.setsInternalBit0C = transport.setsInternalBit0C;
+        plan.finalInternalBit0C = transport.setsInternalBit0C;
+        ++plan.packetCount;
     }
 };
 
