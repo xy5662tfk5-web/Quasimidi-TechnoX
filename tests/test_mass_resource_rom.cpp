@@ -503,9 +503,9 @@ void testMASS1C61SecondaryTableAddress() {
     image[0x4050] = 0x12;
     image[0x40d0] = 0x34;
     image[0x4150] = 0x56;
-    image[0x4210] = 0x33;
-    image[0x4290] = 0x44;
-    image[0x4310] = 0x55;
+    image[0x41d0] = 0x33;
+    image[0x4250] = 0x44;
+    image[0x42d0] = 0x55;
     MASSFirmwareROMView view;
     assert(view.attach(image.data(), image.size()));
 
@@ -519,8 +519,8 @@ void testMASS1C61SecondaryTableAddress() {
     MASS1C61SecondaryTableBytes triplet{};
     MASS1C61SecondaryTableFetchAddress resolved{};
     assert(MASS1C61SecondaryTableReader::read(
-        view, upper, 0x40, triplet, &resolved));
-    assert(resolved.address == 0x4210 && resolved.pageCarry);
+        view, upper, triplet, &resolved));
+    assert(resolved.address == 0x41d0 && !resolved.pageCarry);
     assert((triplet.bytes == std::array<std::uint8_t, 3>{{0x33, 0x44, 0x55}}));
 }
 
