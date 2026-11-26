@@ -53,6 +53,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSVoiceManager.h
     Source/MASSModulationMatrix.h
     Source/MASSAudioEngine.h
+    Source/MASSWaveformMemoryView.h
     Source/MASSResourceROM.h
     Source/MASSFirmwareResourceCommandPlanner.h
     Source/MASSFirmwarePitchParameterExecution.h
@@ -236,6 +237,17 @@ if (BUILD_TESTING)
     add_test(NAME technox_panel_gpio_input_tests
         COMMAND technox_panel_gpio_input_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
+    )
+endif()
+
+# Raw external waveform memory view tests (no codec or sample format assumptions).
+if (BUILD_TESTING)
+    add_executable(technox_waveform_memory_view_tests
+        tests/test_waveform_memory_view.cpp
+    )
+    target_compile_features(technox_waveform_memory_view_tests PRIVATE cxx_std_17)
+    add_test(NAME technox_waveform_memory_view_tests
+        COMMAND technox_waveform_memory_view_tests
     )
 endif()
 
