@@ -118,9 +118,11 @@ public:
                 snapshot.ram2F,
                 snapshot.secondaryTableBankSelectR4);
 
+        // At 0x1D45 the firmware overwrites the group-08 R7 byte with
+        // the normalized (R3 + RAM[0x2F]) index. 0x1D95 adds that normalized
+        // R7 to the loaded base pointer; commandFields.r7 is no longer live.
         if (!MASS1C61SecondaryTableReader::read(
                 firmwareROM, result.secondaryAddress,
-                result.commandFields.r7,
                 result.secondaryTableBytes,
                 &result.secondaryFetchAddress)) {
             result.status = MASS1C61PitchExecutionStatus::secondaryTableReadFailed;
