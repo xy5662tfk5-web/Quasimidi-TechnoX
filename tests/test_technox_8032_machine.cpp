@@ -5337,6 +5337,7 @@ int main(int argc, char** argv) {
         bool note72SawNormalizedAddressInput = false;
         bool note72SawPreAccumulatorInput = false;
         bool note72SawPostAccumulatorOutput = false;
+        bool note72SawR2Producer = false;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
             const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
@@ -5377,6 +5378,37 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(event.directRam05),
                     static_cast<unsigned>(event.directRam06),
                     static_cast<unsigned>(event.directRam07));
+            }
+            if (event.instructionPC == 0x1d51u &&
+                event.accumulator == 0x00u &&
+                event.registers[4] == 0xa0u &&
+                event.directRam34 == 0x80u) {
+                note72SawR2Producer = true;
+                std::printf(
+                    "NOTE72 R2 PRODUCER INPUT pc=1D51 A=%02X R4=%02X RAM34=%02X R2=%02X ret=%04X\\n",
+                    static_cast<unsigned>(event.accumulator),
+                    static_cast<unsigned>(event.registers[4]),
+                    static_cast<unsigned>(event.directRam34),
+                    static_cast<unsigned>(event.registers[2]),
+                    static_cast<unsigned>(event.returnPC));
+            }
+            if (event.instructionPC == 0x1d53u &&
+                event.directRam34 == 0x80u &&
+                event.registers[4] == 0xa0u) {
+                assert(event.accumulator == 0x80u);
+                assert((event.psw & 0x04u) == 0u); // PSW.2 = OV
+            }
+            if (event.instructionPC == 0x1d76u &&
+                event.directRam34 == 0x80u &&
+                event.registers[4] == 0xa0u) {
+                assert(event.accumulator == 0x80u);
+                note72SawR2Producer = true;
+            }
+            if (event.instructionPC == 0x1d78u &&
+                event.directRam34 == 0x80u &&
+                event.registers[4] == 0xa0u) {
+                assert(event.b == 0x80u);
+                note72SawR2Producer = true;
             }
             if (event.instructionPC == 0x1d95u && event.returnPC == 0x2017u) {
                 assert(event.dptr == 0x3903u);
@@ -5431,6 +5463,7 @@ int main(int argc, char** argv) {
         assert(note72SawNormalizedAddressInput);
         assert(note72SawPreAccumulatorInput);
         assert(note72SawPostAccumulatorOutput);
+        assert(note72SawR2Producer);
         assert(firmwareMachine.readCode(0x3978u) == 0x53u);
         assert(firmwareMachine.readCode(0x39f8u) == 0x99u);
         assert(firmwareMachine.readCode(0x3a78u) == 0x01u);
