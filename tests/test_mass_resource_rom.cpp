@@ -1149,6 +1149,12 @@ void testOriginalVoiceProgramRuntime(
     assert(exhaustedPlan.status ==
            MASSFirmwarePacketPlanStatus::commandStreamExhausted);
     assert(exhaustedPlan.packetCount == 0u);
+    MASSFirmwareROMView unusedPitchROM;
+    MASS1C61PitchExecutionSnapshot unusedPitchSnapshot{};
+    const auto exhaustedPitchPlan = runtime.planNextPitchCommand(
+        4, false, unusedPitchROM, unusedPitchSnapshot);
+    assert(exhaustedPitchPlan.status ==
+           MASS1C61PitchExecutionStatus::commandStreamExhausted);
     while (runtime.nextCommand(4, true) != nullptr) {}
     assert(runtime.commandCursor(4, true) == flagA->stream.commands.size());
 
