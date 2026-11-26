@@ -387,7 +387,7 @@ Evidence boundary: RAM `0x36/0x37` have multiple firmware uses. The `0x1494` res
 
 - The successful real-ROM Note 72 trace exposes the complete 1C61 secondary fetch: group-08 `R7=F6` is replaced by normalized `R7=75` at `0x1D45`; `R3=18` plus `RAM[0x2F]=75` wraps by `-0C` twice to `75`. The base pointer loaded from IRAM `0x9E/0x9F` is `0x3903`; at `0x1D95` the normalized R7 is added once, yielding MOVC DPTR `0x3978`.
 - Actual descrambled IC4 bytes at `0x3978/0x39F8/0x3A78` are `53/99/01`, matching the live packed lookup registers `R5/R6/R7`. The decoder returns `R3=2A,R4=33`.
-- `XDATA[0x2067]=00` selects the non-interpolating branch; the actual accumulator R2 is separately captured as `80` at `0x1DC8`, not copied from the raw group-08 R2 byte `20`. The live `0x1D51..0x1D78` route is the producer of that value.
+- `XDATA[0x2067]=00` selects the non-interpolating branch; group-08 R2 `20` is not the accumulator input. The upstream route is now modelled: with R4.5 set, firmware clears A and adds direct RAM `0x34=80`; OV is clear, so it writes live R2 `80` and leaves normalized R7=`75`. The Note72 trace asserts the source byte, flags and resulting R2.
 - Updated the executable projection to represent the base DPTR, normalized-index add, and pre-accumulator R2 as distinct required inputs. A real-ROM Note 72 regression now checks the table bytes and accumulator result `R2/R3/R4=BE/7F/01`; the real 8032 fixture asserts the exact instruction-boundary snapshots and code-ROM MOVC bytes.
 
 ## Intel macOS release build and regression checkpoint — 27 November 2026
