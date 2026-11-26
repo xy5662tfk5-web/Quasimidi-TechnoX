@@ -74,6 +74,8 @@ public:
         const MASSResourceCommand& command,
         const MASSFirmwareCommandBoundaryState& state) noexcept {
         MASSFirmwarePacketPlan result{};
+        // Commands that do not write through 0x0DB7 leave the phase latch as-is.
+        result.finalInternalBit0C = state.flag0C;
 
         switch (command.kind) {
             case MASSResourceCommandKind::conditionalRecord: {
