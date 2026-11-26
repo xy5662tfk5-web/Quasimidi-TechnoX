@@ -202,6 +202,9 @@ public:
         std::uint8_t psw = 0;
         std::uint8_t registerBankBase = 0;
         std::array<std::uint8_t, 8> registers{};
+        std::uint8_t directRam05 = 0;
+        std::uint8_t directRam06 = 0;
+        std::uint8_t directRam07 = 0;
         std::uint8_t directRam25 = 0;
         std::uint8_t directRam26 = 0;
         std::uint8_t directRam28 = 0;
@@ -977,6 +980,8 @@ public:
             pc == 0x1c83u || pc == 0x1c84u || pc == 0x1c86u ||
             pc == 0x1c87u || pc == 0x1c89u || pc == 0x1c8au ||
             pc == 0x1c91u ||
+            pc == 0x1d2fu || pc == 0x1d95u || pc == 0x1d9du ||
+            pc == 0x1dc8u || pc == 0x1e04u ||
             pc == 0x1c97u || pc == 0x1c9bu || pc == 0x1c9cu || pc == 0x1c9eu ||
             pc == 0x1ca0u || pc == 0x1ca3u || pc == 0x1ca6u ||
             pc == 0x1ca8u || pc == 0x1caau || pc == 0x1cabu ||
@@ -1007,6 +1012,9 @@ public:
             for (std::size_t index = 0; index < event.registers.size(); ++index)
                 event.registers[index] = readInternal(static_cast<std::uint8_t>(
                     event.registerBankBase + index));
+            event.directRam05 = readInternal(0x05u);
+            event.directRam06 = readInternal(0x06u);
+            event.directRam07 = readInternal(0x07u);
             event.directRam25 = readInternal(0x25u);
             event.directRam26 = readInternal(0x26u);
             event.directRam28 = readInternal(0x28u);
@@ -2279,6 +2287,7 @@ private:
             (address >= 0x0091u && address <= 0x0093u) ||
             (address >= 0x2000u && address <= 0x201fu) ||
             (address >= 0x2054u && address <= 0x2063u) ||
+            address == 0x2067u ||
             indexedCurveSourceAddress;
         if (!pitchSourceAddress)
             return;
