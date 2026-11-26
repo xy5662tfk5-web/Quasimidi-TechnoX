@@ -1154,6 +1154,7 @@ void testFirmwareResourceCommandPlanner() {
     plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
     assert(plan.status == MASSFirmwarePacketPlanStatus::fillerSlotOnly);
     assert(plan.packetCount == 0u);
+    assert(plan.finalInternalBit0C);
 
     command = {};
     command.kind = MASSResourceCommandKind::conditionalRecord;
