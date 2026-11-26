@@ -43,7 +43,7 @@ The SAM9407 exposes a separate memory interface for sample ROM/SRAM/DRAM, includ
 - `WCS0/`, `WCS1/`, `WWE/`, `WOE/`, and byte-select/DRAM timing signals;
 - `S0–S1` cycle-type outputs distinguishing idle, synthesis access, instruction fetch and P16 processor read/write.
 
-The IC4-visible `0xC000–0xFFFF` window and the 13,647-byte IC51 remapped startup image are not themselves proof of the physical waveform memory layout. They may represent a transfer/buffer, control RAM, mapped external memory, or another intermediate resource. Published TechnoX specification listings report 64 MB of waveform memory ([Japanese TechnoX specification](https://piano.tyonmage.com/quasimidi/technox.html), [Vintage Synth Explorer](https://www.vintagesynth.com/quasimidi/technox)); this is a secondary-source capacity claim, not a confirmed chip topology or recovered image. No complete byte-exact 64 MB waveform dump has been recovered.
+The IC4-visible `0xC000–0xFFFF` window and the 13,647-byte IC51 remapped startup image are not themselves proof of the physical waveform memory layout. They may represent a transfer/buffer, control RAM, mapped external memory, or another intermediate resource. Contemporaneous 1995 sources support a 6 MB waveform-memory figure: the Quasimidi advertisement in *Sound On Sound* (July 1995) says 6 MB of digitally sampled waveforms, and *The Mix* review (April 1995) describes six-megabyte sample memory. Later online listings say 64 MB, so the actual installed capacity must remain unverified until board markings or a dump resolve the conflict. No complete byte-exact waveform dump has been recovered.
 
 ## Independent software cross-check: Linux SAM9407 driver
 
