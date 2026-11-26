@@ -385,6 +385,7 @@ Evidence boundary: RAM `0x36/0x37` have multiple firmware uses. The `0x1494` res
 
 ## Note 72 1C61 live input closure — 27 November 2026
 
+- The raw IC51 record `08 20 18 A0 F6 00 00` has one exact occurrence in the 128-KiB image: absolute offset `0x1160C` (bank 1, `0x160C`). The IC4 dispatch table selects `0x1C61`; Note 65's typed-record trace captures the reads at `0x160C..0x1612`. The link from this nested location back to a specific top-level program descriptor/stream cursor in the Note 72 run remains open.
 - The successful real-ROM Note 72 trace exposes the complete 1C61 secondary fetch: group-08 `R7=F6` is replaced by normalized `R7=75` at `0x1D45`; `R3=18` plus `RAM[0x2F]=75` wraps by `-0C` twice to `75`. The base pointer loaded from IRAM `0x9E/0x9F` is `0x3903`; at `0x1D95` the normalized R7 is added once, yielding MOVC DPTR `0x3978`.
 - Actual descrambled IC4 bytes at `0x3978/0x39F8/0x3A78` are `53/99/01`, matching the live packed lookup registers `R5/R6/R7`. The decoder returns `R3=2A,R4=33`.
 - `XDATA[0x2067]=00` selects the non-interpolating branch; group-08 R2 `20` is not the accumulator input. The upstream route is now modelled: with R4.5 set, firmware clears A and adds direct RAM `0x34=80`; OV is clear, so it writes live R2 `80` and leaves normalized R7=`75`. The Note72 trace asserts the source byte, flags and resulting R2.
