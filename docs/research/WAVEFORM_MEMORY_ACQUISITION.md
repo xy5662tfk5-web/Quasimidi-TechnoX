@@ -2,7 +2,7 @@
 
 ## What is known
 
-- The strongest contemporaneous sources currently available report **6 MB of sampled waveforms**: a Quasimidi advertisement in *Sound On Sound* (July 1995) and *The Mix* review (April 1995). Later online listings report 64 MB, conflicting with those contemporary sources. The actual capacity of the user's unit remains to be confirmed from chip markings and a dump.
+- The contemporaneous *The Mix* review of TechnoX (April 1995) explicitly reports **6 MB of sample memory**. Later online listings report 64 MB, conflicting with this direct review. The actual capacity of the user's unit remains to be confirmed from chip markings and a dump.
 - The currently referenced public MAME TechnoX set listing contains only the IC4 and IC51 firmware ROMs (each 128 KiB); it does not provide a waveform-bank dump ([MAME set listing](https://www.planetemu.net/en/rom/mame-roms-merged/technox)).
 - The project's IC51 stream catalog and the 16-KiB remapped startup-memory image are control/resource evidence. They are **not** a decoded PCM bank.
 - Neither the exact physical memory topology nor the actual sample encoding/address map has been established. SAM9407 remains a candidate until the board marking and host wiring are verified.
