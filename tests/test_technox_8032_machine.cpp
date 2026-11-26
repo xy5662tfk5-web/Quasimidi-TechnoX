@@ -5338,6 +5338,8 @@ int main(int argc, char** argv) {
         bool note72SawPreAccumulatorInput = false;
         bool note72SawPostAccumulatorOutput = false;
         bool note72SawR2Producer = false;
+        bool note72SawR2AddResult = false;
+        bool note72SawR2Commit = false;
         bool note72SawGroup08Inputs = false;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
@@ -5407,6 +5409,7 @@ int main(int argc, char** argv) {
                 event.registers[4] == 0xa0u) {
                 assert(event.accumulator == 0x80u);
                 assert((event.psw & 0x04u) == 0u); // PSW.2 = OV
+                note72SawR2AddResult = true;
             }
             if (event.instructionPC == 0x1d76u &&
                 event.directRam34 == 0x80u &&
@@ -5418,6 +5421,8 @@ int main(int argc, char** argv) {
                 event.directRam34 == 0x80u &&
                 event.registers[4] == 0xa0u) {
                 assert(event.b == 0x80u);
+                assert(event.registers[2] == 0x20u); // before MOV R2,B
+                note72SawR2Commit = true;
                 note72SawR2Producer = true;
             }
             if (event.instructionPC == 0x1d95u && event.returnPC == 0x2017u) {
@@ -5474,6 +5479,8 @@ int main(int argc, char** argv) {
         assert(note72SawPreAccumulatorInput);
         assert(note72SawPostAccumulatorOutput);
         assert(note72SawR2Producer);
+        assert(note72SawR2AddResult);
+        assert(note72SawR2Commit);
         assert(note72SawGroup08Inputs);
         assert(firmwareMachine.readCode(0x3978u) == 0x53u);
         assert(firmwareMachine.readCode(0x39f8u) == 0x99u);
