@@ -909,6 +909,54 @@ void testOriginalVoiceProgramRuntime(
         assert(runtime.commandCursor(4, false) == 0u);
         assert(runtime.nextCommand(4, false) == &normal->stream.commands[0]);
     }
+    // Exercise the live voice-bound stream -> packet-planner handoff on
+    // actual factory IC51 data. Search the catalog for the first stream with
+    // a packet branch already reconstructed from IC4; no DSP register meaning
+    // is asserted by this test.
+    const auto originalVoice = voice;
+    MASSFirmwareCommandBoundaryState packetState{};
+    packetState.ram2B = 0x20u;
+    packetState.flag0C = false;
+    bool foundRuntimePacket = false;
+    for (int bank = 0; bank < 4 && !foundRuntimePacket; ++bank) {
+        for (int sound = 0; sound < 128 && !foundRuntimePacket; ++sound) {
+            voice.bankNumber = static_cast<std::uint8_t>(bank);
+            voice.soundNumber = static_cast<std::uint8_t>(sound);
+            assert(runtime.noteOn(4, voice));
+            const auto* resource = runtime.programForVoice(4, false);
+            if (resource == nullptr) continue;
+            std::size_t packetCommandIndex = resource->stream.commands.size();
+            for (std::size_t commandIndex = 0;
+                 commandIndex < resource->stream.commands.size(); ++commandIndex) {
+                const auto candidate = MASSFirmwareResourceCommandPlanner::plan(
+                    resource->stream.commands[commandIndex], packetState);
+                if (candidate.ready()) {
+                    packetCommandIndex = commandIndex;
+                    break;
+                }
+            }
+            if (packetCommandIndex == resource->stream.commands.size()) continue;
+
+            runtime.rewindCommandStream(4, false);
+            MASSFirmwarePacketPlan livePlan{};
+            for (std::size_t commandIndex = 0;
+                 commandIndex <= packetCommandIndex; ++commandIndex)
+                livePlan = runtime.planNextCommand(4, false, packetState);
+            assert(livePlan.ready());
+            assert(livePlan.packetCount >= 1u && livePlan.packetCount <= 3u);
+            assert(runtime.commandCursor(4, false) == packetCommandIndex + 1u);
+            foundRuntimePacket = true;
+        }
+    }
+    assert(foundRuntimePacket);
+    voice = originalVoice;
+    assert(runtime.noteOn(4, voice));
+    normal = runtime.programForVoice(4, false);
+    flagA = runtime.programForVoice(4, true);
+    assert(normal != nullptr && flagA != nullptr);
+    runtime.rewindCommandStream(4, false);
+    runtime.rewindCommandStream(4, true);
+
     while (runtime.nextCommand(4, false) != nullptr) {}
     assert(runtime.commandCursor(4, false) == normal->stream.commands.size());
     assert(runtime.nextCommand(4, false) == nullptr);
