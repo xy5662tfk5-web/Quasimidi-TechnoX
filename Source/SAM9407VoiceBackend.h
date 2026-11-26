@@ -64,16 +64,28 @@ public:
              entry.loopEndWord > entry.endWord))
             return false;
 
+        bool replaced = false;
         for (std::size_t i = 0; i < sampleMapCount_; ++i) {
             if (sampleMap_[i].bank == entry.bank &&
                 sampleMap_[i].program == entry.program) {
                 sampleMap_[i] = entry;
-                return true;
+                replaced = true;
+                break;
             }
         }
-        if (sampleMapCount_ >= sampleMap_.size())
-            return false;
-        sampleMap_[sampleMapCount_++] = entry;
+        if (!replaced) {
+            if (sampleMapCount_ >= sampleMap_.size())
+                return false;
+            sampleMap_[sampleMapCount_++] = entry;
+        }
+
+        // Map files are loaded while audio is stopped. Invalidate matching
+        // live voices so a previously missing/replaced entry is rebound on
+        // the next render instead of leaving that voice silent/stale.
+        for (auto& state : voices_) {
+            if (state.bank == entry.bank && state.program == entry.program)
+                state.mappingChecked = false;
+        }
         return true;
     }
 
