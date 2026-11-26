@@ -21,6 +21,10 @@ For each board revision, preserve:
 
 Never read or remove a device from a powered board. Do not select a voltage or programming algorithm by package appearance alone.
 
+## Engine hand-off
+
+The engine exposes `MASSWaveformMemoryView`, a non-owning immutable view over a caller-owned byte image. The memory owner must outlive the view and keep its bytes unchanged while the backend can access it. `MASSAudioEngine::setWaveformMemoryView()` forwards the view to the active backend and carries it across backend replacement. The current `BasicMASSVoiceBackend` only exposes raw-byte test access; it does not interpret or render the image.
+
 ## Integrity inspection
 
 Run the evidence-first inspector against each candidate image:
