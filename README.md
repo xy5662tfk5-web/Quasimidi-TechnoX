@@ -37,7 +37,7 @@ CMake fetches JUCE 8.0.13. The project declares AU, VST3 and Standalone formats 
 
 ## Regression tests
 
-The dependency-free C++17 test targets cover the MCS-51 core, TechnoX 8032 bus/firmware integration, firmware transactions, M.A.S.S. resource ROM parsing, MIDI control routing, Part editing, Performance layers and the generic audio backend. Python tests cover MIDI/SysEx parsing and ROM/disassembly analysis.
+The dependency-free C++17 test targets cover the MCS-51 core, TechnoX 8032 bus/firmware integration, firmware transactions, M.A.S.S. resource ROM parsing, MIDI control routing, Part editing, Performance layers and the generic audio backend. Python tests cover MIDI/SysEx parsing, ROM/disassembly analysis and bounded-memory waveform-dump integrity inspection.
 
 ## Project map
 
@@ -50,6 +50,8 @@ The dependency-free C++17 test targets cover the MCS-51 core, TechnoX 8032 bus/f
 - `research/ORIGINAL_AUDIO_ENGINE_STATUS.md` — verified progress, evidence boundaries and next reverse-engineering steps.
 - `research/FINALIZATION_PLAN.md` — short path to one verified waveform, the original voice renderer and Intel release validation.
 - `docs/research/SAM9407_ARCHITECTURE_AND_TECHNOX_BRIDGE.md` — SAM9407 candidate architecture, separate host/sample-memory domains and evidence required before identifying the fitted chip.
+- `docs/research/WAVEFORM_MEMORY_ACQUISITION.md` — acquisition and hash-validation requirements for the missing reported 64 MB waveform bank.
+- `tools/inspect_technox_waveform_dump.py` — bounded-memory size/CRC32/SHA-256 and byte-distribution inspection; deliberately does not guess PCM format.
 - `Source/MASSFirmwareResourceCommandPlanner.h` — recovered IC51 command-to-packet dispatch, with explicit unresolved pitch/conditional states.
 - `Source/MASSFirmwarePitchParameterExecution.h` — snapshot-driven group-08 / 1C61 lookup and accumulator projection.
 - `Source/MASSFirmwarePitchSlotCorrectionProjection.h` — 1E4B slot guard/writeback projection.
