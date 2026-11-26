@@ -1142,10 +1142,19 @@ void testActualFirmwareROMTables(const char* path) {
     pitchProjectionSnapshot.secondaryTableIndexR3 = 0x18u;
     pitchProjectionSnapshot.secondaryTableBankSelectR4 = 0xa0u;
     pitchProjectionSnapshot.hasCapturedSecondaryAddressInputs = true;
+    // Synthetic stage fixture: exercise the now-explicit 0x1D51 R2 producer
+    // with RAM[0x34]=0x80. This is not asserted to be the live Note-66 RAM34
+    // value; the adjacent live Note-72 trace has its own independent capture.
+    pitchProjectionSnapshot.directRam34 = 0x80u;
+    pitchProjectionSnapshot.hasCapturedAccumulatorInputSource = true;
     const auto pitchProjection =
         MASS1C61PitchParameterExecutionProjection::execute(
             view, pitchProjectionFixture, pitchProjectionSnapshot);
     assert(pitchProjection.ready());
+    assert(pitchProjection.accumulatorInputRoute.initialA == 0x00u);
+    assert(pitchProjection.accumulatorInputRoute.sum == 0x80u);
+    assert(pitchProjection.accumulatorInputRoute.accumulatorR2 == 0x80u);
+    assert(pitchProjection.accumulatorInputR2 == 0x80u);
     assert(pitchProjection.secondaryFetchAddress.address == 0x397eu);
     assert(pitchProjection.accumulator.r2 == 0xd5u);
     assert(pitchProjection.accumulator.r3 == 0x1eu);
