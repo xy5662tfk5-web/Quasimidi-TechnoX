@@ -960,6 +960,10 @@ void testOriginalVoiceProgramRuntime(
     while (runtime.nextCommand(4, false) != nullptr) {}
     assert(runtime.commandCursor(4, false) == normal->stream.commands.size());
     assert(runtime.nextCommand(4, false) == nullptr);
+    const auto exhaustedPlan = runtime.planNextCommand(4, false, packetState);
+    assert(exhaustedPlan.status ==
+           MASSFirmwarePacketPlanStatus::commandStreamExhausted);
+    assert(exhaustedPlan.packetCount == 0u);
     while (runtime.nextCommand(4, true) != nullptr) {}
     assert(runtime.commandCursor(4, true) == flagA->stream.commands.size());
 
