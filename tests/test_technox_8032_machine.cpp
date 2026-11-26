@@ -4299,6 +4299,11 @@ int main(int argc, char** argv) {
         const auto note65PacketCount =
             firmwareMachine.soundCommandPacketCount() - note65PacketStart;
         assert(note65PacketCount == 549u);
+        const auto& note65PitchPacket =
+            firmwareMachine.soundCommandPacketAt(note65PacketStart);
+        assert(note65PitchPacket.returnPC == 0x0a52u);
+        assert((note65PitchPacket.bytes ==
+                std::array<std::uint8_t, 4>{{0x00u, 0x71u, 0x01u, 0x02u}}));
         const auto note65PitchSourceAccessCount =
             firmwareMachine.pitchSourceDataAccessTraceCountForTesting();
         std::printf("NOTE65 PITCH SOURCE ACCESS: count=%zu\n",
