@@ -2,6 +2,7 @@
 #include "../Source/MASSAudioEngine.h"
 #include "../Source/MASSOriginalVoiceProgramRuntime.h"
 #include "../Source/MASSFirmwarePitchParameterExecution.h"
+#include "../Source/MASSFirmwarePitchInterpolationPacketProjection.h"
 #include "../Source/MASSFirmwareResourceCommandPlanner.h"
 #include "../Source/BasicMASSVoiceBackend.h"
 
@@ -224,6 +225,67 @@ void testMASS09B9SlotInterpolationArithmetic() {
     assert(result.incrementMagnitude24 == 0u);
     assert(result.outputValue24 == 0x020157u);
 }
+
+void testMASSFirmwarePitchInterpolationPacketProjection() {
+    MASSFirmwarePitchInterpolationSnapshot snapshot{};
+    auto result = MASSFirmwarePitchInterpolationPacketProjection::execute(snapshot);
+    assert(result.status ==
+           MASSFirmwarePitchInterpolationPacketStatus::requiresSlotTriplet);
+
+    snapshot.hasCapturedSlotTriplet = true;
+    result = MASSFirmwarePitchInterpolationPacketProjection::execute(snapshot);
+    assert(result.status ==
+           MASSFirmwarePitchInterpolationPacketStatus::requiresStepAndSign);
+
+    // Note 65 / velocity 100 real-IC4 fixture:
+    // 0x0081..0x0083 = 57 01 A2, step=+0x000D -> 0x020171.
+    snapshot.slotLow = 0x57u;
+    snapshot.slotMiddle = 0x01u;
+    snapshot.slotHigh = 0xa2u;
+    snapshot.stepMagnitude = 0x000du;
+    snapshot.negativeStep = false;
+    snapshot.hasCapturedStepAndSign = true;
+    result = MASSFirmwarePitchInterpolationPacketProjection::execute(snapshot);
+    assert(result.status ==
+           MASSFirmwarePitchInterpolationPacketStatus::requiresPacketR5);
+
+    snapshot.packetR5 = 0x00u;
+    snapshot.hasCapturedPacketR5 = true;
+    result = MASSFirmwarePitchInterpolationPacketProjection::execute(snapshot);
+    assert(result.ready());
+    assert(result.interpolation.inputValue24 == 0x020157u);
+    assert(result.interpolation.incrementMagnitude24 == 0x00001au);
+    assert(result.interpolation.outputValue24 == 0x020171u);
+    assert((result.packet.bytes ==
+            std::array<std::uint8_t, 4>{{0x00u, 0x71u, 0x01u, 0x02u}}));
+    assert(!result.packet.setsInternalBit0C);
+
+    // Note 72 fixture: the independently populated lane contains BE 80 A1.
+    // The same +0x000D firmware step produces 00 D1 80 01 at 0x0A4F/0x0DB7.
+    snapshot.slotLow = 0xbeu;
+    snapshot.slotMiddle = 0x80u;
+    snapshot.slotHigh = 0xa1u;
+    result = MASSFirmwarePitchInterpolationPacketProjection::execute(snapshot);
+    assert(result.ready());
+    assert(result.interpolation.inputValue24 == 0x0180beu);
+    assert(result.interpolation.incrementMagnitude24 == 0x000013u);
+    assert(result.interpolation.outputValue24 == 0x0180d1u);
+    assert((result.packet.bytes ==
+            std::array<std::uint8_t, 4>{{0x00u, 0xd1u, 0x80u, 0x01u}}));
+
+    // Negative step preserves the same low/middle/high order but subtracts
+    // the increment before the 0x0DB7 phase/mask stage.
+    snapshot.slotLow = 0x57u;
+    snapshot.slotMiddle = 0x01u;
+    snapshot.slotHigh = 0xa2u;
+    snapshot.negativeStep = true;
+    result = MASSFirmwarePitchInterpolationPacketProjection::execute(snapshot);
+    assert(result.ready());
+    assert(result.interpolation.outputValue24 == 0x02013du);
+    assert((result.packet.bytes ==
+            std::array<std::uint8_t, 4>{{0x00u, 0x3du, 0x01u, 0x02u}}));
+}
+
 
 void testMASS1C61PitchParameterExecutionProjection() {
     std::vector<std::uint8_t> codeROM(0x20000u, 0xffu);
@@ -2147,6 +2209,7 @@ int main(int argc, char** argv) {
     testMASS0DCEExchangeDecoder();
     testMASS0DB7PacketBuilder();
     testMASS1EDDRecordPacketSequenceBuilder();
+    testMASSFirmwarePitchInterpolationPacketProjection();
     testMASS09B9SlotInterpolationArithmetic();
     testMASS1C61PitchParameterExecutionProjection();
     testMASS1C61SecondaryTableAddress();
