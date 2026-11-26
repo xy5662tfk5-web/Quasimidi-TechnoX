@@ -150,9 +150,9 @@ public:
         auto accumulatorR2 = sum;
         auto adjustedR7 = normalizedR7;
         if (overflow) {
-            adjustedR7 = static_cast<std::uint8_t>(adjustedR7 - 1u);
             if ((sum & 0x80u) == 0) {
                 accumulatorR2 = static_cast<std::uint8_t>(sum | 0x80u);
+                adjustedR7 = static_cast<std::uint8_t>(adjustedR7 - 1u);
                 if (adjustedR7 == 0xffu)
                     adjustedR7 = static_cast<std::uint8_t>(adjustedR7 + 0x0cu);
             } else {
