@@ -5321,6 +5321,82 @@ int main(int argc, char** argv) {
         }
         assert(note72SubroutineInstructionCount > 0u);
 
+        // Capture the inputs that feed the reusable group-08/1C61 projection.
+        // The address/flag fields remain snapshots at their actual instruction
+        // boundaries; this trace does not infer that every IC51 record owns
+        // the same table pointer or interpolation control.
+        std::size_t note72SecondaryAddressSnapshots = 0;
+        std::size_t note72AccumulatorSnapshots = 0;
+        std::size_t note72InterpolationControlReads = 0;
+        std::size_t note72PitchGuardStateAccesses = 0;
+        for (std::size_t i = 0;
+             i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
+            const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
+            if (event.instructionPC == 0x1d2fu ||
+                event.instructionPC == 0x1d95u ||
+                event.instructionPC == 0x1d9du) {
+                ++note72SecondaryAddressSnapshots;
+                std::printf(
+                    "NOTE72 1C61 ADDRESS SNAP pc=%04X ret=%04X DPTR=%04X "
+                    "R3=%02X R4=%02X R7=%02X RAM2F=%02X P2=%02X cycle=%llu\\n",
+                    static_cast<unsigned>(event.instructionPC),
+                    static_cast<unsigned>(event.returnPC),
+                    static_cast<unsigned>(event.dptr),
+                    static_cast<unsigned>(event.registers[3]),
+                    static_cast<unsigned>(event.registers[4]),
+                    static_cast<unsigned>(event.registers[7]),
+                    static_cast<unsigned>(event.directRam2F),
+                    static_cast<unsigned>(event.port2Latch),
+                    static_cast<unsigned long long>(event.machineCycle));
+            }
+            if (event.instructionPC == 0x1dc8u ||
+                event.instructionPC == 0x1e04u) {
+                ++note72AccumulatorSnapshots;
+                std::printf(
+                    "NOTE72 1C61 ACC SNAP pc=%04X ret=%04X "
+                    "R2/R3/R4/R5/R6/R7=%02X/%02X/%02X/%02X/%02X/%02X "
+                    "A=%02X B=%02X direct05/06/07=%02X/%02X/%02X\\n",
+                    static_cast<unsigned>(event.instructionPC),
+                    static_cast<unsigned>(event.returnPC),
+                    static_cast<unsigned>(event.registers[2]),
+                    static_cast<unsigned>(event.registers[3]),
+                    static_cast<unsigned>(event.registers[4]),
+                    static_cast<unsigned>(event.registers[5]),
+                    static_cast<unsigned>(event.registers[6]),
+                    static_cast<unsigned>(event.registers[7]),
+                    static_cast<unsigned>(event.accumulator),
+                    static_cast<unsigned>(event.b),
+                    static_cast<unsigned>(event.directRam05),
+                    static_cast<unsigned>(event.directRam06),
+                    static_cast<unsigned>(event.directRam07));
+            }
+        }
+        for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
+            const auto& access =
+                firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
+            if (!access.write && access.address == 0x2067u) {
+                ++note72InterpolationControlReads;
+                std::printf(
+                    "NOTE72 XDATA 2067 READ value=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                    static_cast<unsigned>(access.value),
+                    static_cast<unsigned>(access.instructionPC),
+                    static_cast<unsigned>(access.stackReturnPC),
+                    static_cast<unsigned long long>(access.machineCycle));
+            }
+            if (access.address == 0x2018u || access.address == 0x2019u)
+                ++note72PitchGuardStateAccesses;
+        }
+        assert(note72SecondaryAddressSnapshots > 0u);
+        assert(note72AccumulatorSnapshots > 0u);
+        assert(note72InterpolationControlReads > 0u);
+        assert(note72PitchGuardStateAccesses > 0u);
+        std::printf(
+            "NOTE72 PITCH INPUT PROVENANCE: addressSnapshots=%zu accumulatorSnapshots=%zu "
+            "X2067-reads=%zu guard2018/19-accesses=%zu\\n",
+            note72SecondaryAddressSnapshots, note72AccumulatorSnapshots,
+            note72InterpolationControlReads, note72PitchGuardStateAccesses);
+
+
         // Pin the resource handler's final byte stores into the two independent
         // interpolation triplets. The 1E60/1E63/1E66 sequence writes high,
         // middle, then low bytes; the following 09B9 pass consumes low-to-high.
