@@ -62,6 +62,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSOriginalVoiceProgramRuntime.h
     Source/TechnoXSoundDeviceTimeline.h
     Source/BasicMASSVoiceBackend.h
+    Source/SAM9407VoiceBackend.h
     Source/MCS51Core.h
     Source/TechnoX8032Machine.h
     Source/TechnoXPanelControlEvents.h
@@ -257,5 +258,19 @@ if (BUILD_TESTING)
     add_test(NAME technox_waveform_dump_inspector_tests
         COMMAND ${Python3_EXECUTABLE}
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_waveform_dump_inspector.py"
+    )
+endif()
+
+# Dependency-free tests for the SAM9407-oriented 16-bit sample voice path.
+# This validates the generic sample-memory playback contract only; it does
+# not claim a recovered TechnoX waveform map or a SAM9407 instruction emulator.
+if (BUILD_TESTING)
+    add_executable(technox_sam9407_voice_backend_tests
+        tests/test_sam9407_voice_backend.cpp
+    )
+    target_compile_features(technox_sam9407_voice_backend_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_sam9407_voice_backend_tests PRIVATE -UNDEBUG)
+    add_test(NAME technox_sam9407_voice_backend_tests
+        COMMAND technox_sam9407_voice_backend_tests
     )
 endif()
