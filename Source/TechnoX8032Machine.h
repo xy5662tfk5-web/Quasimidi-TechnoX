@@ -1597,8 +1597,12 @@ public:
     void writeExternalImpl(std::uint16_t address, std::uint8_t value) noexcept {
         const auto instructionPC =
             static_cast<std::uint16_t>(cpu_.registers().pc - 1u);
+        // FF10 can appear both in its dedicated aperture trace and in the
+        // external-memory aperture classification. Keep one sequence ID for
+        // that single MOVX operation instead of inventing two bus events.
         // Keep exact writes from the interpreter's four-byte nested-record
         // copier even if the broad 8192-entry XDATA ring wraps later in the test.
+        std::uint64_t accessSequence = 0;
         const bool nestedResourceWritePC =
             instructionPC == 0x1a32u || instructionPC == 0x1a35u ||
             instructionPC == 0x1a38u || instructionPC == 0x1a3cu ||
@@ -1637,7 +1641,8 @@ public:
             event.soundBusMode = internal_[0x8e];
             event.ic51Selected = ic51Selected;
             event.soundDeviceResetReleased = soundDeviceResetReleased_;
-            event.eventSequence = ++traceEventSequence_;
+            accessSequence = ++traceEventSequence_;
+            event.eventSequence = accessSequence;
             event.machineCycle = elapsedMachineCycles_;
             ++ff10WriteCount_;
         }
@@ -1721,7 +1726,8 @@ public:
                 const auto returnLow = readIndirect(static_cast<std::uint8_t>(stackPointer - 1u));
                 event.returnPC = static_cast<std::uint16_t>(
                     (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
-                event.eventSequence = ++traceEventSequence_;
+                event.eventSequence = accessSequence != 0u
+                    ? accessSequence : ++traceEventSequence_;
                 event.machineCycle = elapsedMachineCycles_;
                 ++soundMemoryWriteTraceCount_;
             }
