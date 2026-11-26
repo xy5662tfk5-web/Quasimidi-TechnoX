@@ -155,6 +155,7 @@ if (BUILD_TESTING)
     add_test(NAME technox_mass_resource_rom_tests
         COMMAND technox_mass_resource_rom_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC51_nm27c010_v105.bin"
+            "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
     )
 endif()
 
