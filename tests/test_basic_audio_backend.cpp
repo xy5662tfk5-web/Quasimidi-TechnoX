@@ -16,6 +16,11 @@ public:
     bool renderedImageLoaded = false;
     double preparedSampleRate = 0.0;
     int preparedBlockSize = 0;
+    const technox::MASSWaveformMemoryView* waveformMemoryView = nullptr;
+    void setWaveformMemoryView(
+        const technox::MASSWaveformMemoryView* view) noexcept override {
+        waveformMemoryView = view;
+    }
     void prepare(double sampleRate, int blockSize) override {
         ++prepareCalls;
         preparedSampleRate = sampleRate;
@@ -392,6 +397,11 @@ int main() {
     CountingBackend replacementBackend;
     MASSAudioEngine swappableEngine(&prototypeBackend);
     swappableEngine.prepare(96000.0, 512);
+    constexpr std::array<std::uint8_t, 6> waveformBytes{{0x00, 0x80, 0xFF, 0x7F, 0x22, 0x44}};
+    MASSWaveformMemoryView waveformView;
+    assert(waveformView.attach(waveformBytes.data(), waveformBytes.size()));
+    swappableEngine.setWaveformMemoryView(&waveformView);
+    assert(prototypeBackend.waveformMemoryView == &waveformView);
     swappableEngine.noteOn(12, 1, 64, 100);
     assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
     swappableEngine.setBackend(&replacementBackend);
@@ -400,9 +410,15 @@ int main() {
     assert(replacementBackend.prepareCalls == 1);
     assert(replacementBackend.preparedSampleRate == 96000.0);
     assert(replacementBackend.preparedBlockSize == 512);
+    assert(replacementBackend.waveformMemoryView == &waveformView);
+    assert(swappableEngine.waveformMemoryView() == &waveformView);
     assert(swappableEngine.backend() == &replacementBackend);
     swappableEngine.noteOn(12, 1, 65, 100);
     assert(replacementBackend.noteOnCalls == 1);
+    std::uint8_t forwardedWaveByte = 0;
+    assert(waveformView.readByte(2, forwardedWaveByte) && forwardedWaveByte == 0xFF);
+    swappableEngine.setWaveformMemoryView(nullptr);
+    assert(replacementBackend.waveformMemoryView == nullptr);
     assert(swappableEngine.voiceManager().activeVoiceCount() == 1);
 
     // Common parameter 0 is the saved overall Performance output level.
