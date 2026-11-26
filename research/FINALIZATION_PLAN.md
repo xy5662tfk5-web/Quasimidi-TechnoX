@@ -30,6 +30,8 @@ The JUCE processor now exposes a stopped-audio-only read-only `MemoryMappedFile`
 
 Obtain a verified TechnoX waveform-memory dump or a trustworthy board/memory map and identify the actual sample device. Decode **one** known sample with its address, encoding, rate and loop boundaries. Add a small golden test before attempting the full library.
 
+A third-party pack lists 94 drum hits recorded from a physical TechnoX (24-bit/44.1 kHz stereo). It is a possible comparison reference only, not the machine's raw ROM image or a factory note map; do not bundle it without checking its terms. See [`docs/research/WAVEFORM_MEMORY_ACQUISITION.md`](../docs/research/WAVEFORM_MEMORY_ACQUISITION.md).
+
 The IC51 descriptors and command streams are inputs to this work, not proof that their bytes are PCM.
 
 ### 3. Replace the diagnostic voice path incrementally
