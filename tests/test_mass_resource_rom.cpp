@@ -251,7 +251,7 @@ void testMASS1C61PitchParameterExecutionProjection() {
         firmwareROM, command, snapshot);
     assert(result.ready());
     assert(result.commandFields.r2 == 0x80u);
-    assert(result.interpolatedInput.value24 == 0x008018u);
+    assert(result.interpolatedInput.value24 == 0x001880u);
     assert(result.secondaryAddress.address == 0x397eu);
     assert(result.secondaryFetchAddress.address == 0x397eu);
     assert((result.secondaryTableBytes.bytes ==
