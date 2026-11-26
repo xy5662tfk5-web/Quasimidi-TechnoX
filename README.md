@@ -48,6 +48,7 @@ The dependency-free C++17 test targets cover the MCS-51 core, TechnoX 8032 bus/f
 - `Source/MASSResourceROM.h` — IC51 directories, descriptors, streams and arithmetic/resource models.
 - `Source/MASSAudioEngine.h`, `Source/MASSVoiceManager.h` and `Source/BasicMASSVoiceBackend.h` — audio framework and current generic test backend.
 - `research/ORIGINAL_AUDIO_ENGINE_STATUS.md` — verified progress, evidence boundaries and next reverse-engineering steps.
+- `research/FINALIZATION_PLAN.md` — short path to one verified waveform, the original voice renderer and Intel release validation.
 - `docs/research/SAM9407_ARCHITECTURE_AND_TECHNOX_BRIDGE.md` — selected SAM9407 architecture target, the separate host/sample-memory domains and evidence required to map IC4 to the chip.
 - `Source/MASSFirmwareResourceCommandPlanner.h` — recovered IC51 command-to-packet dispatch, with explicit unresolved pitch/conditional states.
 - `Source/MASSFirmwarePitchParameterExecution.h` — snapshot-driven group-08 / 1C61 lookup and accumulator projection.
