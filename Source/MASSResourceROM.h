@@ -157,6 +157,7 @@ public:
                     adjustedR7 = static_cast<std::uint8_t>(adjustedR7 + 0x0cu);
             } else {
                 accumulatorR2 = static_cast<std::uint8_t>(sum & 0x7fu);
+                adjustedR7 = static_cast<std::uint8_t>(adjustedR7 + 1u);
                 if (adjustedR7 == 0x80u)
                     adjustedR7 = static_cast<std::uint8_t>(adjustedR7 - 0x0cu);
             }
