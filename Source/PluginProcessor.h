@@ -72,6 +72,7 @@ public:
 
     // Call only while audio processing is stopped. This maps a separately acquired
     // raw waveform-memory image read-only; it does not assume a PCM format.
+    // Do not resize or modify the file until unloadWaveformMemoryFile() is called.
     bool loadWaveformMemoryFile(const juce::File& file);
     void unloadWaveformMemoryFile() noexcept;
     bool hasWaveformMemoryFile() const noexcept { return waveformMemoryView.isAttached(); }
