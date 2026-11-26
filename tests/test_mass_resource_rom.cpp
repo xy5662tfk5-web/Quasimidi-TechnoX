@@ -1920,6 +1920,16 @@ void testActualIC51(const char* path) {
     for (std::size_t flagIndex = 0; flagIndex < 2u; ++flagIndex) {
         assert(plannerStatusCounts[flagIndex][0] > 0u);
         assert(plannerStatusCounts[flagIndex][5] == 0u);
+        std::printf(
+            "IC51 planner flag0A=%u: ready=%zu filler=%zu stream-only=%zu "
+            "pitch-context=%zu conditional-context=%zu invalid=%zu\\n",
+            static_cast<unsigned>(flagIndex),
+            plannerStatusCounts[flagIndex][0],
+            plannerStatusCounts[flagIndex][1],
+            plannerStatusCounts[flagIndex][2],
+            plannerStatusCounts[flagIndex][3],
+            plannerStatusCounts[flagIndex][4],
+            plannerStatusCounts[flagIndex][5]);
     }
 }
 }
