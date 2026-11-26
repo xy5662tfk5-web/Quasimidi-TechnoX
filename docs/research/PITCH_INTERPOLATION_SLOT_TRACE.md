@@ -240,4 +240,13 @@ The pitch-source data-access probe now includes XDATA `0x2067`, in addition to t
 - at least one read from interpolation control XDATA `0x2067`;
 - accesses to both guard bytes `0x2018/0x2019`.
 
+The new real Note-72 trace resolves the previously missing values:
+
+- IC51 group-08 record: `08 20 18 A0 F6 00 00`.
+- XDATA `0x2067=00` at PC `0x1CCC`: firmware takes the zero-control bypass rather than performing the interpolation-table lookup.
+- At PC `0x1D95`, before the final address add: base DPTR `0x3903`, R3 `0x18`, R4 `0xA0`, RAM `0x2F=75`, and live normalized R7 `75`. The normalization path computes `18+75=8D`, then subtracts `0C` twice to reach `75`. R4.4 is clear, so bank offset is zero.
+- The firmware adds this normalized R7 exactly once: the first MOVC at PC `0x1D9D` uses DPTR `0x3978`. The actual IC4 ROM bytes at `3978/39F8/3A78` are `53/99/01`.
+- The packed lookup decodes R3/R4/R5/R6/R7 as `2A/33/53/99/01`. The live PC `0x1DC8` snapshot separately captures accumulator input R2 `80`; this is not the raw IC51 R2 byte `20`. The intervening `0x1D51..0x1D78` route transforms it.
+- The accumulator returns low/middle/high `BE/7F/01`. At the trace boundary PC `0x1E04`, the event is captured before `MOV R4,A`, so the register still reads `FF` while A already holds the masked output `01`.
+
 These diagnostics will provide the real handler-boundary values needed to replace the remaining manually supplied 1C61 snapshot fields. The new assertions and projections have been committed to the research branch; CI execution is not yet confirmed.
