@@ -1,4 +1,5 @@
 #include "../Source/TechnoX8032Machine.h"
+#include "../Source/TechnoXSoundDeviceTimeline.h"
 #include "../Source/MASSResourceROM.h"
 #include "../Source/MASSAudioEngine.h"
 #include "../Source/MASSNoteEventAddressing.h"
@@ -7011,6 +7012,45 @@ int main(int argc, char** argv) {
         }
         } else {
             std::printf("MIDI bytes were received, but this fixture emitted no SoundHost host transaction yet.\\n");
+        }
+
+        // Merge all retained external-device observations on the 8032 cycle
+        // axis. This is diagnostic output only: equal-cycle sub-order is not
+        // implied, and test-injected responses remain explicitly synthetic.
+        const auto deviceTimeline =
+            technox::SoundDeviceTimeline::collect(injectedResponseMachine, 256u);
+        assert(!deviceTimeline.empty());
+        bool timelineHasHostWrite = false;
+        bool timelineHasModeWrite = false;
+        for (std::size_t i = 0; i < deviceTimeline.size(); ++i) {
+            if (i != 0u)
+                assert(deviceTimeline[i - 1u].machineCycle <= deviceTimeline[i].machineCycle);
+            timelineHasHostWrite = timelineHasHostWrite ||
+                deviceTimeline[i].kind == technox::SoundDeviceTimelineKind::soundHostWrite;
+            timelineHasModeWrite = timelineHasModeWrite ||
+                deviceTimeline[i].kind == technox::SoundDeviceTimelineKind::soundBusModeWrite;
+        }
+        assert(timelineHasHostWrite);
+        assert(timelineHasModeWrite);
+        std::printf("MERGED SOUND-DEVICE TIMELINE: retained=%zu (last 256 max); "
+                    "same-cycle order is not asserted\\n", deviceTimeline.size());
+        for (const auto& event : deviceTimeline) {
+            std::printf("  DEV cycle=%llu %-7s pc=%04X caller=%04X addr=%04X "
+                        "val=%02X prev=%02X P2=%02X P3=%02X mode=%02X "
+                        "IC51=%u bank=%u index=%u\\n",
+                        static_cast<unsigned long long>(event.machineCycle),
+                        technox::SoundDeviceTimeline::kindName(event.kind),
+                        static_cast<unsigned>(event.instructionPC),
+                        static_cast<unsigned>(event.callerPC),
+                        static_cast<unsigned>(event.address),
+                        static_cast<unsigned>(event.value),
+                        static_cast<unsigned>(event.previousValue),
+                        static_cast<unsigned>(event.port2),
+                        static_cast<unsigned>(event.port3),
+                        static_cast<unsigned>(event.busMode),
+                        static_cast<unsigned>(event.ic51Selected),
+                        static_cast<unsigned>(event.bank),
+                        static_cast<unsigned>(event.index));
         }
     }
     return 0;
