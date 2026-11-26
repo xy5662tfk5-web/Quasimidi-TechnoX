@@ -50,3 +50,6 @@ The dependency-free C++17 test targets cover the MCS-51 core, TechnoX 8032 bus/f
 - `research/ORIGINAL_AUDIO_ENGINE_STATUS.md` — verified progress, evidence boundaries and next reverse-engineering steps.
 - `docs/research/SAM9407_ARCHITECTURE_AND_TECHNOX_BRIDGE.md` — selected SAM9407 architecture target, the separate host/sample-memory domains and evidence required to map IC4 to the chip.
 - `Source/MASSFirmwareResourceCommandPlanner.h` — recovered IC51 command-to-packet dispatch, with explicit unresolved pitch/conditional states.
+- `Source/MASSFirmwarePitchParameterExecution.h` — snapshot-driven group-08 / 1C61 lookup and accumulator projection.
+- `Source/MASSFirmwarePitchSlotCorrectionProjection.h` — 1E4B slot guard/writeback projection.
+- `Source/MASSFirmwarePitchInterpolationPacketProjection.h` — 09B9 interpolation through 0A4F and the 0DB7 packet formatter.
