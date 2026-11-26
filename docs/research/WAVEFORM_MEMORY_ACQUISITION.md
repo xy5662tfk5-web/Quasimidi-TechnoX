@@ -27,6 +27,12 @@ The engine exposes `MASSWaveformMemoryView`, a non-owning immutable view over a 
 
 `QuasimidiTechnoXAudioProcessor::loadWaveformMemoryFile(file)` now maps a selected file read-only with `juce::MemoryMappedFile`, validates the mapped pointer/size, and publishes the view to the engine. `hasWaveformMemoryFile()` and `getWaveformMemoryFileSize()` report the mapped state; `unloadWaveformMemoryFile()` disconnects the backend before releasing the OS mapping. Call load/unload only while audio processing is stopped. Do not resize or modify the mapped file until it has been unloaded; JUCE documents resizing a mapped file as undefined behavior. No UI file chooser is wired yet, and loading a dump does not imply that it is decoded or audible.
 
+## External drum reference recordings (not a ROM dump)
+
+Rhythm Lab lists a separate set of **94 drum samples recorded from a Quasimidi TechnoX**, in 24-bit / 44.1 kHz / stereo WAV format (about 9 MB): [Quasimidi Technox drum samples](https://rhythm-lab.com/quasimidi-technox-drum-samples/). This can serve as a listening/reference set for comparing drum-hit timbre and tails once a sample playback path exists. It is not the original 6 MB waveform-memory image, does not reveal IC51 sample addresses or the factory key map, and must not be inserted into the ROM catalog or described as an authentic ROM reconstruction. Check the pack's license/usage terms before distributing or bundling any files.
+
+A separate public drum archive also lists 94 Technox-labeled WAVs, but its listing likewise does not claim to expose the raw instrument ROM: [KB6 free drum samples](https://samples.kb6.de/downloads_en.php).
+
 ## Integrity inspection
 
 Run the evidence-first inspector against each candidate image:
