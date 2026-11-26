@@ -132,6 +132,36 @@ bool QuasimidiTechnoXAudioProcessor::installVoiceBackend(
     return true;
 }
 
+bool QuasimidiTechnoXAudioProcessor::loadWaveformMemoryFile(const juce::File& file)
+{
+    if (!file.existsAsFile())
+        return false;
+
+    auto mappedFile = std::make_unique<juce::MemoryMappedFile>(
+        file, juce::MemoryMappedFile::readOnly);
+    const auto* mappedBytes = static_cast<const std::uint8_t*>(mappedFile->getData());
+    const auto mappedSize = mappedFile->getSize();
+
+    technox::MASSWaveformMemoryView candidateView;
+    if (!candidateView.attach(mappedBytes, mappedSize))
+        return false;
+
+    // The new view points into mappedFile. Move ownership first, then publish
+    // the stable view object to the backend. The caller must keep audio stopped.
+    waveformMemoryView = candidateView;
+    waveformMemoryFile = std::move(mappedFile);
+    massEngine.setWaveformMemoryView(&waveformMemoryView);
+    return true;
+}
+
+void QuasimidiTechnoXAudioProcessor::unloadWaveformMemoryFile() noexcept
+{
+    // Remove the pointer from the backend before the OS mapping is destroyed.
+    massEngine.setWaveformMemoryView(nullptr);
+    waveformMemoryView.detach();
+    waveformMemoryFile.reset();
+}
+
 void QuasimidiTechnoXAudioProcessor::initialisePartStates()
 {
     for (std::size_t performanceIndex = 0; performanceIndex < performanceBank.count(); ++performanceIndex) {
