@@ -25,6 +25,8 @@ Keep the recovered IC4, IC51, voice-routing, pitch and FX work as the baseline. 
 
 A bounded-memory raw-image inspector is now in `tools/inspect_technox_waveform_dump.py`; its four unit tests are registered with CTest. It checks exact size when explicitly requested, CRC32/SHA-256 and byte distribution without making PCM or address-map assumptions. Acquisition requirements are documented in [`docs/research/WAVEFORM_MEMORY_ACQUISITION.md`](../docs/research/WAVEFORM_MEMORY_ACQUISITION.md).
 
+The audio engine now also has `MASSWaveformMemoryView`, a non-owning, immutable and bounds-checked raw-byte view. It is forwarded to the active backend and survives backend replacement; the view does not decode or render samples. Its C++ tests cover bounds, span access, detach and backend hand-off.
+
 Obtain a verified TechnoX waveform-memory dump or a trustworthy board/memory map and identify the actual sample device. Decode **one** known sample with its address, encoding, rate and loop boundaries. Add a small golden test before attempting the full library.
 
 The IC51 descriptors and command streams are inputs to this work, not proof that their bytes are PCM.
