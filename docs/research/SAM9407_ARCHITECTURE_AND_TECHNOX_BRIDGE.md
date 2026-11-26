@@ -1,0 +1,78 @@
+# DREAM SAM9407 — architecture target and TechnoX bridge constraints
+
+Status: primary working synthesis architecture for the TechnoX reconstruction; physical board population and the 8032-to-chip bridge are not yet verified.
+
+## Why SAM9407 is the selected target
+
+The SAM9407 objective specification (DREAM, February 1996) describes a single-chip sound system with:
+- a 16-bit CISC P16 control processor;
+- a separate RISC synthesis/DSP core;
+- algorithm RAM and five dedicated synthesis parameter RAM banks;
+- 64 frame-process slots, with 16 micro-instructions per algorithm and up to 32 resident algorithms;
+- wavetable synthesis with interpolation, alternate looping and a 24 dB resonant filter per voice;
+- a memory-management unit that shares external ROM/RAM between P16 code/data and DSP sample/delay-line access;
+- an intelligent I/O block, MIDI UART, timers, codec interface, host FIFO and burst interface.
+
+The public application list names Quasimidi TechnoX, and family-generation material links the M.A.S.S. platform to Quasar/Raven. This makes SAM9407 the appropriate architecture target for implementation planning. It is not a substitute for a readable SAM9407 marking on a TechnoX mainboard or a verified pin/bus capture.
+
+## Three domains that must not be collapsed
+
+### 1. IC4 controller domain
+
+IC4 is the Intel 8032 firmware already executing in the project. It performs MIDI handling, resource selection, voice bookkeeping, parameter arithmetic and external-device transactions. Its observed external apertures include:
+- four byte addresses at `0x8000–0x8003`;
+- the mode-dependent `0xFF10` path;
+- the `0xC000–0xFFFF` external memory window, selected through SFR `0x8E` and P3 controls.
+
+The meanings decoded at the IC4 side must remain firmware meanings until a physical bridge is demonstrated.
+
+### 2. SAM9407 host/control domain
+
+The SAM9407 datasheet specifies a 16-bit host data bus `D0–D15`, address lines `A0–A2`, and separate `CS/`, `RD/`, `WR/` and `SBHE/` controls. The eight host register selections are grouped as follows:
+- `A2:A1=00`: primary byte-wide MIDI/UART interface;
+- `A2:A1=01`: 16-bit burst data port;
+- `A2=1`: auxiliary/game-compatible register range.
+
+This is not a direct match for the 8032's currently observed four-byte external aperture. The TechnoX board could include glue logic, latches, bus-width adaptation or another intermediary, but none is currently decoded. Do not equate IC4 address `0x8000` with SAM9407 host register zero, or map `0x8001–0x8003` to named SAM9407 registers, without evidence.
+
+### 3. SAM9407 external sample-memory domain
+
+The SAM9407 exposes a separate memory interface for sample ROM/SRAM/DRAM, including:
+- `WA0–WA24` external memory addressing;
+- `WD0–WD15` sample-memory data;
+- `WCS0/`, `WCS1/`, `WWE/`, `WOE/`, and byte-select/DRAM timing signals;
+- `S0–S1` cycle-type outputs distinguishing idle, synthesis access, instruction fetch and P16 processor read/write.
+
+The IC4-visible `0xC000–0xFFFF` window and the 13,647-byte IC51 remapped startup image are not themselves proof of the physical waveform memory layout. They may represent a transfer/buffer, control RAM, mapped external memory, or another intermediate resource. The 6 MB TechnoX sample-memory product claim is a configuration specification; no complete byte-exact 6 MB waveform dump has been recovered.
+
+## Architecture-level implementation boundary
+
+The implementation should be separated into independent components:
+
+1. `TechnoX8032Machine`: the original IC4 machine, including its 8-bit bus and firmware-executed protocol.
+2. `TechnoXSoundHostBridge`: only the behavior actually established from IC4 write/read sequences, including selector+payload framing and phase transitions. Keep external responses open-bus or explicitly supplied by a test fixture until measured.
+3. `SAM9407HostInterface`: a separate datasheet-conformant 16-bit host-side component. Its eight register selection and byte/burst semantics can be modeled independently, but the TechnoX bridge mapping must be injected only after it is proven.
+4. `SAM9407P16Runtime` and `SAM9407SynthesisDSP`: separate control and synthesis domains. Datasheet architecture is known, but P16 firmware, algorithm images and parameter-address maps for TechnoX have not yet been recovered.
+5. `SAM9407ExternalWaveMemory`: a separate address-space model for actual waveform/sample data. Do not substitute IC51 program command streams for PCM.
+6. `ADSP2105FX`: keep in a separate effects boundary. It remains a candidate FX1/FX2 processor in this specific instrument until chip marking or hardware trace confirms it.
+
+## Evidence needed before connecting IC4 to SAM9407
+
+- clear photograph of the TechnoX mainboard with all large IC markings legible;
+- schematic or continuity measurements from IC4 P2/P3 and XDATA address/data/control to the suspected SAM9407 pins/glue logic;
+- read/write capture for host data/address/strobes, including data width and byte lanes;
+- identification of sample ROM/DRAM/SRAM parts and their address/data connections;
+- power-up/reset timing and the relationship of SAM9407 `RUN`, reset and audio serial signals to the rest of the board;
+- at least one known command/response captured both at IC4's aperture and at the SAM9407 host pins.
+
+## Current project state
+
+- IC4 control firmware executes and the observed host traffic is retained with PC/caller, P2/P3, SFR `0x8E`, machine cycle and a machine-wide event sequence.
+- An offline timeline merges IC51, host aperture, FF10, external-memory, P3 and mode-register observations.
+- IC51 resource catalogs and per-voice program bindings are connected to the backend.
+- The original sample playback, SAM9407 P16 firmware execution, SAM9407 synthesis algorithm execution, physical host-bridge mapping and ADSP-2105 FX rendering are **not implemented**.
+- `BasicMASSVoiceBackend` remains a diagnostic oscillator and is not an authentic TechnoX sound source.
+
+## Primary source
+
+DREAM SAM9407, *Integrated Sound Studio*, objective specification, February 1996: [datasheet PDF](https://dosdays.co.uk/media/dream/SAM9407.PDF). Architecture, P16/DSP division, process slots and RAM banks are described in section 2; host bus and pin groups are described in sections 3 and 7.
