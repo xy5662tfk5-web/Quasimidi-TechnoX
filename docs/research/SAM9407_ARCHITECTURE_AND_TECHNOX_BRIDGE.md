@@ -45,6 +45,14 @@ The SAM9407 exposes a separate memory interface for sample ROM/SRAM/DRAM, includ
 
 The IC4-visible `0xC000–0xFFFF` window and the 13,647-byte IC51 remapped startup image are not themselves proof of the physical waveform memory layout. They may represent a transfer/buffer, control RAM, mapped external memory, or another intermediate resource. The 6 MB TechnoX sample-memory product claim is a configuration specification; no complete byte-exact 6 MB waveform dump has been recovered.
 
+## Independent software cross-check: Linux SAM9407 driver
+
+The open-source [libmikmod SAM9407 backend](https://github.com/sezero/mikmod/blob/d27e9c85aabce9a8e3cb8762913cf39b0fc1a0b8/libmikmod/drivers/drv_sam9407.c) drives the generic Linux SAM9407 driver through a structured event API. Its event sequence includes voice open/close, sample-memory assignment, output volume, main stereo send, pitch, start and stop. The memory event carries a sample handle, 16-bit sample type, forward/reverse loop mode, start position, loop position and end position. It also demonstrates independent pitch, volume and panning updates.
+
+This is useful as a **generic semantic cross-check**: a SAM9407 voice model should be able to represent sample source/loop boundaries, pitch, stereo level and lifecycle separately. It does **not** provide the TechnoX M.A.S.S. command mapping, does not prove the TechnoX board uses the same Linux-facing firmware, and does not identify any of the IC4 bytes at `0x8000–0x8003` with a SAM9407 register or event. Do not copy the Linux event numbers or API structures into the TechnoX bridge.
+
+The EWS64 reference driver is also from another SAM9407-based product. Its firmware and `.94B` sound banks can be useful for studying generic SAM9407 memory loading and software architecture, but they are not TechnoX's 6 MB waveform image and cannot substitute for TechnoX's original IC51/DSP resources. See the [EWS64 hardware/software notes](https://vogonswiki.com/index.php/EWS64).
+
 ## Architecture-level implementation boundary
 
 The implementation should be separated into independent components:
