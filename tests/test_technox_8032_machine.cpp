@@ -7064,6 +7064,7 @@ int main(int argc, char** argv) {
         assert(!deviceTimeline.empty());
         bool timelineHasHostWrite = false;
         bool timelineHasModeWrite = false;
+        bool timelineHasSyntheticResponse = false;
         bool timelineHasNonzeroSequence = false;
         for (std::size_t i = 0; i < deviceTimeline.size(); ++i) {
             const auto& event = deviceTimeline[i];
@@ -7078,16 +7079,19 @@ int main(int argc, char** argv) {
                 event.kind == technox::SoundDeviceTimelineKind::soundHostWrite;
             timelineHasModeWrite = timelineHasModeWrite ||
                 event.kind == technox::SoundDeviceTimelineKind::soundBusModeWrite;
+            timelineHasSyntheticResponse = timelineHasSyntheticResponse ||
+                event.syntheticResponse;
         }
         assert(timelineHasHostWrite);
         assert(timelineHasModeWrite);
+        assert(timelineHasSyntheticResponse);
         assert(timelineHasNonzeroSequence);
         std::printf("MERGED SOUND-DEVICE TIMELINE: retained=%zu (last 256 max); "
                     "cycle + shared sequence ordering asserted\\n", deviceTimeline.size());
         for (const auto& event : deviceTimeline) {
             std::printf("  DEV cycle=%llu seq=%llu %-7s pc=%04X caller=%04X addr=%04X "
                         "val=%02X prev=%02X P2=%02X P3=%02X mode=%02X "
-                        "IC51=%u bank=%u index=%u\\n",
+                        "IC51=%u bank=%u index=%u synthetic=%u\\n",
                         static_cast<unsigned long long>(event.machineCycle),
                         static_cast<unsigned long long>(event.eventSequence),
                         technox::SoundDeviceTimeline::kindName(event.kind),
@@ -7101,7 +7105,8 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.busMode),
                         static_cast<unsigned>(event.ic51Selected),
                         static_cast<unsigned>(event.bank),
-                        static_cast<unsigned>(event.index));
+                        static_cast<unsigned>(event.index),
+                        static_cast<unsigned>(event.syntheticResponse));
         }
     }
     return 0;
