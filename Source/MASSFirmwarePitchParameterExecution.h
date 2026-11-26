@@ -25,6 +25,12 @@ struct MASS1C61PitchExecutionSnapshot {
     std::uint8_t directRam06 = 0;
     std::uint8_t directRam07 = 0;
     bool hasCapturedDirectRamAccumulatorInputs = false;
+
+    // R2 is further transformed by the live 0x1D51..0x1D78 route before the
+    // accumulator at 0x1DC8. It is not always identical to the group-08 byte
+    // or the 0x2067 interpolation projection (notably Note 72: 0x20 -> 0x80).
+    std::uint8_t accumulatorInputR2 = 0;
+    bool hasCapturedAccumulatorInputR2 = false;
 };
 
 enum class MASS1C61PitchExecutionStatus : std::uint8_t {
@@ -36,6 +42,7 @@ enum class MASS1C61PitchExecutionStatus : std::uint8_t {
     interpolationLookupFailed,
     requiresSecondaryAddressSnapshot,
     secondaryTableReadFailed,
+    requiresAccumulatorInputR2Snapshot,
     requiresDirectRamBypassSnapshot
 };
 
@@ -49,6 +56,7 @@ struct MASS1C61PitchExecutionResult {
     MASS1C61SecondaryTableFetchAddress secondaryFetchAddress{};
     MASS1C61SecondaryTableBytes secondaryTableBytes{};
     MASS1C61PackedLookupFields packedFields{};
+    std::uint8_t accumulatorInputR2 = 0;
     MASS1C61AccumulatorResult accumulator{};
 
     bool ready() const noexcept {
@@ -132,7 +140,14 @@ public:
         result.packedFields =
             MASS1C61PackedLookupDecoder::decode(result.secondaryTableBytes);
 
-        if (result.interpolatedInput.r2 == 0u &&
+        if (!snapshot.hasCapturedAccumulatorInputR2) {
+            result.status =
+                MASS1C61PitchExecutionStatus::requiresAccumulatorInputR2Snapshot;
+            return result;
+        }
+        result.accumulatorInputR2 = snapshot.accumulatorInputR2;
+
+        if (result.accumulatorInputR2 == 0u &&
             !snapshot.hasCapturedDirectRamAccumulatorInputs) {
             result.status =
                 MASS1C61PitchExecutionStatus::requiresDirectRamBypassSnapshot;
@@ -140,7 +155,7 @@ public:
         }
 
         result.accumulator = MASS1C61AccumulatorTransform::apply(
-            result.interpolatedInput.r2,
+            result.accumulatorInputR2,
             result.packedFields.r3,
             result.packedFields.r4,
             result.packedFields.r5,
