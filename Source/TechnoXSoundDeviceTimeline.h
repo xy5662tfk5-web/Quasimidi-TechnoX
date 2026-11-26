@@ -2,8 +2,8 @@
 
 // Offline, diagnostic-only merger for IC4's external sound-device activity.
 // This helper is intentionally not used by the real-time audio callback.
-// Equal-cycle entries are kept stable, but their cross-trace sub-order is not
-// claimed because the underlying trace rings do not share a global event ID.
+// Every retained hardware-facing event carries a machine-wide sequence ID.
+// The merger can therefore reproduce cross-ring ordering even when cycles tie.
 
 #include "TechnoX8032Machine.h"
 
@@ -29,6 +29,7 @@ enum class SoundDeviceTimelineKind : std::uint8_t {
 
 struct SoundDeviceTimelineEntry {
     std::uint64_t machineCycle = 0;
+    std::uint64_t eventSequence = 0;
     SoundDeviceTimelineKind kind = SoundDeviceTimelineKind::soundHostWrite;
     std::uint16_t instructionPC = 0;
     std::uint16_t callerPC = 0;
@@ -62,6 +63,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::ic51Read;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -82,6 +84,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::soundHostRead;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -102,6 +105,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::soundHostWrite;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -123,6 +127,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::ff10Read;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.stackReturnPC;
@@ -142,6 +147,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::ff10Write;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.stackReturnPC;
@@ -162,6 +168,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::soundMemoryRead;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -181,6 +188,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::soundMemoryWrite;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -201,6 +209,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::p3Write;
                 out.instructionPC = e.instructionPC;
                 out.address = e.port;
@@ -222,6 +231,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::p3Bit2ControlWrite;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -243,6 +253,7 @@ public:
             [](const auto& e) {
                 SoundDeviceTimelineEntry out{};
                 out.machineCycle = e.machineCycle;
+                out.eventSequence = e.eventSequence;
                 out.kind = SoundDeviceTimelineKind::soundBusModeWrite;
                 out.instructionPC = e.instructionPC;
                 out.callerPC = e.returnPC;
@@ -258,7 +269,9 @@ public:
 
         std::stable_sort(entries.begin(), entries.end(),
             [](const SoundDeviceTimelineEntry& a, const SoundDeviceTimelineEntry& b) {
-                return a.machineCycle < b.machineCycle;
+                if (a.machineCycle != b.machineCycle)
+                    return a.machineCycle < b.machineCycle;
+                return a.eventSequence < b.eventSequence;
             });
 
         if (maximumEntries != 0u && entries.size() > maximumEntries)
