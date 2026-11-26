@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MASSResourceROM.h"
+#include "MASSFirmwareResourceCommandPlanner.h"
 #include "MASSVoiceManager.h"
 
 #include <array>
@@ -154,6 +155,21 @@ public:
         if (cursor >= program->stream.commands.size())
             return nullptr;
         return &program->stream.commands[cursor++];
+    }
+
+    // Consume one immutable IC51 command and route its already-decoded kind
+    // through the exact packet builders. Caller supplies the register/flag
+    // snapshot at the corresponding firmware handler boundary.
+    MASSFirmwarePacketPlan planNextCommand(
+        int voiceIndex, bool firmwareFlag0ASet,
+        const MASSFirmwareCommandBoundaryState& state) noexcept {
+        const auto* command = nextCommand(voiceIndex, firmwareFlag0ASet);
+        if (command == nullptr) {
+            MASSFirmwarePacketPlan exhausted{};
+            exhausted.status = MASSFirmwarePacketPlanStatus::commandStreamExhausted;
+            return exhausted;
+        }
+        return MASSFirmwareResourceCommandPlanner::plan(*command, state);
     }
 
     std::size_t commandCursor(int voiceIndex, bool firmwareFlag0ASet) const noexcept {
