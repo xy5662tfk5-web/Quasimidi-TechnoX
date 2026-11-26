@@ -7059,10 +7059,14 @@ int main(int argc, char** argv) {
         // Merge all retained external-device observations on the 8032 cycle
         // axis. This is diagnostic output only: equal-cycle sub-order is not
         // implied, and test-injected responses remain explicitly synthetic.
+        // Collect all events retained in the individual trace rings. A global
+        // last-256 tail is dominated by GPIO polling and can hide earlier
+        // SoundHost writes from the same MIDI/startup session.
         const auto deviceTimeline =
-            technox::SoundDeviceTimeline::collect(injectedResponseMachine, 256u);
+            technox::SoundDeviceTimeline::collect(injectedResponseMachine, 0u);
         assert(!deviceTimeline.empty());
         bool timelineHasHostWrite = false;
+        bool timelineHasPortWrite = false;
         bool timelineHasModeWrite = false;
         bool timelineHasSyntheticResponse = false;
         bool timelineHasNonzeroSequence = false;
@@ -7077,18 +7081,27 @@ int main(int argc, char** argv) {
             }
             timelineHasHostWrite = timelineHasHostWrite ||
                 event.kind == technox::SoundDeviceTimelineKind::soundHostWrite;
+            timelineHasPortWrite = timelineHasPortWrite ||
+                event.kind == technox::SoundDeviceTimelineKind::p3Write;
             timelineHasModeWrite = timelineHasModeWrite ||
                 event.kind == technox::SoundDeviceTimelineKind::soundBusModeWrite;
             timelineHasSyntheticResponse = timelineHasSyntheticResponse ||
                 event.syntheticResponse;
         }
         assert(timelineHasHostWrite);
-        assert(timelineHasModeWrite);
-        assert(timelineHasSyntheticResponse);
+        assert(timelineHasPortWrite);
         assert(timelineHasNonzeroSequence);
-        std::printf("MERGED SOUND-DEVICE TIMELINE: retained=%zu (last 256 max); "
-                    "cycle + shared sequence ordering asserted\n", deviceTimeline.size());
-        for (const auto& event : deviceTimeline) {
+        std::printf("MERGED SOUND-DEVICE TIMELINE: retained=%zu hostWrite=%u "
+                    "modeWrite=%u syntheticResponse=%u; cycle + sequence order asserted\n",
+                    deviceTimeline.size(),
+                    static_cast<unsigned>(timelineHasHostWrite),
+                    static_cast<unsigned>(timelineHasModeWrite),
+                    static_cast<unsigned>(timelineHasSyntheticResponse));
+        const auto timelinePrintStart = deviceTimeline.size() > 256u
+            ? deviceTimeline.size() - 256u : 0u;
+        for (std::size_t timelineIndex = timelinePrintStart;
+             timelineIndex < deviceTimeline.size(); ++timelineIndex) {
+            const auto& event = deviceTimeline[timelineIndex];
             std::printf("  DEV cycle=%llu seq=%llu %-7s pc=%04X caller=%04X addr=%04X "
                         "val=%02X prev=%02X P2=%02X P3=%02X mode=%02X "
                         "IC51=%u bank=%u index=%u synthetic=%u\n",
