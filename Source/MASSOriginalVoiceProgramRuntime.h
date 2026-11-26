@@ -2,6 +2,7 @@
 
 #include "MASSResourceROM.h"
 #include "MASSFirmwareResourceCommandPlanner.h"
+#include "MASSFirmwarePitchParameterExecution.h"
 #include "MASSVoiceManager.h"
 
 #include <array>
@@ -170,6 +171,23 @@ public:
             return exhausted;
         }
         return MASSFirmwareResourceCommandPlanner::plan(*command, state);
+    }
+
+    // Group-08 path uses a different evidence-bounded projection than the
+    // 0x1EDD packet builder. Its address-selection inputs are supplied as a
+    // captured handler snapshot; no SAM9407 register semantics are inferred.
+    MASS1C61PitchExecutionResult planNextPitchCommand(
+        int voiceIndex, bool firmwareFlag0ASet,
+        const MASSFirmwareROMView& firmwareROM,
+        const MASS1C61PitchExecutionSnapshot& snapshot) noexcept {
+        const auto* command = nextCommand(voiceIndex, firmwareFlag0ASet);
+        if (command == nullptr) {
+            MASS1C61PitchExecutionResult exhausted{};
+            exhausted.status = MASS1C61PitchExecutionStatus::invalidCommand;
+            return exhausted;
+        }
+        return MASS1C61PitchParameterExecutionProjection::execute(
+            firmwareROM, *command, snapshot);
     }
 
     std::size_t commandCursor(int voiceIndex, bool firmwareFlag0ASet) const noexcept {
