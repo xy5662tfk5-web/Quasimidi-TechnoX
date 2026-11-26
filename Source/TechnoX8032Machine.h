@@ -308,6 +308,29 @@ public:
         std::uint16_t stackReturnPC = 0;
         std::uint64_t machineCycle = 0;
     };
+    // Writes to IRAM 0x36/0x37 are the two-byte result of the slot/sine
+    // fixed-point stage. Keep both direct and @Ri writes with pre-write CPU state.
+    struct InternalRamWriteEvent {
+        std::uint8_t address = 0;
+        std::uint8_t previousValue = 0;
+        std::uint8_t value = 0;
+        bool indirectAddressing = false;
+        std::uint16_t instructionPC = 0;
+        std::uint16_t pcAfterFetch = 0;
+        std::uint16_t returnPC = 0;
+        std::array<std::uint8_t, 3> opcodeBytes{};
+        std::uint16_t dptr = 0;
+        std::uint8_t accumulator = 0;
+        std::uint8_t b = 0;
+        std::uint8_t psw = 0;
+        std::uint8_t registerBankBase = 0;
+        std::array<std::uint8_t, 8> registers{};
+        std::uint8_t port2 = 0xff;
+        std::uint8_t port3 = 0xff;
+        std::uint8_t soundBusMode = 0;
+        std::uint64_t eventSequence = 0;
+        std::uint64_t machineCycle = 0;
+    };
     struct FF10ReadEvent {
         std::uint16_t address = 0xff10u;
         std::uint8_t value = 0xffu;
@@ -626,6 +649,8 @@ public:
         dispatchFlagWriteTraceCount_ = 0;
         internalFlagWriteTrace_.fill(InternalFlagWriteEvent{});
         internalFlagWriteTraceCount_ = 0;
+        internalRamWriteTrace_.fill(InternalRamWriteEvent{});
+        internalRamWriteTraceCount_ = 0;
         bulkTransferEntryTrace_.fill(BulkTransferEntryEvent{});
         bulkTransferEntryCount_ = 0;
         unmappedBusTrace_.fill(UnmappedBusEvent{});
@@ -1246,6 +1271,10 @@ public:
             }
         } else {
             const auto previousValue = internal_[address];
+            if (address == 0x36u || address == 0x37u)
+                recordInternalRamWriteForTesting(
+                    address, previousValue, value,
+                    currentWriteInstructionPC(address), false);
             internal_[address] = value;
             if (address == 0x25u || address == 0x26u)
                 recordDispatchFlagBackingWrite(address, previousValue, value);
@@ -1299,6 +1328,10 @@ public:
     void writeIndirect(std::uint8_t address, std::uint8_t value) noexcept override {
         if (address < 0x80u) {
             const auto previousValue = internal_[address];
+            if (address == 0x36u || address == 0x37u)
+                recordInternalRamWriteForTesting(
+                    address, previousValue, value,
+                    currentIndirectWriteInstructionPC(), true);
             internal_[address] = value;
             if (address == 0x25u || address == 0x26u)
                 recordDispatchFlagBackingWrite(address, previousValue, value);
@@ -2053,6 +2086,17 @@ public:
     const IC51BusProbeEvent& ic51BusProbeTraceAt(std::size_t index) const noexcept {
         return ic51BusProbeTrace_[index % ic51BusProbeTrace_.size()];
     }
+    void clearInternalRamWriteTraceForTesting() noexcept {
+        internalRamWriteTrace_.fill(InternalRamWriteEvent{});
+        internalRamWriteTraceCount_ = 0;
+    }
+    std::size_t internalRamWriteTraceCountForTesting() const noexcept {
+        return internalRamWriteTraceCount_;
+    }
+    const InternalRamWriteEvent& internalRamWriteTraceAtForTesting(
+        std::size_t index) const noexcept {
+        return internalRamWriteTrace_[index % internalRamWriteTrace_.size()];
+    }
     std::uint64_t soundBusModeWriteCount() const noexcept { return soundBusModeWriteCount_; }
     std::size_t soundBusModeWriteTraceCount() const noexcept {
         return soundBusModeWriteTraceCount_;
@@ -2312,6 +2356,51 @@ private:
             (static_cast<std::uint16_t>(returnHigh) << 8u) | returnLow);
     }
 
+    std::uint16_t currentIndirectWriteInstructionPC() const noexcept {
+        const auto pcAfterFetch = cpu_.registers().pc;
+        const auto twoBytePC = static_cast<std::uint16_t>(pcAfterFetch - 2u);
+        const auto opcode = readCode(twoBytePC);
+        // MOV @Ri,#data and MOV @Ri,direct consume one operand byte.
+        if (opcode == 0x76u || opcode == 0x77u ||
+            opcode == 0xa6u || opcode == 0xa7u)
+            return twoBytePC;
+        return static_cast<std::uint16_t>(pcAfterFetch - 1u);
+    }
+
+    void recordInternalRamWriteForTesting(
+        std::uint8_t address, std::uint8_t previousValue, std::uint8_t value,
+        std::uint16_t instructionPC, bool indirectAddressing) noexcept {
+        const auto& registers = cpu_.registers();
+        auto& event = internalRamWriteTrace_[
+            internalRamWriteTraceCount_ % internalRamWriteTrace_.size()];
+        event.address = address;
+        event.previousValue = previousValue;
+        event.value = value;
+        event.indirectAddressing = indirectAddressing;
+        event.instructionPC = instructionPC;
+        event.pcAfterFetch = registers.pc;
+        event.returnPC = currentStackReturnPC();
+        event.opcodeBytes = {{
+            readCode(instructionPC),
+            readCode(static_cast<std::uint16_t>(instructionPC + 1u)),
+            readCode(static_cast<std::uint16_t>(instructionPC + 2u))
+        }};
+        event.dptr = registers.dptr;
+        event.accumulator = registers.a;
+        event.b = registers.b;
+        event.psw = registers.psw.pack();
+        event.registerBankBase = registers.psw.registerBankBase();
+        for (std::size_t i = 0; i < event.registers.size(); ++i)
+            event.registers[i] = readInternal(static_cast<std::uint8_t>(
+                event.registerBankBase + i));
+        event.port2 = portPins_[2];
+        event.port3 = portPins_[3];
+        event.soundBusMode = internal_[0x8e];
+        event.eventSequence = ++traceEventSequence_;
+        event.machineCycle = elapsedMachineCycles_;
+        ++internalRamWriteTraceCount_;
+    }
+
     static constexpr int portIndex(std::uint8_t address) noexcept {
         return address == 0x80u ? 0 : address == 0x90u ? 1 :
                address == 0xa0u ? 2 : address == 0xb0u ? 3 : -1;
@@ -2458,6 +2547,8 @@ private:
     std::size_t portWriteCount_ = 0;
     std::array<SoundBusModeWriteEvent, 512> soundBusModeWriteTrace_{};
     std::size_t soundBusModeWriteTraceCount_ = 0;
+    std::array<InternalRamWriteEvent, 512> internalRamWriteTrace_{};
+    std::size_t internalRamWriteTraceCount_ = 0;
     std::array<P3Bit2ControlWriteEvent, 128> p3Bit2ControlWriteTrace_{};
     std::size_t p3Bit2ControlWriteCount_ = 0;
     mutable std::array<PortReadEvent, 512> portReadTrace_{};
