@@ -95,7 +95,13 @@ public:
     }
 
     void setWaveformMemoryView(const MASSWaveformMemoryView* view) noexcept override {
+        if (waveformMemory_ == view)
+            return;
         waveformMemory_ = view;
+        // A newly attached/detached memory view changes whether an existing
+        // bank/program can be resolved. Force one rebind on the next render.
+        for (auto& state : voices_)
+            state.mappingChecked = false;
     }
 
     void prepare(double sampleRate, int) override {
@@ -138,15 +144,30 @@ public:
                 const MASSCommonControlStore&,
                 const MASSPerformanceImageStore&,
                 const MASSDrumParameterStore&) noexcept override {
-        if (channels == nullptr || channelCount <= 0 || sampleCount <= 0 ||
-            waveformMemory_ == nullptr)
+        if (channels == nullptr || channelCount <= 0 || sampleCount <= 0)
             return;
 
         const auto& slots = voiceManager.voices();
         for (std::size_t voiceIndex = 0; voiceIndex < slots.size(); ++voiceIndex) {
             const auto& slot = slots[voiceIndex];
             auto& state = voices_[voiceIndex];
-            if (!slot.active || !state.active)
+            if (!slot.active) {
+                state = {};
+                programRuntime_.resetVoice(static_cast<int>(voiceIndex));
+                continue;
+            }
+
+            // Keep the original IC51 program binding synchronized with the
+            // authoritative VoiceSlot, including mono/legato retargeting.
+            // Retargeting can change bank/program without a fresh noteOn call.
+            programRuntime_.synchronizeVoice(static_cast<int>(voiceIndex), slot);
+
+            if (!state.mappingChecked ||
+                state.bank != slot.bankNumber ||
+                state.program != slot.soundNumber)
+                bindVoice(static_cast<int>(voiceIndex), slot);
+
+            if (!state.active || waveformMemory_ == nullptr)
                 continue;
 
             const int part = static_cast<int>(slot.part);
@@ -209,6 +230,9 @@ private:
         bool active = false;
         bool released = false;
         bool reverse = false;
+        bool mappingChecked = false;
+        std::uint8_t bank = 0;
+        std::uint8_t program = 0;
         double position = 0.0;
         SAM9407SampleMapEntry mapping{};
     };
@@ -236,6 +260,9 @@ private:
     void bindVoice(int voiceIndex, const VoiceSlot& slot) noexcept {
         auto& state = voices_[static_cast<std::size_t>(voiceIndex)];
         state = {};
+        state.mappingChecked = true;
+        state.bank = slot.bankNumber;
+        state.program = slot.soundNumber;
         if (waveformMemory_ == nullptr || !waveformMemory_->isAttached())
             return;
         const auto* mapping = findMapping(slot.bankNumber, slot.soundNumber);
