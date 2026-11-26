@@ -447,7 +447,13 @@ void testMASS1C61SecondaryTableAddress() {
     const auto positiveOverflow = MASS1C61AccumulatorInputRouteProjection::apply(
         0x60u, 0x00u, 0x30u, 0x55u);
     assert(positiveOverflow.overflow && positiveOverflow.accumulatorR2 == 0x10u);
-    assert(positiveOverflow.normalizedR7 == 0x54u);
+    assert(positiveOverflow.normalizedR7 == 0x56u);
+
+    const auto positiveOverflowBoundary = MASS1C61AccumulatorInputRouteProjection::apply(
+        0x60u, 0x00u, 0x30u, 0x7fu);
+    assert(positiveOverflowBoundary.overflow &&
+           positiveOverflowBoundary.accumulatorR2 == 0x10u);
+    assert(positiveOverflowBoundary.normalizedR7 == 0x74u);
 
     const auto negativeOverflowWrap = MASS1C61AccumulatorInputRouteProjection::apply(
         0x90u, 0x00u, 0x90u, 0x00u);
