@@ -7,14 +7,16 @@
 namespace technox {
 
 // These values are snapshots from distinct IC4 instruction boundaries.
-// Address-selection inputs are explicit because the current trace does not
-// prove that they can always be reconstructed from the original group-08 bytes.
+// The live Note-72 trace demonstrates that several values are rewritten
+// between the resource record and the 1DC8 accumulator boundary.
 struct MASS1C61PitchExecutionSnapshot {
     std::uint8_t interpolationControl2067 = 0;
     bool hasCapturedInterpolationControl = false;
 
-    // These values must be captured together at the 0x1D2F address boundary.
+    // Base DPTR loaded from IRAM[0x9E:0x9F] at 0x1D7C..0x1D81,
+    // captured before the normalized R7 add at 0x1D95.
     std::uint16_t secondaryTableBasePointer = 0;
+    // Inputs to the earlier 0x1D2F..0x1D45 normalization and bank selection.
     std::uint8_t secondaryTableIndexR3 = 0;
     std::uint8_t secondaryTableBankSelectR4 = 0;
     std::uint8_t ram2F = 0;
@@ -66,16 +68,16 @@ struct MASS1C61PitchExecutionResult {
 
 // Composes the already reconstructed IC4 group-08 stages:
 //   1) command field extraction;
-//   2) 0x2067 signed table lookup and 24-bit interpolation arithmetic;
-//   3) 0x1D2F secondary table address selection and original-R7 fetch offset;
-//   4) MOVC reads at DPTR, DPTR+0x80 and DPTR+0x100;
+//   2) 0x2067 signed table lookup and 24-bit interpolation projection;
+//   3) 0x1D2F..0x1D45 normalized-index and 0x1D7C..0x1D84 base/bank selection;
+//   4) add normalized live R7 at 0x1D95, then MOVC at DPTR/+0x80/+0x100;
 //   5) packed byte -> R3/R4/R5/R6/R7 decode;
-//   6) 0x1DC8..0x1E04 24-bit accumulator transform.
+//   6) captured live R2 plus decoded fields -> 0x1DC8..0x1E04 accumulator.
 //
 // This is intentionally a snapshot-driven projection. The caller must supply
-// the 0x1D2F address inputs from a captured handler boundary; the code does not
-// guess their origin from the IC51 payload. The resulting accumulator is the
-// pre-slot-correction value. The later 0x1E4B..0x1E66 guard/writeback remains a
+// the base pointer, address-selection inputs, and actual R2 at the 0x1DC8
+// boundary; these are not interchangeable with the raw IC51 command bytes.
+// The resulting accumulator is the pre-slot-correction value. The later 0x1E4B..0x1E66 guard/writeback remains a
 // separate operation with its own XDATA snapshot.
 class MASS1C61PitchParameterExecutionProjection {
 public:
