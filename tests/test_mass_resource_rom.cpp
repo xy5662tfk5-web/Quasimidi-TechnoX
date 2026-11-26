@@ -1824,6 +1824,10 @@ void testActualIC51(const char* path) {
         {{75, 42, 66, 82}}  // flag 0x0A set
     }};
     std::array<std::array<std::size_t, 4>, 2> modulationBranchCounts{};
+    // Planner categories: ready, filler, stream-only, pitch-context,
+    // conditional-context, invalid. Every decoded factory command must land
+    // in one of the first five evidence-bounded categories.
+    std::array<std::array<std::size_t, 6>, 2> plannerStatusCounts{};
 
     for (const auto bank : {MASSResourceBank::bank0, MASSResourceBank::bank1}) {
         std::set<std::uint16_t> pointers;
@@ -1847,7 +1851,39 @@ void testActualIC51(const char* path) {
                     bankData, MASSResourceROM::kBankSize,
                     descriptor.commandStreamPointer, decoded, flagIndex != 0));
                 assert(!decoded.truncated);
+                MASSFirmwareCommandBoundaryState plannerState{};
+                plannerState.flag0A = flagIndex != 0u;
                 for (const auto& command : decoded.commands) {
+                    const auto planned =
+                        MASSFirmwareResourceCommandPlanner::plan(command, plannerState);
+                    switch (planned.status) {
+                        case MASSFirmwarePacketPlanStatus::ready:
+                            assert(planned.packetCount >= 1u &&
+                                   planned.packetCount <= 3u);
+                            ++plannerStatusCounts[flagIndex][0];
+                            break;
+                        case MASSFirmwarePacketPlanStatus::fillerSlotOnly:
+                            assert(planned.packetCount == 0u);
+                            ++plannerStatusCounts[flagIndex][1];
+                            break;
+                        case MASSFirmwarePacketPlanStatus::streamAdvanceOnly:
+                            assert(planned.packetCount == 0u);
+                            ++plannerStatusCounts[flagIndex][2];
+                            break;
+                        case MASSFirmwarePacketPlanStatus::requiresPitchHandlerState:
+                            assert(planned.packetCount == 0u);
+                            ++plannerStatusCounts[flagIndex][3];
+                            break;
+                        case MASSFirmwarePacketPlanStatus::requiresConditionalHandlerState:
+                            assert(planned.packetCount == 0u);
+                            ++plannerStatusCounts[flagIndex][4];
+                            break;
+                        default:
+                            assert(false && "decoded IC51 command was not classified by planner");
+                            ++plannerStatusCounts[flagIndex][5];
+                            break;
+                    }
+
                     if (command.kind != MASSResourceCommandKind::multiParameter ||
                         command.bytes[1] == 0)
                         continue;
@@ -1881,6 +1917,10 @@ void testActualIC51(const char* path) {
         assert(endStates == expectedEndStates[bankNumber]);
     }
     assert(modulationBranchCounts == expectedModulationBranches);
+    for (std::size_t flagIndex = 0; flagIndex < 2u; ++flagIndex) {
+        assert(plannerStatusCounts[flagIndex][0] > 0u);
+        assert(plannerStatusCounts[flagIndex][5] == 0u);
+    }
 }
 }
 
