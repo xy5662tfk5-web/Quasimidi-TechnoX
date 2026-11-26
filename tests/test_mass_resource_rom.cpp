@@ -3,6 +3,7 @@
 #include "../Source/MASSOriginalVoiceProgramRuntime.h"
 #include "../Source/MASSFirmwarePitchParameterExecution.h"
 #include "../Source/MASSFirmwarePitchInterpolationPacketProjection.h"
+#include "../Source/MASSFirmwarePitchSlotCorrectionProjection.h"
 #include "../Source/MASSFirmwareResourceCommandPlanner.h"
 #include "../Source/BasicMASSVoiceBackend.h"
 
@@ -224,6 +225,60 @@ void testMASS09B9SlotInterpolationArithmetic() {
         0x57u, 0x01u, 0xa2u, 0x0000u, false);
     assert(result.incrementMagnitude24 == 0u);
     assert(result.outputValue24 == 0x020157u);
+}
+
+void testMASSFirmwarePitchSlotCorrectionProjection() {
+    MASS1C61PitchExecutionResult upstream{};
+    MASSFirmwarePitchSlotCorrectionSnapshot snapshot{};
+
+    auto result = MASSFirmwarePitchSlotCorrectionProjection::execute(upstream, snapshot);
+    assert(result.status ==
+           MASSFirmwarePitchSlotCorrectionStatus::upstreamPitchExecutionNotReady);
+
+    upstream.status = MASS1C61PitchExecutionStatus::ready;
+    upstream.accumulator.r2 = 0xd5u;
+    upstream.accumulator.r3 = 0x1eu;
+    upstream.accumulator.r4 = 0x02u;
+
+    result = MASSFirmwarePitchSlotCorrectionProjection::execute(upstream, snapshot);
+    assert(result.status ==
+           MASSFirmwarePitchSlotCorrectionStatus::requiresGuardAndRegisterSnapshot);
+
+    snapshot.hasCapturedGuardAndRegisters = true;
+    snapshot.xdata2018 = 0x00u;
+    snapshot.xdata2019 = 0x06u;
+    snapshot.incomingR4 = 0x02u;
+    snapshot.existingHigh = 0xa0u;
+    snapshot.incomingR3 = 0x1eu;
+    snapshot.incomingR2 = 0xd5u;
+    result = MASSFirmwarePitchSlotCorrectionProjection::execute(upstream, snapshot);
+    assert(result.ready());
+    assert(result.matchesPreCorrectionAccumulator);
+    assert(!result.slotWriteSuppressedByZeroGuard);
+    assert(result.slot.writeSlot);
+    assert(result.slot.mergedHigh == 0xa2u);
+    assert(result.slot.middle == 0x1eu);
+    assert(result.slot.low == 0xd5u);
+
+    // The Note-66 trace reports the corrected slot vector D5:1F:A2
+    // (low/middle/high), not the pre-correction accumulator D5:1E:02.
+    // Supply the actual 1E4B boundary byte as a capture; the unexplained
+    // correction delta stays visible instead of being invented here.
+    snapshot.incomingR3 = 0x1fu;
+    result = MASSFirmwarePitchSlotCorrectionProjection::execute(upstream, snapshot);
+    assert(result.ready());
+    assert(!result.matchesPreCorrectionAccumulator);
+    assert(result.slot.writeSlot);
+    assert(result.slot.low == 0xd5u);
+    assert(result.slot.middle == 0x1fu);
+    assert(result.slot.mergedHigh == 0xa2u);
+
+    snapshot.xdata2018 = 0u;
+    snapshot.xdata2019 = 0u;
+    result = MASSFirmwarePitchSlotCorrectionProjection::execute(upstream, snapshot);
+    assert(result.ready());
+    assert(result.slotWriteSuppressedByZeroGuard);
+    assert(!result.slot.writeSlot);
 }
 
 void testMASSFirmwarePitchInterpolationPacketProjection() {
@@ -2221,6 +2276,7 @@ int main(int argc, char** argv) {
     testMASS0DCEExchangeDecoder();
     testMASS0DB7PacketBuilder();
     testMASS1EDDRecordPacketSequenceBuilder();
+    testMASSFirmwarePitchSlotCorrectionProjection();
     testMASSFirmwarePitchInterpolationPacketProjection();
     testMASS09B9SlotInterpolationArithmetic();
     testMASS1C61PitchParameterExecutionProjection();
