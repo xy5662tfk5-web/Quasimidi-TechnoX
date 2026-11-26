@@ -2232,6 +2232,10 @@ void testActualIC51(const char* path) {
     // in one of the first five evidence-bounded categories.
     std::array<std::array<std::size_t, 6>, 2> plannerStatusCounts{};
     std::array<std::size_t, 2> pitchParameterCommandCounts{};
+    constexpr std::array<std::uint8_t, 7> note72ObservedGroup08{{
+        0x08u, 0x20u, 0x18u, 0xa0u, 0xf6u, 0x00u, 0x00u
+    }};
+    std::array<std::size_t, 2> exactNote72Group08Matches{};
 
     for (const auto bank : {MASSResourceBank::bank0, MASSResourceBank::bank1}) {
         std::set<std::uint16_t> pointers;
@@ -2259,6 +2263,20 @@ void testActualIC51(const char* path) {
                 plannerState.flag0A = flagIndex != 0u;
                 for (const auto& command : decoded.commands) {
                     if (command.kind == MASSResourceCommandKind::pitchParameter) {
+                        if (command.length == note72ObservedGroup08.size() &&
+                            std::equal(note72ObservedGroup08.begin(),
+                                       note72ObservedGroup08.end(),
+                                       command.bytes.begin())) {
+                            ++exactNote72Group08Matches[flagIndex];
+                            std::printf(
+                                "IC51 EXACT NOTE72 GROUP08 RECORD: bank=%u pointerIndex=%zu "
+                                "descriptor=%04X stream=%04X commandOffset=%04X flag0A=%u\\n",
+                                static_cast<unsigned>(bankNumber), i,
+                                static_cast<unsigned>(address),
+                                static_cast<unsigned>(descriptor.commandStreamPointer),
+                                static_cast<unsigned>(command.bankOffset),
+                                static_cast<unsigned>(flagIndex));
+                        }
                         MASSPitchParameterRegisterFields pitchFields{};
                         assert(MASSResourceCommandFieldDecoder::decodePitchParameter(
                             command, pitchFields));
@@ -2328,6 +2346,9 @@ void testActualIC51(const char* path) {
         assert(endStates == expectedEndStates[bankNumber]);
     }
     assert(modulationBranchCounts == expectedModulationBranches);
+    std::printf(
+        "IC51 exact Note72 group-08 stream matches: flag0A-clear=%zu flag0A-set=%zu\\n",
+        exactNote72Group08Matches[0], exactNote72Group08Matches[1]);
     for (std::size_t flagIndex = 0; flagIndex < 2u; ++flagIndex) {
         assert(plannerStatusCounts[flagIndex][0] > 0u);
         assert(pitchParameterCommandCounts[flagIndex] > 0u);
