@@ -70,6 +70,8 @@ public:
         switch (command.kind) {
             case MASSResourceCommandKind::conditionalRecord: {
                 if (!command.branchesToExtendedCommand) {
+                    if (command.length != 4u || (command.opcode & 0x38u) != 0x00u)
+                        return result;
                     result.status =
                         MASSFirmwarePacketPlanStatus::requiresConditionalHandlerState;
                     return result;
@@ -89,12 +91,17 @@ public:
                 return result;
             }
 
-            case MASSResourceCommandKind::pitchParameter:
+            case MASSResourceCommandKind::pitchParameter: {
+                MASSPitchParameterRegisterFields decoded{};
+                if (!MASSResourceCommandFieldDecoder::decodePitchParameter(
+                        command, decoded))
+                    return result;
                 // Group 0x08 enters the pitch/interpolation path. Its required
                 // pointer, table, slot and bus-derived input state is not
                 // represented by this packet-boundary snapshot.
                 result.status = MASSFirmwarePacketPlanStatus::requiresPitchHandlerState;
                 return result;
+            }
 
             case MASSResourceCommandKind::multiParameter: {
                 MASSMultiParameterRegisterFields decoded{};
@@ -119,9 +126,14 @@ public:
                 return result;
             }
 
-            case MASSResourceCommandKind::emptyMultiParameter:
+            case MASSResourceCommandKind::emptyMultiParameter: {
+                MASSMultiParameterRegisterFields decoded{};
+                if (!MASSResourceCommandFieldDecoder::decodeMultiParameter(
+                        command, decoded) || !decoded.takesFillerPath())
+                    return result;
                 result.status = MASSFirmwarePacketPlanStatus::fillerSlotOnly;
                 return result;
+            }
 
             case MASSResourceCommandKind::fourByteCommand: {
                 MASSHardwareCommandPacket packet{};
@@ -150,10 +162,16 @@ public:
             }
 
             case MASSResourceCommandKind::marker:
+                if (command.length != 1u || (command.opcode & 0x38u) != 0x38u)
+                    return result;
                 result.status = MASSFirmwarePacketPlanStatus::fillerSlotOnly;
                 return result;
 
             case MASSResourceCommandKind::singleByteAdvance:
+                if (command.length != 1u ||
+                    ((command.opcode & 0x38u) != 0x28u &&
+                     (command.opcode & 0x38u) != 0x30u))
+                    return result;
                 result.status = MASSFirmwarePacketPlanStatus::streamAdvanceOnly;
                 return result;
         }
