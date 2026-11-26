@@ -2367,6 +2367,7 @@ private:
             oneByteOpcode == 0x56u || oneByteOpcode == 0x57u ||
             oneByteOpcode == 0x66u || oneByteOpcode == 0x67u ||
             oneByteOpcode == 0xc6u || oneByteOpcode == 0xc7u ||
+            oneByteOpcode == 0xd6u || oneByteOpcode == 0xd7u ||
             oneByteOpcode == 0xf6u || oneByteOpcode == 0xf7u)
             return oneBytePC;
 
