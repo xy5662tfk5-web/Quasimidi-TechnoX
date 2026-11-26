@@ -39,6 +39,7 @@ The following are still absent: a validated 8032-to-confirmed-sound-device host-
 ## Remaining work — ordered by dependency
 
 - [x] Add a bounded-memory integrity inspector for candidate external waveform dumps (size, CRC32, SHA-256 and byte histogram) plus four standalone Python tests; register the tests with CTest. This validates acquired bytes only and deliberately does not decode PCM.
+- [x] Add a non-owning immutable `MASSWaveformMemoryView`; route it through `MASSAudioEngine` to the active `IMASSVoiceBackend`, preserve it across backend replacement, and test bounds/span/detach/hand-off. The current oscillator deliberately does not render from this raw view.
 
 ### A. Finish the firmware-to-command data path
 
