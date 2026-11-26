@@ -2,6 +2,7 @@
 
 #include "MASSAudioEngine.h"
 #include "MASSOriginalVoiceProgramRuntime.h"
+#include "MASSWaveformMemoryView.h"
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -24,6 +25,18 @@ public:
     void setExternalSoundMemoryImage(
         const MASSIC51ExternalSoundMemoryImage* image) noexcept override {
         originalProgramRuntime_.setExternalSoundMemoryImage(image);
+    }
+
+    void setWaveformMemoryView(const MASSWaveformMemoryView* view) noexcept override {
+        waveformMemoryView_ = view;
+    }
+
+    const MASSWaveformMemoryView* waveformMemoryViewForTesting() const noexcept {
+        return waveformMemoryView_;
+    }
+    bool readWaveformMemoryByteForTesting(
+        std::size_t address, std::uint8_t& value) const noexcept {
+        return waveformMemoryView_ != nullptr && waveformMemoryView_->readByte(address, value);
     }
 
     const MASSOriginalVoiceProgramRuntime::VoiceProgramBinding*
@@ -262,6 +275,7 @@ private:
     static constexpr double twoPi = 6.28318530717958647692;
     std::array<VoiceState, VoiceManager::kVoiceCount> states_{};
     MASSOriginalVoiceProgramRuntime originalProgramRuntime_{};
+    const MASSWaveformMemoryView* waveformMemoryView_ = nullptr;
     double sampleRate_ = 44100.0;
 
     static bool valid(int index) noexcept {
