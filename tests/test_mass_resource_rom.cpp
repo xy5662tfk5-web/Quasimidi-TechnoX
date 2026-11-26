@@ -1,6 +1,7 @@
 #include "../Source/MASSResourceROM.h"
 #include "../Source/MASSAudioEngine.h"
 #include "../Source/MASSOriginalVoiceProgramRuntime.h"
+#include "../Source/MASSFirmwareResourceCommandPlanner.h"
 #include "../Source/BasicMASSVoiceBackend.h"
 
 #include <algorithm>
@@ -1056,6 +1057,105 @@ void testResourceSelectionRecordParser() {
         nullptr, page.size(), 0, parsed));
 }
 
+void testFirmwareResourceCommandPlanner() {
+    MASSFirmwareCommandBoundaryState state{};
+    state.ram2B = 0x40u;
+    state.flag0A = false;
+    state.flag0C = true;
+    state.recordTail = {{0xd7u, 0xe8u, 0xf9u}};
+    state.r2 = 0x81u; state.r3 = 0x92u; state.r4 = 0x03u;
+    state.r5 = 0xa4u; state.r6 = 0xb5u; state.r7 = 0xc6u;
+    state.direct02 = 0x72u; state.direct07 = 0x91u;
+
+    MASSResourceCommand command{};
+    command.kind = MASSResourceCommandKind::multiParameter;
+    command.opcode = 0x15u;
+    command.length = 7u;
+    command.bytes = {{0x15u, 0x01u, 0x12u, 0x23u, 0x34u, 0x45u, 0x56u}};
+
+    auto plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::ready && plan.packetCount == 2u);
+    assert((plan.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0xc6u}}));
+    assert((plan.packets[1].bytes ==
+            std::array<std::uint8_t, 4>{{0x3fu, 0x81u, 0x92u, 0x03u}}));
+
+    state.flag0A = true;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.ready() && plan.packetCount == 3u);
+    assert((plan.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x3eu, 0xd7u, 0xe8u, 0x89u}}));
+    assert((plan.packets[1].bytes ==
+            std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0xc6u}}));
+    assert((plan.packets[2].bytes ==
+            std::array<std::uint8_t, 4>{{0x3fu, 0x81u, 0x92u, 0x03u}}));
+
+    command.bytes[1] = 0u;
+    command.kind = MASSResourceCommandKind::emptyMultiParameter;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::fillerSlotOnly);
+    assert(plan.packetCount == 0u);
+
+    command = {};
+    command.kind = MASSResourceCommandKind::conditionalRecord;
+    command.opcode = 0x00u;
+    command.length = 7u;
+    command.branchesToExtendedCommand = true;
+    command.bytes = {{0x00u, 0x11u, 0x22u, 0x08u, 0xa1u, 0xb2u, 0xfdu}};
+    state.flag08 = false;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.ready() && plan.packetCount == 1u);
+    assert((plan.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x40u, 0xa1u, 0xb2u, 0x05u}}));
+    state.flag08 = true;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::extendedBranchSuppressed);
+
+    command = {};
+    command.kind = MASSResourceCommandKind::fourByteCommand;
+    command.opcode = 0x1bu;
+    command.length = 4u;
+    command.bytes = {{0x1bu, 0xabu, 0xcdu, 0xfdu}};
+    state.flag08 = false;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.ready() && plan.packetCount == 1u);
+    assert((plan.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x40u, 0xabu, 0xcdu, 0x05u}}));
+
+    command = {};
+    command.kind = MASSResourceCommandKind::threePayloadCommand;
+    command.opcode = 0x22u;
+    command.length = 4u;
+    command.bytes = {{0x22u, 0x11u, 0x22u, 0xfdu}};
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.ready() && plan.packetCount == 1u);
+    assert((plan.packets[0].bytes ==
+            std::array<std::uint8_t, 4>{{0x4fu, 0x91u, 0x72u, 0x05u}}));
+
+    command = {};
+    command.kind = MASSResourceCommandKind::pitchParameter;
+    command.opcode = 0x08u;
+    command.length = 7u;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::requiresPitchHandlerState);
+
+    command = {};
+    command.kind = MASSResourceCommandKind::conditionalRecord;
+    command.length = 4u;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status ==
+           MASSFirmwarePacketPlanStatus::requiresConditionalHandlerState);
+
+    command = {};
+    command.kind = MASSResourceCommandKind::marker;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::fillerSlotOnly);
+
+    command.kind = MASSResourceCommandKind::singleByteAdvance;
+    plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
+    assert(plan.status == MASSFirmwarePacketPlanStatus::streamAdvanceOnly);
+}
+
 void testCommandRegisterFieldDecoders() {
     MASSResourceCommand command{};
     command.opcode = 0x0d;
@@ -1749,6 +1849,7 @@ int main(int argc, char** argv) {
     if (argc > 2)
         testActualFirmwareROMTables(argv[2]);
     testResourceSelectionRecordParser();
+    testFirmwareResourceCommandPlanner();
     testCommandRegisterFieldDecoders();
     testMultiParameterPacketSequenceBuilder();
     testConditionalExtendedPacketBuilder();
