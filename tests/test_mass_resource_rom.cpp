@@ -1128,9 +1128,12 @@ void testFirmwareResourceCommandPlanner() {
     auto plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
     assert(plan.status == MASSFirmwarePacketPlanStatus::ready && plan.packetCount == 2u);
     assert((plan.packets[0].bytes ==
-            std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0xc6u}}));
+            std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0x86u}}));
     assert((plan.packets[1].bytes ==
             std::array<std::uint8_t, 4>{{0x3fu, 0x81u, 0x92u, 0x03u}}));
+    assert(plan.packets[0].setsInternalBit0C);
+    assert(!plan.packets[1].setsInternalBit0C);
+    assert(!plan.finalInternalBit0C);
 
     state.flag0A = true;
     plan = MASSFirmwareResourceCommandPlanner::plan(command, state);
@@ -1138,9 +1141,13 @@ void testFirmwareResourceCommandPlanner() {
     assert((plan.packets[0].bytes ==
             std::array<std::uint8_t, 4>{{0x3eu, 0xd7u, 0xe8u, 0x81u}}));
     assert((plan.packets[1].bytes ==
-            std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0xc6u}}));
+            std::array<std::uint8_t, 4>{{0x40u, 0xa4u, 0xb5u, 0x86u}}));
+    assert(plan.packets[0].setsInternalBit0C);
+    assert(plan.packets[1].setsInternalBit0C);
     assert((plan.packets[2].bytes ==
             std::array<std::uint8_t, 4>{{0x3fu, 0x81u, 0x92u, 0x03u}}));
+    assert(!plan.packets[2].setsInternalBit0C);
+    assert(!plan.finalInternalBit0C);
 
     command.bytes[1] = 0u;
     command.kind = MASSResourceCommandKind::emptyMultiParameter;
@@ -1173,6 +1180,7 @@ void testFirmwareResourceCommandPlanner() {
     assert(plan.ready() && plan.packetCount == 1u);
     assert((plan.packets[0].bytes ==
             std::array<std::uint8_t, 4>{{0x40u, 0xabu, 0xcdu, 0x05u}}));
+    assert(!plan.packets[0].setsInternalBit0C && !plan.finalInternalBit0C);
 
     command = {};
     command.kind = MASSResourceCommandKind::threePayloadCommand;
@@ -1183,6 +1191,7 @@ void testFirmwareResourceCommandPlanner() {
     assert(plan.ready() && plan.packetCount == 1u);
     assert((plan.packets[0].bytes ==
             std::array<std::uint8_t, 4>{{0x4fu, 0x91u, 0x72u, 0x05u}}));
+    assert(!plan.packets[0].setsInternalBit0C && !plan.finalInternalBit0C);
 
     command = {};
     command.kind = MASSResourceCommandKind::pitchParameter;
