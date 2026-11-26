@@ -2096,6 +2096,7 @@ void testActualIC51(const char* path) {
     // conditional-context, invalid. Every decoded factory command must land
     // in one of the first five evidence-bounded categories.
     std::array<std::array<std::size_t, 6>, 2> plannerStatusCounts{};
+    std::array<std::size_t, 2> pitchParameterCommandCounts{};
 
     for (const auto bank : {MASSResourceBank::bank0, MASSResourceBank::bank1}) {
         std::set<std::uint16_t> pointers;
@@ -2122,6 +2123,13 @@ void testActualIC51(const char* path) {
                 MASSFirmwareCommandBoundaryState plannerState{};
                 plannerState.flag0A = flagIndex != 0u;
                 for (const auto& command : decoded.commands) {
+                    if (command.kind == MASSResourceCommandKind::pitchParameter) {
+                        MASSPitchParameterRegisterFields pitchFields{};
+                        assert(MASSResourceCommandFieldDecoder::decodePitchParameter(
+                            command, pitchFields));
+                        assert(pitchFields.opcode == command.opcode);
+                        ++pitchParameterCommandCounts[flagIndex];
+                    }
                     const auto planned =
                         MASSFirmwareResourceCommandPlanner::plan(command, plannerState);
                     switch (planned.status) {
@@ -2187,15 +2195,19 @@ void testActualIC51(const char* path) {
     assert(modulationBranchCounts == expectedModulationBranches);
     for (std::size_t flagIndex = 0; flagIndex < 2u; ++flagIndex) {
         assert(plannerStatusCounts[flagIndex][0] > 0u);
+        assert(pitchParameterCommandCounts[flagIndex] > 0u);
+        assert(plannerStatusCounts[flagIndex][3] ==
+               pitchParameterCommandCounts[flagIndex]);
         assert(plannerStatusCounts[flagIndex][5] == 0u);
         std::printf(
             "IC51 planner flag0A=%u: ready=%zu filler=%zu stream-only=%zu "
-            "pitch-context=%zu conditional-context=%zu invalid=%zu\n",
+            "pitch-context=%zu decoded-pitch=%zu conditional-context=%zu invalid=%zu\n",
             static_cast<unsigned>(flagIndex),
             plannerStatusCounts[flagIndex][0],
             plannerStatusCounts[flagIndex][1],
             plannerStatusCounts[flagIndex][2],
             plannerStatusCounts[flagIndex][3],
+            pitchParameterCommandCounts[flagIndex],
             plannerStatusCounts[flagIndex][4],
             plannerStatusCounts[flagIndex][5]);
     }
