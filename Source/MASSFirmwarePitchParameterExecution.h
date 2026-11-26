@@ -31,6 +31,13 @@ struct MASS1C61PitchExecutionSnapshot {
     // R2 is further transformed by the live 0x1D51..0x1D78 route before the
     // accumulator at 0x1DC8. It is not always identical to the group-08 byte
     // or the 0x2067 interpolation projection (notably Note 72: 0x20 -> 0x80).
+    // Optional live producer input for 0x1D51..0x1D78. When captured, the
+    // projection derives both accumulator R2 and any OV-dependent R7 correction.
+    std::uint8_t directRam34 = 0;
+    bool hasCapturedAccumulatorInputSource = false;
+
+    // Fallback for captured instruction-boundary R2 when RAM[0x34]/the
+    // preceding 0x1D51 branch inputs are not yet available.
     std::uint8_t accumulatorInputR2 = 0;
     bool hasCapturedAccumulatorInputR2 = false;
 };
@@ -58,6 +65,7 @@ struct MASS1C61PitchExecutionResult {
     MASS1C61SecondaryTableFetchAddress secondaryFetchAddress{};
     MASS1C61SecondaryTableBytes secondaryTableBytes{};
     MASS1C61PackedLookupFields packedFields{};
+    MASS1C61AccumulatorInputRouteResult accumulatorInputRoute{};
     std::uint8_t accumulatorInputR2 = 0;
     MASS1C61AccumulatorResult accumulator{};
 
@@ -128,9 +136,28 @@ public:
                 snapshot.ram2F,
                 snapshot.secondaryTableBankSelectR4);
 
-        // At 0x1D45 the firmware overwrites the group-08 R7 byte with
-        // the normalized (R3 + RAM[0x2F]) index. 0x1D95 adds that normalized
-        // R7 to the loaded base pointer; commandFields.r7 is no longer live.
+        if (snapshot.hasCapturedAccumulatorInputSource) {
+            result.accumulatorInputRoute =
+                MASS1C61AccumulatorInputRouteProjection::apply(
+                    result.commandFields.r2,
+                    result.commandFields.r4,
+                    snapshot.directRam34,
+                    result.secondaryAddress.normalizedIndex);
+            result.accumulatorInputR2 =
+                result.accumulatorInputRoute.accumulatorR2;
+            result.secondaryAddress.normalizedIndex =
+                result.accumulatorInputRoute.normalizedR7;
+        } else if (snapshot.hasCapturedAccumulatorInputR2) {
+            result.accumulatorInputR2 = snapshot.accumulatorInputR2;
+        } else {
+            result.status =
+                MASS1C61PitchExecutionStatus::requiresAccumulatorInputR2Snapshot;
+            return result;
+        }
+
+        // At 0x1D45 the group-08 R7 byte is replaced by normalized R7.
+        // The 0x1D51..0x1D78 route may make a further OV-dependent correction.
+        // 0x1D95 adds the resulting live R7 exactly once to the loaded base DPTR.
         if (!MASS1C61SecondaryTableReader::read(
                 firmwareROM, result.secondaryAddress,
                 result.secondaryTableBytes,
@@ -141,13 +168,6 @@ public:
 
         result.packedFields =
             MASS1C61PackedLookupDecoder::decode(result.secondaryTableBytes);
-
-        if (!snapshot.hasCapturedAccumulatorInputR2) {
-            result.status =
-                MASS1C61PitchExecutionStatus::requiresAccumulatorInputR2Snapshot;
-            return result;
-        }
-        result.accumulatorInputR2 = snapshot.accumulatorInputR2;
 
         if (result.accumulatorInputR2 == 0u &&
             !snapshot.hasCapturedDirectRamAccumulatorInputs) {
