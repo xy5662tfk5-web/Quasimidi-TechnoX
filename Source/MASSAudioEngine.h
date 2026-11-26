@@ -2,6 +2,7 @@
 #include <algorithm>
 #include "MASSModulationMatrix.h"
 #include "MASSVoiceManager.h"
+#include "MASSWaveformMemoryView.h"
 #include "TechnoXPartModel.h"
 #include <array>
 #include <atomic>
@@ -417,6 +418,7 @@ public:
     virtual void setFXUploadPlanCatalog(const MASSFXUploadPlanCatalog*) noexcept {}
     virtual void setExternalSoundMemoryImage(
         const MASSIC51ExternalSoundMemoryImage*) noexcept {}
+    virtual void setWaveformMemoryView(const MASSWaveformMemoryView*) noexcept {}
     virtual void setDrumSet(int /*partIndex*/, int /*drumSet*/) noexcept {}
     virtual void prepare(double sampleRate, int maximumBlockSize) = 0;
     virtual void noteOn(int voiceIndex, const VoiceSlot& voice) noexcept = 0;
@@ -474,6 +476,7 @@ public:
         backend_->setFX2ResourceCatalog(fx2ResourceCatalog_);
         backend_->setFXUploadPlanCatalog(fxUploadPlanCatalog_);
         backend_->setExternalSoundMemoryImage(externalSoundMemoryImage_);
+        backend_->setWaveformMemoryView(waveformMemoryView_);
         for (std::size_t part = 0; part < MASSDrumSetStore::kPartCount; ++part)
             backend_->setDrumSet(static_cast<int>(part), drumSets_.get(static_cast<int>(part)));
         if (prepared_)
@@ -531,6 +534,16 @@ public:
     }
     const MASSIC51ExternalSoundMemoryImage* externalSoundMemoryImage() const noexcept {
         return externalSoundMemoryImage_;
+    }
+
+    // Optional externally acquired waveform bytes. This is an immutable raw-memory
+    // view only; the engine does not infer sample format or render from it.
+    void setWaveformMemoryView(const MASSWaveformMemoryView* view) noexcept {
+        waveformMemoryView_ = view;
+        backend_->setWaveformMemoryView(waveformMemoryView_);
+    }
+    const MASSWaveformMemoryView* waveformMemoryView() const noexcept {
+        return waveformMemoryView_;
     }
 
     void prepare(double sampleRate, int maximumBlockSize) {
@@ -911,6 +924,7 @@ private:
     const MASSFX2ResourceCatalog* fx2ResourceCatalog_ = nullptr;
     const MASSFXUploadPlanCatalog* fxUploadPlanCatalog_ = nullptr;
     const MASSIC51ExternalSoundMemoryImage* externalSoundMemoryImage_ = nullptr;
+    const MASSWaveformMemoryView* waveformMemoryView_ = nullptr;
     double preparedSampleRate_ = 44100.0;
     int preparedMaximumBlockSize_ = 0;
     bool prepared_ = false;
