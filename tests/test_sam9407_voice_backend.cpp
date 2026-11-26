@@ -110,6 +110,61 @@ int main() {
     assert(bigLeft[0] > 0.1f && bigRight[0] > 0.1f);
     assert(bigLeft[1] < -0.1f && bigRight[1] < -0.1f);
 
+    // A mono/legato retarget can change the selected program without a
+    // second backend noteOn. The active voice must follow the new mapping.
+    std::array<std::uint8_t, 8> retargetPcm{{
+        0x00, 0x20, 0x00, 0x20, 0x00, 0xe0, 0x00, 0xe0
+    }};
+    MASSWaveformMemoryView retargetMemory;
+    assert(retargetMemory.attach(retargetPcm.data(), retargetPcm.size()));
+    SAM9407VoiceBackend retargetBackend;
+    SAM9407SampleMapEntry positiveEntry{};
+    positiveEntry.bank = 0;
+    positiveEntry.program = 0;
+    positiveEntry.startWord = 0;
+    positiveEntry.endWord = 2;
+    positiveEntry.sampleRate = 44100;
+    positiveEntry.rootNote = 60;
+    positiveEntry.gain = 127;
+    positiveEntry.pan = 64;
+    assert(retargetBackend.addSampleMapping(positiveEntry));
+    SAM9407SampleMapEntry negativeEntry = positiveEntry;
+    negativeEntry.program = 1;
+    negativeEntry.startWord = 2;
+    negativeEntry.endWord = 4;
+    assert(retargetBackend.addSampleMapping(negativeEntry));
+    retargetBackend.setWaveformMemoryView(&retargetMemory);
+    retargetBackend.prepare(44100.0, 8);
+
+    VoiceManager retargetVoices;
+    const int retargetIndex = retargetVoices.noteOn(0, 1, 60, 127, -1, 0, 0);
+    assert(retargetIndex >= 0);
+    retargetBackend.noteOn(retargetIndex,
+        retargetVoices.voices()[static_cast<std::size_t>(retargetIndex)]);
+    MASSPartParameterStore retargetParts;
+    assert(retargetParts.set(0, PartParameter::level, 127));
+    MASSModulationSourceStore retargetSources;
+    MASSPartRuntimeControlStore retargetControls;
+    MASSCommonControlStore retargetCommon;
+    MASSPerformanceImageStore retargetPerformance;
+    MASSDrumParameterStore retargetDrums;
+    ModulationMatrix retargetMatrix;
+    std::array<float, 2> retargetLeft{}, retargetRight{};
+    float* retargetChannels[] = {retargetLeft.data(), retargetRight.data()};
+    retargetBackend.render(retargetChannels, 2, 1, retargetVoices,
+        retargetMatrix, retargetParts, retargetSources, retargetControls,
+        retargetCommon, retargetPerformance, retargetDrums);
+    assert(retargetLeft[0] > 0.05f);
+
+    assert(retargetVoices.retargetVoice(static_cast<std::size_t>(retargetIndex),
+        1, 60, 127, 0, 1));
+    retargetLeft.fill(0.0f);
+    retargetRight.fill(0.0f);
+    retargetBackend.render(retargetChannels, 2, 1, retargetVoices,
+        retargetMatrix, retargetParts, retargetSources, retargetControls,
+        retargetCommon, retargetPerformance, retargetDrums);
+    assert(retargetLeft[0] < -0.05f);
+
     // Invalid loops and out-of-range sample descriptors are rejected early.
     SAM9407VoiceBackend validationBackend;
     SAM9407SampleMapEntry invalid = entry;
