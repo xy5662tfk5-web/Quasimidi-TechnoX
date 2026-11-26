@@ -25,10 +25,14 @@ Purpose: one authoritative work queue for the original-audio reconstruction. Thi
 - Per-voice bank/program identity and immutable program/FX/upload-plan catalogs reach the backend without parsing or allocation in the render callback.
 - Firmware traces cover Note On/Off, velocity-sensitive command bytes, two-Part event expansion, IC51 nested-record copying, pitch interpolation operands, SoundHost writes/reads, and FF10 resource uploads.
 - The 8032 firmware is emulated; the external sound processor and its original audio algorithms are not.
+- DREAM SAM9407 is the primary working architecture for the TechnoX synthesis path, supported by the SAM9407 datasheet and public application references naming TechnoX/Quasar/Raven; the fitted chip and its pin-level connection still need board or bus confirmation.
+- ADSP-2105 is a separate candidate for FX1/FX2 based on Quasimidi-family reports; its presence and exact connection in this TechnoX unit are not yet physically confirmed.
 
 ## Current implementation truth
 
-`BasicMASSVoiceBackend` is still a generic test oscillator. There is no confirmed physical DSP/processor model, no validated host-port command interpreter, no decoded full waveform store, no original sample playback, no proven original voice/filter/envelope model, and no original FX DSP. Do not describe the plugin as an authentic-sounding TechnoX emulator until those components are implemented and compared against hardware/reference audio.
+The external synthesis target is now the **DREAM SAM9407 architecture**; the separate FX target under investigation is **ADSP-2105**. These are implementation targets based on the available public documentation and Quasimidi-family evidence, not completed physical board identification or a decoded bus-level device map.
+
+The following are still absent: a validated 8032-to-SAM9407 host-port bridge, decoded full waveform store, original sample playback, proven original voice/filter/envelope behavior, and the separate original FX DSP implementation. `BasicMASSVoiceBackend` remains a generic diagnostic oscillator. Do not describe the plugin as an authentic-sounding TechnoX emulator until these components are implemented and compared with hardware/reference audio.
 
 ## Remaining work — ordered by dependency
 
@@ -56,12 +60,13 @@ Status: **partially mapped at firmware level; physical device/protocol still unc
 - [x] Add P3 write provenance: port writes now retain PC, previous/new latch, changed mask, P2 and SFR `0x8E`; separate P3.2 control writes are retained even when the bit does not change. The real-ROM boot test asserts P3.2 write sites `0xAF1A` and `0xAF73`. Full CTest/unit-test workflow passed 29/29 steps.
 - [ ] Establish the external semantics of the phase-triggered offset-2 read. Its return value is discarded by IC4 immediately, so it may be a read-side-effect handshake, but this must be verified rather than labelled ACK.
 
-- [ ] Create a single chronological merged report of each `0x8000–0x8003` transaction with instruction/caller PC, P2/P3, SFR `0x8E`, P3.2 level, IC51 selection, cycle, and preceding/following `0xFF10` and IC51 activity. Existing per-byte contexts exist; the cross-interface timeline is still missing.
+- [ ] Validate the initial offline cycle-sorted merged trace collector added in `Source/TechnoXSoundDeviceTimeline.h` and the real-ROM fixture. It merges IC51 reads, `0x8000–0x8003` reads/writes, `0xFF10`, external sound-memory reads/writes, P3 control writes and SFR `0x8E` writes with PC/caller, P2/P3 and machine-cycle context.
+- [ ] Extend the trace with a shared monotonically increasing event sequence (so same-cycle cross-ring ordering can be proven), include complete P3/caller context, and emit separate boot/upload/Note On/Note Off/FX windows. Current equal-cycle order is intentionally not asserted.
 - [ ] Separate boot/configuration, external-memory load, Note On, Note Off, pitch, controller, and FX traffic using isolated stimuli.
 - [ ] Determine the four host-register meanings only from repeatable evidence; retain neutral register names until then.
 - [ ] Establish ready/busy/ack behavior, read semantics, control-phase timing, and device selection. The `0x40/0xC0` writes to offset 3 are observed control-phase values, not yet decoded as ACK/BUSY. Current open-bus and synthetic-ready responses are test fixtures, not hardware behavior.
 - [ ] Resolve P3.2 polarity/function. The C++ `soundDeviceResetReleased` label is a working compatibility hypothesis only: firmware clears P3.2 for the bulk transfer and memory test, and existing SoundHost contexts include P3.2-low states.
-- [ ] Identify the physical processor/DSP from board markings, schematics, service documentation, or a verified bus capture. SAM9407 remains a hypothesis, not an established identity.
+- [ ] Verify the fitted SAM9407 against readable TechnoX board markings, schematics or a hardware capture, then map the 8032 host aperture/glue logic to its 16-bit host interface. SAM9407 is the primary synthesis architecture target; the board-level proof and bridge remain open.
 - [ ] Determine the external memory topology and the path to the advertised multi-megabyte waveform store. Do not treat the 128-KiB IC51 dump or the 16-KiB startup image as the complete sample ROM.
 
 Exit condition: documented host protocol and memory topology with enough evidence to implement a device model without guessed register meanings.
