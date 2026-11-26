@@ -51,7 +51,7 @@ The open-source [libmikmod SAM9407 backend](https://github.com/sezero/mikmod/blo
 
 This is useful as a **generic semantic cross-check**: a SAM9407 voice model should be able to represent sample source/loop boundaries, pitch, stereo level and lifecycle separately. It does **not** provide the TechnoX M.A.S.S. command mapping, does not prove the TechnoX board uses the same Linux-facing firmware, and does not identify any of the IC4 bytes at `0x8000–0x8003` with a SAM9407 register or event. Do not copy the Linux event numbers or API structures into the TechnoX bridge.
 
-The EWS64 reference driver is also from another SAM9407-based product. Its firmware and `.94B` sound banks can be useful for studying generic SAM9407 memory loading and software architecture, but they are not TechnoX's reported 64 MB waveform bank and cannot substitute for TechnoX's original IC51/DSP resources. See the [EWS64 hardware/software notes](https://vogonswiki.com/index.php/EWS64).
+The EWS64 reference driver is also from another SAM9407-based product. Its firmware and `.94B` sound banks can be useful for studying generic SAM9407 memory loading and software architecture, but they are not TechnoX's reported waveform bank and cannot substitute for TechnoX's original IC51/DSP resources. See the [EWS64 hardware/software notes](https://vogonswiki.com/index.php/EWS64).
 
 ## Architecture-level implementation boundary
 
