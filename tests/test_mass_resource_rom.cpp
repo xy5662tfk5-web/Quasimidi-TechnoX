@@ -1007,6 +1007,65 @@ void testOriginalVoiceProgramRuntime(
         }
     }
     assert(foundRuntimePacket);
+
+    // Consume a real factory group-08 command from the selected voice cursor,
+    // while injecting only the still-unresolved 1D2F address-boundary state
+    // and a deterministic code-ROM image for the three MOVC table bytes.
+    bool foundRuntimePitch = false;
+    for (int bank = 0; bank < 4 && !foundRuntimePitch; ++bank) {
+        for (int sound = 0; sound < 128 && !foundRuntimePitch; ++sound) {
+            voice.bankNumber = static_cast<std::uint8_t>(bank);
+            voice.soundNumber = static_cast<std::uint8_t>(sound);
+            assert(runtime.noteOn(4, voice));
+            const auto* resource = runtime.programForVoice(4, false);
+            if (resource == nullptr) continue;
+
+            std::size_t pitchCommandIndex = resource->stream.commands.size();
+            MASSPitchParameterRegisterFields pitchFields{};
+            for (std::size_t commandIndex = 0;
+                 commandIndex < resource->stream.commands.size(); ++commandIndex) {
+                if (MASSResourceCommandFieldDecoder::decodePitchParameter(
+                        resource->stream.commands[commandIndex], pitchFields)) {
+                    pitchCommandIndex = commandIndex;
+                    break;
+                }
+            }
+            if (pitchCommandIndex == resource->stream.commands.size()) continue;
+
+            std::vector<std::uint8_t> pitchCodeROM(0x20000u, 0xffu);
+            constexpr std::uint16_t targetTableAddress = 0x5000u;
+            pitchCodeROM[targetTableAddress] = 0x05u;
+            pitchCodeROM[targetTableAddress + 0x80u] = 0x43u;
+            pitchCodeROM[targetTableAddress + 0x100u] = 0x02u;
+            MASSFirmwareROMView pitchFirmwareROM;
+            assert(pitchFirmwareROM.attach(
+                pitchCodeROM.data(), pitchCodeROM.size()));
+
+            const auto addressOffset =
+                MASS1C61SecondaryTableAddressBuilder::resolve(
+                    0u, pitchFields.r3, 0u, pitchFields.r4);
+            const auto basePointer = static_cast<std::uint16_t>(
+                targetTableAddress - addressOffset.address - pitchFields.r7);
+            MASS1C61PitchExecutionSnapshot pitchSnapshot{};
+            pitchSnapshot.interpolationControl2067 = 0u;
+            pitchSnapshot.secondaryTableBasePointer = basePointer;
+            pitchSnapshot.secondaryTableIndexR3 = pitchFields.r3;
+            pitchSnapshot.secondaryTableBankSelectR4 = pitchFields.r4;
+            pitchSnapshot.ram2F = 0u;
+
+            runtime.rewindCommandStream(4, false);
+            for (std::size_t commandIndex = 0;
+                 commandIndex < pitchCommandIndex; ++commandIndex)
+                assert(runtime.nextCommand(4, false) != nullptr);
+            const auto livePitch = runtime.planNextPitchCommand(
+                4, false, pitchFirmwareROM, pitchSnapshot);
+            assert(livePitch.ready());
+            assert(runtime.commandCursor(4, false) == pitchCommandIndex + 1u);
+            assert(livePitch.secondaryFetchAddress.address == targetTableAddress);
+            foundRuntimePitch = true;
+        }
+    }
+    assert(foundRuntimePitch);
     voice = originalVoice;
     assert(runtime.noteOn(4, voice));
     normal = runtime.programForVoice(4, false);
