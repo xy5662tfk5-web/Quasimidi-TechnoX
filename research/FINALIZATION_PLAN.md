@@ -13,7 +13,9 @@ The project already has a substantial firmware/resource foundation:
 - Firmware-side command planning and pitch/slot arithmetic projections produce evidence-backed packet bytes for covered paths.
 - FX1/FX2 directories and upload byte streams are reconstructed separately.
 
-**The Intel macOS workflow has now built AU, VST3 and Standalone on x86_64 and passed 11/11 CTest tests plus the Python suite (run 45862138151). The artifact is linked in the status report; actual Logic loading on the user's Monterey system remains to be confirmed.\n\nThe original sound generator is not complete.** `BasicMASSVoiceBackend` still renders a diagnostic oscillator. The 16-KiB C000–FFFF image is a verified firmware memory-transfer result, not a decoded waveform library. The fitted synthesis chip/host-port bridge, larger waveform store, sample format and original DSP playback behavior are not yet verified. Recent pitch-probe changes also have no confirmed CI result at this checkpoint.
+**The current code revision `1d645f2` has passed GitHub Actions run [45874257408](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45874257408): Intel AU/VST3/Standalone build, 11/11 CTest tests and the Python unit-test job. The Intel plugin artifact is linked in the status report; actual Logic loading on the user's Monterey system remains to be confirmed.**
+
+**The original sound generator is not complete.** `BasicMASSVoiceBackend` still renders a diagnostic oscillator. The 16-KiB C000–FFFF image is a verified firmware memory-transfer result, not a decoded waveform library. The fitted synthesis chip/host-port bridge, larger waveform store, sample format and original DSP playback behavior are not yet verified. Recent pitch-probe changes also have no confirmed CI result at this checkpoint.
 
 ## Short completion path
 
@@ -42,8 +44,8 @@ FX1/FX2 remain a separate completion item: upload resources are reconstructed, b
 
 ### 4. Release validation
 
-- Run the current full CTest and Python regression suites against the final source revision.
-- [x] Produce x86_64 Intel macOS builds for AU, VST3 and Standalone. Workflow 45862138151 passed; all three bundles were built and packaged.
+- [x] Run the full CTest and Python regression suites against code revision `1d645f2`: 11/11 CTest and the Python job passed in Actions run `45874257408`.
+- [x] Produce x86_64 Intel macOS builds for AU, VST3 and Standalone. Workflow 45874257408 passed and uploaded artifact `technox-intel-plugins` (artifact ID `15144262800`).
 - [ ] Install/load the AU in Logic on the user's macOS Monterey system and compare against a physical TechnoX or trusted reference capture.
 - Compare controlled notes and a small set of factory Performances against a physical TechnoX or a trusted reference capture.
 - Keep any unmatched behavior explicitly listed; do not label the emulator authentic until sample playback and the original processing path are demonstrated.

@@ -21,6 +21,10 @@ For each board revision, preserve:
 
 Never read or remove a device from a powered board. Do not select a voltage or programming algorithm by package appearance alone.
 
+## SysEx dump boundary
+
+The owner's manual's documented “Request Data” command and address table cover system/temporary parameters, Performance and Multi-Setup data, drum-set data, and sound-name banks. The documented map does **not** define a raw waveform/sample-ROM address range. Therefore a documented SysEx request/dump is useful for factory configuration and sound-name state, but is not evidence that the internal waveform memory can be read over MIDI. See the [TechnoX owner’s manual](https://www.deepsonic.ch/deep/docs_manuals/quasimidi_technox_manual.pdf), SysEx Request Data/address-map pages.
+
 ## Engine hand-off
 
 The engine exposes `MASSWaveformMemoryView`, a non-owning immutable view over a caller-owned byte image. The memory owner must outlive the view and keep its bytes unchanged while the backend can access it. `MASSAudioEngine::setWaveformMemoryView()` forwards the view to the active backend and carries it across backend replacement. The current `BasicMASSVoiceBackend` only exposes raw-byte test access; it does not interpret or render the image.
