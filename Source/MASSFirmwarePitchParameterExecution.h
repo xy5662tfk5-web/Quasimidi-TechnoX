@@ -11,17 +11,20 @@ namespace technox {
 // prove that they can always be reconstructed from the original group-08 bytes.
 struct MASS1C61PitchExecutionSnapshot {
     std::uint8_t interpolationControl2067 = 0;
+    bool hasCapturedInterpolationControl = false;
 
-    // Inputs observed at the 0x1D2F secondary MOVC-address selection.
+    // These values must be captured together at the 0x1D2F address boundary.
     std::uint16_t secondaryTableBasePointer = 0;
     std::uint8_t secondaryTableIndexR3 = 0;
     std::uint8_t secondaryTableBankSelectR4 = 0;
     std::uint8_t ram2F = 0;
+    bool hasCapturedSecondaryAddressInputs = false;
 
-    // Direct RAM inputs used by the 0x1DC8..0x1E04 accumulator bypass.
+    // Direct RAM inputs are consulted only by the R2==0 accumulator bypass.
     std::uint8_t directRam05 = 0;
     std::uint8_t directRam06 = 0;
     std::uint8_t directRam07 = 0;
+    bool hasCapturedDirectRamAccumulatorInputs = false;
 };
 
 enum class MASS1C61PitchExecutionStatus : std::uint8_t {
@@ -29,8 +32,11 @@ enum class MASS1C61PitchExecutionStatus : std::uint8_t {
     commandStreamExhausted,
     invalidCommand,
     firmwareROMUnavailable,
+    requiresInterpolationControlSnapshot,
     interpolationLookupFailed,
-    secondaryTableReadFailed
+    requiresSecondaryAddressSnapshot,
+    secondaryTableReadFailed,
+    requiresDirectRamBypassSnapshot
 };
 
 struct MASS1C61PitchExecutionResult {
@@ -80,6 +86,12 @@ public:
             return result;
         }
 
+        if (!snapshot.hasCapturedInterpolationControl) {
+            result.status =
+                MASS1C61PitchExecutionStatus::requiresInterpolationControlSnapshot;
+            return result;
+        }
+
         if (!MASS1C61InterpolationLookup::resolve(
                 firmwareROM, snapshot.interpolationControl2067,
                 result.interpolationLookup)) {
@@ -92,6 +104,12 @@ public:
             result.commandFields.r2,
             result.commandFields.r3,
             result.commandFields.r4);
+
+        if (!snapshot.hasCapturedSecondaryAddressInputs) {
+            result.status =
+                MASS1C61PitchExecutionStatus::requiresSecondaryAddressSnapshot;
+            return result;
+        }
 
         result.secondaryAddress =
             MASS1C61SecondaryTableAddressBuilder::resolve(
@@ -111,6 +129,13 @@ public:
 
         result.packedFields =
             MASS1C61PackedLookupDecoder::decode(result.secondaryTableBytes);
+
+        if (result.interpolatedInput.r2 == 0u &&
+            !snapshot.hasCapturedDirectRamAccumulatorInputs) {
+            result.status =
+                MASS1C61PitchExecutionStatus::requiresDirectRamBypassSnapshot;
+            return result;
+        }
 
         result.accumulator = MASS1C61AccumulatorTransform::apply(
             result.interpolatedInput.r2,
