@@ -246,6 +246,7 @@ if (BUILD_TESTING)
         tests/test_waveform_memory_view.cpp
     )
     target_compile_features(technox_waveform_memory_view_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_waveform_memory_view_tests PRIVATE -UNDEBUG)
     add_test(NAME technox_waveform_memory_view_tests
         COMMAND technox_waveform_memory_view_tests
     )
