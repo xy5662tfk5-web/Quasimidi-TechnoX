@@ -715,7 +715,7 @@ int main(int argc, char** argv) {
                     fxDispatchProbe.testExternalRamByteForTesting(dispatch.destination);
                 if (actual != expected) {
                     std::fprintf(stderr,
-                        "FX dispatch mismatch: sub=%02X input=%02X dest=%04X actual=%02X expected=%02X PC=%04X 3702=%02X 3708=%02X 6A=%02X 2B94=%02X 308B=%02X 308D=%02X\\n",
+                        "FX dispatch mismatch: sub=%02X input=%02X dest=%04X actual=%02X expected=%02X PC=%04X 3702=%02X 3708=%02X 6A=%02X 2B94=%02X 308B=%02X 308D=%02X\n",
                         static_cast<unsigned>(dispatch.subcommand),
                         static_cast<unsigned>(input),
                         static_cast<unsigned>(dispatch.destination),
@@ -805,7 +805,7 @@ int main(int argc, char** argv) {
                 fxEventProbe.testExternalRamByteForTesting(event.destination);
             if (storedSelector != expected) {
                 std::fprintf(stderr,
-                    "FX event path mismatch: entry=%04X cmd=%02X input1A=%u 7BDC=%02X dest=%04X stored=%02X expected=%02X 3702=%02X 3708=%02X 7BD9=%02X 7BDA=%02X 7BDB=%02X 308B=%02X 308D=%02X 3097=%02X 6A=%02X PC=%04X fault=%u\\n",
+                    "FX event path mismatch: entry=%04X cmd=%02X input1A=%u 7BDC=%02X dest=%04X stored=%02X expected=%02X 3702=%02X 3708=%02X 7BD9=%02X 7BDA=%02X 7BDB=%02X 308B=%02X 308D=%02X 3097=%02X 6A=%02X PC=%04X fault=%u\n",
                     static_cast<unsigned>(event.entry),
                     static_cast<unsigned>(event.command),
                     static_cast<unsigned>(event.bit1aInitial),
@@ -968,7 +968,7 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(frame[9u]),
                             static_cast<unsigned>(trackMode));
             }
-            std::printf("\\n");
+            std::printf("\n");
         }
 
         TechnoX8032Machine firmwareMachine;
@@ -1066,7 +1066,7 @@ int main(int argc, char** argv) {
             registers.pc = 0x044cu;
             const auto executed = phaseMachine.runUntilProgramCounter(0x047du, 512u);
             std::fprintf(stderr,
-                "Periodic scheduler exit pc=%04X executed=%zu page=%02X P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\\n",
+                "Periodic scheduler exit pc=%04X executed=%zu page=%02X P2=%02X R47=%02X R48=%02X R49=%02X status[%04X]=%02X tick[2064]=%02X fault=%d\n",
                 static_cast<unsigned>(registers.pc), executed,
                 static_cast<unsigned>(schedulerPage),
                 static_cast<unsigned>(phaseMachine.readPortLatch(0xa0u)),
@@ -1080,7 +1080,7 @@ int main(int argc, char** argv) {
             for (std::size_t n = 0; n < phaseMachine.xdataWatchTraceCount(); ++n) {
                 const auto& event = phaseMachine.xdataWatchTraceAt(n);
                 if (event.instructionPC == 0x0465u) {
-                    std::fprintf(stderr, "  scheduler MOVX addr=%04X value=%02X P2=%02X P3=%02X\\n",
+                    std::fprintf(stderr, "  scheduler MOVX addr=%04X value=%02X P2=%02X P3=%02X\n",
                         static_cast<unsigned>(event.address), static_cast<unsigned>(event.value),
                         static_cast<unsigned>(event.port2), static_cast<unsigned>(event.port3));
                 }
@@ -1118,7 +1118,7 @@ int main(int argc, char** argv) {
             }
 
             std::fprintf(stderr,
-                "Periodic sine probe gate=%02X step=%02X R47=%02X R48=%02X IRAM03=%02X PSW=%02X XDATA=%02X/%02X/%02X writes=%zu\\n",
+                "Periodic sine probe gate=%02X step=%02X R47=%02X R48=%02X IRAM03=%02X PSW=%02X XDATA=%02X/%02X/%02X writes=%zu\n",
                 static_cast<unsigned>(gate), static_cast<unsigned>(stepCount),
                 static_cast<unsigned>(phaseMachine.readInternal(0x47u)),
                 static_cast<unsigned>(phaseMachine.readInternal(0x48u)),
@@ -1133,7 +1133,7 @@ int main(int argc, char** argv) {
             for (std::size_t traceIndex = firstTrace; traceIndex < traceCount; ++traceIndex) {
                 const auto& event = phaseMachine.xdataWatchTraceAt(traceIndex);
                 if (event.address >= 0x2050u && event.address <= 0x2053u) {
-                    std::fprintf(stderr, "  XDATA %04X=%02X write=%d pc=%04X ret=%04X\\n",
+                    std::fprintf(stderr, "  XDATA %04X=%02X write=%d pc=%04X ret=%04X\n",
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value), event.write ? 1 : 0,
                         static_cast<unsigned>(event.instructionPC),
@@ -1235,7 +1235,7 @@ int main(int argc, char** argv) {
             assert(consumerMachine.readInternal(0x36u) != 0u ||
                    consumerMachine.readInternal(0x37u) != 0u);
             bool sawInternal36Write = false;
-            std::printf("SINE/SLOT IRAM RESULT WRITES: count=%zu\\n",
+            std::printf("SINE/SLOT IRAM RESULT WRITES: count=%zu\n",
                         consumerMachine.internalRamWriteTraceCountForTesting());
             for (std::size_t writeIndex = 0;
                  writeIndex < consumerMachine.internalRamWriteTraceCountForTesting();
@@ -1247,7 +1247,7 @@ int main(int argc, char** argv) {
                 std::printf("  IRAM[%02X] %02X->%02X %s pc=%04X bytes=%02X/%02X/%02X "
                             "ret=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
                             "R0-R7=%02X/%02X/%02X/%02X/%02X/%02X/%02X/%02X "
-                            "P2/P3=%02X/%02X cycle=%llu seq=%llu\\n",
+                            "P2/P3=%02X/%02X cycle=%llu seq=%llu\n",
                             static_cast<unsigned>(write.address),
                             static_cast<unsigned>(write.previousValue),
                             static_cast<unsigned>(write.value),
@@ -1316,7 +1316,7 @@ int main(int argc, char** argv) {
                 assert(cpuRegisters.pc == 0x0a52u);
             }
             std::fprintf(stderr,
-                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu writer=%d voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
+                "Sine slot downstream step=%u page=%02X P3=%02X mode=%02X PC=%04X instructions=%zu writer=%d voiceField=%02X/%02X hostWrites=%zu packets=%zu fault=%d\n",
                 static_cast<unsigned>(sineStepCount),
                 static_cast<unsigned>(voiceRecordPage),
                 static_cast<unsigned>(consumerMachine.readPortLatch(0xb0u)),
@@ -1405,7 +1405,7 @@ int main(int argc, char** argv) {
             for (std::size_t eventIndex = firstHostTrace; eventIndex < hostTraceCount; ++eventIndex) {
                 const auto& event = consumerMachine.soundHostWriteAt(eventIndex);
                 std::fprintf(stderr,
-                    "  SoundHost reg=%u value=%02X pc=%04X ret=%04X device=%02X P2=%02X\\n",
+                    "  SoundHost reg=%u value=%02X pc=%04X ret=%04X device=%02X P2=%02X\n",
                     static_cast<unsigned>(event.registerIndex),
                     static_cast<unsigned>(event.value),
                     static_cast<unsigned>(event.instructionPC),
@@ -1417,7 +1417,7 @@ int main(int argc, char** argv) {
                  packetIndex < consumerMachine.soundCommandPacketCount(); ++packetIndex) {
                 const auto& packet = consumerMachine.soundCommandPacketAt(packetIndex);
                 std::fprintf(stderr,
-                    "  SoundHost packet=%02X %02X %02X %02X ret=%04X device=%02X\\n",
+                    "  SoundHost packet=%02X %02X %02X %02X ret=%04X device=%02X\n",
                     static_cast<unsigned>(packet.bytes[0]),
                     static_cast<unsigned>(packet.bytes[1]),
                     static_cast<unsigned>(packet.bytes[2]),
@@ -1576,7 +1576,7 @@ int main(int argc, char** argv) {
                 writerExitPC = cpuRegisters.pc;
             }
             std::fprintf(stderr,
-                "Sine slot1 downstream step=%u page=%02X PC=%04X instructions=%zu writer=%d writerInstructions=%zu writerExit=%04X field=%02X/%02X hostWrites=%zu packets=%zu fault=%d\\n",
+                "Sine slot1 downstream step=%u page=%02X PC=%04X instructions=%zu writer=%d writerInstructions=%zu writerExit=%04X field=%02X/%02X hostWrites=%zu packets=%zu fault=%d\n",
                 static_cast<unsigned>(sineStepCount),
                 static_cast<unsigned>(voiceRecordPage),
                 static_cast<unsigned>(cpuRegisters.pc), downstreamInstructions,
@@ -1662,13 +1662,13 @@ int main(int argc, char** argv) {
                 assert(event.port2 == 0x80u);
             }
 
-            std::fprintf(stderr, "  slot1 writer final PC=%04X instructions=%zu\\n",
+            std::fprintf(stderr, "  slot1 writer final PC=%04X instructions=%zu\n",
                 static_cast<unsigned>(writerExitPC), writerInstructions);
             const auto hostTraceCount = consumerMachine.soundHostWriteCount();
             for (std::size_t eventIndex = 0; eventIndex < hostTraceCount; ++eventIndex) {
                 const auto& event = consumerMachine.soundHostWriteAt(eventIndex);
                 std::fprintf(stderr,
-                    "  slot1 SoundHost reg=%u value=%02X pc=%04X ret=%04X device=%02X P2=%02X\\n",
+                    "  slot1 SoundHost reg=%u value=%02X pc=%04X ret=%04X device=%02X P2=%02X\n",
                     static_cast<unsigned>(event.registerIndex),
                     static_cast<unsigned>(event.value),
                     static_cast<unsigned>(event.instructionPC),
@@ -1680,7 +1680,7 @@ int main(int argc, char** argv) {
                  packetIndex < consumerMachine.soundCommandPacketCount(); ++packetIndex) {
                 const auto& packet = consumerMachine.soundCommandPacketAt(packetIndex);
                 std::fprintf(stderr,
-                    "  slot1 SoundHost packet=%02X %02X %02X %02X ret=%04X device=%02X\\n",
+                    "  slot1 SoundHost packet=%02X %02X %02X %02X ret=%04X device=%02X\n",
                     static_cast<unsigned>(packet.bytes[0]),
                     static_cast<unsigned>(packet.bytes[1]),
                     static_cast<unsigned>(packet.bytes[2]),
@@ -1779,7 +1779,7 @@ int main(int argc, char** argv) {
             }
         }
         assert(verifiedParameterSlotCases == 32u);
-        std::printf("IC4 parameter slot matrix: %zu/32 (16 slots x 2 coefficient pages) verified\\n",
+        std::printf("IC4 parameter slot matrix: %zu/32 (16 slots x 2 coefficient pages) verified\n",
                     verifiedParameterSlotCases);
 
         // Recover the fixed FX1 algorithm/resource table from descrambled IC4,
@@ -2118,7 +2118,7 @@ int main(int argc, char** argv) {
                 const auto executed = fx1Runtime.runUntilProgramCounter(0x8048u, 100000u);
                 if (fx1Runtime.ff10WriteCount() != roomUploadPlan.totalPortBytes()) {
                     std::fprintf(stderr,
-                        "FX1 Room upload mismatch: actual=%zu expected=%zu PC=%04X IC51reads=%llu\\n",
+                        "FX1 Room upload mismatch: actual=%zu expected=%zu PC=%04X IC51reads=%llu\n",
                         fx1Runtime.ff10WriteCount(), roomUploadPlan.totalPortBytes(),
                         static_cast<unsigned>(fx1Runtime.cpu().registers().pc),
                         static_cast<unsigned long long>(fx1Runtime.ic51ReadCount()));
@@ -2186,14 +2186,14 @@ int main(int argc, char** argv) {
                 assert(expectedPortBytes > 0u);
                 if (fx2Runtime.ff10WriteCount() != expectedPortBytes) {
                     std::fprintf(stderr,
-                        "FX2 Equalizr1 FF10 mismatch: actual=%zu expected=%zu IC51=%llu PC=%04X\\n",
+                        "FX2 Equalizr1 FF10 mismatch: actual=%zu expected=%zu IC51=%llu PC=%04X\n",
                         fx2Runtime.ff10WriteCount(), expectedPortBytes,
                         static_cast<unsigned long long>(fx2Runtime.ic51ReadCount()),
                         static_cast<unsigned>(fx2Runtime.cpu().registers().pc));
                     for (std::size_t i = 0; i < fx2Runtime.ff10WriteCount(); ++i) {
                         const auto& event = fx2Runtime.ff10WriteAt(i);
                         std::fprintf(stderr,
-                            "  FF10[%zu]=%02X mode=%02X pc=%04X ret=%04X P2=%02X P3=%02X\\n",
+                            "  FF10[%zu]=%02X mode=%02X pc=%04X ret=%04X P2=%02X P3=%02X\n",
                             i, static_cast<unsigned>(event.value),
                             static_cast<unsigned>(event.soundBusMode),
                             static_cast<unsigned>(event.instructionPC),
@@ -2204,7 +2204,7 @@ int main(int argc, char** argv) {
                     for (std::size_t i = 0; i < fx2Runtime.ic51ReadTraceCount(); ++i) {
                         const auto& event = fx2Runtime.ic51ReadTraceAt(i);
                         std::fprintf(stderr,
-                            "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X\\n",
+                            "  IC51[%zu] bank=%u addr=%04X value=%02X pc=%04X\n",
                             i, static_cast<unsigned>(event.bank),
                             static_cast<unsigned>(event.address),
                             static_cast<unsigned>(event.value),
@@ -2528,7 +2528,7 @@ int main(int argc, char** argv) {
         assert(firmwareMachine.xdataByteForTesting(0x34ff) == 0x00);
 
         const auto resourceInit = firmwareMachine.runUntilProgramCounter(0x326a, 50000);
-        std::printf("IC4 resource-table handoff: instructions=%zu PC=%04X\\n",
+        std::printf("IC4 resource-table handoff: instructions=%zu PC=%04X\n",
                     resourceInit, static_cast<unsigned>(firmwareMachine.cpu().registers().pc));
         assert(resourceInit != 0);
         assert(firmwareMachine.cpu().registers().pc == 0x326a);
@@ -2536,7 +2536,7 @@ int main(int argc, char** argv) {
         const auto peripheralInit = firmwareMachine.runUntilProgramCounter(0x32b0, 2000000);
         const bool reachedPeripheralHandoff = firmwareMachine.cpu().registers().pc == 0x32b0;
         const auto bank = firmwareMachine.cpu().registers().psw.registerBankBase();
-        std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X P3=%02X lastFF10write=%02X FF10read=%02X XWR=%llu XRD=%llu 8EWR=%llu P35=%llu mode8E=%02X mode2WR=%llu mode2RD=%llu lastMem=%04X:%02X cycles=%llu\\n",
+        std::printf("IC4 peripheral-init trace: reached=%u instructions=%zu PC=%04X opcode=%02X SP=%02X R2=%02X R3=%02X R4=%02X R5=%02X R6=%02X R7=%02X P3=%02X lastFF10write=%02X FF10read=%02X XWR=%llu XRD=%llu 8EWR=%llu P35=%llu mode8E=%02X mode2WR=%llu mode2RD=%llu lastMem=%04X:%02X cycles=%llu\n",
                     static_cast<unsigned>(reachedPeripheralHandoff), peripheralInit,
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned>(firmwareMachine.readCode(firmwareMachine.cpu().registers().pc)),
@@ -2575,7 +2575,7 @@ int main(int argc, char** argv) {
                technox::MASSIC51BulkBlockHeader::kObservedStartupTransferIndex);
         std::printf("IC51 AF1A startup entry: callPC=%04X selector=%02X "
                     "P2=%02X P3=%02X mode8E=%02X flag1B=%u globalEA=%u "
-                    "cycle=%llu\\n",
+                    "cycle=%llu\n",
                     static_cast<unsigned>(bulkEntry.callPC),
                     static_cast<unsigned>(bulkEntry.selectorR7),
                     static_cast<unsigned>(bulkEntry.p2),
@@ -2663,11 +2663,11 @@ int main(int argc, char** argv) {
         const auto& finalSoundWrite = firmwareMachine.soundMemoryWriteTraceAt(soundWrites - 1u);
         assert(finalSoundWrite.instructionPC == 0xaf10u);
         assert(finalSoundWrite.returnPC == 0xaf68u);
-        std::printf("IC4 external sound-memory writes (last 12):\\n");
+        std::printf("IC4 external sound-memory writes (last 12):\n");
         const auto firstRecentWrite = soundWrites > 12u ? soundWrites - 12u : 0u;
         for (std::size_t i = firstRecentWrite; i < soundWrites; ++i) {
             const auto& event = firmwareMachine.soundMemoryWriteTraceAt(i);
-            std::printf("  %04X=%02X pc=%04X ret=%04X mode=%u cycle=%llu\\n",
+            std::printf("  %04X=%02X pc=%04X ret=%04X mode=%u cycle=%llu\n",
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned>(event.instructionPC),
@@ -2676,18 +2676,18 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto ic51Reads = firmwareMachine.ic51ReadTraceCount();
-        std::printf("IC51 source reads: total=%llu bank0=%llu bank1=%llu trace=%zu\\n",
+        std::printf("IC51 source reads: total=%llu bank0=%llu bank1=%llu trace=%zu\n",
                     static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()),
                     static_cast<unsigned long long>(firmwareMachine.ic51ReadsByBank(0)),
                     static_cast<unsigned long long>(firmwareMachine.ic51ReadsByBank(1)),
                     ic51Reads);
         // A zero count is diagnostically useful here: the bus probe below
         // records whether the current P3 decode ever selects the IC51 image.
-        std::printf("IC51 source reads (last 12):\\n");
+        std::printf("IC51 source reads (last 12):\n");
         const auto firstRecentRead = ic51Reads > 12u ? ic51Reads - 12u : 0u;
         for (std::size_t i = firstRecentRead; i < ic51Reads; ++i) {
             const auto& event = firmwareMachine.ic51ReadTraceAt(i);
-            std::printf("  bank=%u %04X=%02X pc=%04X ret=%04X cycle=%llu\\n",
+            std::printf("  bank=%u %04X=%02X pc=%04X ret=%04X cycle=%llu\n",
                         static_cast<unsigned>(event.bank),
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
@@ -2696,12 +2696,12 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto busProbeCount = firmwareMachine.ic51BusProbeTraceCount();
-        std::printf("IC51 bus probes around AF3C-AF63 (last 24): total=%zu\\n",
+        std::printf("IC51 bus probes around AF3C-AF63 (last 24): total=%zu\n",
                     busProbeCount);
         const auto firstBusProbe = busProbeCount > 24u ? busProbeCount - 24u : 0u;
         for (std::size_t i = firstBusProbe; i < busProbeCount; ++i) {
             const auto& event = firmwareMachine.ic51BusProbeTraceAt(i);
-            std::printf("  pc=%04X DPTR=%04X P3=%02X selected=%u bank=%u value=%02X cycle=%llu\\n",
+            std::printf("  pc=%04X DPTR=%04X P3=%02X selected=%u bank=%u value=%02X cycle=%llu\n",
                         static_cast<unsigned>(event.instructionPC),
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.p3),
@@ -2710,14 +2710,14 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.valueOnCurrentMap),
                         static_cast<unsigned long long>(event.machineCycle));
         }
-        std::printf("IC4 P3 writes during peripheral init (last 32):\\n");
+        std::printf("IC4 P3 writes during peripheral init (last 32):\n");
         const auto p3Writes = firmwareMachine.portWriteCount();
         std::size_t shownP3Writes = 0;
         for (std::size_t age = 0; age < p3Writes && shownP3Writes < 32u; ++age) {
             const auto& event = firmwareMachine.portWriteAt(p3Writes - 1u - age);
             if (event.port != 3u) continue;
             ++shownP3Writes;
-            std::printf("  P3=%02X prev=%02X changed=%02X pc=%04X P2=%02X 8E=%02X cycle=%llu\\n",
+            std::printf("  P3=%02X prev=%02X changed=%02X pc=%04X P2=%02X 8E=%02X cycle=%llu\n",
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned>(event.previousValue),
                         static_cast<unsigned>(event.changedMask),
@@ -2736,12 +2736,12 @@ int main(int argc, char** argv) {
         const auto firstRetainedUnmapped = unmappedTraceCount > 4096u
             ? unmappedTraceCount - 4096u : 0u;
         std::size_t peripheralWindowEvents = 0;
-        std::printf("Undocumented 7BFE/7Cxx/7Dxx bus trace (instruction-level):\\n");
+        std::printf("Undocumented 7BFE/7Cxx/7Dxx bus trace (instruction-level):\n");
         for (std::size_t i = firstRetainedUnmapped; i < unmappedTraceCount; ++i) {
             const auto& event = firmwareMachine.unmappedBusTraceAt(i);
             if ((event.address < 0x7c00u || event.address > 0x7fffu) && event.address != 0x7bfeu) continue;
             ++peripheralWindowEvents;
-            std::printf("  %c %04X=%02X pc=%04X stackRet=%04X P3=%02X 8E=%02X cycle=%llu\\n",
+            std::printf("  %c %04X=%02X pc=%04X stackRet=%04X P3=%02X 8E=%02X cycle=%llu\n",
                         event.write ? 'W' : 'R',
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
@@ -2751,7 +2751,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.soundBusMode),
                         static_cast<unsigned long long>(event.machineCycle));
         }
-        std::printf("Undocumented peripheral-window events retained: %zu\\n",
+        std::printf("Undocumented peripheral-window events retained: %zu\n",
                     peripheralWindowEvents);
 
         // Resume the real-IC51 loader with a controlled ready signature.
@@ -2764,7 +2764,7 @@ int main(int argc, char** argv) {
         firmwareMachine.setSoundDeviceResponseForTesting(0xacu);
         const auto resumedToMain = firmwareMachine.runUntilProgramCounter(0x32b0u, 2000000u);
         std::printf("IC4 after synthetic SoundHost-ready response: instructions=%llu PC=%04X "
-                    "IC51=%llu writes=%llu burstWords=%zu\\n",
+                    "IC51=%llu writes=%llu burstWords=%zu\n",
                     static_cast<unsigned long long>(resumedToMain),
                     static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                     static_cast<unsigned long long>(firmwareMachine.ic51ReadCount()),
@@ -2835,13 +2835,13 @@ int main(int argc, char** argv) {
         const auto bootTransactions = firmwareMachine.soundCommandPacketCount();
         const auto hostWrites = firmwareMachine.soundHostWriteCount();
         assert(bootBurstWords == bootTransactions);
-        std::printf("External window boot: writes=%zu completeTransactions=%zu pairedWords=%zu\\n",
+        std::printf("External window boot: writes=%zu completeTransactions=%zu pairedWords=%zu\n",
                     hostWrites, bootTransactions, bootBurstWords);
-        std::printf("Standalone register-3 writes (outside complete transactions):\\n");
+        std::printf("Standalone register-3 writes (outside complete transactions):\n");
         for (std::size_t i = 0; i < hostWrites; ++i) {
             const auto& write = firmwareMachine.soundHostWriteAt(i);
             if (write.registerIndex == 3u && write.instructionPC != 0x0dc5u)
-                std::printf("  reg3=%02X pc=%04X cycle=%llu\\n",
+                std::printf("  reg3=%02X pc=%04X cycle=%llu\n",
                             static_cast<unsigned>(write.value),
                             static_cast<unsigned>(write.instructionPC),
                             static_cast<unsigned long long>(write.machineCycle));
@@ -2872,7 +2872,7 @@ int main(int argc, char** argv) {
                 (i >= 512u && word.value != packetWord)) {
                 std::printf("SoundHost packet mismatch[%zu]: actual=%02X %02X %02X %02X "
                             "word=%04X expectedIndex=%02X expectedWord=%04X caller=%04X "
-                            "expectedCaller=%04X\\n",
+                            "expectedCaller=%04X\n",
                     i, packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3],
                     static_cast<unsigned>(word.value), expectedIndex,
                     static_cast<unsigned>(expectedWord), packet.returnPC, expectedCaller);
@@ -2894,16 +2894,16 @@ int main(int argc, char** argv) {
             }
         }
         const auto hostReads = firmwareMachine.soundHostReadCount();
-        std::printf("External-window reads (current test model, %zu):\\n", hostReads);
+        std::printf("External-window reads (current test model, %zu):\n", hostReads);
         for (std::size_t i = 0; i < hostReads; ++i) {
             const auto& read = firmwareMachine.soundHostReadAt(i);
-            std::printf("  read[%03zu] reg=%u value=%02X pc=%04X cycle=%llu\\n",
+            std::printf("  read[%03zu] reg=%u value=%02X pc=%04X cycle=%llu\n",
                         i, static_cast<unsigned>(read.registerIndex),
                         static_cast<unsigned>(read.value),
                         static_cast<unsigned>(read.instructionPC),
                         static_cast<unsigned long long>(read.machineCycle));
         }
-        std::printf("SoundHost host transactions after IC51 boot block (%zu):\\n",
+        std::printf("SoundHost host transactions after IC51 boot block (%zu):\n",
                     bootTransactions);
         for (std::size_t i = 0; i < bootTransactions; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
@@ -2912,7 +2912,7 @@ int main(int argc, char** argv) {
             const auto& lastContext = packet.byteContext[3];
             std::printf("  %03zu: %02X %02X %02X %02X -> %04X pc=%04X ret=%04X "
                         "P2/P3/8E=%02X/%02X/%02X->%02X/%02X/%02X "
-                        "reset=%u/%u IC51=%u/%u\\n",
+                        "reset=%u/%u IC51=%u/%u\n",
                         i,
                         static_cast<unsigned>(packet.bytes[0]),
                         static_cast<unsigned>(packet.bytes[1]),
@@ -2963,7 +2963,7 @@ int main(int argc, char** argv) {
             }
             firmwareMachine.runForMachineCycles(5000000u);
             std::printf("Real IC51 factory Performance SysEx: frames=%zu bytes=%llu "
-                        "PC=%04X packets=%zu burstWords=%zu IC51=%llu\\n",
+                        "PC=%04X packets=%zu burstWords=%zu IC51=%llu\n",
                         factoryFrames.size(),
                         static_cast<unsigned long long>(totalFactoryBytes),
                         static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
@@ -3044,7 +3044,7 @@ int main(int argc, char** argv) {
                         "1494=+%llu AC00=+%llu AC88=+%llu B34D=+%llu "
                         "16C3=+%llu 189D=+%llu 1009=+%llu 018D=+%llu "
                         "1780=+%llu 17D4=+%llu 0E8E=+%llu 1456=+%llu 1742=+%llu "
-                        "4803=+%llu 02D1=+%llu 1848=+%llu] IC51=+%llu\\n",
+                        "4803=+%llu 02D1=+%llu 1848=+%llu] IC51=+%llu\n",
                         label, instructions, drain,
                         static_cast<unsigned>(firmwareMachine.cpu().registers().pc),
                         packetAfter - packetBefore,
@@ -3077,7 +3077,7 @@ int main(int argc, char** argv) {
             const auto firstRetainedHostWrite = hostWriteAfter > hostWriteTraceCapacity
                 ? hostWriteAfter - hostWriteTraceCapacity : 0u;
             const auto firstStageHostWrite = std::max(hostWriteBefore, firstRetainedHostWrite);
-            std::printf("  SoundHost writes=+%zu (retained=%zu, overwritten=%zu)\\n",
+            std::printf("  SoundHost writes=+%zu (retained=%zu, overwritten=%zu)\n",
                         hostWriteAfter - hostWriteBefore,
                         hostWriteAfter - firstStageHostWrite,
                         firstStageHostWrite - hostWriteBefore);
@@ -3093,7 +3093,7 @@ int main(int argc, char** argv) {
                     (event.value == 0x40u || event.value == 0xc0u))
                     ++observedHandshakeStrobes;
                 std::printf("    W%u=%02X dev=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
-                            "mode=%u IC51=%u reset=%u cycle=%llu\\n",
+                            "mode=%u IC51=%u reset=%u cycle=%llu\n",
                             static_cast<unsigned>(event.registerIndex),
                             static_cast<unsigned>(event.value),
                             static_cast<unsigned>(event.deviceIndex),
@@ -3111,7 +3111,7 @@ int main(int argc, char** argv) {
                 ? hostReadAfter - hostReadTraceCapacity : 0u;
             const auto firstStageHostRead = std::max(hostReadBefore, firstRetainedHostRead);
             std::printf("  Write distribution: R0=%zu R1=%zu R2=%zu R3=%zu; "
-                        "known R3 strobes(40/C0)=%zu\\n",
+                        "known R3 strobes(40/C0)=%zu\n",
                         writesByRegister[0], writesByRegister[1],
                         writesByRegister[2], writesByRegister[3],
                         observedHandshakeStrobes);
@@ -3120,15 +3120,15 @@ int main(int argc, char** argv) {
                 if (writesByDevice[device] != 0u)
                     std::printf(" %02zX:%zu", device, writesByDevice[device]);
             }
-            std::printf("\\n");
-            std::printf("  SoundHost reads=+%zu (retained=%zu, overwritten=%zu)\\n",
+            std::printf("\n");
+            std::printf("  SoundHost reads=+%zu (retained=%zu, overwritten=%zu)\n",
                         hostReadAfter - hostReadBefore,
                         hostReadAfter - firstStageHostRead,
                         firstStageHostRead - hostReadBefore);
             for (std::size_t i = firstStageHostRead; i < hostReadAfter; ++i) {
                 const auto& event = firmwareMachine.soundHostReadAt(i);
                 std::printf("    R%u=%02X pc=%04X ret=%04X P2=%02X P3=%02X "
-                            "mode=%u IC51=%u reset=%u cycle=%llu\\n",
+                            "mode=%u IC51=%u reset=%u cycle=%llu\n",
                             static_cast<unsigned>(event.registerIndex),
                             static_cast<unsigned>(event.value),
                             static_cast<unsigned>(event.instructionPC),
@@ -3144,7 +3144,7 @@ int main(int argc, char** argv) {
             const auto firstRetainedPeripheral = peripheralTraceAfter > unmappedTraceCapacity
                 ? peripheralTraceAfter - unmappedTraceCapacity : 0u;
             const auto firstStagePeripheral = std::max(peripheralTraceBefore, firstRetainedPeripheral);
-            std::printf("  Unknown-bus trace window: total=%zu retained=%zu overwritten=%zu\\n",
+            std::printf("  Unknown-bus trace window: total=%zu retained=%zu overwritten=%zu\n",
                         peripheralTraceAfter - peripheralTraceBefore,
                         peripheralTraceAfter - firstStagePeripheral,
                         firstStagePeripheral - peripheralTraceBefore);
@@ -3155,7 +3155,7 @@ int main(int argc, char** argv) {
                 const auto& event = firmwareMachine.unmappedBusTraceAt(i);
                 if ((event.address < 0x7c00u || event.address > 0x7fffu) && event.address != 0x7bfeu) continue;
                 std::printf("  MIDI-7B/7C %c %04X=%02X pc=%04X stackRet=%04X "
-                            "P3=%02X 8E=%02X overlay=%u cycle=%llu\\n",
+                            "P3=%02X 8E=%02X overlay=%u cycle=%llu\n",
                             event.write ? 'W' : 'R',
                             static_cast<unsigned>(event.address),
                             static_cast<unsigned>(event.value),
@@ -3173,7 +3173,7 @@ int main(int argc, char** argv) {
                 const auto& event = firmwareMachine.xdataWatchTraceAt(i);
                 if (event.address == 0x3098u) {
                     std::printf("  FX-SELECT %c 3098=%02X pc=%04X stackRet=%04X "
-                                "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\\n",
+                                "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\n",
                                 event.write ? 'W' : 'R',
                                 static_cast<unsigned>(event.value),
                                 static_cast<unsigned>(event.instructionPC),
@@ -3186,7 +3186,7 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned long long>(event.machineCycle));
                 }
                 std::printf("  MIDI-XDATA %c %04X=%02X pc=%04X stackRet=%04X "
-                            "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\\n",
+                            "P2=%02X P3=%02X 8E=%02X IC51=%u accepted=%u cycle=%llu\n",
                             event.write ? 'W' : 'R',
                             static_cast<unsigned>(event.address),
                             static_cast<unsigned>(event.value),
@@ -3207,13 +3207,13 @@ int main(int argc, char** argv) {
                     ? internalFlagTraceAfter - internalFlagTraceCapacity : 0u;
             const auto firstStageFlagTrace =
                 std::max(internalFlagTraceBefore, firstRetainedFlagTrace);
-            std::printf("  Internal bit 0A transitions: total=%zu retained=%zu\\n",
+            std::printf("  Internal bit 0A transitions: total=%zu retained=%zu\n",
                         internalFlagTraceAfter - internalFlagTraceBefore,
                         internalFlagTraceAfter - firstStageFlagTrace);
             for (std::size_t i = firstStageFlagTrace;
                  i < internalFlagTraceAfter; ++i) {
                 const auto& event = firmwareMachine.internalFlagWriteTraceAt(i);
-                std::printf("    %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                std::printf("    %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\n",
                             static_cast<unsigned>(event.previousValue),
                             static_cast<unsigned>(event.currentValue),
                             static_cast<unsigned>(event.byteValue),
@@ -3230,11 +3230,11 @@ int main(int argc, char** argv) {
         {
             const auto count = firmwareMachine.internalFlagWriteTraceCount();
             const auto first = count > 256u ? count - 256u : 0u;
-            std::printf("IC4 boot bit 0A transitions: total=%zu retained=%zu\\n",
+            std::printf("IC4 boot bit 0A transitions: total=%zu retained=%zu\n",
                         count, count - first);
             for (std::size_t i = first; i < count; ++i) {
                 const auto& event = firmwareMachine.internalFlagWriteTraceAt(i);
-                std::printf("  %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\\n",
+                std::printf("  %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\n",
                             static_cast<unsigned>(event.previousValue),
                             static_cast<unsigned>(event.currentValue),
                             static_cast<unsigned>(event.byteValue),
@@ -3365,7 +3365,7 @@ int main(int argc, char** argv) {
         }
         std::printf("8032 EXEC-TRACE vel100: instructions=%zu retained=%zu "
                     "xdata-accesses=%zu retained-xdata=%zu firstPC=%04X "
-                    "saw1FC9=%u saw2027=%u saw210F=%u\\n",
+                    "saw1FC9=%u saw2027=%u saw210F=%u\n",
                     secondNoteExecutionTraceCount, secondNoteExecutionTraceRetained,
                     secondNoteExecutionDataCount, secondNoteExecutionDataRetained,
                     static_cast<unsigned>(secondNoteExecutionTrace.front().windowStartPC),
@@ -3375,7 +3375,7 @@ int main(int argc, char** argv) {
         const auto secondNotePacketCount =
             firmwareMachine.soundCommandPacketCount() - secondNotePacketStart;
         assert(secondNotePacketCount == 549u);
-        std::printf("NOTE64-BULK-CALLS vel100: 0E3A=%llu 26A2=%llu 0E21=%llu 0DF7=%llu\\n",
+        std::printf("NOTE64-BULK-CALLS vel100: 0E3A=%llu 26A2=%llu 0E21=%llu 0DF7=%llu\n",
             static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e3au) - secondNoteBulkEntryStart),
             static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x26a2u) - secondNoteBulkCallerStart),
             static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e21u) - secondNoteBulkPageStart),
@@ -3491,7 +3491,7 @@ int main(int argc, char** argv) {
         assert(writer0A4FReturnB == 0x1e6au);
         std::printf("0x0A4F stack snapshot: packet0 caller-return=%04X "
                     "packet1 caller-return=%04X (raw firmware observations; "
-                    "caller labels pending control-flow trace)\\n",
+                    "caller labels pending control-flow trace)\n",
                     static_cast<unsigned>(writer0A4FReturnA),
                     static_cast<unsigned>(writer0A4FReturnB));
 
@@ -3595,11 +3595,11 @@ int main(int argc, char** argv) {
                   [](const IC51ReadGroup& lhs, const IC51ReadGroup& rhs) {
                       return lhs.count > rhs.count;
                   });
-        std::printf("Second Note On IC51 read groups (%zu reads, %zu caller groups):\\n",
+        std::printf("Second Note On IC51 read groups (%zu reads, %zu caller groups):\n",
                     ic51TraceEnd, ic51ReadGroupCount);
         for (std::size_t i = 0; i < ic51ReadGroupCount; ++i) {
             const auto& group = ic51ReadGroups[i];
-            std::printf("  IC51-GROUP bank=%u ret=%04X count=%zu range=%04X-%04X first=%04X@%04X last=%04X@%04X\\n",
+            std::printf("  IC51-GROUP bank=%u ret=%04X count=%zu range=%04X-%04X first=%04X@%04X last=%04X@%04X\n",
                         static_cast<unsigned>(group.bank),
                         static_cast<unsigned>(group.returnPC), group.count,
                         static_cast<unsigned>(group.minAddress),
@@ -3609,11 +3609,11 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(group.lastAddress),
                         static_cast<unsigned>(group.lastInstructionPC));
         }
-        std::printf("Second Note On IC51 read tail (%zu entries):\\n",
+        std::printf("Second Note On IC51 read tail (%zu entries):\n",
                     ic51TraceEnd - ic51TraceBegin);
         for (std::size_t i = ic51TraceBegin; i < ic51TraceEnd; ++i) {
             const auto& event = firmwareMachine.ic51ReadTraceAt(i);
-            std::printf("  IC51 bank=%u addr=%04X value=%02X pc=%04X ret=%04X cycle=%llu\\n",
+            std::printf("  IC51 bank=%u addr=%04X value=%02X pc=%04X ret=%04X cycle=%llu\n",
                         static_cast<unsigned>(event.bank),
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
@@ -3637,7 +3637,7 @@ int main(int argc, char** argv) {
             const auto pc = event.instructionPC;
             if (pc == 0xafc0u || pc == 0xafd8u || pc == 0xafebu || pc == 0xaffeu) {
                 ++afPayloadWrites;
-                std::printf("  IC51-AF93 FF10[%zu]=%02X pc=%04X ret=%04X mode=%02X cycle=%llu\\n",
+                std::printf("  IC51-AF93 FF10[%zu]=%02X pc=%04X ret=%04X mode=%02X cycle=%llu\n",
                             i, static_cast<unsigned>(event.value), static_cast<unsigned>(pc),
                             static_cast<unsigned>(event.stackReturnPC),
                             static_cast<unsigned>(event.soundBusMode),
@@ -3645,14 +3645,14 @@ int main(int argc, char** argv) {
             } else if (pc == 0xb045u || pc == 0xb058u ||
                        pc == 0xb06bu || pc == 0xb07eu) {
                 ++b0PayloadWrites;
-                std::printf("  IC51-B015 FF10[%zu]=%02X pc=%04X ret=%04X mode=%02X cycle=%llu\\n",
+                std::printf("  IC51-B015 FF10[%zu]=%02X pc=%04X ret=%04X mode=%02X cycle=%llu\n",
                             i, static_cast<unsigned>(event.value), static_cast<unsigned>(pc),
                             static_cast<unsigned>(event.stackReturnPC),
                             static_cast<unsigned>(event.soundBusMode),
                             static_cast<unsigned long long>(event.machineCycle));
             }
         }
-        std::printf("Second Note On filtered FF10 payload writes: AF93=%zu B015=%zu scanned=%zu\\n",
+        std::printf("Second Note On filtered FF10 payload writes: AF93=%zu B015=%zu scanned=%zu\n",
                     afPayloadWrites, b0PayloadWrites, ff10TraceEnd - ff10TraceBegin);
 
         // The final 60 source reads in this event are issued by AFF5 with
@@ -3680,7 +3680,7 @@ int main(int argc, char** argv) {
             assert(matchedWrite);
         }
         assert(verifiedIC51ToFF10Bytes == 60u);
-        std::printf("Verified IC51 -> FF10 byte-for-byte transfers: %zu (cycle delta=6)\\n",
+        std::printf("Verified IC51 -> FF10 byte-for-byte transfers: %zu (cycle delta=6)\n",
                     verifiedIC51ToFF10Bytes);
 
         // Capture the firmware's 16-slot resource staging page. The page is
@@ -3694,7 +3694,7 @@ int main(int argc, char** argv) {
                 ? firmwareMachine.testExternalRamByteForTesting(address)
                 : firmwareMachine.xdataByteForTesting(address);
         };
-        std::printf("MASS 16-slot staging page=%02X\\n",
+        std::printf("MASS 16-slot staging page=%02X\n",
                     static_cast<unsigned>(massSlotPage));
         for (unsigned slot = 0; slot < 16u; ++slot) {
             const auto slotId = readMassSlotByte(
@@ -3707,7 +3707,7 @@ int main(int argc, char** argv) {
                 std::printf("%02X%s", static_cast<unsigned>(value),
                             byte == 7u ? "" : " ");
             }
-            std::printf("\\n");
+            std::printf("\n");
         }
 
         // Search all firmware-visible control pages for populated 16-slot
@@ -3732,7 +3732,7 @@ int main(int argc, char** argv) {
                 std::printf(" %02X=%02X", offset, static_cast<unsigned>(value));
                 ++shown;
             }
-            std::printf("\\n");
+            std::printf("\n");
         }
         for (unsigned page = 0x70u; page <= 0x7fu; ++page) {
             unsigned nonzero = 0;
@@ -3754,7 +3754,7 @@ int main(int argc, char** argv) {
                 std::printf(" %02X=%02X", offset, static_cast<unsigned>(value));
                 ++shown;
             }
-            std::printf("\\n");
+            std::printf("\n");
         }
 
         // Differentially hold pitch/Part/program constant and change only
@@ -3821,7 +3821,7 @@ int main(int argc, char** argv) {
         }
         std::printf("8032 EXEC-TRACE vel50: instructions=%zu retained=%zu "
                     "xdata-accesses=%zu retained-xdata=%zu firstPC=%04X "
-                    "saw210F=%u\\n",
+                    "saw210F=%u\n",
                     lowerVelocityExecutionTraceCount, lowerVelocityExecutionTraceRetained,
                     lowerVelocityExecutionDataCount, lowerVelocityExecutionDataRetained,
                     static_cast<unsigned>(lowerVelocityExecutionTrace.front().windowStartPC),
@@ -3829,7 +3829,7 @@ int main(int argc, char** argv) {
         const auto lowerVelocityPacketCount =
             firmwareMachine.soundCommandPacketCount() - lowerVelocityPacketStart;
         assert(lowerVelocityPacketCount == 549u);
-        std::printf("NOTE64-BULK-CALLS vel50: 0E3A=%llu 26A2=%llu 0E21=%llu 0DF7=%llu\\n",
+        std::printf("NOTE64-BULK-CALLS vel50: 0E3A=%llu 26A2=%llu 0E21=%llu 0DF7=%llu\n",
             static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e3au) - lowerVelocityBulkEntryStart),
             static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x26a2u) - lowerVelocityBulkCallerStart),
             static_cast<unsigned long long>(firmwareMachine.watchedCallCount(0x0e21u) - lowerVelocityBulkPageStart),
@@ -3922,7 +3922,7 @@ int main(int argc, char** argv) {
                 std::printf(" %02X/%02X",
                             static_cast<unsigned>(high.ram2BAnd30To37[byte]),
                             static_cast<unsigned>(low.ram2BAnd30To37[byte]));
-            std::printf(" P2=%02X/%02X P3=%02X/%02X 8E=%02X/%02X\\n",
+            std::printf(" P2=%02X/%02X P3=%02X/%02X 8E=%02X/%02X\n",
                         static_cast<unsigned>(high.port2),
                         static_cast<unsigned>(low.port2),
                         static_cast<unsigned>(high.port3),
@@ -3935,7 +3935,7 @@ int main(int argc, char** argv) {
             if (i < secondNoteDataTrace.size()) {
                 const auto& event = secondNoteDataTrace[i];
                 std::printf("8032 XDATA100[%02zu] PC=%04X RET=%04X %c %04X=%02X "
-                            "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
+                            "P2=%02X P3=%02X 8E=%02X IC51=%u\n",
                             i, static_cast<unsigned>(event.instructionPC),
                             static_cast<unsigned>(event.stackReturnPC),
                             event.write ? 'W' : 'R',
@@ -3949,7 +3949,7 @@ int main(int argc, char** argv) {
             if (i < lowerVelocityDataTrace.size()) {
                 const auto& event = lowerVelocityDataTrace[i];
                 std::printf("8032 XDATA050[%02zu] PC=%04X RET=%04X %c %04X=%02X "
-                            "P2=%02X P3=%02X 8E=%02X IC51=%u\\n",
+                            "P2=%02X P3=%02X 8E=%02X IC51=%u\n",
                             i, static_cast<unsigned>(event.instructionPC),
                             static_cast<unsigned>(event.stackReturnPC),
                             event.write ? 'W' : 'R',
@@ -3976,7 +3976,7 @@ int main(int argc, char** argv) {
                 high.opcodeBytes != low.opcodeBytes) {
                 std::printf("8032 FIRST PATH DIVERGENCE[%zu]: "
                             "vel100 PC=%04X op=%02X %02X %02X; "
-                            "vel50 PC=%04X op=%02X %02X %02X\\n",
+                            "vel50 PC=%04X op=%02X %02X %02X\n",
                             i,
                             static_cast<unsigned>(high.instructionPC),
                             static_cast<unsigned>(high.opcodeBytes[0]),
@@ -4004,7 +4004,7 @@ int main(int argc, char** argv) {
                 std::printf("8032 FIRST STATE DIVERGENCE[%zu] PC=%04X: "
                             "A=%02X/%02X B=%02X/%02X PSW=%02X/%02X "
                             "RET=%04X/%04X DPTR=%04X/%04X R2=%02X/%02X RAM2B=%02X/%02X "
-                            "RAM30=%02X/%02X RAM31=%02X/%02X\\n",
+                            "RAM30=%02X/%02X RAM31=%02X/%02X\n",
                             i, static_cast<unsigned>(high.instructionPC),
                             static_cast<unsigned>(high.accumulator),
                             static_cast<unsigned>(low.accumulator),
@@ -4030,7 +4030,7 @@ int main(int argc, char** argv) {
         }
         if (!firstExecutionDifferenceReported) {
             std::printf("8032 instruction trace prefix identical: compared=%zu "
-                        "vel100=%zu vel50=%zu\\n",
+                        "vel100=%zu vel50=%zu\n",
                         comparedInstructionCount, secondNoteExecutionTrace.size(),
                         lowerVelocityExecutionTrace.size());
         }
@@ -4068,7 +4068,7 @@ int main(int argc, char** argv) {
                 firstDataDifferenceIndex = i;
                 std::printf("8032 FIRST XDATA DIVERGENCE[%zu]: "
                             "vel100 PC=%04X %c %04X=%02X; "
-                            "vel50 PC=%04X %c %04X=%02X\\n",
+                            "vel50 PC=%04X %c %04X=%02X\n",
                             i,
                             static_cast<unsigned>(high.instructionPC),
                             high.write ? 'W' : 'R',
@@ -4084,7 +4084,7 @@ int main(int argc, char** argv) {
         }
         if (!firstDataDifferenceReported) {
             std::printf("8032 XDATA trace prefix identical: compared=%zu "
-                        "vel100=%zu vel50=%zu\\n",
+                        "vel100=%zu vel50=%zu\n",
                         comparedDataAccessCount, secondNoteDataTrace.size(),
                         lowerVelocityDataTrace.size());
         }
@@ -4106,11 +4106,11 @@ int main(int argc, char** argv) {
         assert(firstLowData.value == 0x59u);
 
         std::printf("8032 XDATA trace totals: vel100=%zu (retained %zu), "
-                    "vel50=%zu (retained %zu)\\n",
+                    "vel50=%zu (retained %zu)\n",
                     secondNoteExecutionDataCount, secondNoteExecutionDataRetained,
                     lowerVelocityExecutionDataCount, lowerVelocityExecutionDataRetained);
         std::printf("MASS velocity differential: reference=note64/vel100 "
-                    "comparison=note64/vel50 packets=%zu\\n",
+                    "comparison=note64/vel50 packets=%zu\n",
                     lowerVelocityPacketCount);
         for (std::size_t i = 0; i < secondNote1848Inputs.size(); ++i) {
             const auto& high = secondNote1848Inputs[i];
@@ -4122,7 +4122,7 @@ int main(int argc, char** argv) {
             assert(high.registers[4] == low.registers[4]);
             assert(high.registers[2] != low.registers[2]);
             std::printf("  MASS-1848[%zu] ret=%04X vel100 A=%02X B=%02X R2=%02X R3=%02X R4=%02X "
-                        "vel50 A=%02X B=%02X R2=%02X R3=%02X R4=%02X\\n",
+                        "vel50 A=%02X B=%02X R2=%02X R3=%02X R4=%02X\n",
                         i,
                         static_cast<unsigned>(high.returnPC),
                         static_cast<unsigned>(high.accumulator),
@@ -4164,7 +4164,7 @@ int main(int argc, char** argv) {
                 assert(highModel.value == 0x0fu && lowModel.value == 0x53u);
             }
             std::printf("  MASS-1848-OUT[%zu] pc=%04X vel100 A=%02X/model=%02X B=%02X R2=%02X PSW=%02X "
-                        "vel50 A=%02X/model=%02X B=%02X R2=%02X PSW=%02X\\n",
+                        "vel50 A=%02X/model=%02X B=%02X R2=%02X PSW=%02X\n",
                         i,
                         static_cast<unsigned>(high.instructionPC),
                         static_cast<unsigned>(high.accumulator),
@@ -4252,7 +4252,7 @@ int main(int argc, char** argv) {
                 assert((lowerVelocityInstructionWatch.registers[4] & 0x07u) == 0x02u);
                 assert(lowerVelocityInstructionWatch.directRam2B == 0x0au);
                 std::printf("MASS 0x210F inputs: vel100 R3=%02X R4=%02X RAM2B=%02X; "
-                            "vel50 R3=%02X R4=%02X RAM2B=%02X\\n",
+                            "vel50 R3=%02X R4=%02X RAM2B=%02X\n",
                             static_cast<unsigned>(secondNoteInstructionWatch.registers[3]),
                             static_cast<unsigned>(secondNoteInstructionWatch.registers[4]),
                             static_cast<unsigned>(secondNoteInstructionWatch.directRam2B),
@@ -4262,7 +4262,7 @@ int main(int argc, char** argv) {
             }
             std::printf("  VELOCITY-CMD[%zu] ref=%02X %02X %02X %02X "
                         "low=%02X %02X %02X %02X changed-bytes=%X "
-                        "ret=%04X\\n",
+                        "ret=%04X\n",
                         i,
                         static_cast<unsigned>(referenceVelocityPackets[i][0]),
                         static_cast<unsigned>(referenceVelocityPackets[i][1]),
@@ -4301,13 +4301,13 @@ int main(int argc, char** argv) {
         assert(note65PacketCount == 549u);
         const auto note65PitchSourceAccessCount =
             firmwareMachine.pitchSourceDataAccessTraceCountForTesting();
-        std::printf("NOTE65 PITCH SOURCE ACCESS: count=%zu\\n",
+        std::printf("NOTE65 PITCH SOURCE ACCESS: count=%zu\n",
                     note65PitchSourceAccessCount);
         for (std::size_t i = 0; i < note65PitchSourceAccessCount; ++i) {
             const auto& access =
                 firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
             std::printf("  NOTE65-PITCH-SOURCE %c %04X=%02X pc=%04X ret=%04X "
-                        "P2=%02X P3=%02X mode=%u IC51=%u cycle=%llu\\n",
+                        "P2=%02X P3=%02X mode=%u IC51=%u cycle=%llu\n",
                         access.write ? 'W' : 'R',
                         static_cast<unsigned>(access.address),
                         static_cast<unsigned>(access.value),
@@ -4380,7 +4380,7 @@ int main(int argc, char** argv) {
             }
         }
         std::printf("NOTE65 09B9 trace: packets=%zu entry=%zu multiply=%zu writer=%zu "
-                    "MOVX-events=%zu\\n",
+                    "MOVX-events=%zu\n",
                     note65PacketCount, note65SlotEntryCount,
                     note65InterpolationCount, note65WriterCount,
                     firmwareMachine.slotInterpolationDataAccessTraceCountForTesting());
@@ -4416,11 +4416,11 @@ int main(int argc, char** argv) {
             assert(branch.registers[7] == note65PartDispatchEvents[i].registers[7]);
             assert(branch.port2Latch == 0x35u);
         }
-        std::printf("NOTE65 PART DISPATCH: calls=%zu\\n", note65PartDispatchCount);
+        std::printf("NOTE65 PART DISPATCH: calls=%zu\n", note65PartDispatchCount);
         for (std::size_t i = 0; i < note65PartDispatchCount; ++i) {
             const auto& event = note65PartDispatchEvents[i];
             std::printf("  NOTE65 PART EVENT[%zu]: cycle=%llu return=%04X "
-                        "R7(event)=%02X R5(class/key)=%02X R3(velocity)=%02X RAM2B=%02X\\n",
+                        "R7(event)=%02X R5(class/key)=%02X R3(velocity)=%02X RAM2B=%02X\n",
                         i, static_cast<unsigned long long>(event.machineCycle),
                         static_cast<unsigned>(event.returnPC),
                         static_cast<unsigned>(event.registers[7]),
@@ -4428,7 +4428,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.registers[3]),
                         static_cast<unsigned>(event.directRam2B));
         }
-        std::printf("NOTE65 DESCRIPTOR/DISPATCH ENTRIES: 1494=%zu AC00=%zu 189D=%zu\\n",
+        std::printf("NOTE65 DESCRIPTOR/DISPATCH ENTRIES: 1494=%zu AC00=%zu 189D=%zu\n",
                     note65DescriptorCount, note65IndirectDispatchCount,
                     note65StreamCount);
         assert(note65DescriptorCount == 2u);
@@ -4497,12 +4497,12 @@ int main(int argc, char** argv) {
                 std::printf("%02X%s",
                             static_cast<unsigned>(firmwareMachine.xdataByteForTesting(
                                 static_cast<std::uint16_t>(base + offset))),
-                            offset == 11u ? "\\n" : " ");
+                            offset == 11u ? "\n" : " ");
         }
         for (std::size_t i = 0; i < note65IndirectDispatchCount; ++i) {
             const auto& event = note65IndirectDispatchEvents[i];
             std::printf("  NOTE65 AC00[%zu]: cycle=%llu return=%04X "
-                        "R0=%02X R5=%02X R7=%02X A=%02X DPTR=%04X\\n",
+                        "R0=%02X R5=%02X R7=%02X A=%02X DPTR=%04X\n",
                         i, static_cast<unsigned long long>(event.machineCycle),
                         static_cast<unsigned>(event.returnPC),
                         static_cast<unsigned>(event.registers[0]),
@@ -4514,7 +4514,7 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < note65StreamCount; ++i) {
             const auto& event = note65StreamEvents[i];
             std::printf("  NOTE65 189D[%zu]: cycle=%llu return=%04X "
-                        "R0=%02X R5=%02X R7=%02X A=%02X DPTR=%04X\\n",
+                        "R0=%02X R5=%02X R7=%02X A=%02X DPTR=%04X\n",
                         i, static_cast<unsigned long long>(event.machineCycle),
                         static_cast<unsigned>(event.returnPC),
                         static_cast<unsigned>(event.registers[0]),
@@ -4578,7 +4578,7 @@ int main(int argc, char** argv) {
             }
             std::printf("NOTE65 PASS%zu: ret=%04X entryR=%02X/%02X/%02X/%02X "
                         "slot=%04X:%02X %04X:%02X %04X:%02X step=%04X neg=%u "
-                        "result=%06X writer=%02X %02X %02X\\n",
+                        "result=%06X writer=%02X %02X %02X\n",
                         pass + 1u, static_cast<unsigned>(input.returnPC),
                         static_cast<unsigned>(input.registers[2]),
                         static_cast<unsigned>(input.registers[3]),
@@ -4638,7 +4638,7 @@ int main(int argc, char** argv) {
         assert(note65OffEntryCount == 2u);
         assert(note65OffBranchCount == 2u);
         assert(note65OffPageBranchCount == 2u);
-        std::printf("NOTE65 OFF DISPATCH: AC88=%zu ACA0=%zu ACB2=%zu\\n",
+        std::printf("NOTE65 OFF DISPATCH: AC88=%zu ACA0=%zu ACB2=%zu\n",
                     note65OffEntryCount, note65OffBranchCount,
                     note65OffPageBranchCount);
         for (std::size_t i = 0; i < note65OffEntryCount; ++i) {
@@ -4653,7 +4653,7 @@ int main(int argc, char** argv) {
             assert(note65OffPageBranches[i].registers[0] == address.byteOffset);
             assert(note65OffPageBranches[i].port2Latch == 0x35u);
             std::printf("  NOTE65 OFF[%zu]: event=%02X key=%02X byteOffset=%02X "
-                        "branchOffset=%02X page=%02X\\n",
+                        "branchOffset=%02X page=%02X\n",
                         i, static_cast<unsigned>(eventId),
                         static_cast<unsigned>(note65OffEntries[i].registers[5]),
                         static_cast<unsigned>(address.byteOffset),
@@ -4695,7 +4695,7 @@ int main(int argc, char** argv) {
             assert(packet.returnPC == secondNoteBulkReturnPCs[i]);
         }
         std::printf("NOTE66 ADJACENT PITCH STEP: word=%06X note65=%06X ratio_ppm=%llu "
-                    "packets=%zu bulk=544/544 identical\\n",
+                    "packets=%zu bulk=544/544 identical\n",
                     static_cast<unsigned>(note66PitchStep),
                     static_cast<unsigned>(note65PitchStep),
                     static_cast<unsigned long long>(adjacentSemitoneRatioPPM),
@@ -4910,7 +4910,7 @@ int main(int argc, char** argv) {
         }
         assert(curveSourceGuardPairs >= 16u);
         std::printf("NOTE72 PARAMETER-20 SOURCE -> GUARD: %zu matched slot/caller pairs "
-                    "(guard=abs(source-0x18)); source window is synthetic test RAM\\n",
+                    "(guard=abs(source-0x18)); source window is synthetic test RAM\n",
                     curveSourceGuardPairs);
 
         // Correlate the 4x24-byte Part payload copied by IC4 loader 0xB475
@@ -5055,7 +5055,7 @@ int main(int argc, char** argv) {
                 std::printf("NOTE72 IC51->PERFORMANCE->PITCH SENSITIVITY: "
                             "bank=0 pointer[%04X]=%04X, 169 bytes (8/65/96); "
                             "Part13..16 +20 = %02X/%02X/%02X/%02X, "
-                            "overlay and 6D81 reads matched\\n",
+                            "overlay and 6D81 reads matched\n",
                             static_cast<unsigned>(transfer.pointerTableAddress),
                             static_cast<unsigned>(transfer.sourceAddress),
                             static_cast<unsigned>(transfer.data[93]),
@@ -5067,17 +5067,17 @@ int main(int argc, char** argv) {
         assert(completeNote72IC51Transfers > 0u);
         assert(matchedNote72IC51PartPayloads > 0u);
         std::printf("NOTE72 IC51 169-BYTE TRANSFERS: complete=%zu matched-Part-payload=%zu "
-                    "scanned reads=%zu\\n",
+                    "scanned reads=%zu\n",
                     completeNote72IC51Transfers, matchedNote72IC51PartPayloads,
                     note72IC51TraceEnd - firstNote72IC51Read);
 
-        std::printf("NOTE72 PITCH SOURCE ACCESS: count=%zu\\n",
+        std::printf("NOTE72 PITCH SOURCE ACCESS: count=%zu\n",
                     note72PitchSourceAccessCount);
         for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
             const auto& access =
                 firmwareMachine.pitchSourceDataAccessTraceAtForTesting(i);
             std::printf("  NOTE72-PITCH-SOURCE %c %04X=%02X pc=%04X ret=%04X "
-                        "P2=%02X P3=%02X mode=%u IC51=%u cycle=%llu\\n",
+                        "P2=%02X P3=%02X mode=%u IC51=%u cycle=%llu\n",
                         access.write ? 'W' : 'R',
                         static_cast<unsigned>(access.address),
                         static_cast<unsigned>(access.value),
@@ -5096,7 +5096,7 @@ int main(int argc, char** argv) {
             0x1e64u, 0x1e65u, 0x1e66u
         }};
         std::array<bool, note72ResourceProducerPCs.size()> note72SawResourceProducer{};
-        std::printf("NOTE72 RESOURCE-TO-PITCH PRODUCER TRACE:\\n");
+        std::printf("NOTE72 RESOURCE-TO-PITCH PRODUCER TRACE:\n");
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
             const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
@@ -5110,7 +5110,7 @@ int main(int argc, char** argv) {
             note72SawResourceProducer[producerIndex] = true;
             std::printf("  PC=%04X bytes=%02X/%02X/%02X ret=%04X A=%02X B=%02X PSW=%02X DPTR=%04X "
                         "R0-R7=%02X/%02X/%02X/%02X/%02X/%02X/%02X/%02X "
-                        "RAM2B/2D/2E=%02X/%02X/%02X P2/P3=%02X/%02X\\n",
+                        "RAM2B/2D/2E=%02X/%02X/%02X P2/P3=%02X/%02X\n",
                         static_cast<unsigned>(event.instructionPC),
                         static_cast<unsigned>(firmwareMachine.readCode(event.instructionPC)),
                         static_cast<unsigned>(firmwareMachine.readCode(static_cast<std::uint16_t>(event.instructionPC + 1u))),
@@ -5155,7 +5155,7 @@ int main(int argc, char** argv) {
                    kIndexedCurveSlotCount> indexedCurveLowStoreSeen{};
         const auto indexedPairMathCount =
             firmwareMachine.indexedPairMathWatchCountForTesting();
-        std::printf("NOTE72 INDEXED PAIR MATH (0x02D1) TRACE: count=%zu\\n",
+        std::printf("NOTE72 INDEXED PAIR MATH (0x02D1) TRACE: count=%zu\n",
                     indexedPairMathCount);
 
         std::array<std::uint8_t, 0x1408> ic4CurveCode{};
@@ -5221,7 +5221,7 @@ int main(int argc, char** argv) {
                 assert(projected.valid);
                 std::printf("  INPUT ret=%04X slot=%02X guard=%02X R29=%02X R2A=%02X "
                             "table=%04X record=%04X fraction=%04X base=%04X "
-                            "slope=%04X expected=%04X\\n",
+                            "slope=%04X expected=%04X\n",
                             static_cast<unsigned>(event.returnPC),
                             static_cast<unsigned>(indexedPairPendingSlot),
                             static_cast<unsigned>(indexedPairPendingGuard),
@@ -5287,10 +5287,10 @@ int main(int argc, char** argv) {
             }
         }
         std::printf("NOTE72 INDEXED PAIR MODEL VS REAL IC4 STORES: %zu matched "
-                    "invocations across all 16 slots; ignored callers=%zu\\n",
+                    "invocations across all 16 slots; ignored callers=%zu\n",
                     note72IndexedPairMathCompared, ignoredIndexedPairCallers);
 
-        std::printf("NOTE72 IC4 1E00-1E5F EXECUTION CONTEXT (B register source):\\n");
+        std::printf("NOTE72 IC4 1E00-1E5F EXECUTION CONTEXT (B register source):\n");
         std::size_t note72SubroutineInstructionCount = 0;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
@@ -5301,7 +5301,7 @@ int main(int argc, char** argv) {
                 continue;
             ++note72SubroutineInstructionCount;
             std::printf("  PC=%04X opcode=%02X/%02X/%02X R7=%02X A=%02X B=%02X "
-                        "PSW=%02X DPTR=%04X R0-R6=%02X/%02X/%02X/%02X/%02X/%02X/%02X\\n",
+                        "PSW=%02X DPTR=%04X R0-R6=%02X/%02X/%02X/%02X/%02X/%02X/%02X\n",
                         static_cast<unsigned>(event.instructionPC),
                         static_cast<unsigned>(firmwareMachine.readCode(event.instructionPC)),
                         static_cast<unsigned>(firmwareMachine.readCode(static_cast<std::uint16_t>(event.instructionPC + 1u))),
@@ -5440,7 +5440,7 @@ int main(int argc, char** argv) {
                    static_cast<std::uint8_t>((projected.outputValue24 >> 16u) & 0x07u));
             std::printf("NOTE72 INTERPOLATION LANE[%zu]: ret=%04X source=%04X:%02X "
                         "%04X:%02X %04X:%02X step=%04X negative=%u result=%06X "
-                        "writer=%02X/%02X/%02X\\n",
+                        "writer=%02X/%02X/%02X\n",
                         pass, static_cast<unsigned>(input.returnPC),
                         static_cast<unsigned>(low->address), static_cast<unsigned>(low->value),
                         static_cast<unsigned>(middle->address), static_cast<unsigned>(middle->value),
@@ -5465,7 +5465,7 @@ int main(int argc, char** argv) {
             assert(packet.returnPC == secondNoteBulkReturnPCs[i]);
         }
         std::printf("NOTE72 PITCH WORD (UNCLASSIFIED): word=%06X note66=%06X ratio_ppm=%llu "
-                    "packets=%zu bulk=544/544 identical\\n",
+                    "packets=%zu bulk=544/544 identical\n",
                     static_cast<unsigned>(note72PitchStep),
                     static_cast<unsigned>(note66ReferencePitchWord),
                     static_cast<unsigned long long>(note72To66RatioPPM),
@@ -5510,7 +5510,7 @@ int main(int argc, char** argv) {
         assert(singleModeDispatch.registers[7] == 0x0cu);
         assert(singleModeDispatch.registers[5] == 0x41u);
         assert(singleModeDispatch.registers[3] == 0x64u);
-        std::printf("NOTE65 SINGLE MODE: CommonOverride=00 4256=%zu 1494=%zu 189D=%zu AC00=%zu event=%02X\\n",
+        std::printf("NOTE65 SINGLE MODE: CommonOverride=00 4256=%zu 1494=%zu 189D=%zu AC00=%zu event=%02X\n",
                     firmwareMachine.watchedCallCount(0x4256u) - singleModePartCallsBefore,
                     firmwareMachine.watchedCallCount(0x1494u) - singleModeDescriptorCallsBefore,
                     firmwareMachine.watchedCallCount(0x189du) - singleModeStreamCallsBefore,
@@ -5546,7 +5546,7 @@ int main(int argc, char** argv) {
         // Count the two interpolation lanes from the six exact operand reads,
         // not from the total size of the bounded trace buffer.
         std::printf("NOTE65 SINGLE PITCH: MOVX=%zu tripletA=%02X/%02X/%02X "
-                    "tripletB=%02X/%02X/%02X\\n",
+                    "tripletB=%02X/%02X/%02X\n",
                     singleModeInterpolationAccessCount,
                     static_cast<unsigned>(singleLowA->value),
                     static_cast<unsigned>(singleMidA->value),
@@ -5593,7 +5593,7 @@ int main(int argc, char** argv) {
                 firmwareMachine.instructionWatchCountForTesting();
             const auto instructionWatchFirst = instructionWatchCount > 1024u
                 ? instructionWatchCount - 1024u : 0u;
-            std::printf("NOTE65 WATCH CAPTURE: total=%zu retained=%zu\\n",
+            std::printf("NOTE65 WATCH CAPTURE: total=%zu retained=%zu\n",
                         instructionWatchCount, instructionWatchCount - instructionWatchFirst);
             std::array<std::uint8_t, 4> observedEventIds{};
             std::array<TechnoX8032Machine::InstructionWatchEvent, 4>
@@ -5681,7 +5681,7 @@ int main(int argc, char** argv) {
             assert(firmwareMachine.readCode(0x0002u) == 0x32u);
             std::printf("NOTE65 RESOURCE SLOT BOUNDARY selector=%u "
                         "PC18EB=%zu at40=%zu PC18EE/LJMP0000=%zu "
-                        "PC0000=%zu PC_EB32=%zu finalPC=%04X\\n",
+                        "PC0000=%zu PC_EB32=%zu finalPC=%04X\n",
                         static_cast<unsigned>(selector),
                         nestedSlotBoundaryCount, boundaryAt40,
                         boundaryJumpToZero, resetVectorCount, resetBootCount,
@@ -5689,7 +5689,7 @@ int main(int argc, char** argv) {
             for (std::size_t i = 0; i < nestedSlotBoundaryCount; ++i) {
                 const auto& event = nestedSlotBoundaryEvents[i];
                 std::printf("  NOTE65 SLOT BOUNDARY PC=%04X A=%02X "
-                            "RAM2E=%02X RAM38/39=%02X/%02X ret=%04X\\n",
+                            "RAM2E=%02X RAM38/39=%02X/%02X ret=%04X\n",
                             static_cast<unsigned>(event.instructionPC),
                             static_cast<unsigned>(event.accumulator),
                             static_cast<unsigned>(event.directRam2E),
@@ -5731,7 +5731,7 @@ int main(int argc, char** argv) {
             for (std::size_t i = 0; i < partCalls; ++i)
                 std::printf("%s%02X", i == 0u ? "" : ",",
                             static_cast<unsigned>(allocatedPages[i]));
-            std::printf("\\n");
+            std::printf("\n");
 
             // Event 0x0C begins with a typed 0x08 record. The 0x1BC3
             // dispatch table selects handler 0x1C61; trace its source fields,
@@ -5780,7 +5780,7 @@ int main(int argc, char** argv) {
                 const auto* secondWrite = captureType08(0x1cabu, 0u);
                 const auto* nextMarker = captureType08(0x1986u, 0x1613u, 0x88u);
                 std::fprintf(stderr,
-                    "TYPE08 SNAPSHOTS entry=%u tag=%u b1=%u b2=%u b3=%u b4=%u b5=%u b6=%u w0=%u w1=%u marker=%u page=%02X\\n",
+                    "TYPE08 SNAPSHOTS entry=%u tag=%u b1=%u b2=%u b3=%u b4=%u b5=%u b6=%u w0=%u w1=%u marker=%u page=%02X\n",
                     entry != nullptr, readTag != nullptr, readByte1 != nullptr,
                     readByte2 != nullptr, readByte3 != nullptr, readByte4 != nullptr,
                     readByte5 != nullptr, readByte6 != nullptr, firstWrite != nullptr,
@@ -5793,7 +5793,7 @@ int main(int argc, char** argv) {
                 assert(entry->directRam36 == 0x0cu && entry->directRam37 == 0x16u);
                 std::fprintf(stderr,
                     "TYPE08 A snapshots tag=%02X bytes=%02X/%02X/%02X/%02X/%02X/%02X "
-                    "writeA=%02X/%02X markerA=%02X markerDPTR=%04X\\n",
+                    "writeA=%02X/%02X markerA=%02X markerDPTR=%04X\n",
                     static_cast<unsigned>(readTag->accumulator),
                     static_cast<unsigned>(readByte1->accumulator),
                     static_cast<unsigned>(readByte2->accumulator),
@@ -5827,14 +5827,14 @@ int main(int argc, char** argv) {
                         write.address < 0x0180u || write.address > 0x0190u)
                         continue;
                     ++typedWriteMatches;
-                    std::printf("NOTE65 TYPE08 WRITE: pc=%04X addr=%04X value=%02X\\n",
+                    std::printf("NOTE65 TYPE08 WRITE: pc=%04X addr=%04X value=%02X\n",
                                 static_cast<unsigned>(write.instructionPC),
                                 static_cast<unsigned>(write.address),
                                 static_cast<unsigned>(write.value));
                 }
                 assert(typedWriteMatches >= 4u);
                 std::printf("NOTE65 TYPE08 DISPATCH: source=160C..1612 "
-                            "table=1BC7->1C61 cursor=1613 page=%02X slot=80->88\\n",
+                            "table=1BC7->1C61 cursor=1613 page=%02X slot=80->88\n",
                             static_cast<unsigned>(allocatedPages[0]));
             }
 
@@ -5960,7 +5960,7 @@ int main(int argc, char** argv) {
                         expected.offset);
                     assert(write.address == expectedAddress);
                     std::fprintf(stderr,
-                                 "NESTED POSTWRITE pc=%04X page=%02X addr=%04X value=%02X expected=%02X\\n",
+                                 "NESTED POSTWRITE pc=%04X page=%02X addr=%04X value=%02X expected=%02X\n",
                                  static_cast<unsigned>(write.instructionPC),
                                  static_cast<unsigned>(write.port2),
                                  static_cast<unsigned>(write.address),
@@ -6226,21 +6226,21 @@ int main(int argc, char** argv) {
                 assert(seen);
 
             std::printf("NOTE65 NESTED SLOT MAP: slots=8 active=00,28 empty=6 "
-                        "source=03AF..03BE\\n");
+                        "source=03AF..03BE\n");
             std::printf("NOTE65 SLOT 28: raw=51 00 00 29 copy=51 00 00 29 "
-                        "metadata=00 7F 50 00\\n");
+                        "metadata=00 7F 50 00\n");
 
             std::printf("NOTE65 NESTED IC51 POSTPROCESS: "
-                        "slot+3=00 (R2!=0) slot+4=00 slot+5=80 slot+6=00\\n");
+                        "slot+3=00 (R2!=0) slot+4=00 slot+5=80 slot+6=00\n");
             std::printf("NOTE65 NESTED IC51 RECORD: bank1[03AF..03B0]=06 38 "
                         "ptr=3806 raw=A4 16 A3 40 acc6=A4->E4 page=%02X "
-                        "writes=E4 16 A3 40\\n",
+                        "writes=E4 16 A3 40\n",
                         static_cast<unsigned>(secondEventPage));
 
             std::size_t selectorReadCount = 0;
             std::size_t selectorBranchCount = 0;
             std::size_t selectorCallsiteCount = 0;
-            std::printf("NOTE65 593D DISPATCH TRACE selector=%u:\\n",
+            std::printf("NOTE65 593D DISPATCH TRACE selector=%u:\n",
                         static_cast<unsigned>(selector));
             for (std::size_t i = instructionWatchFirst;
                  i < instructionWatchCount; ++i) {
@@ -6346,7 +6346,7 @@ int main(int argc, char** argv) {
                     std::printf("  PART-ROUTE PC=%04X ret=%04X event=%02X "
                                 "key=%02X velocity=%02X state71=%02X "
                                 "A=%02X DPTR=%04X R5=%02X R7=%02X "
-                                "PartFields[28/29/2A]=%02X/%02X/%02X\\n",
+                                "PartFields[28/29/2A]=%02X/%02X/%02X\n",
                                 static_cast<unsigned>(pc),
                                 static_cast<unsigned>(event.returnPC),
                                 static_cast<unsigned>(event.directRam6E),
@@ -6367,7 +6367,7 @@ int main(int argc, char** argv) {
                                 "RAM2F/30=%02X/%02X RAM3C/3D=%02X/%02X "
                                 "RAM3E/3F=%02X/%02X RAM45=%02X "
                                 "RAM50/51/52=%02X/%02X/%02X "
-                                "P2=%02X P3=%02X\\n",
+                                "P2=%02X P3=%02X\n",
                                 static_cast<unsigned>(pc),
                                 static_cast<unsigned>(event.returnPC),
                                 static_cast<unsigned>(event.accumulator),
@@ -6393,7 +6393,7 @@ int main(int argc, char** argv) {
                                 "RAM2B/2C/2D/2E=%02X/%02X/%02X/%02X "
                                 "RAM36/37/38/39=%02X/%02X/%02X/%02X "
                                 "RAM3A/3B=%02X/%02X RAM41/43/44=%02X/%02X/%02X "
-                                "RAM20=%02X PSW=%02X P2/P3=%02X/%02X\\n",
+                                "RAM20=%02X PSW=%02X P2/P3=%02X/%02X\n",
                                 static_cast<unsigned>(pc),
                                 static_cast<unsigned>(event.returnPC),
                                 static_cast<unsigned>(event.accumulator),
@@ -6437,7 +6437,7 @@ int main(int argc, char** argv) {
                 const auto bit32 = (event.directRam26 >> 2u) & 1u;
                 std::printf("  PC=%04X A=%02X DPTR=%04X P3=%02X ret=%04X "
                             "R7=%02X bits[2F/30/31/32]=%u/%u/%u/%u "
-                            "IRAM25=%02X IRAM26=%02X RAM28=%02X\\n",
+                            "IRAM25=%02X IRAM26=%02X RAM28=%02X\n",
                             static_cast<unsigned>(pc),
                             static_cast<unsigned>(event.accumulator),
                             static_cast<unsigned>(event.dptr),
@@ -6449,7 +6449,7 @@ int main(int argc, char** argv) {
                             static_cast<unsigned>(event.directRam26),
                             static_cast<unsigned>(event.directRam28));
             }
-            std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\\n",
+            std::printf("  selector reads=%zu branch-targets=%zu call-sites=%zu\n",
                         selectorReadCount, selectorBranchCount,
                         selectorCallsiteCount);
             const auto resourceXdataAfter = firmwareMachine.xdataWatchTraceCount();
@@ -6459,7 +6459,7 @@ int main(int argc, char** argv) {
                 selectorXdataBefore, firstRetainedResourceXdata);
             std::size_t resourcePageReads = 0;
             std::size_t resourcePageWrites = 0;
-            std::printf("NOTE65 SELECTED XDATA PAGES 01/02 TRACE:\\n");
+            std::printf("NOTE65 SELECTED XDATA PAGES 01/02 TRACE:\n");
             for (std::size_t i = firstResourceXdata; i < resourceXdataAfter; ++i) {
                 const auto& access = firmwareMachine.xdataWatchTraceAt(i);
                 const auto page = static_cast<unsigned>(access.address >> 8u);
@@ -6472,7 +6472,7 @@ int main(int argc, char** argv) {
                 else ++resourcePageReads;
                 if (offset >= 0x60u) {
                     std::printf("  RESOURCE-XDATA %c %04X=%02X pc=%04X ret=%04X "
-                                "P2=%02X P3=%02X mode=%u cycle=%llu\\n",
+                                "P2=%02X P3=%02X mode=%u cycle=%llu\n",
                                 access.write ? 'W' : 'R',
                                 static_cast<unsigned>(access.address),
                                 static_cast<unsigned>(access.value),
@@ -6484,16 +6484,16 @@ int main(int argc, char** argv) {
                                 static_cast<unsigned long long>(access.machineCycle));
                 }
             }
-            std::printf("NOTE65 SELECTED XDATA PAGE COUNTS: reads=%zu writes=%zu\\n",
+            std::printf("NOTE65 SELECTED XDATA PAGE COUNTS: reads=%zu writes=%zu\n",
                         resourcePageReads, resourcePageWrites);
             const auto gateAccessCount =
                 firmwareMachine.midiEventGateTraceCountForTesting();
-            std::printf("NOTE65 REPEATED-NOTE GATE XDATA: count=%zu\\n",
+            std::printf("NOTE65 REPEATED-NOTE GATE XDATA: count=%zu\n",
                         gateAccessCount);
             for (std::size_t i = 0; i < gateAccessCount; ++i) {
                 const auto& access = firmwareMachine.midiEventGateTraceAtForTesting(i);
                 std::printf("  GATE-XDATA %c %04X=%02X pc=%04X ret=%04X "
-                            "mode=%u IC51=%u\\n",
+                            "mode=%u IC51=%u\n",
                             access.write ? 'W' : 'R',
                             static_cast<unsigned>(access.address),
                             static_cast<unsigned>(access.value),
@@ -6504,12 +6504,12 @@ int main(int argc, char** argv) {
             }
             const auto flagWriteCount =
                 firmwareMachine.dispatchFlagWriteTraceCountForTesting();
-            std::printf("NOTE65 DISPATCH FLAG BACKING WRITES: count=%zu\\n",
+            std::printf("NOTE65 DISPATCH FLAG BACKING WRITES: count=%zu\n",
                         flagWriteCount);
             for (std::size_t i = 0; i < flagWriteCount; ++i) {
                 const auto& write = firmwareMachine.dispatchFlagWriteTraceAtForTesting(i);
                 std::printf("  FLAG-RAM W %02X %02X->%02X opcode=%02X operand=%02X "
-                            "pc=%04X ret=%04X\\n",
+                            "pc=%04X ret=%04X\n",
                             static_cast<unsigned>(write.address),
                             static_cast<unsigned>(write.previousValue),
                             static_cast<unsigned>(write.currentValue),
@@ -6528,11 +6528,11 @@ int main(int argc, char** argv) {
                 if (event.address != 0x7bd5u || event.write)
                     continue;
                 ++selectorOverrideReads;
-                std::printf("  7BD5 OVERRIDE READ: value=%02X cycle=%llu\\n",
+                std::printf("  7BD5 OVERRIDE READ: value=%02X cycle=%llu\n",
                             static_cast<unsigned>(event.value),
                             static_cast<unsigned long long>(event.machineCycle));
             }
-            std::printf("  override-backed 7BD5 reads=%zu\\n", selectorOverrideReads);
+            std::printf("  override-backed 7BD5 reads=%zu\n", selectorOverrideReads);
             const auto selectorXdataAfter = firmwareMachine.xdataWatchTraceCount();
             const auto selectorXdataFirst = selectorXdataAfter > 8192u
                 ? selectorXdataAfter - 8192u : 0u;
@@ -6543,7 +6543,7 @@ int main(int argc, char** argv) {
                     event.address != 0x7bd5u)
                     continue;
                 std::printf("  RESOURCE XDATA %c %04X=%02X pc=%04X ret=%04X "
-                            "P3=%02X IC51=%u\\n",
+                            "P3=%02X IC51=%u\n",
                             event.write ? 'W' : 'R',
                             static_cast<unsigned>(event.address),
                             static_cast<unsigned>(event.value),
@@ -6566,7 +6566,7 @@ int main(int argc, char** argv) {
             for (std::size_t i = 0; i < observedCount; ++i)
                 std::printf("%s%02X", i == 0u ? "" : ",",
                             static_cast<unsigned>(observedEventIds[i]));
-            std::printf("\\n");
+            std::printf("\n");
         };
         probeCommonLayerSelector(0x02u,
             "Note On pitch 65 with synthetic Common Layer 3 selector");
@@ -6576,13 +6576,13 @@ int main(int argc, char** argv) {
         const auto realPackets = firmwareMachine.soundCommandPacketCount();
         const auto realBursts = firmwareMachine.soundHostBurstWordCount();
         const auto realSoundReads = firmwareMachine.soundMemoryReadTraceCount();
-        std::printf("REAL-ROM sound-memory reads after MIDI: total=%llu traced=%zu\\n",
+        std::printf("REAL-ROM sound-memory reads after MIDI: total=%llu traced=%zu\n",
                     static_cast<unsigned long long>(firmwareMachine.soundMemoryReadCount()),
                     realSoundReads);
         const auto realFirstRead = realSoundReads > 64u ? realSoundReads - 64u : 0u;
         for (std::size_t i = realFirstRead; i < realSoundReads; ++i) {
             const auto& event = firmwareMachine.soundMemoryReadTraceAt(i);
-            std::printf("  REAL-XREAD[%zu] %04X=%02X mode=%u pc=%04X ret=%04X cycle=%llu\\n",
+            std::printf("  REAL-XREAD[%zu] %04X=%02X mode=%u pc=%04X ret=%04X cycle=%llu\n",
                         i, static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value), static_cast<unsigned>(event.mode),
                         static_cast<unsigned>(event.instructionPC),
@@ -6630,7 +6630,7 @@ int main(int argc, char** argv) {
         }
         std::printf(" effective7BD5=%02X effective7D95=%02X effectiveFFFB=%02X "
                     "effectiveFF80=%02X effectiveFF88=%02X "
-                    "RAM[4E]=%02X RAM[4F]=%02X RAM[50]=%02X RAM[51]=%02X RAM[52]=%02X\\n",
+                    "RAM[4E]=%02X RAM[4F]=%02X RAM[50]=%02X RAM[51]=%02X RAM[52]=%02X\n",
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7bd5u)),
                     static_cast<unsigned>(firmwareMachine.readExternal(0x7d95u)),
                     static_cast<unsigned>(firmwareMachine.readExternal(0xfffbu)),
@@ -6645,7 +6645,7 @@ int main(int argc, char** argv) {
         for (std::size_t i = realPacketBaseline; i < realPackets; ++i) {
             const auto& packet = firmwareMachine.soundCommandPacketAt(i);
             const auto& word = firmwareMachine.soundHostBurstWordAt(i);
-            std::printf("  real-host[%zu] %02X %02X %02X %02X -> %04X pc=%04X ret=%04X\\n",
+            std::printf("  real-host[%zu] %02X %02X %02X %02X -> %04X pc=%04X ret=%04X\n",
                         i - realPacketBaseline,
                         static_cast<unsigned>(packet.bytes[0]),
                         static_cast<unsigned>(packet.bytes[1]),
@@ -6656,7 +6656,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(packet.returnPC));
         }
         if (realBursts > realBurstBaseline)
-            std::printf("  real burst tail=%04X\\n",
+            std::printf("  real burst tail=%04X\n",
                         static_cast<unsigned>(firmwareMachine.soundHostBurstWordAt(realBursts - 1u).value));
 
         // Controlled test stimulus only: inject the expected AC signature so
@@ -6681,7 +6681,7 @@ int main(int argc, char** argv) {
         assert(injectedResponseMachine.runUntilProgramCounter(0x326a, 50000) != 0);
         injectedResponseMachine.setSoundDeviceResponseForTesting(0xac);
         const auto injectedBoot = injectedResponseMachine.runUntilProgramCounter(0x32b0, 2000000);
-        std::printf("IC4 injected-response diagnostic (test-only AC): instructions=%zu PC=%04X XWR=%llu XRD=%llu mode2WR=%llu mode2RD=%llu\\n",
+        std::printf("IC4 injected-response diagnostic (test-only AC): instructions=%zu PC=%04X XWR=%llu XRD=%llu mode2WR=%llu mode2RD=%llu\n",
                     injectedBoot,
                     static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
                     static_cast<unsigned long long>(injectedResponseMachine.soundMemoryWriteCount()),
@@ -6720,7 +6720,7 @@ int main(int argc, char** argv) {
             // Finish the long factory SysEx stream before the isolated
             // Program Change / Note On stimulus is queued.
             injectedResponseMachine.runForMachineCycles(5000000u);
-            std::printf("Factory RAM Performance SysEx loaded: frames=%zu bytes=%llu tempo=%u division=%u commands=%zu IC51=%llu\\n",
+            std::printf("Factory RAM Performance SysEx loaded: frames=%zu bytes=%llu tempo=%u division=%u commands=%zu IC51=%llu\n",
                         factoryFrames.size(),
                         static_cast<unsigned long long>(totalFactoryBytes),
                         factoryTempo, static_cast<unsigned>(factoryDivision),
@@ -6748,7 +6748,7 @@ int main(int argc, char** argv) {
             programAndNote.data(), programAndNote.size(), midiStartCycle));
         const auto midiInstructions = injectedResponseMachine.runForMachineCycles(2000000);
         const auto midiDrainInstructions = injectedResponseMachine.runForMachineCycles(5000000u);
-        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu drain=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X ACIAreads=%llu validReads=%llu lastRX=%02X lastValid=%02X queued=%zu RAM49=%02X RAM47=%02X RAM59=%02X RAM5E=%02X X2B8B=%02X X2B8C=%02X X2B8D=%02X X2B8F=%02X X30E4=%02X R53=%02X R56=%02X R29=%02X R2A=%02X R5D=%02X R5E=%02X X2B90=%02X X2B9D=%02X X2B9E=%02X X2B9F=%02X X30E6=%02X X30E8=%02X X304C=%02X X304D=%02X X304E=%02X\\n",
+        std::printf("IC4 MIDI Note On diagnostic: instructions=%zu drain=%zu PC=%04X IE=%02X TCON=%02X ACIA=%02X P3=%02X IC51=%llu bank0=%llu bank1=%llu lastIC51=%04X ACIAreads=%llu validReads=%llu lastRX=%02X lastValid=%02X queued=%zu RAM49=%02X RAM47=%02X RAM59=%02X RAM5E=%02X X2B8B=%02X X2B8C=%02X X2B8D=%02X X2B8F=%02X X30E4=%02X R53=%02X R56=%02X R29=%02X R2A=%02X R5D=%02X R5E=%02X X2B90=%02X X2B9D=%02X X2B9E=%02X X2B9F=%02X X30E6=%02X X30E8=%02X X304C=%02X X304D=%02X X304E=%02X\n",
                     midiInstructions, midiDrainInstructions,
                     static_cast<unsigned>(injectedResponseMachine.cpu().registers().pc),
                     static_cast<unsigned>(ieBeforeMidi),
@@ -6790,14 +6790,14 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x304e)));
         std::fflush(stdout);
         const auto soundReadTraceCount = injectedResponseMachine.soundMemoryReadTraceCount();
-        std::printf("Sound-memory reads after MIDI: total=%llu traced=%zu\\n",
+        std::printf("Sound-memory reads after MIDI: total=%llu traced=%zu\n",
                     static_cast<unsigned long long>(injectedResponseMachine.soundMemoryReadCount()),
                     soundReadTraceCount);
         const auto firstSoundRead = soundReadTraceCount > 48u
             ? soundReadTraceCount - 48u : 0u;
         for (std::size_t i = firstSoundRead; i < soundReadTraceCount; ++i) {
             const auto& event = injectedResponseMachine.soundMemoryReadTraceAt(i);
-            std::printf("  XREAD[%zu] addr=%04X value=%02X mode=%u pc=%04X ret=%04X cycle=%llu\\n",
+            std::printf("  XREAD[%zu] addr=%04X value=%02X mode=%u pc=%04X ret=%04X cycle=%llu\n",
                         i, static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned>(event.mode),
@@ -6814,7 +6814,7 @@ int main(int argc, char** argv) {
         // cleared by the downstream voice dispatcher, so retain the note check
         // but do not require the raw status byte to remain 0x90.
         // Downstream processing may consume and clear the note work byte.
-        std::printf("Firmware call deltas: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu\\n",
+        std::printf("Firmware call deltas: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu\n",
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x57a8) - call57a8BeforeMidi),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x5671) - call5671BeforeMidi),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x4256) - call4256BeforeMidi),
@@ -6822,7 +6822,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x0db7) - commandWriterCallsBeforeMidi),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac00) - callAC00BeforeMidi),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac88) - callAC88BeforeMidi));
-        std::printf("Firmware call counts: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu B34D=%llu\\n",
+        std::printf("Firmware call counts: 57A8=%llu 5671=%llu 4256=%llu 1494=%llu 0DB7=%llu AC00=%llu AC88=%llu B34D=%llu\n",
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x57a8)),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x5671)),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0x4256)),
@@ -6831,7 +6831,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac00)),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xac88)),
                     static_cast<unsigned long long>(injectedResponseMachine.watchedCallCount(0xb34d)));
-        std::printf("MIDI voice-gate XDATA: 7D95=%02X 3702=%02X 3704=%02X 370A=%02X 370B=%02X 3039=%02X 303A=%02X 304B=%02X 3050=%02X 3051=%02X 2FB3=%02X 2FB4=%02X\\n",
+        std::printf("MIDI voice-gate XDATA: 7D95=%02X 3702=%02X 3704=%02X 370A=%02X 370B=%02X 3039=%02X 303A=%02X 304B=%02X 3050=%02X 3051=%02X 2FB3=%02X 2FB4=%02X\n",
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x7d95)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3702)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3704)),
@@ -6844,7 +6844,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3051)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fb3)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2fb4)));
-        std::printf("Part-0 MIDI route XDATA: 2900=%02X 2901=%02X 2902=%02X 2903=%02X 2904=%02X 2905=%02X 2906=%02X 2B98=%02X 2B99=%02X 2FD7=%02X 2FA2=%02X 7C17=%02X 7C1C=%02X 7C26=%02X 7BD5=%02X 3700=%02X 3703=%02X\\n",
+        std::printf("Part-0 MIDI route XDATA: 2900=%02X 2901=%02X 2902=%02X 2903=%02X 2904=%02X 2905=%02X 2906=%02X 2B98=%02X 2B99=%02X 2FD7=%02X 2FA2=%02X 7C17=%02X 7C1C=%02X 7C26=%02X 7BD5=%02X 3700=%02X 3703=%02X\n",
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2900)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2901)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x2902)),
@@ -6862,7 +6862,7 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x7bd5)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3700)),
                     static_cast<unsigned>(injectedResponseMachine.readExternal(0x3703)));
-        std::printf("IC51 raw route bytes: bank0[7BD4..7BD7]=%02X %02X %02X %02X bank1[7BD4..7BD7]=%02X %02X %02X %02X\\n",
+        std::printf("IC51 raw route bytes: bank0[7BD4..7BD7]=%02X %02X %02X %02X bank1[7BD4..7BD7]=%02X %02X %02X %02X\n",
                     static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd4)),
                     static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd5)),
                     static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(0, 0x7bd6)),
@@ -6872,54 +6872,54 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(1, 0x7bd6)),
                     static_cast<unsigned>(injectedResponseMachine.ic51RomByteForTesting(1, 0x7bd7)));
         const auto ic51TraceCount = injectedResponseMachine.ic51ReadTraceCount();
-        std::printf("IC51 reads near 7BD5 (newest first):\\n");
+        std::printf("IC51 reads near 7BD5 (newest first):\n");
         std::size_t routeReads = 0;
         for (std::size_t age = 0; age < ic51TraceCount && routeReads < 24u; ++age) {
             const auto& event = injectedResponseMachine.ic51ReadTraceAt(ic51TraceCount - 1u - age);
             if (event.address < 0x7bd0u || event.address > 0x7be0u) continue;
             ++routeReads;
-            std::printf("  bank=%u address=%04X value=%02X cycle=%llu\\n",
+            std::printf("  bank=%u address=%04X value=%02X cycle=%llu\n",
                         static_cast<unsigned>(event.bank),
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto xdataWatchCount = injectedResponseMachine.xdataWatchTraceCount();
-        std::printf("XDATA 7BD4-7BD7 accesses (newest first):\\n");
+        std::printf("XDATA 7BD4-7BD7 accesses (newest first):\n");
         for (std::size_t age = 0; age < xdataWatchCount && age < 64u; ++age) {
             const auto& event = injectedResponseMachine.xdataWatchTraceAt(xdataWatchCount - 1u - age);
-            std::printf("  %c %04X=%02X cycle=%llu\\n",
+            std::printf("  %c %04X=%02X cycle=%llu\n",
                         event.write ? 'W' : 'R',
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto unmappedCount = injectedResponseMachine.unmappedBusTraceCount();
-        std::printf("Unmapped external bus accesses (newest first, last 64):\\n");
+        std::printf("Unmapped external bus accesses (newest first, last 64):\n");
         for (std::size_t age = 0; age < unmappedCount && age < 64u; ++age) {
             const auto& event = injectedResponseMachine.unmappedBusTraceAt(unmappedCount - 1u - age);
-            std::printf("  %c %04X=%02X cycle=%llu\\n",
+            std::printf("  %c %04X=%02X cycle=%llu\n",
                         event.write ? 'W' : 'R',
                         static_cast<unsigned>(event.address),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
-        std::printf("Unmapped 7xxx address histogram:\\n");
+        std::printf("Unmapped 7xxx address histogram:\n");
         for (std::uint32_t address = 0x7000u; address <= 0x7fffu; ++address) {
             const auto reads = injectedResponseMachine.unmappedReadCountAt7xxx(
                 static_cast<std::uint16_t>(address));
             const auto writes = injectedResponseMachine.unmappedWriteCountAt7xxx(
                 static_cast<std::uint16_t>(address));
             if (reads != 0 || writes != 0)
-                std::printf("  %04X reads=%llu writes=%llu\\n", address,
+                std::printf("  %04X reads=%llu writes=%llu\n", address,
                             static_cast<unsigned long long>(reads),
                             static_cast<unsigned long long>(writes));
         }
         const auto portWrites = injectedResponseMachine.portWriteCount();
-        std::printf("Recent IC4 port writes (newest first):\\n");
+        std::printf("Recent IC4 port writes (newest first):\n");
         for (std::size_t portAge = 0; portAge < 24u && portAge < portWrites; ++portAge) {
             const auto& event = injectedResponseMachine.portWriteAt(portWrites - 1u - portAge);
-            std::printf("  P%u=%02X prev=%02X changed=%02X pc=%04X P2=%02X 8E=%02X cycle=%llu\\n",
+            std::printf("  P%u=%02X prev=%02X changed=%02X pc=%04X P2=%02X 8E=%02X cycle=%llu\n",
                         static_cast<unsigned>(event.port),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned>(event.previousValue),
@@ -6929,34 +6929,34 @@ int main(int argc, char** argv) {
                         static_cast<unsigned>(event.soundBusMode),
                         static_cast<unsigned long long>(event.machineCycle));
         }
-        std::printf("IC4 P1/P3 trace (newest first):\\n");
+        std::printf("IC4 P1/P3 trace (newest first):\n");
         std::size_t serialPortEvents = 0;
         for (std::size_t portAge = 0; portAge < 256u && portAge < portWrites && serialPortEvents < 64u; ++portAge) {
             const auto& event = injectedResponseMachine.portWriteAt(portWrites - 1u - portAge);
             if (event.port != 1u && event.port != 3u) continue;
             ++serialPortEvents;
-            std::printf("  P%u=%02X cycle=%llu\\n",
+            std::printf("  P%u=%02X cycle=%llu\n",
                         static_cast<unsigned>(event.port),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto portReads = injectedResponseMachine.portReadCount();
-        std::printf("IC4 GPIO input samples (newest first):\\n");
+        std::printf("IC4 GPIO input samples (newest first):\n");
         std::size_t gpioReadEvents = 0;
         for (std::size_t readAge = 0; readAge < portReads && gpioReadEvents < 64u; ++readAge) {
             const auto& event = injectedResponseMachine.portReadAt(portReads - 1u - readAge);
             if (event.port != 1u && event.port != 3u) continue;
             ++gpioReadEvents;
-            std::printf("  P%u=%02X cycle=%llu\\n",
+            std::printf("  P%u=%02X cycle=%llu\n",
                         static_cast<unsigned>(event.port),
                         static_cast<unsigned>(event.value),
                         static_cast<unsigned long long>(event.machineCycle));
         }
         const auto& midiCpu = injectedResponseMachine.cpu();
-        std::printf("Recent IC4 instructions (newest first):\\n");
+        std::printf("Recent IC4 instructions (newest first):\n");
         for (std::size_t traceAge = 0; traceAge < 24u &&
              traceAge < midiCpu.recentInstructionCount(); ++traceAge) {
-            std::printf("  %04X: %02X\\n",
+            std::printf("  %04X: %02X\n",
                         static_cast<unsigned>(midiCpu.recentInstructionPC(traceAge)),
                         static_cast<unsigned>(midiCpu.recentInstructionOpcode(traceAge)));
         }
@@ -7013,7 +7013,7 @@ int main(int argc, char** argv) {
         assert(midpointControl.bytes[3] == 0xc0u);
         assert(tableWriteSecondFirst.bytes[0] == 0x0fu && tableWriteSecondFirst.bytes[3] == 0x80u);
         assert(tableWriteSecondLast.bytes[0] == 0xffu && tableWriteSecondLast.bytes[3] == 0x80u);
-        std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\\n",
+        std::printf("M.A.S.S. command packets: beforeMidi=%zu afterMidi=%zu delta=%zu\n",
                     commandCountBeforeMidi, commandCount, commandCount - commandCountBeforeMidi);
         // Preserve the complete MIDI-triggered command burst in CI logs.
         // The machine trace is a 1024-packet ring, so skip only entries that
@@ -7021,11 +7021,11 @@ int main(int argc, char** argv) {
         const auto firstRetainedCommand = commandCount > 1024u
             ? commandCount - 1024u : 0u;
         const auto firstNewCommand = std::max(commandCountBeforeMidi, firstRetainedCommand);
-        std::printf("Retained MIDI command packet range: [%zu, %zu)\\n",
+        std::printf("Retained MIDI command packet range: [%zu, %zu)\n",
                     firstNewCommand, commandCount);
         for (auto commandIndex = firstNewCommand; commandIndex < commandCount; ++commandIndex) {
             const auto& packet = injectedResponseMachine.soundCommandPacketAt(commandIndex);
-            std::printf("  MIDI-CMD[%zu] pc=%04X ret=%04X cycle=%llu %02X %02X %02X %02X\\n",
+            std::printf("  MIDI-CMD[%zu] pc=%04X ret=%04X cycle=%llu %02X %02X %02X %02X\n",
                         commandIndex,
                         static_cast<unsigned>(packet.instructionPC),
                         static_cast<unsigned>(packet.returnPC),
@@ -7039,11 +7039,11 @@ int main(int argc, char** argv) {
         const auto bit0ATraceCount = injectedResponseMachine.internalFlagWriteTraceCount();
         const auto firstRetainedBit0A = bit0ATraceCount > 256u
             ? bit0ATraceCount - 256u : 0u;
-        std::printf("Synthetic-ready bit 0A transitions: total=%zu retained=%zu\\n",
+        std::printf("Synthetic-ready bit 0A transitions: total=%zu retained=%zu\n",
                     bit0ATraceCount, bit0ATraceCount - firstRetainedBit0A);
         for (std::size_t i = firstRetainedBit0A; i < bit0ATraceCount; ++i) {
             const auto& event = injectedResponseMachine.internalFlagWriteTraceAt(i);
-            std::printf("  %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\\n",
+            std::printf("  %u->%u byte=%02X opcode=%02X pc=%04X ret=%04X cycle=%llu\n",
                         static_cast<unsigned>(event.previousValue),
                         static_cast<unsigned>(event.currentValue),
                         static_cast<unsigned>(event.byteValue),
@@ -7053,7 +7053,7 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(event.machineCycle));
         }
         } else {
-            std::printf("MIDI bytes were received, but this fixture emitted no SoundHost host transaction yet.\\n");
+            std::printf("MIDI bytes were received, but this fixture emitted no SoundHost host transaction yet.\n");
         }
 
         // Merge all retained external-device observations on the 8032 cycle
@@ -7087,11 +7087,11 @@ int main(int argc, char** argv) {
         assert(timelineHasSyntheticResponse);
         assert(timelineHasNonzeroSequence);
         std::printf("MERGED SOUND-DEVICE TIMELINE: retained=%zu (last 256 max); "
-                    "cycle + shared sequence ordering asserted\\n", deviceTimeline.size());
+                    "cycle + shared sequence ordering asserted\n", deviceTimeline.size());
         for (const auto& event : deviceTimeline) {
             std::printf("  DEV cycle=%llu seq=%llu %-7s pc=%04X caller=%04X addr=%04X "
                         "val=%02X prev=%02X P2=%02X P3=%02X mode=%02X "
-                        "IC51=%u bank=%u index=%u synthetic=%u\\n",
+                        "IC51=%u bank=%u index=%u synthetic=%u\n",
                         static_cast<unsigned long long>(event.machineCycle),
                         static_cast<unsigned long long>(event.eventSequence),
                         technox::SoundDeviceTimeline::kindName(event.kind),
