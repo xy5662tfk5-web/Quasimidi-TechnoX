@@ -152,6 +152,7 @@ if (BUILD_TESTING)
         OUTPUT "${TECHNOX_DESCRAMBLED_IC4}"
         COMMAND ${Python3_EXECUTABLE}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/analyze_technox_rom.py"
+            --ic4 "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
             --write-descrambled-ic4 "${TECHNOX_DESCRAMBLED_IC4}"
         DEPENDS
             "${CMAKE_CURRENT_SOURCE_DIR}/technox_IC4_mx27c1000_v105.bin"
