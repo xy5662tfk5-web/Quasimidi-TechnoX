@@ -247,6 +247,17 @@ void testMASS1C61PitchParameterExecutionProjection() {
     snapshot.secondaryTableBankSelectR4 = 0xa0u;
     snapshot.ram2F = 0x00u;
 
+    auto missingControl = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(missingControl.status ==
+           MASS1C61PitchExecutionStatus::requiresInterpolationControlSnapshot);
+    snapshot.hasCapturedInterpolationControl = true;
+    auto missingAddress = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(missingAddress.status ==
+           MASS1C61PitchExecutionStatus::requiresSecondaryAddressSnapshot);
+    snapshot.hasCapturedSecondaryAddressInputs = true;
+
     const auto result = MASS1C61PitchParameterExecutionProjection::execute(
         firmwareROM, command, snapshot);
     assert(result.ready());
@@ -1048,7 +1059,9 @@ void testOriginalVoiceProgramRuntime(
                 targetTableAddress - addressOffset.address - pitchFields.r7);
             MASS1C61PitchExecutionSnapshot pitchSnapshot{};
             pitchSnapshot.interpolationControl2067 = 0u;
+            pitchSnapshot.hasCapturedInterpolationControl = true;
             pitchSnapshot.secondaryTableBasePointer = basePointer;
+            pitchSnapshot.hasCapturedSecondaryAddressInputs = true;
             pitchSnapshot.secondaryTableIndexR3 = pitchFields.r3;
             pitchSnapshot.secondaryTableBankSelectR4 = pitchFields.r4;
             pitchSnapshot.ram2F = 0u;
