@@ -1,6 +1,7 @@
 #include "../Source/MASSResourceROM.h"
 #include "../Source/MASSAudioEngine.h"
 #include "../Source/MASSOriginalVoiceProgramRuntime.h"
+#include "../Source/MASSFirmwarePitchParameterExecution.h"
 #include "../Source/MASSFirmwareResourceCommandPlanner.h"
 #include "../Source/BasicMASSVoiceBackend.h"
 
@@ -222,6 +223,63 @@ void testMASS09B9SlotInterpolationArithmetic() {
         0x57u, 0x01u, 0xa2u, 0x0000u, false);
     assert(result.incrementMagnitude24 == 0u);
     assert(result.outputValue24 == 0x020157u);
+}
+
+void testMASS1C61PitchParameterExecutionProjection() {
+    std::vector<std::uint8_t> codeROM(0x20000u, 0xffu);
+    codeROM[0x397eu] = 0x05u;
+    codeROM[0x39feu] = 0x43u;
+    codeROM[0x3a7eu] = 0x02u;
+
+    MASSFirmwareROMView firmwareROM;
+    assert(firmwareROM.attach(codeROM.data(), codeROM.size()));
+
+    MASSResourceCommand command{};
+    command.kind = MASSResourceCommandKind::pitchParameter;
+    command.opcode = 0x08u;
+    command.length = 7u;
+    command.bytes = {{0x08u, 0x80u, 0x18u, 0xa0u, 0x00u, 0x00u, 0x00u}};
+
+    MASS1C61PitchExecutionSnapshot snapshot{};
+    snapshot.interpolationControl2067 = 0x00u;
+    snapshot.secondaryTableBasePointer = 0x3966u;
+    snapshot.secondaryTableIndexR3 = 0x18u;
+    snapshot.secondaryTableBankSelectR4 = 0xa0u;
+    snapshot.ram2F = 0x00u;
+
+    const auto result = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(result.ready());
+    assert(result.commandFields.r2 == 0x80u);
+    assert(result.interpolatedInput.value24 == 0x008018u);
+    assert(result.secondaryAddress.address == 0x397eu);
+    assert(result.secondaryFetchAddress.address == 0x397eu);
+    assert((result.secondaryTableBytes.bytes ==
+            std::array<std::uint8_t, 3>{{0x05u, 0x43u, 0x02u}}));
+    assert(result.packedFields.r3 == 0x80u);
+    assert(result.packedFields.r4 == 0x60u);
+    assert(result.packedFields.r5 == 0x05u);
+    assert(result.packedFields.r6 == 0x43u);
+    assert(result.packedFields.r7 == 0x02u);
+    // This reproduces the documented pre-slot-correction 1C61 accumulator
+    // vector D5:1E:02. It does not claim a musical unit or DSP register.
+    assert(result.accumulator.r2 == 0xd5u);
+    assert(result.accumulator.r3 == 0x1eu);
+    assert(result.accumulator.r4 == 0x02u);
+
+    command.opcode = 0x10u;
+    command.bytes[0] = 0x10u;
+    const auto invalid = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(invalid.status == MASS1C61PitchExecutionStatus::invalidCommand);
+
+    command.opcode = 0x08u;
+    command.bytes[0] = 0x08u;
+    snapshot.secondaryTableBasePointer = 0xffffu;
+    const auto missingTable = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(missingTable.status ==
+           MASS1C61PitchExecutionStatus::secondaryTableReadFailed);
 }
 
 void testMASS1C61SecondaryTableAddress() {
@@ -1952,6 +2010,7 @@ int main(int argc, char** argv) {
     testMASS0DB7PacketBuilder();
     testMASS1EDDRecordPacketSequenceBuilder();
     testMASS09B9SlotInterpolationArithmetic();
+    testMASS1C61PitchParameterExecutionProjection();
     testMASS1C61SecondaryTableAddress();
     testMASS1C61AccumulatorTransform();
     testMASS1C61InterpolationLookup();
