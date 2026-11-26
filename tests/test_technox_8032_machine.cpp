@@ -7022,23 +7022,32 @@ int main(int argc, char** argv) {
         assert(!deviceTimeline.empty());
         bool timelineHasHostWrite = false;
         bool timelineHasModeWrite = false;
+        bool timelineHasNonzeroSequence = false;
         for (std::size_t i = 0; i < deviceTimeline.size(); ++i) {
-            if (i != 0u)
-                assert(deviceTimeline[i - 1u].machineCycle <= deviceTimeline[i].machineCycle);
+            const auto& event = deviceTimeline[i];
+            timelineHasNonzeroSequence = timelineHasNonzeroSequence || event.eventSequence != 0u;
+            if (i != 0u) {
+                const auto& previous = deviceTimeline[i - 1u];
+                assert(previous.machineCycle <= event.machineCycle);
+                if (previous.machineCycle == event.machineCycle)
+                    assert(previous.eventSequence <= event.eventSequence);
+            }
             timelineHasHostWrite = timelineHasHostWrite ||
-                deviceTimeline[i].kind == technox::SoundDeviceTimelineKind::soundHostWrite;
+                event.kind == technox::SoundDeviceTimelineKind::soundHostWrite;
             timelineHasModeWrite = timelineHasModeWrite ||
-                deviceTimeline[i].kind == technox::SoundDeviceTimelineKind::soundBusModeWrite;
+                event.kind == technox::SoundDeviceTimelineKind::soundBusModeWrite;
         }
         assert(timelineHasHostWrite);
         assert(timelineHasModeWrite);
+        assert(timelineHasNonzeroSequence);
         std::printf("MERGED SOUND-DEVICE TIMELINE: retained=%zu (last 256 max); "
-                    "same-cycle order is not asserted\\n", deviceTimeline.size());
+                    "cycle + shared sequence ordering asserted\\n", deviceTimeline.size());
         for (const auto& event : deviceTimeline) {
-            std::printf("  DEV cycle=%llu %-7s pc=%04X caller=%04X addr=%04X "
+            std::printf("  DEV cycle=%llu seq=%llu %-7s pc=%04X caller=%04X addr=%04X "
                         "val=%02X prev=%02X P2=%02X P3=%02X mode=%02X "
                         "IC51=%u bank=%u index=%u\\n",
                         static_cast<unsigned long long>(event.machineCycle),
+                        static_cast<unsigned long long>(event.eventSequence),
                         technox::SoundDeviceTimeline::kindName(event.kind),
                         static_cast<unsigned>(event.instructionPC),
                         static_cast<unsigned>(event.callerPC),
