@@ -368,3 +368,16 @@ A fresh straight-line disassembly of the IC4 v1.05 helper region resolves more o
 - Latest code change: `3b17b82b749d0532c6613818a395d6b1a7fddd04`. GitHub combined status currently exposes no check records for the documentation checkpoint; this is not a passing build result.
 
 Evidence boundary: RAM `0x36/0x37` have multiple firmware uses. The `0x1494` resource-selection path loads them as a descriptor pointer, while the isolated sine/slot consumer uses them as scratch/cached state. Never assign them one global semantic name.
+
+
+## IC51 command stream → firmware packet planner — 26 November 2026
+
+- Added `Source/MASSFirmwareResourceCommandPlanner.h`. It routes decoded IC51 command kinds through packet builders derived from IC4 handlers, using an explicit post-handler register/flag snapshot rather than guessing DSP fields from raw stream bytes.
+- Implemented branches currently covered by the recovered firmware: group `0x00` extended-command path, group `0x10` multi-parameter packet sequence (including the optional `RAM[0x2B]-2` record controlled by flag `0x0A` and the bit-`0x0C` high-bit projection), group `0x18` four-byte command, and group `0x20` terminal command.
+- Classified group `0x08` pitch records as `requiresPitchHandlerState`: they still need the exact pointer/table/slot/external-byte state from the pitch/interpolation path. Ordinary group-`0x00` records are marked `requiresConditionalHandlerState` rather than being treated as a packet. Empty multi-parameter and marker commands are slot/filler-only; the one-byte advance groups are stream-only.
+- The planner returns ordered four-byte packets, up to three per command, or an explicit non-packet/unknown-context status. It does not assign SAM9407 register names or cause a hardware write.
+- `MASSOriginalVoiceProgramRuntime::planNextCommand()` now consumes the next command from a selected voice's immutable IC51 stream and passes it through the planner. It has a distinct `commandStreamExhausted` status, preserving the difference between end-of-stream and a command that needs more firmware context.
+- Tests now exercise all planner classifications, verify exact packet bytes/masks for supported branches, find a ready command in real factory IC51 program streams, execute it through the voice runtime cursor, and verify explicit stream exhaustion. This adds a real-ROM integration regression, but **no CI pass is claimed** until GitHub reports a completed run.
+- This is the firmware-side command-to-packet layer only. Original waveform lookup, sample playback, SAM9407 P16/DSP execution, the IC4-to-SAM9407 physical bridge, and original FX rendering are still absent. `BasicMASSVoiceBackend` remains a diagnostic oscillator.
+- Latest code commit in this branch at this checkpoint: `be1bccaba28c346b1da2661010a5cf03f37378fc`. GitHub combined status has not yet shown a completed CI result.
+
