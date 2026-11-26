@@ -47,7 +47,7 @@ The dependency-free C++17 test targets cover the MCS-51 core, TechnoX 8032 bus/f
 - `Source/TechnoX8032Machine.h` and `Source/MCS51Core.h` — firmware execution and bus model.
 - `Source/MASSResourceROM.h` — IC51 directories, descriptors, streams and arithmetic/resource models.
 - `Source/MASSAudioEngine.h`, `Source/MASSVoiceManager.h` and `Source/BasicMASSVoiceBackend.h` — audio framework and current generic test backend.
-- `Source/MASSWaveformMemoryView.h` — immutable bounds-checked view for a separately acquired raw waveform-memory image; no codec or sample semantics are assumed.
+- `Source/MASSWaveformMemoryView.h` — immutable bounds-checked view for a separately acquired raw waveform-memory image; `PluginProcessor` can map a dump read-only, without assuming codec or sample semantics.
 - `research/ORIGINAL_AUDIO_ENGINE_STATUS.md` — verified progress, evidence boundaries and next reverse-engineering steps.
 - `research/FINALIZATION_PLAN.md` — short path to one verified waveform, the original voice renderer and Intel release validation.
 - `docs/research/SAM9407_ARCHITECTURE_AND_TECHNOX_BRIDGE.md` — SAM9407 candidate architecture, separate host/sample-memory domains and evidence required before identifying the fitted chip.
