@@ -44,6 +44,7 @@ struct SoundDeviceTimelineEntry {
     bool ic51Selected = false;
     bool write = false;
     bool bit2Changed = false;
+    bool syntheticResponse = false;
 };
 
 class SoundDeviceTimeline {
@@ -95,6 +96,7 @@ public:
                 out.busMode = e.soundBusMode;
                 out.index = e.deviceIndex;
                 out.ic51Selected = e.ic51Selected;
+                out.syntheticResponse = e.responseInjectedForTesting;
                 return out;
             });
 
