@@ -5458,7 +5458,8 @@ int main(int argc, char** argv) {
         const auto& note72PitchPacket =
             firmwareMachine.soundCommandPacketAt(note72PacketStart);
         assert(note72PitchPacket.returnPC == 0x0a52u);
-        assert(note72PitchPacket.bytes[0] == 0x00u);
+        assert((note72PitchPacket.bytes ==
+                std::array<std::uint8_t, 4>{{0x00u, 0xd1u, 0x80u, 0x01u}}));
         const auto note72PitchStep = static_cast<std::uint32_t>(
             note72PitchPacket.bytes[1] |
             (static_cast<std::uint32_t>(note72PitchPacket.bytes[2]) << 8u) |
