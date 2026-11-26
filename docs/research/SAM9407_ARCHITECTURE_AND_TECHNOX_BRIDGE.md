@@ -1,8 +1,8 @@
-# DREAM SAM9407 — architecture target and TechnoX bridge constraints
+# DREAM SAM9407 — candidate architecture and TechnoX bridge constraints
 
-Status: primary working synthesis architecture for the TechnoX reconstruction; physical board population and the 8032-to-chip bridge are not yet verified.
+Status: unverified candidate for architectural comparison only; physical board population and the 8032-to-chip bridge are not verified.
 
-## Why SAM9407 is the selected target
+## Why SAM9407 is worth evaluating
 
 The SAM9407 objective specification (DREAM, February 1996) describes a single-chip sound system with:
 - a 16-bit CISC P16 control processor;
@@ -13,7 +13,7 @@ The SAM9407 objective specification (DREAM, February 1996) describes a single-ch
 - a memory-management unit that shares external ROM/RAM between P16 code/data and DSP sample/delay-line access;
 - an intelligent I/O block, MIDI UART, timers, codec interface, host FIFO and burst interface.
 
-The public application list names Quasimidi TechnoX, and family-generation material links the M.A.S.S. platform to Quasar/Raven. This makes SAM9407 the appropriate architecture target for implementation planning. It is not a substitute for a readable SAM9407 marking on a TechnoX mainboard or a verified pin/bus capture.
+The public application list names Quasimidi TechnoX, and family-generation material links the M.A.S.S. platform to Quasar/Raven. This makes SAM9407 a candidate worth evaluating, but it does not establish that this exact TechnoX board contains the chip. A readable IC marking and a matching pin/bus capture are required before a SAM9407-specific emulator is treated as the target.
 
 ## Three domains that must not be collapsed
 
@@ -43,7 +43,7 @@ The SAM9407 exposes a separate memory interface for sample ROM/SRAM/DRAM, includ
 - `WCS0/`, `WCS1/`, `WWE/`, `WOE/`, and byte-select/DRAM timing signals;
 - `S0–S1` cycle-type outputs distinguishing idle, synthesis access, instruction fetch and P16 processor read/write.
 
-The IC4-visible `0xC000–0xFFFF` window and the 13,647-byte IC51 remapped startup image are not themselves proof of the physical waveform memory layout. They may represent a transfer/buffer, control RAM, mapped external memory, or another intermediate resource. The 6 MB TechnoX sample-memory product claim is a configuration specification; no complete byte-exact 6 MB waveform dump has been recovered.
+The IC4-visible `0xC000–0xFFFF` window and the 13,647-byte IC51 remapped startup image are not themselves proof of the physical waveform memory layout. They may represent a transfer/buffer, control RAM, mapped external memory, or another intermediate resource. Published TechnoX specification listings report 64 MB of waveform memory ([Japanese TechnoX specification](https://piano.tyonmage.com/quasimidi/technox.html), [Vintage Synth Explorer](https://www.vintagesynth.com/quasimidi/technox)); this is a secondary-source capacity claim, not a confirmed chip topology or recovered image. No complete byte-exact 64 MB waveform dump has been recovered.
 
 ## Independent software cross-check: Linux SAM9407 driver
 
@@ -51,7 +51,7 @@ The open-source [libmikmod SAM9407 backend](https://github.com/sezero/mikmod/blo
 
 This is useful as a **generic semantic cross-check**: a SAM9407 voice model should be able to represent sample source/loop boundaries, pitch, stereo level and lifecycle separately. It does **not** provide the TechnoX M.A.S.S. command mapping, does not prove the TechnoX board uses the same Linux-facing firmware, and does not identify any of the IC4 bytes at `0x8000–0x8003` with a SAM9407 register or event. Do not copy the Linux event numbers or API structures into the TechnoX bridge.
 
-The EWS64 reference driver is also from another SAM9407-based product. Its firmware and `.94B` sound banks can be useful for studying generic SAM9407 memory loading and software architecture, but they are not TechnoX's 6 MB waveform image and cannot substitute for TechnoX's original IC51/DSP resources. See the [EWS64 hardware/software notes](https://vogonswiki.com/index.php/EWS64).
+The EWS64 reference driver is also from another SAM9407-based product. Its firmware and `.94B` sound banks can be useful for studying generic SAM9407 memory loading and software architecture, but they are not TechnoX's reported 64 MB waveform bank and cannot substitute for TechnoX's original IC51/DSP resources. See the [EWS64 hardware/software notes](https://vogonswiki.com/index.php/EWS64).
 
 ## Architecture-level implementation boundary
 
@@ -78,7 +78,8 @@ The implementation should be separated into independent components:
 - IC4 control firmware executes and the observed host traffic is retained with PC/caller, P2/P3, SFR `0x8E`, machine cycle and a machine-wide event sequence.
 - An offline timeline merges IC51, host aperture, FF10, external-memory, P3 and mode-register observations.
 - IC51 resource catalogs and per-voice program bindings are connected to the backend.
-- The original sample playback, SAM9407 P16 firmware execution, SAM9407 synthesis algorithm execution, physical host-bridge mapping and ADSP-2105 FX rendering are **not implemented**.
+- The original sample playback, any fitted-chip-specific P16/DSP execution, physical host-bridge mapping and ADSP-2105 FX rendering are **not implemented**.
+- SAM9407 remains an unverified candidate, not a confirmed TechnoX chip identification.
 - `BasicMASSVoiceBackend` remains a diagnostic oscillator and is not an authentic TechnoX sound source.
 
 ## Primary source
