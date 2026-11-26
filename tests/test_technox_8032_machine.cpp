@@ -5334,6 +5334,9 @@ int main(int argc, char** argv) {
         std::size_t note72AccumulatorSnapshots = 0;
         std::size_t note72InterpolationControlReads = 0;
         std::size_t note72PitchGuardStateAccesses = 0;
+        bool note72SawNormalizedAddressInput = false;
+        bool note72SawPreAccumulatorInput = false;
+        bool note72SawPostAccumulatorOutput = false;
         for (std::size_t i = 0;
              i < firmwareMachine.instructionWatchCountForTesting(); ++i) {
             const auto& event = firmwareMachine.instructionWatchAtForTesting(i);
@@ -5375,6 +5378,36 @@ int main(int argc, char** argv) {
                     static_cast<unsigned>(event.directRam06),
                     static_cast<unsigned>(event.directRam07));
             }
+            if (event.instructionPC == 0x1d95u && event.returnPC == 0x2017u) {
+                assert(event.dptr == 0x3903u);
+                assert(event.registers[2] == 0x80u);
+                assert(event.registers[3] == 0x18u);
+                assert(event.registers[4] == 0xa0u);
+                assert(event.registers[7] == 0x75u);
+                assert(event.directRam2F == 0x75u);
+                note72SawNormalizedAddressInput = true;
+            }
+            if (event.instructionPC == 0x1d9du && event.returnPC == 0x2017u) {
+                assert(event.dptr == 0x3978u);
+                note72SawNormalizedAddressInput = true;
+            }
+            if (event.instructionPC == 0x1dc8u && event.returnPC == 0x2017u) {
+                assert(event.registers[2] == 0x80u);
+                assert(event.registers[3] == 0x2au);
+                assert(event.registers[4] == 0x33u);
+                assert(event.registers[5] == 0x53u);
+                assert(event.registers[6] == 0x99u);
+                assert(event.registers[7] == 0x01u);
+                note72SawPreAccumulatorInput = true;
+            }
+            if (event.instructionPC == 0x1e04u && event.returnPC == 0x2017u) {
+                // 0x1E04 is MOV R4,A; R4 still holds 0xFF while A has 0x01.
+                assert(event.registers[2] == 0xbeu);
+                assert(event.registers[3] == 0x7fu);
+                assert(event.registers[4] == 0xffu);
+                assert(event.accumulator == 0x01u);
+                note72SawPostAccumulatorOutput = true;
+            }
         }
         for (std::size_t i = 0; i < note72PitchSourceAccessCount; ++i) {
             const auto& access =
@@ -5395,6 +5428,12 @@ int main(int argc, char** argv) {
         assert(note72AccumulatorSnapshots > 0u);
         assert(note72InterpolationControlReads > 0u);
         assert(note72PitchGuardStateAccesses > 0u);
+        assert(note72SawNormalizedAddressInput);
+        assert(note72SawPreAccumulatorInput);
+        assert(note72SawPostAccumulatorOutput);
+        assert(firmwareMachine.readCode(0x3978u) == 0x53u);
+        assert(firmwareMachine.readCode(0x39f8u) == 0x99u);
+        assert(firmwareMachine.readCode(0x3a78u) == 0x01u);
         std::printf(
             "NOTE72 PITCH INPUT PROVENANCE: addressSnapshots=%zu accumulatorSnapshots=%zu "
             "X2067-reads=%zu guard2018/19-accesses=%zu\n",
