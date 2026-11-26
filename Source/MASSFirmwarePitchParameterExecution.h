@@ -82,9 +82,11 @@ struct MASS1C61PitchExecutionResult {
 //   5) packed byte -> R3/R4/R5/R6/R7 decode;
 //   6) captured live R2 plus decoded fields -> 0x1DC8..0x1E04 accumulator.
 //
-// This is intentionally a snapshot-driven projection. The caller must supply
-// the base pointer, address-selection inputs, and actual R2 at the 0x1DC8
-// boundary; these are not interchangeable with the raw IC51 command bytes.
+// This is intentionally a snapshot-driven projection. The caller supplies
+// the loaded base pointer and address-selection inputs. Where RAM[0x34] is
+// captured, the 0x1D51..0x1D78 route derives the actual accumulator R2 and
+// any OV-dependent R7 correction; otherwise an instruction-boundary R2
+// snapshot is required. These are not interchangeable with raw IC51 bytes.
 // The resulting accumulator is the pre-slot-correction value. The later 0x1E4B..0x1E66 guard/writeback remains a
 // separate operation with its own XDATA snapshot.
 class MASS1C61PitchParameterExecutionProjection {
@@ -117,6 +119,10 @@ public:
             return result;
         }
 
+        // This is the group-08 / 0x2067 interpolation projection. On the
+        // zero-control branch, later firmware work may still create a distinct
+        // live accumulator R2; the 0x1D51 route or captured fallback below
+        // supplies that exact register value independently.
         result.interpolatedInput = MASS1C61InterpolationArithmetic::apply(
             result.interpolationLookup,
             result.commandFields.r2,
