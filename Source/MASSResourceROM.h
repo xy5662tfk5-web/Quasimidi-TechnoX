@@ -118,6 +118,54 @@ public:
     }
 };
 
+ 
+struct MASS1C61AccumulatorInputRouteResult {
+    std::uint8_t initialA = 0;
+    std::uint8_t sum = 0;
+    std::uint8_t accumulatorR2 = 0;
+    std::uint8_t normalizedR7 = 0;
+    bool overflow = false;
+    bool clearedAFromR4Bit5 = false;
+};
+
+// Reconstructs the 0x1D46..0x1D78 pre-accumulator R2 route. When R4.5
+// is set, firmware clears A before ADD A,0x34; otherwise it starts from
+// the incoming resource R2 byte. ADD's signed OV branch flips A.7, and
+// conditionally adjusts the already-normalized R7 around its 0x80/0xFF
+// boundaries. This is the producer of the live R2 consumed at 0x1DC8.
+class MASS1C61AccumulatorInputRouteProjection {
+public:
+    static MASS1C61AccumulatorInputRouteResult apply(
+        std::uint8_t resourceR2,
+        std::uint8_t resourceR4,
+        std::uint8_t directRam34,
+        std::uint8_t normalizedR7) noexcept {
+        const bool clearA = (resourceR4 & 0x20u) != 0;
+        const auto initialA = clearA ? std::uint8_t{0} : resourceR2;
+        const auto sumWide = static_cast<unsigned>(initialA) + directRam34;
+        const auto sum = static_cast<std::uint8_t>(sumWide & 0xffu);
+        const bool overflow =
+            ((~(initialA ^ directRam34) & (initialA ^ sum) & 0x80u) != 0);
+
+        auto accumulatorR2 = sum;
+        auto adjustedR7 = normalizedR7;
+        if (overflow) {
+            adjustedR7 = static_cast<std::uint8_t>(adjustedR7 - 1u);
+            if ((sum & 0x80u) == 0) {
+                accumulatorR2 = static_cast<std::uint8_t>(sum | 0x80u);
+                if (adjustedR7 == 0xffu)
+                    adjustedR7 = static_cast<std::uint8_t>(adjustedR7 + 0x0cu);
+            } else {
+                accumulatorR2 = static_cast<std::uint8_t>(sum & 0x7fu);
+                if (adjustedR7 == 0x80u)
+                    adjustedR7 = static_cast<std::uint8_t>(adjustedR7 - 0x0cu);
+            }
+        }
+
+        return {initialA, sum, accumulatorR2, adjustedR7, overflow, clearA};
+    }
+};
+
 struct MASS1C61SecondaryTableFetchAddress {
     std::uint16_t address = 0;
     bool pageCarry = false;
