@@ -286,6 +286,23 @@ void testMASS1C61PitchParameterExecutionProjection() {
 
     command.opcode = 0x08u;
     command.bytes[0] = 0x08u;
+    command.bytes[1] = 0x00u; // exercise the direct-RAM accumulator bypass
+    auto missingBypass = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(missingBypass.status ==
+           MASS1C61PitchExecutionStatus::requiresDirectRamBypassSnapshot);
+    snapshot.hasCapturedDirectRamAccumulatorInputs = true;
+    snapshot.directRam05 = 0x45u;
+    snapshot.directRam06 = 0x56u;
+    snapshot.directRam07 = 0x67u;
+    const auto bypass = MASS1C61PitchParameterExecutionProjection::execute(
+        firmwareROM, command, snapshot);
+    assert(bypass.ready() && bypass.accumulator.zeroInputBypass);
+    assert(bypass.accumulator.r2 == 0x45u);
+    assert(bypass.accumulator.r3 == 0x56u);
+    assert(bypass.accumulator.r4 == 0x67u);
+
+    command.bytes[1] = 0x80u;
     snapshot.secondaryTableBasePointer = 0xffffu;
     const auto missingTable = MASS1C61PitchParameterExecutionProjection::execute(
         firmwareROM, command, snapshot);
