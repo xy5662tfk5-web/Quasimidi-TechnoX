@@ -57,6 +57,7 @@ target_sources(QuasimidiTechnoX PRIVATE
     Source/MASSFirmwareResourceCommandPlanner.h
     Source/MASSFirmwarePitchParameterExecution.h
     Source/MASSFirmwarePitchInterpolationPacketProjection.h
+    Source/MASSFirmwarePitchSlotCorrectionProjection.h
     Source/MASSOriginalVoiceProgramRuntime.h
     Source/TechnoXSoundDeviceTimeline.h
     Source/BasicMASSVoiceBackend.h
