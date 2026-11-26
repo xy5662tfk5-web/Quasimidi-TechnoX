@@ -5,7 +5,7 @@
 #include "TechnoXMidiControlRouter.h"
 #include "MASSAudioEngine.h"
 #include "MASSResourceROM.h"
-#include "BasicMASSVoiceBackend.h"
+#include "SAM9407VoiceBackend.h"
 #include "TechnoX8032Machine.h"
 #include "TechnoXPanelControlEvents.h"
 #include <array>
@@ -75,6 +75,12 @@ public:
     // Do not resize or modify the file until unloadWaveformMemoryFile() is called.
     bool loadWaveformMemoryFile(const juce::File& file);
     void unloadWaveformMemoryFile() noexcept;
+    // Call only while audio processing is stopped. This file maps bank/program
+    // identities to verified 16-bit waveform word ranges; it is not inferred
+    // from IC51 command bytes.
+    bool loadSAM9407SampleMapFile(const juce::File& file);
+    void clearSAM9407SampleMap() noexcept;
+    std::size_t getSAM9407SampleMappingCount() const noexcept;
     bool hasWaveformMemoryFile() const noexcept { return waveformMemoryView.isAttached(); }
     std::size_t getWaveformMemoryFileSize() const noexcept { return waveformMemoryView.sizeInBytes(); }
 
