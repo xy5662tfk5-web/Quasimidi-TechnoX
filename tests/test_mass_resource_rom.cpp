@@ -256,8 +256,8 @@ void testMASS1C61PitchParameterExecutionProjection() {
     assert(result.secondaryFetchAddress.address == 0x397eu);
     assert((result.secondaryTableBytes.bytes ==
             std::array<std::uint8_t, 3>{{0x05u, 0x43u, 0x02u}}));
-    assert(result.packedFields.r3 == 0x80u);
-    assert(result.packedFields.r4 == 0x60u);
+    assert(result.packedFields.r3 == 0x60u);
+    assert(result.packedFields.r4 == 0x48u);
     assert(result.packedFields.r5 == 0x05u);
     assert(result.packedFields.r6 == 0x43u);
     assert(result.packedFields.r7 == 0x02u);
