@@ -1318,7 +1318,7 @@ void testOriginalVoiceProgramRuntime(
                 MASS1C61SecondaryTableAddressBuilder::resolve(
                     0u, pitchFields.r3, 0u, pitchFields.r4);
             const auto basePointer = static_cast<std::uint16_t>(
-                targetTableAddress - addressOffset.address - pitchFields.r7);
+                targetTableAddress - addressOffset.address - addressOffset.normalizedIndex);
             MASS1C61PitchExecutionSnapshot pitchSnapshot{};
             pitchSnapshot.interpolationControl2067 = 0u;
             pitchSnapshot.hasCapturedInterpolationControl = true;
@@ -1328,6 +1328,10 @@ void testOriginalVoiceProgramRuntime(
             pitchSnapshot.secondaryTableBankSelectR4 = pitchFields.r4;
             pitchSnapshot.ram2F = 0u;
             pitchSnapshot.hasCapturedDirectRamAccumulatorInputs = true;
+            // Synthetic handler-boundary R2 input for this cursor plumbing
+            // test; the live Note72 test separately derives R2 from RAM[0x34].
+            pitchSnapshot.accumulatorInputR2 = pitchFields.r2;
+            pitchSnapshot.hasCapturedAccumulatorInputR2 = true;
 
             runtime.rewindCommandStream(4, false);
             for (std::size_t commandIndex = 0;
