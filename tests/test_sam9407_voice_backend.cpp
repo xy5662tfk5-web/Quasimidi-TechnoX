@@ -173,7 +173,7 @@ int main() {
     lateEngine.prepare(44100.0, 8);
     assert(lateEngine.setPartParameter(0, PartParameter::level, 127));
     lateEngine.noteOn(0, 1, 60, 127);
-    std::array<float, 4> lateLeft{}, lateRight{};
+    std::array<float, 8> lateLeft{}, lateRight{};
     float* lateChannels[] = {lateLeft.data(), lateRight.data()};
     lateEngine.render(lateChannels, 2, 4);
     assert(energy(lateLeft, lateRight) == 0.0);
