@@ -186,9 +186,10 @@ public:
     }
 
 private:
+    template <typename Packet>
     static void appendTransportPacket(
         MASSFirmwarePacketPlan& plan,
-        const MASSHardwareCommandPacket& packet) noexcept {
+        const Packet& packet) noexcept {
         const auto transport = MASS0DB7PacketBuilder::build(
             packet.bytes[0], packet.bytes[1], packet.bytes[2], packet.bytes[3]);
         auto& destination = plan.packets[plan.packetCount];
