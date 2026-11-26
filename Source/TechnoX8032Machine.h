@@ -71,6 +71,7 @@ public:
         std::uint8_t soundBusMode = 0;
         bool ic51Selected = false;
         bool soundDeviceResetReleased = true;
+        bool responseInjectedForTesting = false;
     };
     struct soundHostWriteEvent {
         std::uint8_t registerIndex = 0;
@@ -596,6 +597,7 @@ public:
         soundHostWords_.fill(0);
         for (auto& bytes : soundHostData_) bytes.fill(0);
         for (auto& bytes : soundHostResponseData_) bytes.fill(0xff);
+        soundHostResponseInjectedForTesting_.fill(false);
         soundCommandPacketCount_ = 0;
         soundCommandTrace_.fill(SoundCommandPacket{});
         soundHostReadCount_ = 0;
@@ -1159,6 +1161,7 @@ public:
     void setSoundHostResponseForTesting(std::uint8_t index,
                                         const std::array<std::uint8_t, 3>& response) noexcept {
         soundHostResponseData_[index] = response;
+        soundHostResponseInjectedForTesting_[index] = true;
     }
 
     const std::array<std::uint8_t, 3>& soundHostPayloadForTesting(
@@ -1439,6 +1442,8 @@ public:
             event.soundBusMode = internal_[0x8e];
             event.ic51Selected = ic51Selected;
             event.soundDeviceResetReleased = soundDeviceResetReleased_;
+            event.responseInjectedForTesting = index != 0u &&
+                soundHostResponseInjectedForTesting_[soundHostCommandLatch_];
             event.eventSequence = ++traceEventSequence_;
             ++soundHostReadCount_;
             return value;
@@ -2535,6 +2540,7 @@ private:
     std::array<std::uint16_t, 256> soundHostWords_{};
     std::array<std::array<std::uint8_t, 3>, 256> soundHostData_{};
     std::array<std::array<std::uint8_t, 3>, 256> soundHostResponseData_{};
+    std::array<bool, 256> soundHostResponseInjectedForTesting_{};
     std::array<SoundCommandPacket, 1024> soundCommandTrace_{};
     std::size_t soundCommandPacketCount_ = 0;
     std::array<soundHostReadEvent, 2048> soundHostReadTrace_{};
