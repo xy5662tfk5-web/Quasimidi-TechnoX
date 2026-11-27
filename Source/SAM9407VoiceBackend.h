@@ -109,8 +109,9 @@ public:
     }
 
     void setWaveformMemoryView(const MASSWaveformMemoryView* view) noexcept override {
-        if (waveformMemory_ == view)
-            return;
+        // The caller may reuse the same view object while replacing its
+        // mapped backing file. Rebuild the region on every call so a changed
+        // byte length and active-voice mappings cannot remain stale.
         waveformMemory_ = view;
         externalMemoryBus_.clear();
         if (view != nullptr && view->isAttached() &&

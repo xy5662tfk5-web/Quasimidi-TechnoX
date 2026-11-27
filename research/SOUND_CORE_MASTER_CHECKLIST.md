@@ -83,7 +83,9 @@ Status: **partially mapped at firmware level; physical device/protocol still unc
 - [ ] Resolve P3.2 polarity/function. The C++ `soundDeviceResetReleased` label is a working compatibility hypothesis only: firmware clears P3.2 for the bulk transfer and memory test, and existing SoundHost contexts include P3.2-low states.
 - [ ] Identify the fitted synthesis device from readable TechnoX board markings, schematics or a hardware capture, then map the 8032 host aperture/glue logic to its actual host interface. SAM9407 remains only one candidate until this is proven.
 - [x] Add a datasheet-level SAM9407 BOOT-pin bootstrap boundary model: accept 256 already-decoded 16-bit host-burst words into word addresses `0x0100–0x01FF`, then expose external entry `0x0100`. Regression tests cover BOOT-low, the exact 255/256-word boundary, address limits, extra-word rejection and reset. This is isolated from IC4 because the physical host-port/address mapping remains unverified.
+- [x] Add a functional SAM9407 external-memory bus abstraction for 25-bit word addressing, S1/S0 cycle classes, PCM-ROM/SRAM/DRAM windows, and 16-bit reads/writes. The resource-backed voice backend now performs sample fetches through the synthesis-access bus class. This is a datasheet-level candidate model, not proof that TechnoX uses SAM9407.
 - [ ] Determine the external memory topology and the path to the advertised multi-megabyte waveform store. Do not treat the 128-KiB IC51 dump or the 16-KiB startup image as the complete sample ROM.
+- [x] Record the contemporary April 1995 review's stated 6 MB sample memory as the best currently found TechnoX capacity reference. Keep it distinct from SAM9407's theoretical maximum 64 MB addressable external memory; exact fitted chip topology, width and ROM/RAM composition remain unverified.
 
 Exit condition: documented host protocol and memory topology with enough evidence to implement a device model without guessed register meanings.
 
@@ -137,11 +139,11 @@ Status: **test backend builds; authentic engine not release-ready**
 
 ## Immediate next sprint
 
-1. Finish Section A's `0x09DA–0x0A55` arithmetic and `RAM[0x36/0x37]` producer trace.
-2. In parallel, make a single canonical SoundHost transaction report that groups each four-byte packet with its complete per-byte bus context and the immediately preceding IC51/FF10 events.
-3. Use that report to classify traffic by controlled MIDI stimulus; do not implement a guessed DSP protocol.
-4. Audit available board photographs/manual evidence for chip markings and waveform-memory devices. If no readable markings or memory dump exists, record the exact missing physical evidence rather than filling the gap with a speculative chip model.
-5. Once the command and hardware boundary is understood, define the smallest testable resource-backed playback milestone (one known waveform, one voice, one Note On/Off) before scaling to all programs.
+1. Identify the actual waveform-memory ICs, capacity, data width and chip-select routing from a clear TechnoX board photo, readable markings or PCB capture. The contemporary reference is 6 MB sample memory; do not substitute the SAM9407's theoretical 64 MB maximum.
+2. Obtain a verified waveform-memory dump or capture the physical memory contents. The public MAME TechnoX set contains only IC4 and IC51 control ROM images, not the multi-megabyte sample store.
+3. Confirm or reject the SAM9407 candidate from the fitted chip marking and bus wiring; keep the new 25-bit/S1-S0 memory model isolated until this is proven.
+4. For one factory sound, trace the IC51 resource descriptor to its waveform address, sample format, loop and pitch parameters. Do not infer these from the third-party .94B container.
+5. Feed one validated waveform through the memory bus and render one Note On/Off against a physical unit/reference capture. Scale to all factory sounds only after this test matches.
 
 ## Evidence / documentation index
 

@@ -255,6 +255,41 @@ int main() {
     lateEngine.render(lateChannels, 2, 4);
     assert(energy(lateLeft, lateRight) > 0.2);
 
+    // Reattaching a new file through the same MASSWaveformMemoryView object
+    // must rebuild the mapped word window and rebind the active voice.
+    SAM9407VoiceBackend resizeBackend;
+    MASSAudioEngine resizeEngine(&resizeBackend);
+    resizeEngine.prepare(44100.0, 8);
+    assert(resizeEngine.setPartParameter(0, PartParameter::level, 127));
+    std::array<std::uint8_t, 4> shortImage{{0x00, 0x40, 0x00, 0x40}};
+    std::array<std::uint8_t, 8> expandedImage{{
+        0x00, 0x40, 0x00, 0x40, 0x00, 0xc0, 0x00, 0xc0
+    }};
+    MASSWaveformMemoryView reusableMemory;
+    assert(reusableMemory.attach(shortImage.data(), shortImage.size()));
+    resizeEngine.setWaveformMemoryView(&reusableMemory);
+    SAM9407SampleMapEntry expandedEntry{};
+    expandedEntry.bank = 0;
+    expandedEntry.program = 0;
+    expandedEntry.startWord = 0;
+    expandedEntry.endWord = 4;
+    expandedEntry.sampleRate = 44100;
+    expandedEntry.rootNote = 60;
+    expandedEntry.gain = 127;
+    expandedEntry.pan = 64;
+    assert(resizeBackend.addSampleMapping(expandedEntry));
+    resizeEngine.noteOn(0, 1, 60, 127);
+    std::array<float, 8> resizeLeft{}, resizeRight{};
+    float* resizeChannels[] = {resizeLeft.data(), resizeRight.data()};
+    resizeEngine.render(resizeChannels, 2, 4);
+    assert(energy(resizeLeft, resizeRight) == 0.0);
+
+    assert(reusableMemory.attach(expandedImage.data(), expandedImage.size()));
+    resizeEngine.setWaveformMemoryView(&reusableMemory);
+    resizeLeft.fill(0.0f);
+    resizeRight.fill(0.0f);
+    resizeEngine.render(resizeChannels, 2, 4);
+    assert(energy(resizeLeft, resizeRight) > 0.2);
     // Invalid loops and out-of-range sample descriptors are rejected early.
     SAM9407VoiceBackend validationBackend;
     SAM9407SampleMapEntry invalid = entry;
