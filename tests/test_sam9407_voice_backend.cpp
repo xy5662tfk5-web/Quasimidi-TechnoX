@@ -311,5 +311,75 @@ int main() {
         SAM9407ExternalMemoryBus::kAddressSpaceWordCount);
     assert(maximumAddressBackend.addSampleMapping(maximumAddressEntry));
 
+    // One program can contain key zones and velocity layers. Select the
+    // most specific matching region at Note On rather than a single program-wide sample.
+    std::array<std::uint8_t, 12> zonedPcm{};
+    writeLittleEndian(zonedPcm, 0, 4096);
+    writeLittleEndian(zonedPcm, 1, 4096);
+    writeLittleEndian(zonedPcm, 2, -8192);
+    writeLittleEndian(zonedPcm, 3, -8192);
+    writeLittleEndian(zonedPcm, 4, 16384);
+    writeLittleEndian(zonedPcm, 5, 16384);
+    MASSWaveformMemoryView zonedMemory;
+    assert(zonedMemory.attach(zonedPcm.data(), zonedPcm.size()));
+
+    auto renderZonedFirstSample = [&](int note, int velocity) {
+        SAM9407VoiceBackend zonedBackend;
+        SAM9407SampleMapEntry fullRange{};
+        fullRange.bank = 0;
+        fullRange.program = 7;
+        fullRange.startWord = 0;
+        fullRange.endWord = 2;
+        fullRange.sampleRate = 44100;
+        fullRange.rootNote = 60;
+        fullRange.gain = 127;
+        assert(zonedBackend.addSampleMapping(fullRange));
+
+        SAM9407SampleMapEntry keyZone = fullRange;
+        keyZone.keyLow = 60;
+        keyZone.keyHigh = 72;
+        keyZone.startWord = 2;
+        keyZone.endWord = 4;
+        assert(zonedBackend.addSampleMapping(keyZone));
+
+        SAM9407SampleMapEntry velocityZone = fullRange;
+        velocityZone.velocityLow = 100;
+        velocityZone.velocityHigh = 127;
+        velocityZone.startWord = 4;
+        velocityZone.endWord = 6;
+        assert(zonedBackend.addSampleMapping(velocityZone));
+        assert(zonedBackend.sampleMappingCount() == 3);
+        zonedBackend.setWaveformMemoryView(&zonedMemory);
+
+        MASSAudioEngine zonedEngine(&zonedBackend);
+        zonedEngine.prepare(44100.0, 8);
+        assert(zonedEngine.setPartParameter(0, PartParameter::level, 127));
+        zonedEngine.noteOn(0, 1, note, velocity);
+        std::array<float, 2> zonedLeft{}, zonedRight{};
+        float* zonedChannels[] = {zonedLeft.data(), zonedRight.data()};
+        zonedEngine.render(zonedChannels, 2, 1);
+        return zonedLeft[0];
+    };
+    // Key region is more specific than the overlapping high-velocity layer.
+    assert(renderZonedFirstSample(64, 120) < -0.05f);
+    // Outside that key region, high velocity selects its own layer.
+    assert(renderZonedFirstSample(48, 120) > 0.15f);
+    // Outside both special regions, the full-range fallback stays active.
+    assert(renderZonedFirstSample(48, 80) > 0.03f);
+
+    // An identical region is replaced rather than duplicated.
+    SAM9407VoiceBackend replacementBackend;
+    SAM9407SampleMapEntry replacement{};
+    replacement.bank = 3;
+    replacement.program = 9;
+    replacement.endWord = 2;
+    assert(replacementBackend.addSampleMapping(replacement));
+    replacement.startWord = 1;
+    assert(replacementBackend.addSampleMapping(replacement));
+    assert(replacementBackend.sampleMappingCount() == 1);
+    replacement.keyLow = 90;
+    replacement.keyHigh = 80;
+    assert(!replacementBackend.addSampleMapping(replacement));
+
     return 0;
 }
