@@ -1,18 +1,19 @@
 # TechnoX sample-memory capacity and dump status
 
-## Best contemporary capacity reference
+## Conflicting capacity reports
 
-Rob Green's review of the Quasimidi TechnoX in The Mix, April 1995, states that the machine has **six megabytes of sample memory**, 21-note polyphony, 16-part multitimbrality, 512 ROM patches and 24 ROM drum sets. The review is contemporary with the instrument and is currently the strongest capacity reference found for this reconstruction.
+Rob Green's review of the Quasimidi TechnoX in The Mix, April 1995, states that the machine has **six megabytes of sample memory**, 21-note polyphony, 16-part multitimbrality, 512 ROM patches and 24 ROM drum sets. Several later product databases instead report **64 MB** of waveform/sample ROM. These figures conflict; neither is accepted as the physical board capacity until the installed memory devices and decoding are verified.
 
 Source: [The Mix, April 1995 — Revolt into style](https://www.muzines.co.uk/articles/revolt-into-style/12193), especially the comparison/specification at lines 59–62 and 81–89.
 
-## Why 64 MB should not be used as the TechnoX target
+## Separate device capability from installed TechnoX memory
 
-Some later product pages repeat a 64 MB sample-bank figure. The SAM9407 objective specification separately documents a **maximum theoretical external address space of 32M 16-bit words (64 MB)**. That is a chip capability, not evidence that a given instrument populates the full range.
+Later pages that report 64 MB include [Vintage Synth Explorer](https://www.vintagesynth.com/quasimidi/technox) and [Sound Programming](https://soundprogramming.net/synthesizers/quasimidi/quasimidi-technox/). Separately, the SAM9407 objective specification documents a **maximum theoretical external address space of 32M 16-bit words (64 MB)**. That chip capability is not evidence that TechnoX uses a SAM9407 or populates the full range.
 
 Until TechnoX board markings and address decoding prove otherwise, keep these concepts separate:
 
-- reported TechnoX sample memory: 6 MB;
+- contemporary 1995 review: 6 MB sample memory;
+- later databases: 64 MB waveform/sample ROM;
 - candidate SAM9407 address-bus capacity: up to 64 MB;
 - physical TechnoX memory chip count, type, bus width and ROM/RAM composition: unresolved.
 
@@ -26,6 +27,6 @@ Source: [Planet Emulation — TechnoX MAME ROM contents](https://www.planetemu.n
 
 ## Engineering consequence
 
-The new SAM9407 memory-bus model implements the candidate device's documented 25-bit word-address space and S1/S0 external-cycle classes. Its address ceiling is **not** configured as the TechnoX sample-memory size. A real map must come from the board and a dump/capture. Do not extrapolate waveform addresses from the 128-KiB IC51 resource ROM or the 16-KiB startup image.
+The new SAM9407 memory-bus model implements the candidate device's documented 25-bit word-address space and S1/S0 external-cycle classes. Its address ceiling is **not** configured as the TechnoX sample-memory size. A real map must come from the board and a dump/capture. Do not assume either 6 MB or 64 MB from secondary listings alone, and do not extrapolate waveform addresses from the 128-KiB IC51 resource ROM or the 16-KiB startup image.
 
 The next audible milestone remains one factory waveform with a verified address, format, loop and pitch map, rendered through the memory bus and compared with a physical TechnoX/reference capture.

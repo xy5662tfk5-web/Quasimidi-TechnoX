@@ -85,7 +85,7 @@ Status: **partially mapped at firmware level; physical device/protocol still unc
 - [x] Add a datasheet-level SAM9407 BOOT-pin bootstrap boundary model: accept 256 already-decoded 16-bit host-burst words into word addresses `0x0100–0x01FF`, then expose external entry `0x0100`. Regression tests cover BOOT-low, the exact 255/256-word boundary, address limits, extra-word rejection and reset. This is isolated from IC4 because the physical host-port/address mapping remains unverified.
 - [x] Add a functional SAM9407 external-memory bus abstraction for 25-bit word addressing, S1/S0 cycle classes, PCM-ROM/SRAM/DRAM windows, and 16-bit reads/writes. The resource-backed voice backend now performs sample fetches through the synthesis-access bus class. This is a datasheet-level candidate model, not proof that TechnoX uses SAM9407.
 - [ ] Determine the external memory topology and the path to the advertised multi-megabyte waveform store. Do not treat the 128-KiB IC51 dump or the 16-KiB startup image as the complete sample ROM.
-- [x] Record the contemporary April 1995 review's stated 6 MB sample memory as the best currently found TechnoX capacity reference. Keep it distinct from SAM9407's theoretical maximum 64 MB addressable external memory; exact fitted chip topology, width and ROM/RAM composition remain unverified.
+- [x] Record the conflicting TechnoX capacity reports: the contemporary April 1995 review states 6 MB, while later product databases state 64 MB. Neither value is treated as confirmed until the fitted memory devices/topology are identified; SAM9407's 64 MB address-space maximum is not proof of installed capacity.
 
 Exit condition: documented host protocol and memory topology with enough evidence to implement a device model without guessed register meanings.
 
@@ -139,7 +139,7 @@ Status: **test backend builds; authentic engine not release-ready**
 
 ## Immediate next sprint
 
-1. Identify the actual waveform-memory ICs, capacity, data width and chip-select routing from a clear TechnoX board photo, readable markings or PCB capture. The contemporary reference is 6 MB sample memory; do not substitute the SAM9407's theoretical 64 MB maximum.
+1. Identify the actual waveform-memory ICs, capacity, data width and chip-select routing from a clear TechnoX board photo, readable markings or PCB capture. The contemporary review reports 6 MB while later listings report 64 MB; resolve the discrepancy from fitted memory chips and board routing before setting a physical capacity.
 2. Obtain a verified waveform-memory dump or capture the physical memory contents. The public MAME TechnoX set contains only IC4 and IC51 control ROM images, not the multi-megabyte sample store.
 3. Confirm or reject the SAM9407 candidate from the fitted chip marking and bus wiring; keep the new 25-bit/S1-S0 memory model isolated until this is proven.
 4. For one factory sound, trace the IC51 resource descriptor to its waveform address, sample format, loop and pitch parameters. Do not infer these from the third-party .94B container.
