@@ -33,6 +33,11 @@ enum class SAM9407LoopMode : std::uint8_t {
 struct SAM9407SampleMapEntry {
     std::uint8_t bank = 0;
     std::uint8_t program = 0;
+    // Optional key/velocity region; legacy entries cover the full MIDI range.
+    std::uint8_t keyLow = 0;
+    std::uint8_t keyHigh = 127;
+    std::uint8_t velocityLow = 0;
+    std::uint8_t velocityHigh = 127;
     std::uint32_t startWord = 0;
     std::uint32_t endWord = 0;       // Exclusive absolute 16-bit word address.
     std::uint32_t loopStartWord = 0; // Absolute 16-bit word address.
@@ -57,6 +62,7 @@ public:
                 SAM9407ExternalMemoryBus::kAddressSpaceWordCount ||
             entry.sampleRate < 4000u || entry.sampleRate > 192000u ||
             entry.rootNote > 127u || entry.gain > 127u || entry.pan > 127u ||
+            entry.keyLow > entry.keyHigh || entry.velocityLow > entry.velocityHigh ||
             entry.tuneCents < -1200 || entry.tuneCents > 1200)
             return false;
 
@@ -69,7 +75,11 @@ public:
         bool replaced = false;
         for (std::size_t i = 0; i < sampleMapCount_; ++i) {
             if (sampleMap_[i].bank == entry.bank &&
-                sampleMap_[i].program == entry.program) {
+                sampleMap_[i].program == entry.program &&
+                sampleMap_[i].keyLow == entry.keyLow &&
+                sampleMap_[i].keyHigh == entry.keyHigh &&
+                sampleMap_[i].velocityLow == entry.velocityLow &&
+                sampleMap_[i].velocityHigh == entry.velocityHigh) {
                 sampleMap_[i] = entry;
                 replaced = true;
                 break;
@@ -278,11 +288,34 @@ private:
     }
 
     const SAM9407SampleMapEntry* findMapping(
-        std::uint8_t bank, std::uint8_t program) const noexcept {
-        for (std::size_t i = 0; i < sampleMapCount_; ++i)
-            if (sampleMap_[i].bank == bank && sampleMap_[i].program == program)
-                return &sampleMap_[i];
-        return nullptr;
+        std::uint8_t bank, std::uint8_t program,
+        std::uint8_t note, std::uint8_t velocity) const noexcept {
+        const SAM9407SampleMapEntry* best = nullptr;
+        std::uint32_t bestArea = 0xffffffffu;
+        std::uint16_t bestKeyWidth = 0xffffu;
+        std::uint16_t bestVelocityWidth = 0xffffu;
+        for (std::size_t i = 0; i < sampleMapCount_; ++i) {
+            const auto& candidate = sampleMap_[i];
+            if (candidate.bank != bank || candidate.program != program ||
+                note < candidate.keyLow || note > candidate.keyHigh ||
+                velocity < candidate.velocityLow || velocity > candidate.velocityHigh)
+                continue;
+            const auto keyWidth = static_cast<std::uint16_t>(
+                candidate.keyHigh - candidate.keyLow + 1u);
+            const auto velocityWidth = static_cast<std::uint16_t>(
+                candidate.velocityHigh - candidate.velocityLow + 1u);
+            const auto area = static_cast<std::uint32_t>(keyWidth) * velocityWidth;
+            if (best == nullptr || area < bestArea ||
+                (area == bestArea && keyWidth < bestKeyWidth) ||
+                (area == bestArea && keyWidth == bestKeyWidth &&
+                 velocityWidth < bestVelocityWidth)) {
+                best = &candidate;
+                bestArea = area;
+                bestKeyWidth = keyWidth;
+                bestVelocityWidth = velocityWidth;
+            }
+        }
+        return best;
     }
 
     void bindVoice(int voiceIndex, const VoiceSlot& slot) noexcept {
@@ -291,7 +324,8 @@ private:
         state.mappingChecked = true;
         state.bank = slot.bankNumber;
         state.program = slot.soundNumber;
-        const auto* mapping = findMapping(slot.bankNumber, slot.soundNumber);
+        const auto* mapping = findMapping(slot.bankNumber, slot.soundNumber,
+                                           slot.note, slot.velocity);
         if (mapping == nullptr ||
             !externalMemoryBus_.containsReadableRange(
                 mapping->startWord, mapping->endWord))
