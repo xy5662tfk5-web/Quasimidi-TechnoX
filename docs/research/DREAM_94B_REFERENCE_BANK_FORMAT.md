@@ -24,6 +24,10 @@ Run:
 
 ```bash
 python3 tools/inspect_dream_94b_bank.py candidate.94b --json
+
+# Extract the SAMP chunk as opaque bytes, preserving its exact payload.
+python3 tools/inspect_dream_94b_bank.py candidate.94b \\
+  --extract-samp candidate.samp.bin --json
 ```
 
 The inspector:
@@ -31,8 +35,11 @@ The inspector:
 - validates file bounds, two-byte padding for odd-sized payloads, a first PRIO chunk and required IMAP/RLOC/PARA/SAMP chunks;
 - rejects duplicate required chunks, truncation and incomplete banks;
 - streams through SAMP with bounded memory and reports its byte count, SHA-256 and 256-bin byte histogram;
-- reports unknown chunk tags and explicitly marks audio decoding and TechnoX compatibility as false.
+- reports unknown chunk tags and explicitly marks audio decoding and TechnoX compatibility as false;
+- optionally extracts the exact SAMP payload using bounded-memory streaming, verifies its SHA-256 against the inspected chunk, writes atomically, and refuses to overwrite the source bank.
+
+The extracted `.samp.bin` is deliberately **opaque**. Its bytes have not been proven to be signed PCM, and extraction does not interpret IMAP regions, RLOC fixups, PARA instrument parameters, sample codecs, loop points, or address units. It must not be loaded into the TechnoX sample backend as though it were a decoded waveform image.
 
 ## What this enables next
 
-Once a real TechnoX memory image or verified bank file is obtained, use an inspector like this to establish its exact container/byte layout before writing a decoder. Do not feed a random .94B sample bank into the plugin as though it were the original TechnoX resource store. The next real-audio milestone remains: one verified TechnoX waveform, one validated address/loop map, and one matching factory program/voice.
+Once a real TechnoX memory image or verified bank file is obtained, use an inspector like this to establish its exact container/byte layout before writing a decoder. Public Dream-bank research documents that relocation data must be updated when instrument/sample records are moved; copying sample bytes alone cannot preserve instrument address references. Do not feed a random .94B sample bank into the plugin as though it were the original TechnoX resource store. The next real-audio milestone remains: one verified TechnoX waveform, one validated address/loop map, and one matching factory program/voice.
