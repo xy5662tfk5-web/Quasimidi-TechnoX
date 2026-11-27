@@ -226,7 +226,8 @@ bool QuasimidiTechnoXAudioProcessor::loadSAM9407SampleMapFile(const juce::File& 
         technox::SAM9407SampleMapEntry entry{};
         entry.bank = static_cast<std::uint8_t>(bank);
         entry.program = static_cast<std::uint8_t>(program);
-        if (end > static_cast<std::int64_t>(technox::SAM9407VoiceBackend::kMaximumWordAddress) ||
+        if (end > static_cast<std::int64_t>(
+                technox::SAM9407ExternalMemoryBus::kAddressSpaceWordCount) ||
             start > end || sampleRate < 0 || sampleRate > 192000 ||
             rootNote < 0 || rootNote > 127 ||
             tuneCents < -1200 || tuneCents > 1200 ||

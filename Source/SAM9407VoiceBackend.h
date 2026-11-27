@@ -53,7 +53,8 @@ public:
 
     bool addSampleMapping(const SAM9407SampleMapEntry& entry) noexcept {
         if (entry.startWord >= entry.endWord ||
-            entry.endWord > kMaximumWordAddress ||
+            static_cast<std::uint64_t>(entry.endWord) >
+                SAM9407ExternalMemoryBus::kAddressSpaceWordCount ||
             entry.sampleRate < 4000u || entry.sampleRate > 192000u ||
             entry.rootNote > 127u || entry.gain > 127u || entry.pan > 127u ||
             entry.tuneCents < -1200 || entry.tuneCents > 1200)

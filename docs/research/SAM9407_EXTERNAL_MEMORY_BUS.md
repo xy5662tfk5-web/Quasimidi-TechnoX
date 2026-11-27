@@ -18,7 +18,7 @@ Source: [DREAM SAM9407 objective specification, February 1996](https://dosdays.c
 
 `Source/SAM9407ExternalMemoryBus.h` is a bounded, allocation-free word-address bus:
 
-- validates the full 25-bit word address range;
+- validates the full 25-bit word address range, including the exclusive end address `0x02000000` when a mapping includes final word `0x01FFFFFF`;
 - maps up to eight non-overlapping memory regions;
 - supports immutable PCM ROM views plus writable SRAM/DRAM backing;
 - decodes/encodes S1/S0 cycle values;

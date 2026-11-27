@@ -262,8 +262,19 @@ int main() {
     invalid.loopEndWord = 4;
     assert(!validationBackend.addSampleMapping(invalid));
     invalid = entry;
-    invalid.endWord = SAM9407VoiceBackend::kMaximumWordAddress + 1u;
+    invalid.endWord = static_cast<std::uint32_t>(
+        SAM9407ExternalMemoryBus::kAddressSpaceWordCount + 1u);
     assert(!validationBackend.addSampleMapping(invalid));
+
+    // end_word is exclusive, so the final legal sample word is address
+    // 0x01FFFFFF and its exclusive end is 0x02000000.
+    SAM9407VoiceBackend maximumAddressBackend;
+    SAM9407SampleMapEntry maximumAddressEntry{};
+    maximumAddressEntry.startWord =
+        SAM9407ExternalMemoryBus::kMaximumWordAddress;
+    maximumAddressEntry.endWord = static_cast<std::uint32_t>(
+        SAM9407ExternalMemoryBus::kAddressSpaceWordCount);
+    assert(maximumAddressBackend.addSampleMapping(maximumAddressEntry));
 
     return 0;
 }
