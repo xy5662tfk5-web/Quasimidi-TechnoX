@@ -126,7 +126,7 @@ class Dream94BInspectorTests(unittest.TestCase):
 
     def test_extracts_opaque_samp_payload_byte_exactly(self):
         source = self.write(valid_bank())
-        output = self.root / "extracted-samp.bin"
+        output = Path(self.temp.name) / "extracted-samp.bin"
         result = extract_sample_payload(source, str(output))
         expected = b"\x00\x7f\x80\xff\x10"
         self.assertEqual(output.read_bytes(), expected)
@@ -144,14 +144,14 @@ class Dream94BInspectorTests(unittest.TestCase):
 
     def test_extraction_requires_existing_output_directory(self):
         source = self.write(valid_bank())
-        output = self.root / "missing" / "samp.bin"
+        output = Path(self.temp.name) / "missing" / "samp.bin"
         with self.assertRaisesRegex(Dream94BFormatError, "directory does not exist"):
             extract_sample_payload(source, str(output))
         self.assertFalse(output.exists())
 
     def test_cli_extracts_samp_and_reports_opaque_status(self):
         source = self.write(valid_bank())
-        output = self.root / "cli-samp.bin"
+        output = Path(self.temp.name) / "cli-samp.bin"
         script = Path(__file__).resolve().parents[1] / "tools" / "inspect_dream_94b_bank.py"
         result = subprocess.run(
             [sys.executable, str(script), source, "--extract-samp", str(output), "--json"],
