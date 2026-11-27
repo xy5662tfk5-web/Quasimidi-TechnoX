@@ -102,7 +102,7 @@ class Dream94BInspectorTests(unittest.TestCase):
         # The final odd-sized SAMP chunk has no terminal pad byte. Keeping
         # it at EOF makes the missing byte unambiguous.
         data = b"".join([
-            chunk("PRIO", b"GMSBK040\\x00\\x00"),
+            chunk("PRIO", b"GMSBK040\x00\x00"),
             chunk("IMAP", b"imap-data"),
             chunk("RLOC", b"relocation"),
             chunk("PARA", b"parameters"),
@@ -128,7 +128,7 @@ class Dream94BInspectorTests(unittest.TestCase):
         source = self.write(valid_bank())
         output = self.root / "extracted-samp.bin"
         result = extract_sample_payload(source, str(output))
-        expected = b"\\x00\\x7f\\x80\\xff\\x10"
+        expected = b"\x00\x7f\x80\xff\x10"
         self.assertEqual(output.read_bytes(), expected)
         self.assertEqual(result["size"], len(expected))
         self.assertEqual(result["sha256"], hashlib.sha256(expected).hexdigest())
@@ -159,7 +159,7 @@ class Dream94BInspectorTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
-        self.assertEqual(output.read_bytes(), b"\\x00\\x7f\\x80\\xff\\x10")
+        self.assertEqual(output.read_bytes(), b"\x00\x7f\x80\xff\x10")
         self.assertFalse(report["sample_payload"]["extraction"]["audio_decoded"])
 
 
