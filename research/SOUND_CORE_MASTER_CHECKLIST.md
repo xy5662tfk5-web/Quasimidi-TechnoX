@@ -91,6 +91,7 @@ Exit condition: documented host protocol and memory topology with enough evidenc
 
 Status: **not implemented**
 
+- [x] Add an evidence-only Dream `.94B` structural inspector and regression tests for PRIO/IMAP/RLOC/PARA/SAMP chunks, size bounds, odd-byte alignment, duplicates, missing chunks and SAMP integrity. It is a third-party format reference only; no TechnoX PCM or program mapping is inferred.
 - [ ] Locate or obtain the actual waveform/sample memory dump(s), board memory map, or equivalent verified source.
 - [ ] Determine sample encoding/codec, packing, endianness, address units, bank mapping, sample rate/clock, loop start/end, interpolation, and any compression.
 - [ ] Decode a small set of known resources first and validate decoded waveform boundaries against hardware or a trusted reference.

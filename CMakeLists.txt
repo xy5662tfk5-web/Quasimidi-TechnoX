@@ -287,3 +287,12 @@ if (BUILD_TESTING)
         COMMAND technox_sam9407_bootstrap_tests
     )
 endif()
+
+# Evidence-only structural tests for external Dream .94B reference banks.
+# This does not decode PCM or imply that TechnoX uses the .94B format.
+if (BUILD_TESTING)
+    add_test(NAME technox_dream_94b_inspector_tests
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_dream_94b_inspector.py"
+    )
+endif()
