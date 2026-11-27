@@ -1,65 +1,51 @@
 # TechnoX audio-core finalization plan
 
-Branch: `research/original-technox-audio-engine`  
-Working mode: **finish and validate; do not expand low-level reverse engineering unless it blocks playback.**
+Branch: `research/original-technox-audio-engine`
+Working mode: **finish the authentic playback path; do not return to UI work or reopen already-verified controller research unless it blocks playback.**
 
 ## Current baseline
 
-The project already has a substantial firmware/resource foundation:
+- IC4 v1.05 executes in the project's Intel 8032/MCS-51 model. Timed MIDI, Performance/Multi/SysEx paths and external bus traces are retained.
+- IC51 descriptor and command-stream resolution covers all 512 bank/program pairs, including both firmware flag-0A decoder outcomes.
+- Program identity reaches each voice; immutable IC51 program, external-memory and FX1/FX2 resource catalogs are handed to the active backend.
+- Firmware-derived command packet builders and the 1C61 pitch pipeline cover their captured handler snapshots; IC4-to-unknown-audio-device register semantics remain deliberately unmapped.
+- The processor currently selects `SAM9407VoiceBackend`, not the diagnostic oscillator. This is a candidate 16-bit sample renderer with interpolation, pitch stepping, one-shot and loop modes. SAM9407 has not been physically confirmed in the TechnoX board.
+- The external waveform image loader and sample-map parser are in place. The sample map now supports multiple regions per program by MIDI key and velocity; mono/legato changes reselect the matching zone.
+- Current generic playback supports only explicitly supplied signed 16-bit sample data and hand-authored/sample-builder maps. It does not decode factory IC51 resources into waveform addresses or factory key/velocity regions.
 
-- IC4 v1.05 executes in the in-project Intel 8032/MCS-51 model, with the MIDI receive path and bus/event tracing.
-- IC51 program descriptors and command streams are decoded for all 512 bank/program entries, including both firmware flag variants.
-- Program identity reaches each allocated voice; immutable program, external-memory and FX upload catalogs are passed to the audio backend.
-- Firmware-side command planning and pitch/slot arithmetic projections produce evidence-backed packet bytes for covered paths.
-- FX1/FX2 directories and upload byte streams are reconstructed separately.
+## Hard blocker: original waveform memory
 
-**The current code revision `1d645f2` has passed GitHub Actions run [45874257408](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45874257408): Intel AU/VST3/Standalone build, 11/11 CTest tests and the Python unit-test job. The Intel plugin artifact is linked in the status report; actual Logic loading on the user's Monterey system remains to be confirmed.**
+The 16-KiB C000–FFFF image reconstructed from IC51 is a verified firmware transfer result, not a PCM bank. The public MAME TechnoX set listing contains only IC4 and IC51 controller ROMs and no waveform image. The contemporary hardware review reports 6 MB sample memory, while later secondary listings claim higher capacity; actual board population and layout must be verified before setting an expected dump size.
 
-**The original sound generator is not complete.** `BasicMASSVoiceBackend` still renders a diagnostic oscillator. The 16-KiB C000–FFFF image is a verified firmware memory-transfer result, not a decoded waveform library. The fitted synthesis chip/host-port bridge, larger waveform store, sample format and original DSP playback behavior are not yet verified. Recent pitch-probe changes also have no confirmed CI result at this checkpoint.
+Publicly shared 94-hit Technox WAV collections are recorded audio references, not raw memory. They can support dry-hit comparison once a renderer works, but cannot substitute for the missing waveform image or factory instrument map. The KB6 archive states personal-use limitations; do not bundle or redistribute those files in the plugin.
 
-## Short completion path
+## Next completion gates
 
-### 1. Freeze the firmware investigation
+1. **Identify the hardware path.** Readable markings on the fitted sound/DSP and sample-memory devices, plus board-side tracing of IC4 P2/P3, XDATA, and host strobes. Do not assume SAM9407 mappings from address resemblance.
+2. **Acquire one real waveform image.** Capture actual memory using a documented programmer or bus method; record per-device images, exact sizes, repeat-read CRC32/SHA-256 and address/lane topology.
+3. **Decode one factory waveform.** Establish encoding, byte order, address units, sample rate/clock, start/end and loop bounds from evidence. Add a byte-exact golden vector.
+4. **Bind one factory program.** Trace one IC51 program/command sequence through the proven host bridge to one real sample region. Do not infer the association from sample names or a third-party WAV pack.
+5. **Render and compare.** Verify one note and one factory Performance against a dry physical TechnoX capture. Only then expand mapping and the original per-voice filter/envelope/FX processing.
 
-Keep the recovered IC4, IC51, voice-routing, pitch and FX work as the baseline. Do not spend more time decoding isolated addresses unless the result directly unlocks sample playback, the host-device bridge or a required regression.
+## Release validation
 
-### 2. Establish one real waveform
-
-A bounded-memory raw-image inspector is now in `tools/inspect_technox_waveform_dump.py`; its four unit tests are registered with CTest. It checks exact size when explicitly requested, CRC32/SHA-256 and byte distribution without making PCM or address-map assumptions. Acquisition requirements are documented in [`docs/research/WAVEFORM_MEMORY_ACQUISITION.md`](../docs/research/WAVEFORM_MEMORY_ACQUISITION.md).
-
-The audio engine now also has `MASSWaveformMemoryView`, a non-owning, immutable and bounds-checked raw-byte view. It is forwarded to the active backend and survives backend replacement; the view does not decode or render samples. Its C++ tests cover bounds, span access, detach and backend hand-off.
-The JUCE processor now exposes a stopped-audio-only read-only `MemoryMappedFile` loader for an external candidate dump, plus explicit unload and size/state queries. The mapping is held by the processor so the backend view remains valid until unloaded. No sample decoder or file-picker UI is implied.
-
-Obtain a verified TechnoX waveform-memory dump or a trustworthy board/memory map and identify the actual sample device. Decode **one** known sample with its address, encoding, rate and loop boundaries. Add a small golden test before attempting the full library.
-
-A third-party pack lists 94 drum hits recorded from a physical TechnoX (24-bit/44.1 kHz stereo). It is a possible comparison reference only, not the machine's raw ROM image or a factory note map; do not bundle it without checking its terms. See [`docs/research/WAVEFORM_MEMORY_ACQUISITION.md`](../docs/research/WAVEFORM_MEMORY_ACQUISITION.md).
-
-The IC51 descriptors and command streams are inputs to this work, not proof that their bytes are PCM.
-
-### 3. Replace the diagnostic voice path incrementally
-
-Keep the existing `IMASSVoiceBackend` boundary. Implement a separate resource-backed renderer for one voice and one verified waveform first; then add pitch, loop, velocity/envelope and controller behavior only where the firmware or hardware evidence supports it. Do not map the IC4 four-byte packets to SAM9407 registers by guesswork.
-
-FX1/FX2 remain a separate completion item: upload resources are reconstructed, but their receiving device and original effect algorithms are not.
-
-### 4. Release validation
-
-- [x] Run the full CTest and Python regression suites against code revision `1d645f2`: 11/11 CTest and the Python job passed in Actions run `45874257408`.
-- [x] Produce x86_64 Intel macOS builds for AU, VST3 and Standalone. Workflow 45874257408 passed and uploaded artifact `technox-intel-plugins` (artifact ID `15144262800`).
-- [ ] Install/load the AU in Logic on the user's macOS Monterey system and compare against a physical TechnoX or trusted reference capture.
-- Compare controlled notes and a small set of factory Performances against a physical TechnoX or a trusted reference capture.
-- Keep any unmatched behavior explicitly listed; do not label the emulator authentic until sample playback and the original processing path are demonstrated.
+- CI must pass Linux/C++ and Python regressions and build x86_64 AU, VST3 and Standalone bundles for macOS. The actual AU must then be loaded in Logic on Monterey.
+- Preserve current separation: controller firmware, unknown-device bridge, candidate SAM9407 host interface, external waveform memory and FX device are distinct until hardware evidence connects them.
+- Keep every unverified component explicitly labelled. Do not describe the emulator as authentic-sounding until a factory waveform is rendered through a verified playback/DSP path.
 
 ## Completion gates
 
-| Gate | Required evidence | State |
-|---|---|---|
-| Firmware/resource foundation | IC4, IC51 catalogs, voice routing and covered packet paths | Implemented in the branch; latest changes need final regression |
-| One original waveform | Verified source memory plus decoded sample and golden vector | Blocked on waveform dump / memory evidence |
-| Original voice renderer | One voice plays that waveform through a verified playback model | Not implemented |
-| Original FX | Confirmed receiver/protocol and effect processing | Resource uploads only |
-| Intel release | Passing CTest/Python, x86_64 AU/VST3/Standalone artifacts, then Logic check | Build/tests pass on the same code blobs as current branch; Logic/device check pending |
+| Gate | State |
+|---|---|
+| IC4/IC51 firmware and resource foundation | Implemented; extensive regressions present |
+| IC4-to-audio-device host protocol | Captured, not semantically decoded |
+| Candidate 16-bit sample voice renderer | Implemented for explicit external maps; not factory-compatible yet |
+| Key/velocity zones and mono/legato rebinding | Implemented; latest CI pending |
+| One factory waveform + byte-exact decoder vector | Blocked on actual waveform-memory acquisition |
+| Factory program-to-waveform mapping | Blocked on host bridge/sample-map evidence |
+| Original DSP filters and FX algorithms | Not implemented/verified |
+| Intel AU/VST3/Standalone release + Monterey Logic test | Previous Intel build passed; latest changes need CI and local Logic validation |
 
 ## Practical stopping rule
 
-The next major milestone is **one verified waveform sounding through a resource-backed voice**, not another round of address-by-address documentation. If the waveform store or board-level DSP interface is unavailable, the project can still be packaged as a working firmware/resource research build, but it must not be presented as an authentic-sounding TechnoX emulator.
+The next major milestone is **one verified factory waveform sounding from a factory program**, not more isolated address documentation or cosmetic work. Without raw waveform memory and a proven bridge/map, the project can be packaged as a strong firmware/resource research build, but must not be called an authentic TechnoX sound emulator.
