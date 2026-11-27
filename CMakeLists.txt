@@ -301,6 +301,14 @@ if (BUILD_TESTING)
     )
 endif()
 
+# Regression tests for captured-WAV sample-bank conversion.
+if (BUILD_TESTING)
+    add_test(NAME technox_sam9407_sample_bank_builder_tests
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_sam9407_sample_bank_builder.py"
+    )
+endif()
+
 # Evidence-only structural tests for external Dream .94B reference banks.
 # This does not decode PCM or imply that TechnoX uses the .94B format.
 if (BUILD_TESTING)

@@ -117,6 +117,31 @@ QuasimidiTechnoXAudioProcessor::QuasimidiTechnoXAudioProcessor()
     initialisePartStates();
     initialiseCommonControlsFromBank();
     syncCurrentPerformanceToEngine();
+
+    // Optional externally captured WAV bank. This is separate from factory
+    // IC4/IC51 resources and is loaded before the audio callback starts.
+    const auto sampleBankDirectory =
+        juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("Quasimidi TechnoX")
+            .getChildFile("SampleBank");
+    const auto capturedWaveformFile =
+        sampleBankDirectory.getChildFile("waveforms.raw");
+    const auto capturedMapFile =
+        sampleBankDirectory.getChildFile("sample_map.json");
+    if (capturedWaveformFile.existsAsFile() && capturedMapFile.existsAsFile()) {
+        const bool waveformLoaded = loadWaveformMemoryFile(capturedWaveformFile);
+        const bool mapLoaded = waveformLoaded &&
+            loadSAM9407SampleMapFile(capturedMapFile);
+        if (!mapLoaded) {
+            clearSAM9407SampleMap();
+            unloadWaveformMemoryFile();
+            juce::Logger::writeToLog(
+                "TechnoX SampleBank ignored: waveform/map pair failed validation.");
+        } else {
+            juce::Logger::writeToLog(
+                "TechnoX external SampleBank loaded from user Application Support.");
+        }
+    }
 }
 
 bool QuasimidiTechnoXAudioProcessor::installVoiceBackend(

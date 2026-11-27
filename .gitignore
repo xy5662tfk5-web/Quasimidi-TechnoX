@@ -1,8 +1,0 @@
-build/
-cmake-build-*/
-DerivedData/
-*.xcodeproj/
-*.xcworkspace/
-.DS_Store
-*.user
-*.suo
