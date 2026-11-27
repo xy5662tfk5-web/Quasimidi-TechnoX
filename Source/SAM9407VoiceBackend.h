@@ -322,10 +322,13 @@ private:
             state.position >= static_cast<double>(mapping.endWord))
             return false;
 
+        // The sample coordinate is independent of playback direction:
+        // floor(position) and the next word bracket the same fractional
+        // location whether the phase is moving forward or backward. The
+        // reverse flag changes phase advancement only; choosing the previous
+        // word here would interpolate from the wrong side on alternating loops.
         const auto firstWord = static_cast<std::uint32_t>(state.position);
-        auto secondWord = firstWord + (state.reverse ? 0u : 1u);
-        if (state.reverse && firstWord > mapping.startWord)
-            secondWord = firstWord - 1u;
+        auto secondWord = firstWord + 1u;
         if (secondWord >= mapping.endWord)
             secondWord = mapping.endWord - 1u;
         if (!state.released &&

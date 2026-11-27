@@ -7,7 +7,8 @@
 
 using namespace technox;
 
-static void writeLittleEndian(std::array<std::uint8_t, 12>& bytes,
+template <std::size_t Size>
+static void writeLittleEndian(std::array<std::uint8_t, Size>& bytes,
                               std::size_t word, std::int16_t value) {
     const auto bits = static_cast<std::uint16_t>(value);
     bytes[word * 2] = static_cast<std::uint8_t>(bits & 0xffu);
@@ -83,6 +84,42 @@ int main() {
     loopEngine.noteOff(1, 60);
     loopEngine.render(loopChannels, 2, 1);
     assert(energy(loopLeft, loopRight) > 0.2);
+
+    // Alternating loops keep the fractional sample coordinate consistent
+    // through the direction reversal. At frame 3, position is 2.5 words:
+    // the interpolated value must be halfway between words 2 and 3, not
+    // between words 2 and 1 (the old reverse-neighbour bug).
+    std::array<std::uint8_t, 10> alternatingPcm{};
+    writeLittleEndian(alternatingPcm, 0, 0);
+    writeLittleEndian(alternatingPcm, 1, 1000);
+    writeLittleEndian(alternatingPcm, 2, 5000);
+    writeLittleEndian(alternatingPcm, 3, 9000);
+    writeLittleEndian(alternatingPcm, 4, 12000);
+    MASSWaveformMemoryView alternatingMemory;
+    assert(alternatingMemory.attach(alternatingPcm.data(), alternatingPcm.size()));
+    SAM9407VoiceBackend alternatingBackend;
+    SAM9407SampleMapEntry alternatingEntry{};
+    alternatingEntry.startWord = 0;
+    alternatingEntry.endWord = 5;
+    alternatingEntry.sampleRate = 44100;
+    alternatingEntry.rootNote = 60;
+    alternatingEntry.gain = 127;
+    alternatingEntry.pan = 64;
+    alternatingEntry.loopMode = SAM9407LoopMode::alternating;
+    alternatingEntry.loopStartWord = 1;
+    alternatingEntry.loopEndWord = 4;
+    assert(alternatingBackend.addSampleMapping(alternatingEntry));
+    alternatingBackend.setWaveformMemoryView(&alternatingMemory);
+    MASSAudioEngine alternatingEngine(&alternatingBackend);
+    alternatingEngine.prepare(29400.0, 8); // 1.5 source words per output frame
+    assert(alternatingEngine.setPartParameter(0, PartParameter::level, 127));
+    alternatingEngine.noteOn(0, 1, 60, 127);
+    std::array<float, 8> alternatingLeft{}, alternatingRight{};
+    float* alternatingChannels[] = {
+        alternatingLeft.data(), alternatingRight.data()
+    };
+    alternatingEngine.render(alternatingChannels, 2, 4);
+    assert(alternatingLeft[3] > 0.08f && alternatingRight[3] > 0.08f);
 
     // Big-endian samples are explicitly selectable; the renderer never
     // guesses byte order from a raw waveform dump.
