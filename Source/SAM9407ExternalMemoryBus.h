@@ -29,6 +29,16 @@ public:
     static constexpr std::uint64_t kAddressSpaceWordCount = 0x02000000ull;
     static constexpr std::size_t kMaximumRegions = 8u;
 
+    // A flat waveform image is read as 16-bit words. Reject empty/odd-sized
+    // files and any image extending beyond the 25-bit word-address space
+    // before the plugin publishes the mapping to the audio backend.
+    static constexpr bool isValidImageByteCount(
+        std::uint64_t byteCount) noexcept {
+        return byteCount != 0u &&
+            (byteCount & 1u) == 0u &&
+            (byteCount / 2u) <= kAddressSpaceWordCount;
+    }
+
     // Decode the physical S1/S0 pins. S1 is the high bit.
     static constexpr SAM9407MemoryCycle decodeCycle(bool s1, bool s0) noexcept {
         return static_cast<SAM9407MemoryCycle>(

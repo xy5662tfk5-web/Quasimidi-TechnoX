@@ -16,9 +16,10 @@ Source: [DREAM SAM9407 objective specification, February 1996](https://dosdays.c
 
 ## Implemented
 
-`Source/SAM9407ExternalMemoryBus.h` is a bounded, allocation-free word-address bus:
+`Source/SAM9407ExternalMemoryBus.h` is a bounded, allocation-free word-address bus. The plugin's raw waveform-file loader uses the same size validator before publishing the memory view:
 
 - validates the full 25-bit word address range, including the exclusive end address `0x02000000` when a mapping includes final word `0x01FFFFFF`;
+- validates candidate raw waveform-image lengths before load: non-empty, even number of bytes and no larger than `0x04000000` bytes (32M 16-bit words);
 - maps up to eight non-overlapping memory regions;
 - supports immutable PCM ROM views plus writable SRAM/DRAM backing;
 - decodes/encodes S1/S0 cycle values;

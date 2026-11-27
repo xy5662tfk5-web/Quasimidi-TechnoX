@@ -142,6 +142,10 @@ bool QuasimidiTechnoXAudioProcessor::loadWaveformMemoryFile(const juce::File& fi
     const auto* mappedBytes = static_cast<const std::uint8_t*>(mappedFile->getData());
     const auto mappedSize = mappedFile->getSize();
 
+    if (!technox::SAM9407ExternalMemoryBus::isValidImageByteCount(
+            static_cast<std::uint64_t>(mappedSize)))
+        return false;
+
     technox::MASSWaveformMemoryView candidateView;
     if (!candidateView.attach(mappedBytes, mappedSize))
         return false;

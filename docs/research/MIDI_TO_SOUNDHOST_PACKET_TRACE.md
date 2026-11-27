@@ -267,3 +267,47 @@ For the key-66 event:
 The regression is in `tests/test_technox_8032_machine.cpp` and passed the unit-test job in run #1489. The test still uses the explicitly synthetic DSP-ready response. It establishes the original IC4 firmware's output construction, not an actual SAM/DSP response or confirmed audible playback.
 
 CI: [run #1489](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/45458611160), commit `8b70481a0f65e0afeb161b9e59c119a05d6450a9`.
+
+
+## Latest isolated Performance-mode vs Multi-mode MIDI stages — CI run 46026511320
+
+The current `tests/test_technox_8032_machine.cpp` includes a later differential sequence using three separately scheduled ACIA events after the same real IC51 factory Performance stream has been loaded. This is stronger evidence than the earlier combined `C0 05 90 3C 64` probe described above. The latest CI unit-test log gives these exact deltas:
+
+| Isolated stage | SoundHost packets | Burst words | Host writes | Firmware calls / other observations |
+|---|---:|---:|---:|---|
+| Program Change `C0 05` in Performance mode | 0 | 0 | 0 | `0x57A8=1`, `0x5671=1`; no Part/descriptor/writer call |
+| Note On `90 3C 64` in Performance mode | 0 | 0 | 0 | `0x4256=1`, `0x5671=1`, `0x57A8=1`; no `0x0DB7` |
+| Note Off `80 3C 40` in Performance mode | 0 | 0 | 0 | `0x4256=1`, `0x5671=1`, `0x57A8=1`, `0x1494=1`, `0xAC88=1`; no `0x0DB7` |
+| SysEx set Multi mode = 1 | 0 | 0 | 0 | 8 additional IC51 reads |
+| SysEx load temporary Part 1 | 0 | 0 | 0 | no SoundHost traffic |
+
+These results demonstrate that the initial Performance-mode MIDI dispatch does not emit the four-byte command-port packets in the tested path. They do not imply that the Performance has no sound; the peripheral's note handling may use another mode/path, or the fixture has not satisfied the required external-device startup condition.
+
+### Multi-mode first-note bootstrap (explicit synthetic ready/queue-drain)
+
+After setting Multi mode and loading a temporary Part 1 parameter block, the test injects a **synthetic** queue-drain/ready condition: overrides for `0xFFFB`, `0xFF80`, `0xFF88`, a write hook at `0x1742`, and later an override of external read `0x7D95=0x01`. This is a diagnostic fixture, not a captured hardware response.
+
+| Stage | Packets | Burst words | Host writes | IC51 reads |
+|---|---:|---:|---:|---:|
+| First Note On Part 1 after the synthetic ready condition | 546 | 546 | 2,222 | 14,343 |
+| Second Note On, already warm | 549 | 549 | 2,234 | 14,522 |
+| Same note 64, velocity 50 | 549 | 549 | 2,234 | 14,522 |
+| Note Off pitch 65 | 0 | 0 | 0 | 0 |
+| Note On pitch 66 after releasing pitch 65 | 549 | 549 | 2,234 | 14,522 |
+| Note Off pitch 66 | 0 | 0 | 0 | 0 |
+| Note On pitch 72 after releasing pitch 66 | 549 | 549 | 2,234 | 14,522 |
+| Note Off pitch 72 | 0 | 0 | 0 | 0 |
+
+The first Note On produces 546 transactions: the known 544-packet initialization/configuration sweep plus two additional startup transactions from `0x1048` (`F0 80 01 80` and `F1 80 01 80`). The warm Note On path produces 549 transactions: five note-associated commands followed by the 544-packet transfer described above. The test checks that the 544-packet suffix is byte-identical across velocity 100 and 50; only the fourth of the five event-associated commands changes in the tested velocity differential. Adjacent-pitch probes likewise retain the suffix and change the first pitch-step-like packet field.
+
+Paired Note Off events produce no writes to `0x8000–0x8003` and no `0x0DB7` calls in this fixture. They do change IC4 note/event state through `0xAC88` and the Note Off branch. This is a software-trace result, not proof that the physical peripheral receives no release instruction through another channel.
+
+### What is now separated — and what remains unknown
+
+- The test now separates Program Change, Note On and Note Off as individual ACIA events in Performance mode; the older combined five-byte probe should be treated as historical, not as the current differential basis.
+- In the Multi-mode synthetic-ready fixture, the first note stage triggers 544 configuration transactions plus two startup writes; later warm notes emit five note-associated commands plus the same 544-transaction suffix.
+- The `0x0E3A` sweep is an IC4 firmware-generated table/parameter transfer, not 544 PCM samples and not a loop through 512 IC51 program descriptors.
+- Velocity and pitch affect specific bytes in the five note-associated commands, but the external meaning of those fields remains unassigned. The pitch-step-like field has an approximately equal-tempered semitone ratio in the tested adjacent-key differential; this still does not identify a physical register or fixed-point clock.
+- The handshake/ready response used to unlock the Multi-mode note path is injected by the test harness. There is no real-hardware acknowledgement capture, fitted-chip confirmation, or audible reference comparison yet.
+
+Regression source: `tests/test_technox_8032_machine.cpp`, around the isolated `runRealMidiStage` calls and the subsequent synthetic-ready Part 1 Note On path. Latest source/test run: [CI #46026511320](https://github.com/xy5662tfk5-web/Quasimidi-TechnoX/actions/runs/46026511320), commit `605246b7b14fa763e82786b86859fcfeb8b2802d`.

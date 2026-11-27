@@ -10,6 +10,12 @@ using namespace technox;
 int main() {
     static_assert(SAM9407ExternalMemoryBus::kMaximumWordAddress == 0x01ffffffu);
     static_assert(SAM9407ExternalMemoryBus::kAddressSpaceWordCount == 0x02000000ull);
+    static_assert(SAM9407ExternalMemoryBus::isValidImageByteCount(2u));
+    static_assert(SAM9407ExternalMemoryBus::isValidImageByteCount(0x04000000ull));
+    static_assert(!SAM9407ExternalMemoryBus::isValidImageByteCount(0u));
+    static_assert(!SAM9407ExternalMemoryBus::isValidImageByteCount(1u));
+    static_assert(!SAM9407ExternalMemoryBus::isValidImageByteCount(0x04000001ull));
+    static_assert(!SAM9407ExternalMemoryBus::isValidImageByteCount(0x04000002ull));
 
     // S1/S0 meanings from the SAM9407 pin description:
     // 00 idle, 01 synthesis access, 10 instruction fetch, 11 P16 read/write.
