@@ -425,6 +425,12 @@ int main() {
     replacement.keyLow = 90;
     replacement.keyHigh = 80;
     assert(!replacementBackend.addSampleMapping(replacement));
+    replacement.keyLow = 0;
+    replacement.keyHigh = 128;
+    assert(!replacementBackend.addSampleMapping(replacement));
+    replacement.keyHigh = 127;
+    replacement.velocityHigh = 128;
+    assert(!replacementBackend.addSampleMapping(replacement));
 
     return 0;
 }
