@@ -274,3 +274,16 @@ if (BUILD_TESTING)
         COMMAND technox_sam9407_voice_backend_tests
     )
 endif()
+
+# Datasheet-level SAM9407 BOOT-pin / 256-word host-burst boundary.
+# This is not connected to the unverified TechnoX IC4 host-port mapping.
+if (BUILD_TESTING)
+    add_executable(technox_sam9407_bootstrap_tests
+        tests/test_sam9407_bootstrap_receiver.cpp
+    )
+    target_compile_features(technox_sam9407_bootstrap_tests PRIVATE cxx_std_17)
+    target_compile_options(technox_sam9407_bootstrap_tests PRIVATE -UNDEBUG)
+    add_test(NAME technox_sam9407_bootstrap_tests
+        COMMAND technox_sam9407_bootstrap_tests
+    )
+endif()
