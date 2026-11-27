@@ -348,6 +348,46 @@ private:
 
     static void advance(VoiceState& state, double step) noexcept {
         const auto& mapping = state.mapping;
+
+        if (!state.released &&
+            mapping.loopMode == SAM9407LoopMode::alternating) {
+            const double loopStart = static_cast<double>(mapping.loopStartWord);
+            const double loopEnd = static_cast<double>(mapping.loopEndWord);
+            // The upper turn point is half a sample before the exclusive
+            // loop end. This preserves the renderer's interpolated end-to-start
+            // seam while folding arbitrarily large pitch steps into the loop.
+            const double loopSpan = loopEnd - loopStart - 0.5;
+            if (loopSpan > 0.0) {
+                double phase = 0.0;
+                if (!state.reverse) {
+                    const double nextPosition = state.position + step;
+                    // Keep the one-shot attack segment before loopStart intact.
+                    if (nextPosition <= loopStart) {
+                        state.position = nextPosition;
+                        return;
+                    }
+                    phase = nextPosition - loopStart;
+                } else {
+                    phase = 2.0 * loopSpan -
+                        (state.position - loopStart) + step;
+                }
+
+                const double period = 2.0 * loopSpan;
+                phase = std::fmod(phase, period);
+                if (phase < 0.0)
+                    phase += period;
+
+                if (phase <= loopSpan) {
+                    state.position = loopStart + phase;
+                    state.reverse = false;
+                } else {
+                    state.position = loopStart + (period - phase);
+                    state.reverse = true;
+                }
+                return;
+            }
+        }
+
         state.position += state.reverse ? -step : step;
 
         if (state.released || mapping.loopMode == SAM9407LoopMode::oneShot) {
@@ -366,15 +406,6 @@ private:
         if (mapping.loopMode == SAM9407LoopMode::forward) {
             if (!state.reverse && state.position >= loopEnd)
                 state.position = loopStart + std::fmod(state.position - loopStart, loopLength);
-            return;
-        }
-
-        if (!state.reverse && state.position >= loopEnd) {
-            state.position = loopEnd - (state.position - loopEnd) - 1.0;
-            state.reverse = true;
-        } else if (state.reverse && state.position < loopStart) {
-            state.position = loopStart + (loopStart - state.position);
-            state.reverse = false;
         }
     }
 };

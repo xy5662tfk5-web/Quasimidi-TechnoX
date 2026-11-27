@@ -91,7 +91,7 @@ int main() {
     // between words 2 and 1 (the old reverse-neighbour bug).
     std::array<std::uint8_t, 10> alternatingPcm{};
     writeLittleEndian(alternatingPcm, 0, 0);
-    writeLittleEndian(alternatingPcm, 1, 1000);
+    writeLittleEndian(alternatingPcm, 1, -10000);
     writeLittleEndian(alternatingPcm, 2, 5000);
     writeLittleEndian(alternatingPcm, 3, 9000);
     writeLittleEndian(alternatingPcm, 4, 12000);
@@ -120,6 +120,25 @@ int main() {
     };
     alternatingEngine.render(alternatingChannels, 2, 4);
     assert(alternatingLeft[3] > 0.08f && alternatingRight[3] > 0.08f);
+
+    // A high transposition can advance by more than one full alternating
+    // loop period in a single output frame. The phase fold must preserve the
+    // active voice instead of reflecting once and leaving the sample range.
+    SAM9407VoiceBackend fastAlternatingBackend;
+    assert(fastAlternatingBackend.addSampleMapping(alternatingEntry));
+    fastAlternatingBackend.setWaveformMemoryView(&alternatingMemory);
+    MASSAudioEngine fastAlternatingEngine(&fastAlternatingBackend);
+    fastAlternatingEngine.prepare(44100.0, 8);
+    assert(fastAlternatingEngine.setPartParameter(0, PartParameter::level, 127));
+    fastAlternatingEngine.noteOn(0, 1, 100, 127); // 10x+ source-rate step
+    std::array<float, 8> fastLeft{}, fastRight{};
+    float* fastChannels[] = {fastLeft.data(), fastRight.data()};
+    fastAlternatingEngine.render(fastChannels, 2, 1);
+    fastLeft.fill(0.0f);
+    fastRight.fill(0.0f);
+    fastAlternatingEngine.render(fastChannels, 2, 1);
+    assert(fastAlternatingEngine.voiceManager().activeVoiceCount() == 1);
+    assert(energy(fastLeft, fastRight) > 0.001);
 
     // Big-endian samples are explicitly selectable; the renderer never
     // guesses byte order from a raw waveform dump.
