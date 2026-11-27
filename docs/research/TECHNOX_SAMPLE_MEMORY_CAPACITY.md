@@ -22,6 +22,17 @@ Source: [DREAM SAM9407 objective specification, February 1996](https://dosdays.c
 ## Public ROM availability
 
 The publicly indexed MAME TechnoX archive lists only two ROM images: IC4 mx27c1000_v105.ic4 and IC51 nm27c010_v105.ic51, together 160 KB. These are the control/firmware images already used by this project; this listing does not include a multi-megabyte waveform dump.
+## What the 16-KiB CI memory artifact actually contains
+
+The CI artifact historically named technox-external-sound-memory.bin is **not** a raw sample-ROM dump. The integration test creates it from the emulated IC4 XDATA window after the firmware's IC51 bank-0 bulk transfer. Assertions pin:
+
+- 13,647 payload bytes copied from IC51 bank 0 source address 0x3C64;
+- the 256-byte low-address permutation sourced from IC4 table 0xADDD;
+- destination window 0xC000–0xFFFF (16,384 bytes total);
+- final physical write address 0xF5B2;
+- a byte-for-byte comparison of all 16,384 output bytes with the independent MASSIC51ExternalSoundMemoryImage reconstruction.
+
+This is a verified firmware-loaded resource/control-memory image. Its name in earlier CI runs was ambiguous; future runs publish it as technox-ic51-resource-window-16k. Do not use it as PCM waveform memory.
 
 Source: [Planet Emulation — TechnoX MAME ROM contents](https://www.planetemu.net/en/rom/mame-roms-merged/technox).
 

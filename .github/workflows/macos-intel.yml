@@ -99,10 +99,10 @@ jobs:
                       item = reachable[nearby]
                       print(f"  {nearby:04X}: {item.raw:<8} {item.text}")
           PY
-      - name: Upload firmware-loaded external sound memory snapshot
+      - name: Upload IC51-loaded 16-KiB resource window (not waveform PCM)
         uses: actions/upload-artifact@v4
         with:
-          name: technox-external-sound-memory
+          name: technox-ic51-resource-window-16k
           path: /tmp/technox_external_sound_memory.bin
           if-no-files-found: error
           compression-level: 0
