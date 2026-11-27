@@ -1,0 +1,685 @@
+#include "PluginEditor.h"
+#include "BinaryData.h"
+#include "TechnoXPartModel.h"
+#include "TechnoXPanelControlMap.h"
+#include <cmath>
+
+namespace {
+constexpr float kParameterX = 568.0f;
+constexpr float kValueX = 674.0f;
+constexpr float kVolumeX = 964.0f;
+constexpr float kKnobY = 68.0f;
+constexpr int kPartFirstParameter = 0;
+
+void drawTrackedText(juce::Graphics& g, const juce::String& text,
+                     float centreX, float baselineY, float fontHeight,
+                     float letterSpacing, float scaleX = 1.0f, float scaleY = 1.0f)
+{
+    // The original SVG uses Arial Black with explicit 8/7.5/6.8 px sizing
+    // and tracking. JUCE's SVG parser ignores letter-spacing and SVG font
+    // shorthand, so place the same glyphs with the original metrics here.
+    const juce::Font font(juce::FontOptions{}.withName("Arial Black")
+                                             .withPointHeight(fontHeight));
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText(font, text, 0.0f, 0.0f);
+
+    const int count = glyphs.getNumGlyphs();
+    if (count == 0)
+        return;
+
+    const float textWidth = juce::GlyphArrangement::getStringWidth(font, text)
+        + letterSpacing * static_cast<float>(juce::jmax(0, count - 1));
+    const float left = centreX - textWidth * scaleX * 0.5f;
+
+    g.setColour(juce::Colour(0xff181a1c));
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& glyph = glyphs.getGlyph(i);
+        const float x = left
+            + (glyph.getLeft() + letterSpacing * static_cast<float>(i)) * scaleX;
+        const auto transform = juce::AffineTransform::translation(
+                -glyph.getLeft(), -glyph.getBaselineY())
+            .scaled(scaleX, scaleY)
+            .translated(x, baselineY);
+        glyph.draw(g, transform);
+    }
+}
+
+void drawOriginalCurvedLabel(juce::Graphics& g, const juce::String& text,
+                             juce::Point<float> centre, float radius,
+                             bool lowerArc)
+{
+    // Match the source SVG exactly: Arial Black, 8 px, 1.6 px tracking.
+    // JUCE 8.0.13's SVG parser does not implement <textPath> or letter-spacing,
+    // so render the same glyph run along the original SVG arc here.
+    constexpr float fontHeight = 8.0f;
+    constexpr float letterSpacing = 1.6f;
+    const juce::Font font(juce::FontOptions{}.withName("Arial Black").withPointHeight(fontHeight));
+
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText(font, text, 0.0f, 0.0f);
+
+    const int count = glyphs.getNumGlyphs();
+    if (count == 0)
+        return;
+
+    const float textWidth = juce::GlyphArrangement::getStringWidth(font, text)
+        + letterSpacing * static_cast<float>(juce::jmax(0, count - 1));
+    const float pathLength = juce::MathConstants<float>::pi * radius;
+    const float firstGlyphOffset = (pathLength - textWidth) * 0.5f;
+
+    g.setColour(juce::Colour(0xff181a1c));
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& glyph = glyphs.getGlyph(i);
+        const float glyphWidth = glyph.getRight() - glyph.getLeft();
+        const float distance = firstGlyphOffset + glyph.getLeft()
+            + glyphWidth * 0.5f + letterSpacing * static_cast<float>(i);
+        const float theta = lowerArc
+            ? distance / radius
+            : juce::MathConstants<float>::pi + distance / radius;
+
+        const juce::Point<float> position(
+            centre.x + radius * std::cos(theta),
+            centre.y + radius * std::sin(theta));
+        const float tangent = std::atan2(radius * std::cos(theta),
+                                         -radius * std::sin(theta));
+
+        const auto glyphTransform = juce::AffineTransform::translation(
+                -glyph.getLeft(), -glyph.getBaselineY())
+            .rotated(tangent)
+            .translated(position.x, position.y);
+        glyph.draw(g, glyphTransform);
+    }
+}
+}
+
+QuasimidiTechnoXAudioProcessorEditor::QuasimidiTechnoXAudioProcessorEditor(
+    QuasimidiTechnoXAudioProcessor& processor)
+    : AudioProcessorEditor(&processor), audioProcessor(processor)
+{
+    auto svg = juce::XmlDocument::parse(
+        juce::String::fromUTF8(BinaryData::technox_front_panel_svg,
+                               static_cast<int>(BinaryData::technox_front_panel_svgSize)));
+    if (svg != nullptr)
+        frontPanel = juce::Drawable::createFromSVG(*svg);
+    setSize(1200, 132);
+    setResizable(false, false);
+    lastRoutingMode = audioProcessor.getMidiRoutingMode();
+    lastPerformanceIndex = audioProcessor.getCurrentProgram();
+    syncDialsFromCurrentSelection();
+    startTimerHz(12);
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::timerCallback()
+{
+    // Follow host program/mode changes without moving an inactive dial during
+    // a gesture. Part selection belongs to the operating mode: 4 stored
+    // Performance parts versus 16 Sequencer-Multi Parts.
+    if (dragTarget == DragTarget::none) {
+        const auto currentMode = audioProcessor.getMidiRoutingMode();
+        const int currentProgram = audioProcessor.getCurrentProgram();
+        if (currentMode != lastRoutingMode) {
+            lastRoutingMode = currentMode;
+            selectedPart = 0;
+            selectedSequencerPart = 0;
+            syncDialsFromCurrentSelection();
+        } else if (currentProgram != lastPerformanceIndex) {
+            syncDialsFromCurrentSelection();
+        }
+        lastPerformanceIndex = currentProgram;
+    }
+    repaint();
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xffc6cbd1));
+    if (frontPanel != nullptr)
+        frontPanel->drawWithin(g, getLocalBounds().toFloat(),
+                               juce::RectanglePlacement::stretchToFit, 1.0f);
+
+    // Static panel lettering follows the original SVG's exact coordinates,
+    // font sizes and tracking. Drawn here because JUCE 8.0.13 doesn't apply
+    // SVG text shorthand/letter-spacing consistently.
+    drawTrackedText(g, "MADE IN GERMANY", 56.0f, 81.0f, 6.8f, 0.4f);
+    drawTrackedText(g, "POWER", 138.0f, 34.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "16 PART MULTITIMBRAL SYNTHESIZER",
+                    354.0f, 115.0f, 8.0f, 1.0f, 1.12f, 0.85f);
+    drawTrackedText(g, "PARAMETER", 568.0f, 30.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "SOUNDGROUP", 568.0f, 114.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "VALUE", 674.0f, 30.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "SOUND", 674.0f, 114.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "EDIT / OK", 756.0f, 34.0f, 6.8f, 0.4f);
+    drawTrackedText(g, "EXIT", 794.0f, 34.0f, 6.8f, 0.4f);
+    drawTrackedText(g, "PART / BANK", 775.0f, 112.0f, 6.8f, 0.4f);
+    drawOriginalCurvedLabel(g, "TECHNO - RAVE", { 876.0f, 62.0f }, 40.0f, false);
+    drawOriginalCurvedLabel(g, "ELECTRONIC", { 876.0f, 74.0f }, 40.0f, true);
+    drawTrackedText(g, "VOLUME", 964.0f, 21.0f, 7.5f, 0.5f);
+    drawTrackedText(g, "HEADPH.", 1031.0f, 21.0f, 7.5f, 0.5f);
+
+    const auto mode = panelOperatingMode();
+    const auto* descriptor = technox::PartEditModel::descriptor(
+        static_cast<std::size_t>(selectedParameter));
+    const int performanceIndex = audioProcessor.getCurrentProgram();
+    const int bank = currentPartParameterRaw(technox::PartParameter::bankNumber);
+    const int sound = currentPartParameterRaw(technox::PartParameter::soundNumber);
+    const juce::String soundName = currentPartSoundName();
+
+    juce::String line1;
+    juce::String line2;
+    if (page == EditorPage::editPart) {
+        const int raw = currentPartParameterRaw(
+            static_cast<technox::PartParameter>(selectedParameter));
+        const int shown = raw < 0 || descriptor == nullptr
+            ? 0 : raw + descriptor->displayOffset;
+        line1 = "PART " + juce::String(currentPartDisplayNumber()) + " "
+            + (descriptor != nullptr ? juce::String(descriptor->name) : juce::String("PARAM"));
+        line2 = juce::String(shown) + " " + soundName;
+    } else if (page == EditorPage::editFunctionMenu) {
+        static const char* const menuNames[] = {
+            "Edit Common", "Edit Part", "Edit Drums", "Edit FX1", "Edit FX2",
+            "Edit Arpegg.", "Edit System", "Write/Dump", "Play Demo"
+        };
+        line1 = "EDIT/FUNCTION";
+        line2 = menuNotImplemented ? juce::String("MENU NOT BUILT")
+            : juce::String("<") + juce::String(selectedEditFunction) + "> "
+                + menuNames[juce::jlimit(1, 9, selectedEditFunction) - 1];
+    } else if (page == EditorPage::editSystem) {
+        line1 = "EDIT SYSTEM";
+        line2 = audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+            ? juce::String("MODE: PERFORM")
+            : juce::String("MODE: SEQ MULTI");
+    } else if (mode == technox::PanelOperatingMode::performance) {
+        line1 = "TECHNOX";
+        const int slot = selectedPerformanceForDial() + 1;
+        if (ramPerformanceBank)
+            line2 = "RAM-" + juce::String(slot).paddedLeft('0', 2) + ": EMPTY";
+        else
+            line2 = "ROM-" + juce::String(performanceIndex + 1).paddedLeft('0', 2)
+                + ": " + audioProcessor.getCurrentPerformanceName();
+    } else {
+        line1 = "TECHNOX";
+        if (currentPartDisplayNumber() == 10) {
+            const int kit = juce::jlimit(1, 8, sound + 1);
+            line2 = "10:DRUM" + juce::String(kit).paddedLeft('0', 2);
+        } else {
+            const juce::String bankLetter = bank >= 0 && bank < 4
+                ? juce::String::charToString(static_cast<juce::juce_wchar>('A' + bank))
+                : juce::String("?");
+            // Match the manual's two-row LCD example: "1:A001 _303Lead".
+            line2 = juce::String(currentPartDisplayNumber()) + ":" + bankLetter
+                + juce::String(sound < 0 ? 0 : sound).paddedLeft('0', 3)
+                + " _" + soundName;
+        }
+    }
+
+    // The hardware display is 2 x 16 characters. Keep the original fixed-width
+    // character-cell presentation instead of squeezing extra UI text into it.
+    const juce::Rectangle<float> lcdBounds(236.0f, 44.0f, 236.0f, 48.0f);
+    g.setColour(juce::Colour(0xff75cc56));
+    g.fillRoundedRectangle(lcdBounds, 20.0f);
+    g.setColour(juce::Colour(0xff203b16));
+    g.drawRoundedRectangle(lcdBounds, 20.0f, 1.0f);
+    g.setColour(juce::Colour(0xff142605));
+    g.setFont(juce::Font("Courier New", 13.0f, juce::Font::bold));
+    g.drawText(line1.substring(0, 16), 248, 50, 212, 18, juce::Justification::centredLeft);
+    g.drawText(line2.substring(0, 16), 248, 68, 212, 18, juce::Justification::centredLeft);
+
+    const auto drawPointer = [&g](float x, float value, float radius) {
+        const float angle = juce::degreesToRadians(-135.0f + juce::jlimit(0.0f, 1.0f, value) * 270.0f);
+        const juce::Point<float> c(x, kKnobY);
+        const juce::Point<float> tip(c.x + std::sin(angle) * radius,
+                                     c.y - std::cos(angle) * radius);
+        // Dark underlay separates the indicator from the knob's highlights;
+        // the wider white stroke remains clearly visible at every angle.
+        g.setColour(juce::Colour(0xff08090a));
+        g.drawLine(c.x, c.y, tip.x, tip.y, 5.5f);
+        g.setColour(juce::Colours::white);
+        g.drawLine(c.x, c.y, tip.x, tip.y, 3.5f);
+        g.fillEllipse(tip.x - 2.0f, tip.y - 2.0f, 4.0f, 4.0f);
+    };
+    drawPointer(kParameterX, parameterDialNormalized, 21.0f);
+    drawPointer(kValueX, valueDialNormalized, 21.0f);
+    drawPointer(kVolumeX, audioProcessor.getOutputGain(), 14.0f);
+
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::selectNextParameter(int delta)
+{
+    selectedParameter = juce::jlimit(0, 23, selectedParameter + delta);
+    parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+    syncValueDialFromSelection();
+    repaint();
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::changeSelectedValue(int delta)
+{
+    const auto parameter = static_cast<technox::PartParameter>(selectedParameter);
+    const auto* descriptor = technox::PartEditModel::descriptor(
+        static_cast<std::size_t>(selectedParameter));
+    if (descriptor == nullptr)
+        return;
+
+    const int current = audioProcessor.getPartParameterRaw(
+        audioProcessor.getCurrentProgram(), selectedPart, parameter);
+    if (current < 0)
+        return;
+
+    const int next = juce::jlimit(0, static_cast<int>(descriptor->maximum),
+                                  current + delta);
+    if (audioProcessor.queuePanelPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart, parameter, next))
+        syncValueDialFromSelection();
+    repaint();
+}
+
+technox::PanelOperatingMode
+QuasimidiTechnoXAudioProcessorEditor::panelOperatingMode() const noexcept
+{
+    return audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+        ? technox::PanelOperatingMode::performance
+        : technox::PanelOperatingMode::sequencerMulti;
+}
+
+technox::PanelEditPage
+QuasimidiTechnoXAudioProcessorEditor::panelEditPage() const noexcept
+{
+    switch (page) {
+        case EditorPage::editFunctionMenu: return technox::PanelEditPage::editFunctionMenu;
+        case EditorPage::editPart: return technox::PanelEditPage::editPart;
+        case EditorPage::editSystem: return technox::PanelEditPage::editSystem;
+        case EditorPage::main: default: return technox::PanelEditPage::main;
+    }
+}
+
+int QuasimidiTechnoXAudioProcessorEditor::selectedPerformanceForDial() const noexcept
+{
+    return ramPerformanceBank
+        ? juce::jlimit(0, juce::jmax(0, audioProcessor.getNumPrograms() - 1),
+                       ramPerformanceSelection)
+        : audioProcessor.getCurrentProgram();
+}
+
+int QuasimidiTechnoXAudioProcessorEditor::currentPartParameterRaw(
+    technox::PartParameter parameter) const noexcept
+{
+    if (panelOperatingMode() == technox::PanelOperatingMode::performance)
+        return audioProcessor.getPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart, parameter);
+    if (selectedSequencerPart == 9 && parameter == technox::PartParameter::soundNumber)
+        return audioProcessor.getSequencerDrumSet();
+    return audioProcessor.getSequencerPartParameterRaw(selectedSequencerPart, parameter);
+}
+
+bool QuasimidiTechnoXAudioProcessorEditor::queueCurrentPartParameterRaw(
+    technox::PartParameter parameter, int rawValue) noexcept
+{
+    if (panelOperatingMode() == technox::PanelOperatingMode::performance)
+        return audioProcessor.queuePanelPartParameterRaw(
+            audioProcessor.getCurrentProgram(), selectedPart, parameter, rawValue);
+    if (selectedSequencerPart == 9 && parameter == technox::PartParameter::soundNumber)
+        return audioProcessor.queueSequencerDrumSet(rawValue);
+    return audioProcessor.queueSequencerPartParameterRaw(selectedSequencerPart, parameter, rawValue);
+}
+
+juce::String QuasimidiTechnoXAudioProcessorEditor::currentPartSoundName() const
+{
+    if (panelOperatingMode() == technox::PanelOperatingMode::performance)
+        return audioProcessor.getCurrentPartSoundName(selectedPart);
+    return audioProcessor.getSequencerPartSoundName(selectedSequencerPart);
+}
+
+int QuasimidiTechnoXAudioProcessorEditor::currentPartDisplayNumber() const noexcept
+{
+    return panelOperatingMode() == technox::PanelOperatingMode::performance
+        ? selectedPart + 13 : selectedSequencerPart + 1;
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::syncParameterDialFromSelection() noexcept
+{
+    const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
+    if (page == EditorPage::editPart) {
+        parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+    } else if (page == EditorPage::editFunctionMenu) {
+        parameterDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+    } else if (page == EditorPage::editSystem) {
+        parameterDialNormalized = static_cast<float>(selectedSystemParameter);
+    } else if (panelOperatingMode() == technox::PanelOperatingMode::performance) {
+        parameterDialNormalized = static_cast<float>(selectedPerformanceForDial())
+            / static_cast<float>(maximumProgram);
+    } else {
+        const int bank = currentPartParameterRaw(technox::PartParameter::bankNumber);
+        parameterDialNormalized = bank < 0 ? 0.0f : static_cast<float>(bank) / 3.0f;
+    }
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::syncValueDialFromSelection() noexcept
+{
+    if (page == EditorPage::editPart) {
+        const auto* descriptor = technox::PartEditModel::descriptor(
+            static_cast<std::size_t>(selectedParameter));
+        if (descriptor == nullptr || descriptor->maximum == 0) {
+            valueDialNormalized = 0.0f;
+            return;
+        }
+        const int raw = currentPartParameterRaw(
+            static_cast<technox::PartParameter>(selectedParameter));
+        const int maximum = panelOperatingMode() == technox::PanelOperatingMode::sequencerMulti &&
+            selectedSequencerPart == 9 &&
+            selectedParameter == static_cast<int>(technox::PartParameter::soundNumber)
+                ? 7 : static_cast<int>(descriptor->maximum);
+        valueDialNormalized = raw < 0 ? 0.0f
+            : static_cast<float>(juce::jlimit(0, maximum, raw))
+                / static_cast<float>(maximum);
+    } else if (page == EditorPage::editFunctionMenu) {
+        valueDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+    } else if (page == EditorPage::editSystem) {
+        valueDialNormalized = audioProcessor.getMidiRoutingMode() == MidiRoutingMode::performanceOmni
+            ? 0.0f : 1.0f;
+    } else if (panelOperatingMode() == technox::PanelOperatingMode::performance) {
+        const int maximumProgram = juce::jmax(1, audioProcessor.getNumPrograms() - 1);
+        valueDialNormalized = static_cast<float>(selectedPerformanceForDial())
+            / static_cast<float>(maximumProgram);
+    } else {
+        const int sound = currentPartParameterRaw(technox::PartParameter::soundNumber);
+        const int maximumSound = currentPartDisplayNumber() == 10 ? 7 : 127;
+        valueDialNormalized = sound < 0 ? 0.0f
+            : static_cast<float>(juce::jlimit(0, maximumSound, sound))
+                / static_cast<float>(maximumSound);
+    }
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::syncDialsFromCurrentSelection() noexcept
+{
+    syncParameterDialFromSelection();
+    syncValueDialFromSelection();
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::mouseDown(const juce::MouseEvent& e)
+{
+    dragTarget = DragTarget::none;
+    const auto p = e.getEventRelativeTo(this).position;
+    const auto insideKnob = [&p](float cx, float cy, float radius) {
+        return p.getDistanceFrom(juce::Point<float>(cx, cy)) <= radius;
+    };
+
+    const auto mode = panelOperatingMode();
+    const auto currentPage = panelEditPage();
+
+    if (insideKnob(kVolumeX, kKnobY, 21.0f)) {
+        dragTarget = DragTarget::volume;
+        dragStartY = p.y;
+        volumeDragStartValue = audioProcessor.getOutputGain();
+        return;
+    }
+
+    if (insideKnob(kParameterX, kKnobY, 29.0f)) {
+        const auto action = technox::panelAction(
+            mode, currentPage, technox::PanelAlphaDial::parameterSoundGroup);
+        dragTarget = DragTarget::parameter;
+        dragStartY = p.y;
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance:
+                parameterDragStartIndex = static_cast<float>(selectedPerformanceForDial());
+                break;
+            case technox::PanelControlAction::selectSoundGroup:
+                parameterDragStartIndex = static_cast<float>(juce::jmax(0,
+                    currentPartParameterRaw(technox::PartParameter::bankNumber)));
+                break;
+            case technox::PanelControlAction::selectEditFunction:
+                parameterDragStartIndex = static_cast<float>(selectedEditFunction - 1);
+                break;
+            case technox::PanelControlAction::selectEditParameter:
+                parameterDragStartIndex = static_cast<float>(selectedParameter);
+                break;
+            case technox::PanelControlAction::selectSystemParameter:
+                parameterDragStartIndex = static_cast<float>(selectedSystemParameter);
+                break;
+            default:
+                dragTarget = DragTarget::none;
+                break;
+        }
+        return;
+    }
+
+    if (insideKnob(kValueX, kKnobY, 29.0f)) {
+        const auto action = technox::panelAction(
+            mode, currentPage, technox::PanelAlphaDial::valueSound);
+        dragTarget = DragTarget::value;
+        dragStartY = p.y;
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance:
+                valueDragStartRaw = static_cast<float>(selectedPerformanceForDial());
+                break;
+            case technox::PanelControlAction::selectSingleSound:
+                valueDragStartRaw = static_cast<float>(juce::jmax(0,
+                    currentPartParameterRaw(technox::PartParameter::soundNumber)));
+                break;
+            case technox::PanelControlAction::selectEditFunction:
+                valueDragStartRaw = static_cast<float>(selectedEditFunction - 1);
+                break;
+            case technox::PanelControlAction::selectSystemParameter:
+                valueDragStartRaw = static_cast<float>(selectedSystemParameter);
+                break;
+            case technox::PanelControlAction::editSystemParameter:
+                valueDragStartRaw = audioProcessor.getMidiRoutingMode()
+                    == MidiRoutingMode::performanceOmni ? 0.0f : 1.0f;
+                break;
+            case technox::PanelControlAction::editSelectedParameter:
+                valueDragStartRaw = static_cast<float>(juce::jmax(0,
+                    currentPartParameterRaw(
+                        static_cast<technox::PartParameter>(selectedParameter))));
+                break;
+            default:
+                dragTarget = DragTarget::none;
+                break;
+        }
+        return;
+    }
+
+    // EDIT opens the function menu; OK confirms the highlighted function.
+    if (p.x >= 742 && p.x <= 771 && p.y >= 38 && p.y <= 58) {
+        if (page == EditorPage::main) {
+            page = EditorPage::editFunctionMenu;
+            selectedEditFunction = 2; // Edit Part is currently the main supported page.
+            menuNotImplemented = false;
+        } else if (page == EditorPage::editFunctionMenu) {
+            if (selectedEditFunction == 2) {
+                page = EditorPage::editPart;
+                menuNotImplemented = false;
+            } else if (selectedEditFunction == 7) {
+                page = EditorPage::editSystem;
+                menuNotImplemented = false;
+            } else {
+                menuNotImplemented = true;
+            }
+        } else if (page == EditorPage::editPart) {
+            // OK keeps the selected Part edit page open.
+        } else if (page == EditorPage::editSystem) {
+            // System mode is applied immediately by the VALUE encoder.
+        }
+        syncDialsFromCurrentSelection();
+        repaint();
+        return;
+    }
+
+    if (p.x >= 780 && p.x <= 809 && p.y >= 38 && p.y <= 58) {
+        page = EditorPage::main;
+        menuNotImplemented = false;
+        syncDialsFromCurrentSelection();
+        repaint();
+        return;
+    }
+
+    if (p.y >= 82 && p.y <= 101 && p.x >= 742 && p.x <= 809) {
+        const auto key = p.x < 776
+            ? technox::PanelKey::partBankPrevious
+            : technox::PanelKey::partBankNext;
+        const auto action = technox::panelAction(mode, currentPage, key);
+        if (action == technox::PanelControlAction::switchPerformanceBank) {
+            // ROM has the 50 verified factory Performances. A RAM Performance
+            // image is not embedded yet, so expose the bank honestly as empty.
+            ramPerformanceBank = p.x >= 776.0f;
+            ramPerformanceSelection = audioProcessor.getCurrentProgram();
+            syncDialsFromCurrentSelection();
+        } else if (action == technox::PanelControlAction::selectPart) {
+            // Performance memories store four Parts (13–16); Sequencer
+            // Multi has its own independent selector for Parts 1–16.
+            if (mode == technox::PanelOperatingMode::performance) {
+                selectedPart = juce::jlimit(0, 3,
+                    selectedPart + (p.x < 776 ? -1 : 1));
+            } else {
+                selectedSequencerPart = juce::jlimit(0, 15,
+                    selectedSequencerPart + (p.x < 776 ? -1 : 1));
+            }
+            syncDialsFromCurrentSelection();
+        }
+        repaint();
+    }
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::mouseDrag(const juce::MouseEvent& e)
+{
+    if (dragTarget == DragTarget::none || !e.mods.isLeftButtonDown())
+        return;
+    updateFromDrag(e.getEventRelativeTo(this).position.y);
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
+{
+    const auto completedTarget = dragTarget;
+    dragTarget = DragTarget::none;
+
+    if (completedTarget == DragTarget::parameter || completedTarget == DragTarget::value) {
+        // Performance and Edit Function use both dials to select the same item:
+        // only the active pointer moves during the gesture, then both indicators
+        // settle on the selected Performance/function after release.
+        if ((page == EditorPage::main &&
+             panelOperatingMode() == technox::PanelOperatingMode::performance) ||
+            page == EditorPage::editFunctionMenu) {
+            syncDialsFromCurrentSelection();
+        } else if (page == EditorPage::editPart) {
+            // In Part Edit, PARAMETER selects a field and VALUE follows that field.
+            syncValueDialFromSelection();
+        } else if (completedTarget == DragTarget::value) {
+            syncValueDialFromSelection();
+        }
+    }
+}
+
+void QuasimidiTechnoXAudioProcessorEditor::updateFromDrag(float y)
+{
+    const float delta = (dragStartY - y) / 2.5f;
+    if (dragTarget == DragTarget::volume) {
+        audioProcessor.setOutputGain(volumeDragStartValue + delta / 100.0f);
+        repaint();
+        return;
+    }
+
+    const auto mode = panelOperatingMode();
+    const auto currentPage = panelEditPage();
+    const int maximumProgram = juce::jmax(0, audioProcessor.getNumPrograms() - 1);
+
+    if (dragTarget == DragTarget::parameter) {
+        const auto action = technox::panelAction(
+            mode, currentPage, technox::PanelAlphaDial::parameterSoundGroup);
+        const int next = static_cast<int>(std::lround(parameterDragStartIndex + delta));
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance: {
+                const int selection = juce::jlimit(0, maximumProgram, next);
+                if (ramPerformanceBank)
+                    ramPerformanceSelection = selection;
+                else {
+                    audioProcessor.setCurrentProgram(selection);
+                    lastPerformanceIndex = selection;
+                }
+                parameterDialNormalized = maximumProgram > 0
+                    ? static_cast<float>(selection) / static_cast<float>(maximumProgram) : 0.0f;
+                break;
+            }
+            case technox::PanelControlAction::selectSoundGroup: {
+                const int bank = juce::jlimit(0, 3, next);
+                if (queueCurrentPartParameterRaw(technox::PartParameter::bankNumber, bank))
+                    parameterDialNormalized = static_cast<float>(bank) / 3.0f;
+                break;
+            }
+            case technox::PanelControlAction::selectEditFunction:
+                selectedEditFunction = juce::jlimit(1, 9, next + 1);
+                menuNotImplemented = false;
+                parameterDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+                break;
+            case technox::PanelControlAction::selectEditParameter:
+                selectedParameter = juce::jlimit(0, 23, next);
+                parameterDialNormalized = static_cast<float>(selectedParameter) / 23.0f;
+                break;
+            case technox::PanelControlAction::selectSystemParameter:
+                selectedSystemParameter = 0; // Mode is the first supported System item.
+                parameterDialNormalized = 0.0f;
+                break;
+            default:
+                break;
+        }
+    } else if (dragTarget == DragTarget::value) {
+        const auto action = technox::panelAction(
+            mode, currentPage, technox::PanelAlphaDial::valueSound);
+        const int next = static_cast<int>(std::lround(valueDragStartRaw + delta));
+        switch (action) {
+            case technox::PanelControlAction::selectPerformance: {
+                const int selection = juce::jlimit(0, maximumProgram, next);
+                if (ramPerformanceBank)
+                    ramPerformanceSelection = selection;
+                else {
+                    audioProcessor.setCurrentProgram(selection);
+                    lastPerformanceIndex = selection;
+                }
+                valueDialNormalized = maximumProgram > 0
+                    ? static_cast<float>(selection) / static_cast<float>(maximumProgram) : 0.0f;
+                break;
+            }
+            case technox::PanelControlAction::selectSingleSound: {
+                const int maximumSound = currentPartDisplayNumber() == 10 ? 7 : 127;
+                const int sound = juce::jlimit(0, maximumSound, next);
+                if (queueCurrentPartParameterRaw(technox::PartParameter::soundNumber, sound))
+                    valueDialNormalized = static_cast<float>(sound)
+                        / static_cast<float>(maximumSound);
+                break;
+            }
+            case technox::PanelControlAction::selectEditFunction:
+                selectedEditFunction = juce::jlimit(1, 9, next + 1);
+                menuNotImplemented = false;
+                valueDialNormalized = static_cast<float>(selectedEditFunction - 1) / 8.0f;
+                break;
+            case technox::PanelControlAction::editSystemParameter: {
+                const int selectedMode = juce::jlimit(0, 1, next);
+                audioProcessor.setMidiRoutingMode(selectedMode == 0
+                    ? MidiRoutingMode::performanceOmni : MidiRoutingMode::partChannels);
+                lastRoutingMode = audioProcessor.getMidiRoutingMode();
+                selectedPart = 0;
+                selectedSequencerPart = 0;
+                valueDialNormalized = static_cast<float>(selectedMode);
+                break;
+            }
+            case technox::PanelControlAction::editSelectedParameter: {
+                const auto* descriptor = technox::PartEditModel::descriptor(
+                    static_cast<std::size_t>(selectedParameter));
+                if (descriptor != nullptr) {
+                    const int maximum = mode == technox::PanelOperatingMode::sequencerMulti &&
+                        selectedSequencerPart == 9 &&
+                        selectedParameter == static_cast<int>(technox::PartParameter::soundNumber)
+                            ? 7 : static_cast<int>(descriptor->maximum);
+                    const int value = juce::jlimit(0, maximum, next);
+                    if (queueCurrentPartParameterRaw(
+                            static_cast<technox::PartParameter>(selectedParameter), value)) {
+                        valueDialNormalized = maximum > 0
+                            ? static_cast<float>(value) / static_cast<float>(maximum) : 0.0f;
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    repaint();
+}
