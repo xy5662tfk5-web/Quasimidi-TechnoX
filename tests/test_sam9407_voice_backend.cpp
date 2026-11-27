@@ -367,6 +367,40 @@ int main() {
     // Outside both special regions, the full-range fallback stays active.
     assert(renderZonedFirstSample(48, 80) > 0.03f);
 
+    // Mono/legato retargeting within the same program must reselect a
+    // key zone even though the backend does not receive a second noteOn().
+    SAM9407VoiceBackend legatoZoneBackend;
+    SAM9407SampleMapEntry legatoFull{};
+    legatoFull.bank = 0;
+    legatoFull.program = 0;
+    legatoFull.startWord = 0;
+    legatoFull.endWord = 2;
+    legatoFull.sampleRate = 44100;
+    legatoFull.rootNote = 60;
+    legatoFull.gain = 127;
+    assert(legatoZoneBackend.addSampleMapping(legatoFull));
+    auto legatoKeyZone = legatoFull;
+    legatoKeyZone.keyLow = 60;
+    legatoKeyZone.keyHigh = 72;
+    legatoKeyZone.startWord = 2;
+    legatoKeyZone.endWord = 4;
+    assert(legatoZoneBackend.addSampleMapping(legatoKeyZone));
+    legatoZoneBackend.setWaveformMemoryView(&zonedMemory);
+    MASSAudioEngine legatoZoneEngine(&legatoZoneBackend);
+    legatoZoneEngine.prepare(44100.0, 8);
+    assert(legatoZoneEngine.setPartParameter(0, PartParameter::level, 127));
+    assert(legatoZoneEngine.setPartParameter(0, PartParameter::trackMode, 2));
+    std::array<float, 2> legatoZoneLeft{}, legatoZoneRight{};
+    float* legatoZoneChannels[] = {legatoZoneLeft.data(), legatoZoneRight.data()};
+    legatoZoneEngine.noteOn(0, 1, 48, 80);
+    legatoZoneEngine.render(legatoZoneChannels, 2, 1);
+    assert(legatoZoneLeft[0] > 0.03f);
+    legatoZoneLeft.fill(0.0f);
+    legatoZoneRight.fill(0.0f);
+    legatoZoneEngine.noteOn(0, 1, 64, 80);
+    legatoZoneEngine.render(legatoZoneChannels, 2, 1);
+    assert(legatoZoneLeft[0] < -0.05f);
+
     // An identical region is replaced rather than duplicated.
     SAM9407VoiceBackend replacementBackend;
     SAM9407SampleMapEntry replacement{};
