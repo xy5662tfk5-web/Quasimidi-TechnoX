@@ -37,6 +37,14 @@ Rhythm Lab lists a separate set of **94 drum samples recorded from a Quasimidi T
 
 A separate public drum archive also lists 94 Technox-labeled WAVs, but its listing likewise does not claim to expose the raw instrument ROM: [KB6 free drum samples](https://samples.kb6.de/downloads_en.php).
 
+## Additional public TechnoX drum recordings
+
+A second public listing exists at [KB6 Free Drum Samples](https://samples.kb6.de/downloads_en.php): its catalog entry 213 is Quasimidi Technox, 94 WAV drum samples, 14,269 KB. The archive FAQ says its samples are offered free for personal use and may not be sold, resold or commercially redistributed. Treat it as another reference recording set, not ROM data. Do not bundle or redistribute it in the plugin or repository.
+
+A separate [Drum Machine Collection listing](https://drum-machine.app/archive-player.html?q=Techno) exposes the same 94 instrument-named recordings and says its source is Internet Archive. The listing labels the collection as downloadable individual samples/ZIP, but neither listing establishes the raw sample-memory image, factory sample addresses, pitch zones or the complete melodic instrument library.
+
+The public MAME TechnoX set remains only two controller firmware ROMs (IC4 and IC51); no waveform image is listed. This is why public sample recordings can support listening checks but cannot close the raw-memory acquisition gate.
+
 ## Integrity inspection
 
 Run the evidence-first inspector against each candidate image:
