@@ -187,12 +187,66 @@ def inspect_bank(path: str) -> Dict[str, Any]:
     }
 
 
+
+def extract_sample_payload(bank_path: str, output_path: str) -> Dict[str, Any]:
+    """Extract the opaque SAMP bytes without interpreting or converting them."""
+    report = inspect_bank(bank_path)
+    sample = report["sample_payload"]
+    source_real = os.path.realpath(bank_path)
+    output_real = os.path.realpath(output_path)
+    if source_real == output_real:
+        raise Dream94BFormatError("SAMP output must not overwrite the source bank")
+
+    output_parent = os.path.dirname(output_real) or "."
+    if not os.path.isdir(output_parent):
+        raise Dream94BFormatError("SAMP output directory does not exist")
+
+    temporary_path = output_real + ".tmp"
+    digest = hashlib.sha256()
+    remaining = sample["size"]
+    try:
+        with open(bank_path, "rb") as source, open(temporary_path, "wb") as target:
+            source.seek(sample["offset"])
+            while remaining:
+                block = source.read(min(remaining, SAMPLE_READ_SIZE))
+                if not block:
+                    raise Dream94BFormatError(
+                        f"truncated SAMP payload during extraction: {remaining} bytes missing"
+                    )
+                target.write(block)
+                digest.update(block)
+                remaining -= len(block)
+
+        extracted_sha256 = digest.hexdigest()
+        if extracted_sha256 != sample["sha256"]:
+            raise Dream94BFormatError(
+                "SAMP payload changed between inspection and extraction"
+            )
+        os.replace(temporary_path, output_real)
+    except Exception:
+        try:
+            os.remove(temporary_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+    return {
+        "output": output_real,
+        "size": sample["size"],
+        "sha256": extracted_sha256,
+        "audio_decoded": False,
+        "technox_compatibility_verified": False,
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Validate Dream .94B chunk structure (no PCM decoding)."
     )
     parser.add_argument("bank", help="path to a .94B candidate bank")
     parser.add_argument("--json", action="store_true", help="emit JSON report")
+    parser.add_argument("--extract-samp", metavar="PATH",
+                        help="extract opaque SAMP bytes; does not decode audio")
     args = parser.parse_args(argv)
 
     try:
@@ -200,6 +254,15 @@ def main(argv=None) -> int:
     except (OSError, Dream94BFormatError) as exc:
         print(f"94B inspection failed: {exc}", file=sys.stderr)
         return 2
+
+    if args.extract_samp:
+        try:
+            report["sample_payload"]["extraction"] = extract_sample_payload(
+                args.bank, args.extract_samp
+            )
+        except (OSError, Dream94BFormatError) as exc:
+            print(f"94B SAMP extraction failed: {exc}", file=sys.stderr)
+            return 2
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
@@ -214,6 +277,8 @@ def main(argv=None) -> int:
             )
         sample = report["sample_payload"]
         print(f"SAMP SHA-256: {sample['sha256']}")
+        if args.extract_samp:
+            print(f"SAMP extracted (opaque bytes): {args.extract_samp}")
         print("Structural validation only; no audio decoding or TechnoX mapping.")
     return 0
 
