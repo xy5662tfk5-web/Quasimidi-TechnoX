@@ -62,6 +62,7 @@ public:
                 SAM9407ExternalMemoryBus::kAddressSpaceWordCount ||
             entry.sampleRate < 4000u || entry.sampleRate > 192000u ||
             entry.rootNote > 127u || entry.gain > 127u || entry.pan > 127u ||
+            entry.keyHigh > 127u || entry.velocityHigh > 127u ||
             entry.keyLow > entry.keyHigh || entry.velocityLow > entry.velocityHigh ||
             entry.tuneCents < -1200 || entry.tuneCents > 1200)
             return false;
