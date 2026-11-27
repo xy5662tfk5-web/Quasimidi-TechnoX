@@ -87,8 +87,10 @@ class SampleBankBuilderTests(unittest.TestCase):
 
     def test_rejects_program_overflow(self):
         write_wav(self.source / "one.wav", 1, 2, 44100, [100])
+        write_wav(self.source / "two.wav", 1, 2, 44100, [200])
+        # Program 255 is a valid starting index, but two files cannot fit.
         with self.assertRaisesRegex(SampleBankBuildError, "do not fit"):
-            build_sample_bank(self.source, self.raw, self.mapping, start_program=256)
+            build_sample_bank(self.source, self.raw, self.mapping, start_program=255)
 
     def test_rejects_three_channels(self):
         path = self.source / "three.wav"
