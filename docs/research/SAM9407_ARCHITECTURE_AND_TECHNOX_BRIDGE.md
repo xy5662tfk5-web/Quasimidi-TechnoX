@@ -53,6 +53,12 @@ This is useful as a **generic semantic cross-check**: a SAM9407 voice model shou
 
 The EWS64 reference driver is also from another SAM9407-based product. Its firmware and `.94B` sound banks can be useful for studying generic SAM9407 memory loading and software architecture, but they are not TechnoX's reported waveform bank and cannot substitute for TechnoX's original IC51/DSP resources. See the [EWS64 hardware/software notes](https://vogonswiki.com/index.php/EWS64).
 
+## Program-region map support
+
+The optional external `technox-sam9407-map-v1` JSON map now accepts `key_low`, `key_high`, `velocity_low` and `velocity_high`. Omitted fields retain the previous full 0–127 range. Multiple entries may share a bank/program when their region bounds differ. At Note On the sample renderer selects the matching region with the smallest key-range × velocity-range area; ties prefer narrower key range, then narrower velocity range, then stable insertion order. A repeated identical region replaces the previous entry.
+
+This is generic sample-bank playback infrastructure only. It does not infer key zones from IC51 command streams, establish the factory sample map, or prove the physical TechnoX DSP identity. The actual factory region/address map remains unavailable.
+
 ## Architecture-level implementation boundary
 
 The implementation should be separated into independent components:
