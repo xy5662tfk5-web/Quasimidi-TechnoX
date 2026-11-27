@@ -327,7 +327,7 @@ int main() {
         SAM9407VoiceBackend zonedBackend;
         SAM9407SampleMapEntry fullRange{};
         fullRange.bank = 0;
-        fullRange.program = 7;
+        fullRange.program = 0; // MASSAudioEngine test Part defaults to program 0.
         fullRange.startWord = 0;
         fullRange.endWord = 2;
         fullRange.sampleRate = 44100;
