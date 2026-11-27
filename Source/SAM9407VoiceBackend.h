@@ -3,6 +3,7 @@
 #include "MASSAudioEngine.h"
 #include "MASSOriginalVoiceProgramRuntime.h"
 #include "MASSWaveformMemoryView.h"
+#include "SAM9407ExternalMemoryBus.h"
 
 #include <algorithm>
 #include <array>
@@ -110,6 +111,18 @@ public:
         if (waveformMemory_ == view)
             return;
         waveformMemory_ = view;
+        externalMemoryBus_.clear();
+        if (view != nullptr && view->isAttached() &&
+            (view->sizeInBytes() & 1u) == 0u) {
+            // Existing maps express absolute word addresses in this image.
+            // Until a board-derived physical base is available, preserve that
+            // contract as a PCM-ROM window beginning at address zero.
+            const auto words = view->sizeInBytes() / 2u;
+            if (words <= SAM9407ExternalMemoryBus::kAddressSpaceWordCount)
+                (void) externalMemoryBus_.addReadOnlyRegion(
+                    0u, static_cast<std::uint32_t>(words),
+                    SAM9407MemoryDevice::pcmRom, *view);
+        }
         // A newly attached/detached memory view changes whether an existing
         // bank/program can be resolved. Force one rebind on the next render.
         for (auto& state : voices_)
@@ -254,6 +267,7 @@ private:
     std::array<VoiceState, VoiceManager::kVoiceCount> voices_{};
     MASSOriginalVoiceProgramRuntime programRuntime_{};
     const MASSWaveformMemoryView* waveformMemory_ = nullptr;
+    SAM9407ExternalMemoryBus externalMemoryBus_{};
     double hostSampleRate_ = 44100.0;
 
     static bool validVoice(int index) noexcept {
@@ -275,18 +289,10 @@ private:
         state.mappingChecked = true;
         state.bank = slot.bankNumber;
         state.program = slot.soundNumber;
-        if (waveformMemory_ == nullptr || !waveformMemory_->isAttached())
-            return;
         const auto* mapping = findMapping(slot.bankNumber, slot.soundNumber);
-        if (mapping == nullptr)
-            return;
-
-        const std::uint64_t byteStart =
-            static_cast<std::uint64_t>(mapping->startWord) * 2u;
-        const std::uint64_t byteEnd =
-            static_cast<std::uint64_t>(mapping->endWord) * 2u;
-        if (byteEnd > waveformMemory_->sizeInBytes() ||
-            byteStart >= byteEnd)
+        if (mapping == nullptr ||
+            !externalMemoryBus_.containsReadableRange(
+                mapping->startWord, mapping->endWord))
             return;
 
         state.mapping = *mapping;
@@ -297,20 +303,14 @@ private:
     bool readSampleWord(
         std::uint32_t wordAddress, const SAM9407SampleMapEntry& mapping,
         float& value) const noexcept {
-        if (waveformMemory_ == nullptr)
+        std::uint16_t bits = 0;
+        if (!externalMemoryBus_.readWord(
+                wordAddress, SAM9407MemoryCycle::synthesisAccess, bits))
             return false;
-        const std::uint64_t byteAddress =
-            static_cast<std::uint64_t>(wordAddress) * 2u;
-        if (byteAddress + 1u >= waveformMemory_->sizeInBytes())
-            return false;
-        std::uint8_t first = 0, second = 0;
-        if (!waveformMemory_->readByte(static_cast<std::size_t>(byteAddress), first) ||
-            !waveformMemory_->readByte(static_cast<std::size_t>(byteAddress + 1u), second))
-            return false;
-        const std::uint16_t bits =
-            mapping.byteOrder == SAM9407SampleByteOrder::littleEndian
-                ? static_cast<std::uint16_t>(first | (static_cast<std::uint16_t>(second) << 8))
-                : static_cast<std::uint16_t>((static_cast<std::uint16_t>(first) << 8) | second);
+        if (mapping.byteOrder == SAM9407SampleByteOrder::bigEndian) {
+            bits = static_cast<std::uint16_t>(
+                (bits << 8) | (bits >> 8));
+        }
         const auto signedValue = static_cast<std::int16_t>(bits);
         value = static_cast<float>(signedValue) / 32768.0f;
         return true;

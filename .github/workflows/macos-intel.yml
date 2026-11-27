@@ -37,6 +37,8 @@ jobs:
         run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_sam9407_bootstrap_receiver.cpp -o /tmp/test_sam9407_bootstrap && /tmp/test_sam9407_bootstrap
       - name: Compile and test SAM9407 sample voice backend (C++17)
         run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_sam9407_voice_backend.cpp -o /tmp/test_sam9407_voice_backend && /tmp/test_sam9407_voice_backend
+      - name: Compile and test SAM9407 external memory bus (C++17)
+        run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_sam9407_external_memory_bus.cpp -o /tmp/test_sam9407_memory_bus && /tmp/test_sam9407_memory_bus
       - name: Compile and test panel edit mailbox (C++17)
         run: c++ -std=c++17 -Wall -Wextra -pedantic -UNDEBUG tests/test_panel_control_events.cpp -o /tmp/test_panel_control_events && /tmp/test_panel_control_events
       - name: Compile and test manual-based panel control map (C++17)
@@ -153,7 +155,7 @@ jobs:
         run: cmake --build build --config Release --parallel 4
       - name: Build and run Intel C++ regression tests
         run: |
-          cmake --build build --config Release --parallel 4 --target technox_mcs51_core_tests technox_8032_machine_tests technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests technox_panel_control_events_tests technox_panel_gpio_input_tests technox_panel_control_map_tests technox_firmware_panel_events_tests technox_sam9407_bootstrap_tests technox_sam9407_voice_backend_tests
+          cmake --build build --config Release --parallel 4 --target technox_mcs51_core_tests technox_8032_machine_tests technox_firmware_transaction_tests technox_mass_resource_rom_tests technox_basic_audio_backend_tests technox_panel_control_events_tests technox_panel_gpio_input_tests technox_panel_control_map_tests technox_firmware_panel_events_tests technox_sam9407_bootstrap_tests technox_sam9407_voice_backend_tests technox_sam9407_memory_bus_tests
           ctest --test-dir build -C Release --output-on-failure
       - name: Verify Catalina (10.15) deployment target
         run: |
