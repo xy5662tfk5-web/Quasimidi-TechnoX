@@ -231,6 +231,8 @@ bool QuasimidiTechnoXAudioProcessor::loadSAM9407SampleMapFile(const juce::File& 
         std::int64_t bank = 0, program = 0, start = 0, end = 0;
         std::int64_t sampleRate = 44100, rootNote = 60, tuneCents = 0;
         std::int64_t gain = 127, pan = 64, loopStart = 0, loopEnd = 0;
+        std::int64_t keyLow = 0, keyHigh = 127;
+        std::int64_t velocityLow = 0, velocityHigh = 127;
         if (!readInteger(*object, "bank", bank) ||
             !readInteger(*object, "program", program) ||
             !readInteger(*object, "start_word", start) ||
@@ -248,6 +250,10 @@ bool QuasimidiTechnoXAudioProcessor::loadSAM9407SampleMapFile(const juce::File& 
             !optionalInteger("tune_cents", tuneCents) ||
             !optionalInteger("gain", gain) ||
             !optionalInteger("pan", pan) ||
+            !optionalInteger("key_low", keyLow) ||
+            !optionalInteger("key_high", keyHigh) ||
+            !optionalInteger("velocity_low", velocityLow) ||
+            !optionalInteger("velocity_high", velocityHigh) ||
             !optionalInteger("loop_start_word", loopStart) ||
             !optionalInteger("loop_end_word", loopEnd))
             return false;
@@ -261,6 +267,9 @@ bool QuasimidiTechnoXAudioProcessor::loadSAM9407SampleMapFile(const juce::File& 
             rootNote < 0 || rootNote > 127 ||
             tuneCents < -1200 || tuneCents > 1200 ||
             gain < 0 || gain > 127 || pan < 0 || pan > 127 ||
+            keyLow < 0 || keyLow > 127 || keyHigh < keyLow || keyHigh > 127 ||
+            velocityLow < 0 || velocityLow > 127 ||
+            velocityHigh < velocityLow || velocityHigh > 127 ||
             loopStart < 0 || loopEnd < 0)
             return false;
 
@@ -271,6 +280,10 @@ bool QuasimidiTechnoXAudioProcessor::loadSAM9407SampleMapFile(const juce::File& 
         entry.tuneCents = static_cast<std::int16_t>(tuneCents);
         entry.gain = static_cast<std::uint8_t>(gain);
         entry.pan = static_cast<std::uint8_t>(pan);
+        entry.keyLow = static_cast<std::uint8_t>(keyLow);
+        entry.keyHigh = static_cast<std::uint8_t>(keyHigh);
+        entry.velocityLow = static_cast<std::uint8_t>(velocityLow);
+        entry.velocityHigh = static_cast<std::uint8_t>(velocityHigh);
         entry.loopStartWord = static_cast<std::uint32_t>(loopStart);
         entry.loopEndWord = static_cast<std::uint32_t>(loopEnd);
 
