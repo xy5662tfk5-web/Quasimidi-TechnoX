@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from inspect_dream_94b_bank import (  # noqa: E402
     Dream94BFormatError,
+    extract_sample_payload,
     inspect_bank,
 )
 
@@ -121,6 +122,45 @@ class Dream94BInspectorTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(report["bank_identifier"], "GMSBK040")
         self.assertFalse(report["audio_decoded"])
+
+
+    def test_extracts_opaque_samp_payload_byte_exactly(self):
+        source = self.write(valid_bank())
+        output = self.root / "extracted-samp.bin"
+        result = extract_sample_payload(source, str(output))
+        expected = b"\\x00\\x7f\\x80\\xff\\x10"
+        self.assertEqual(output.read_bytes(), expected)
+        self.assertEqual(result["size"], len(expected))
+        self.assertEqual(result["sha256"], hashlib.sha256(expected).hexdigest())
+        self.assertFalse(result["audio_decoded"])
+        self.assertFalse(result["technox_compatibility_verified"])
+
+    def test_extraction_refuses_to_overwrite_source(self):
+        source = self.write(valid_bank())
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(Dream94BFormatError, "must not overwrite"):
+            extract_sample_payload(source, source)
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_extraction_requires_existing_output_directory(self):
+        source = self.write(valid_bank())
+        output = self.root / "missing" / "samp.bin"
+        with self.assertRaisesRegex(Dream94BFormatError, "directory does not exist"):
+            extract_sample_payload(source, str(output))
+        self.assertFalse(output.exists())
+
+    def test_cli_extracts_samp_and_reports_opaque_status(self):
+        source = self.write(valid_bank())
+        output = self.root / "cli-samp.bin"
+        script = Path(__file__).resolve().parents[1] / "tools" / "inspect_dream_94b_bank.py"
+        result = subprocess.run(
+            [sys.executable, str(script), source, "--extract-samp", str(output), "--json"],
+            check=False, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(output.read_bytes(), b"\\x00\\x7f\\x80\\xff\\x10")
+        self.assertFalse(report["sample_payload"]["extraction"]["audio_decoded"])
 
 
 if __name__ == "__main__":
