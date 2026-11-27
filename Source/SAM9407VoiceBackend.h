@@ -201,7 +201,9 @@ public:
 
             if (!state.mappingChecked ||
                 state.bank != slot.bankNumber ||
-                state.program != slot.soundNumber)
+                state.program != slot.soundNumber ||
+                state.note != slot.note ||
+                state.velocity != slot.velocity)
                 bindVoice(static_cast<int>(voiceIndex), slot);
 
             if (!state.active || waveformMemory_ == nullptr)
@@ -270,6 +272,8 @@ private:
         bool mappingChecked = false;
         std::uint8_t bank = 0;
         std::uint8_t program = 0;
+        std::uint8_t note = 0;
+        std::uint8_t velocity = 0;
         double position = 0.0;
         SAM9407SampleMapEntry mapping{};
     };
@@ -324,6 +328,8 @@ private:
         state.mappingChecked = true;
         state.bank = slot.bankNumber;
         state.program = slot.soundNumber;
+        state.note = slot.note;
+        state.velocity = slot.velocity;
         const auto* mapping = findMapping(slot.bankNumber, slot.soundNumber,
                                            slot.note, slot.velocity);
         if (mapping == nullptr ||
