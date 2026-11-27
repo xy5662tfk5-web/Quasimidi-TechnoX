@@ -385,6 +385,12 @@ int main() {
     legatoKeyZone.startWord = 2;
     legatoKeyZone.endWord = 4;
     assert(legatoZoneBackend.addSampleMapping(legatoKeyZone));
+    auto legatoVelocityZone = legatoFull;
+    legatoVelocityZone.velocityLow = 100;
+    legatoVelocityZone.velocityHigh = 127;
+    legatoVelocityZone.startWord = 4;
+    legatoVelocityZone.endWord = 6;
+    assert(legatoZoneBackend.addSampleMapping(legatoVelocityZone));
     legatoZoneBackend.setWaveformMemoryView(&zonedMemory);
     MASSAudioEngine legatoZoneEngine(&legatoZoneBackend);
     legatoZoneEngine.prepare(44100.0, 8);
@@ -400,6 +406,11 @@ int main() {
     legatoZoneEngine.noteOn(0, 1, 64, 80);
     legatoZoneEngine.render(legatoZoneChannels, 2, 1);
     assert(legatoZoneLeft[0] < -0.05f);
+    legatoZoneLeft.fill(0.0f);
+    legatoZoneRight.fill(0.0f);
+    legatoZoneEngine.noteOn(0, 1, 48, 120);
+    legatoZoneEngine.render(legatoZoneChannels, 2, 1);
+    assert(legatoZoneLeft[0] > 0.15f);
 
     // An identical region is replaced rather than duplicated.
     SAM9407VoiceBackend replacementBackend;
